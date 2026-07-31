@@ -1,0 +1,55 @@
+# Прод/стейджинг. Требует .env рядом (см. RUNBOOK.md):
+#   IMAGE_TAG, DOMAIN, DATABASE_URL (managed PostgreSQL), REDIS_URL,
+#   S3_* , SMTP_* / DASHAMAIL_* (по фазам).
+# PostgreSQL в проде — управляемый (Timeweb Cloud/Selectel DBaaS), в compose его нет.
+
+name: gramota
+
+services:
+  api:
+    image: ghcr.io/OWNER/gramota-server:${IMAGE_TAG:-latest}
+    restart: always
+    env_file: .env
+    depends_on:
+      - redis
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://localhost:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # worker включится в Фазе 2 (генерация PDF):
+  # worker:
+  #   image: ghcr.io/OWNER/gramota-server:${IMAGE_TAG:-latest}
+  #   command: node dist/worker.js
+  #   restart: always
+  #   env_file: .env
+  #   mem_limit: 2g
+  #   depends_on:
+  #     - redis
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    volumes:
+      - redis-data:/data
+    command: ['redis-server', '--appendonly', 'yes']
+
+  web:
+    image: ghcr.io/OWNER/gramota-web:${IMAGE_TAG:-latest}
+    restart: always
+    environment:
+      DOMAIN: ${DOMAIN}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - api
+
+volumes:
+  redis-data:
+  caddy-data:
+  caddy-config:

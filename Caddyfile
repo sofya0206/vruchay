@@ -1,0 +1,17 @@
+# DOMAIN задаётся переменной окружения контейнера caddy (например app.example.ru).
+# Для локальной проверки прод-сборки: DOMAIN=localhost:8080 — Caddy отдаст http.
+{$DOMAIN} {
+	encode gzip
+
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+	handle /health {
+		reverse_proxy api:3000
+	}
+	handle {
+		root * /srv/www
+		try_files {path} /index.html
+		file_server
+	}
+}

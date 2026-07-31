@@ -1,0 +1,49 @@
+// Схема данных. Мультитенантность: почти всё принадлежит организации (orgId).
+// Фаза 0: ядро auth. Остальные модели добавляются по фазам плана.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id        String      @id @default(uuid()) @db.Uuid
+  name      String
+  createdAt DateTime    @default(now()) @map("created_at")
+  members   OrgMember[]
+
+  @@map("organizations")
+}
+
+model User {
+  id           String      @id @default(uuid()) @db.Uuid
+  email        String      @unique
+  passwordHash String      @map("password_hash")
+  name         String      @default("")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  memberships  OrgMember[]
+
+  @@map("users")
+}
+
+enum OrgRole {
+  owner
+  admin
+  member
+}
+
+model OrgMember {
+  orgId  String  @map("org_id") @db.Uuid
+  userId String  @map("user_id") @db.Uuid
+  role   OrgRole @default(member)
+
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([orgId, userId])
+  @@map("org_members")
+}
