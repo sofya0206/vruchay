@@ -1,0 +1,143 @@
+@import 'tailwindcss';
+
+/*
+ * Палитра взята из предметной области, а не из стандартной SaaS-темы:
+ * лавр — цвет наградного венка, латунь — цвет медали и печати,
+ * нейтрали уведены в тёплую бумагу, потому что продукт про документы.
+ * Стилизуем только через токены: тогда тёмная тема получается переопределением
+ * значений, а не дублированием правил.
+ */
+@theme {
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-serif: Georgia, 'Iowan Old Style', 'Palatino Linotype', 'Times New Roman', serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+
+  --color-laurel-50: #eef6f1;
+  --color-laurel-100: #d6ebdf;
+  --color-laurel-300: #7cb99a;
+  --color-laurel-600: #1f5d3f;
+  --color-laurel-700: #17492f;
+  --color-brass-100: #f6ecd9;
+  --color-brass-600: #b08341;
+  --color-brass-700: #8e6733;
+}
+
+:root {
+  --ground: #fbfaf7;
+  --surface: #ffffff;
+  --surface-sunken: #f2f1ec;
+  --line: #e3e1da;
+  --line-strong: #cfccc2;
+  --text: #16211c;
+  --text-muted: #5f6b64;
+  --accent: #1f5d3f;
+  --accent-hover: #17492f;
+  --accent-soft: #eef6f1;
+  --accent-contrast: #ffffff;
+  --award: #b08341;
+  --award-soft: #f6ecd9;
+  --danger: #a3302a;
+  --danger-soft: #fbeceb;
+  --focus: #2e8257;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #10150f;
+    --surface: #182018;
+    --surface-sunken: #0b0f0a;
+    --line: #2a352b;
+    --line-strong: #3d4b3e;
+    --text: #e9ece7;
+    --text-muted: #97a399;
+    --accent: #4fa97a;
+    --accent-hover: #63bd8d;
+    --accent-soft: #17291f;
+    --accent-contrast: #0b120c;
+    --award: #d0a45f;
+    --award-soft: #2a2216;
+    --danger: #e08a83;
+    --danger-soft: #2c1917;
+    --focus: #63bd8d;
+  }
+}
+
+/* Ручное переключение темы должно перебивать системную настройку в обе стороны. */
+:root[data-theme='light'] {
+  color-scheme: light;
+  --ground: #fbfaf7;
+  --surface: #ffffff;
+  --surface-sunken: #f2f1ec;
+  --line: #e3e1da;
+  --line-strong: #cfccc2;
+  --text: #16211c;
+  --text-muted: #5f6b64;
+  --accent: #1f5d3f;
+  --accent-hover: #17492f;
+  --accent-soft: #eef6f1;
+  --accent-contrast: #ffffff;
+  --award: #b08341;
+  --award-soft: #f6ecd9;
+  --danger: #a3302a;
+  --danger-soft: #fbeceb;
+  --focus: #2e8257;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --ground: #10150f;
+  --surface: #182018;
+  --surface-sunken: #0b0f0a;
+  --line: #2a352b;
+  --line-strong: #3d4b3e;
+  --text: #e9ece7;
+  --text-muted: #97a399;
+  --accent: #4fa97a;
+  --accent-hover: #63bd8d;
+  --accent-soft: #17291f;
+  --accent-contrast: #0b120c;
+  --award: #d0a45f;
+  --award-soft: #2a2216;
+  --danger: #e08a83;
+  --danger-soft: #2c1917;
+  --focus: #63bd8d;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--ground);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Заголовки набраны антиквой — отсылка к самому наградному документу. */
+h1,
+h2 {
+  font-family: var(--font-serif);
+  text-wrap: balance;
+}
+
+/* Цифры в таблицах и счётчиках должны стоять в колонку. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+:where(a, button, input, select, textarea):focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

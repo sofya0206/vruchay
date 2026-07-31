@@ -1,21 +1,31 @@
-import { useEffect, useState } from 'react';
+import { Navigate, Route, Routes } from 'react-router-dom';
+import { useMe } from './auth/useAuth';
+import { LoginPage } from './pages/LoginPage';
+import { DocumentsPage } from './pages/DocumentsPage';
+import { EditorPage } from './pages/EditorPage';
 
 export function App() {
-  const [apiStatus, setApiStatus] = useState<string>('проверяю...');
+  const me = useMe();
 
-  useEffect(() => {
-    fetch('/health')
-      .then((r) => r.json())
-      .then((d: { status: string }) => setApiStatus(d.status))
-      .catch(() => setApiStatus('недоступен'));
-  }, []);
+  if (me.isPending) {
+    return <div className="grid h-full place-items-center text-slate-500">Загрузка…</div>;
+  }
+
+  if (!me.data) {
+    return (
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    );
+  }
 
   return (
-    <main style={{ fontFamily: 'system-ui', padding: 32 }}>
-      <h1>Сервис грамот — каркас</h1>
-      <p>
-        API: <b>{apiStatus}</b>
-      </p>
-    </main>
+    <Routes>
+      <Route path="/" element={<DocumentsPage />} />
+      <Route path="/documents/:id" element={<EditorPage />} />
+      <Route path="/login" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }
