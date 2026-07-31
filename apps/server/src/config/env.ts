@@ -14,6 +14,12 @@ export const envSchema = z.object({
   DATABASE_URL: z.string().min(1),
   REDIS_URL: z.string().min(1).default('redis://localhost:6379'),
 
+  /**
+   * Секрет для шифрования cookie-сессии. Минимум 32 символа: из него
+   * выводится 32-байтный ключ. Значение только из окружения, в код не попадает.
+   */
+  SESSION_SECRET: z.string().min(32, 'SESSION_SECRET должен быть не короче 32 символов'),
+
   S3_ENDPOINT: z.string().url(),
   S3_ACCESS_KEY: z.string().min(1),
   S3_SECRET_KEY: z.string().min(1),

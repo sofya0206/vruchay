@@ -1,6 +1,11 @@
 packages:
   - apps/*
   - packages/*
+# Fastify должен быть строго один на всё дерево: иначе @fastify/* плагины
+# и @nestjs/platform-fastify собираются с разными копиями типов и не стыкуются.
+overrides:
+  fastify: 5.11.0
+
 allowBuilds:
   '@prisma/client': true
   '@prisma/engines': true

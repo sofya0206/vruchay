@@ -7,6 +7,7 @@ const valid = {
   S3_ACCESS_KEY: 'key',
   S3_SECRET_KEY: 'secret',
   S3_BUCKET: 'bucket',
+  SESSION_SECRET: 'x'.repeat(48),
 };
 
 describe('validateEnv', () => {
@@ -23,5 +24,9 @@ describe('validateEnv', () => {
   it('падает с понятным сообщением при отсутствии обязательной переменной', () => {
     const { DATABASE_URL: _omitted, ...withoutDb } = valid;
     expect(() => validateEnv(withoutDb)).toThrow(/DATABASE_URL/);
+  });
+
+  it('отклоняет слишком короткий секрет сессии', () => {
+    expect(() => validateEnv({ ...valid, SESSION_SECRET: 'коротко' })).toThrow(/SESSION_SECRET/);
   });
 });
