@@ -4,7 +4,9 @@ import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import fastifyCookie from '@fastify/cookie';
 import fastifySecureSession from '@fastify/secure-session';
+import fastifyMultipart from '@fastify/multipart';
 import helmet from '@fastify/helmet';
+import { MAX_IMAGE_BYTES } from './common/image-type';
 import { AppModule } from './app.module';
 import { validateEnv } from './config/env';
 
@@ -36,6 +38,10 @@ async function bootstrap() {
       secure: isProd,
       maxAge: SESSION_TTL_SECONDS,
     },
+  });
+
+  await app.register(fastifyMultipart, {
+    limits: { fileSize: MAX_IMAGE_BYTES, files: 1, fields: 10 },
   });
 
   app.setGlobalPrefix('api', { exclude: ['health'] });
