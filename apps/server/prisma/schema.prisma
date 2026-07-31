@@ -14,10 +14,14 @@ model Organization {
   id        String      @id @default(uuid()) @db.Uuid
   name      String
   createdAt DateTime    @default(now()) @map("created_at")
-  members   OrgMember[]
-  documents Document[]
-  files     File[]
-  jobs      GenerationJob[]
+  members     OrgMember[]
+  documents   Document[]
+  files       File[]
+  jobs        GenerationJob[]
+  mailDomains MailDomain[]
+  senders     Sender[]
+  templates   EmailTemplate[]
+  emails      Email[]
 
   @@map("organizations")
 }
@@ -70,9 +74,10 @@ model Document {
   org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   sheets  Sheet[]
   files   File[]
-  columns RecipientColumn[]
-  rows    RecipientRow[]
-  jobs    GenerationJob[]
+  columns   RecipientColumn[]
+  rows      RecipientRow[]
+  jobs      GenerationJob[]
+  templates EmailTemplate[]
 
   @@index([orgId, deletedAt])
   @@map("documents")
@@ -133,6 +138,7 @@ model File {
   job             GenerationJob? @relation("JobFiles", fields: [jobId], references: [id], onDelete: SetNull)
   sheetBackground Sheet[]        @relation("SheetBackground")
   rows            RecipientRow[] @relation("RowFile")
+  emails          Email[]        @relation("EmailFile")
 
   @@index([orgId, kind])
   @@map("files")
@@ -204,4 +210,127 @@ model GenerationJob {
 
   @@index([orgId, status])
   @@map("generation_jobs")
+}
+
+// ─── Почта (Фаза 3) ────────────────────────────────────────────────────────
+
+enum MailDomainStatus {
+  pending
+  verified
+  failed
+}
+
+model MailDomain {
+  id       String           @id @default(uuid()) @db.Uuid
+  orgId    String           @map("org_id") @db.Uuid
+  domain   String
+  provider String           @default("smtp")
+  status   MailDomainStatus @default(pending)
+  /** DNS-записи, которые владелец домена должен прописать: [{type,host,value}] */
+  dnsRecords Json           @default("[]") @map("dns_records")
+  /** Идентификатор домена на стороне почтового провайдера, если тот его выдаёт. */
+  providerRef String?       @map("provider_ref")
+
+  verifiedAt    DateTime? @map("verified_at")
+  lastCheckedAt DateTime? @map("last_checked_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  org     Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  senders Sender[]
+
+  @@unique([orgId, domain])
+  @@map("mail_domains")
+}
+
+model Sender {
+  id          String  @id @default(uuid()) @db.Uuid
+  orgId       String  @map("org_id") @db.Uuid
+  domainId    String  @map("domain_id") @db.Uuid
+  email       String
+  displayName String  @map("display_name")
+  isDefault   Boolean @default(false) @map("is_default")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  org       Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  domain    MailDomain      @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  templates EmailTemplate[]
+
+  @@unique([orgId, email])
+  @@map("senders")
+}
+
+model EmailTemplate {
+  id         String  @id @default(uuid()) @db.Uuid
+  orgId      String  @map("org_id") @db.Uuid
+  documentId String? @map("document_id") @db.Uuid
+  senderId   String? @map("sender_id") @db.Uuid
+
+  subject  String
+  bodyHtml String  @map("body_html")
+  /** Прикладывать ли к письму сгенерированный для этой строки файл. */
+  attachGeneratedFile Boolean @default(true) @map("attach_generated_file")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  org      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  document Document?    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  sender   Sender?      @relation(fields: [senderId], references: [id], onDelete: SetNull)
+  emails   Email[]
+
+  @@map("email_templates")
+}
+
+enum EmailStatus {
+  queued
+  sent
+  delivered
+  opened
+  bounced
+  failed
+}
+
+model Email {
+  id         String @id @default(uuid()) @db.Uuid
+  orgId      String @map("org_id") @db.Uuid
+  documentId String? @map("document_id") @db.Uuid
+  rowId      String? @map("row_id") @db.Uuid
+  templateId String? @map("template_id") @db.Uuid
+  fileId     String? @map("file_id") @db.Uuid
+
+  toEmail  String @map("to_email")
+  subject  String
+  provider String @default("smtp")
+  providerMessageId String? @map("provider_message_id")
+
+  status EmailStatus @default(queued)
+  error  String?
+
+  queuedAt        DateTime  @default(now()) @map("queued_at")
+  sentAt          DateTime? @map("sent_at")
+  statusUpdatedAt DateTime  @default(now()) @map("status_updated_at")
+
+  org      Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  template EmailTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  file     File?          @relation("EmailFile", fields: [fileId], references: [id], onDelete: SetNull)
+  events   EmailEvent[]
+
+  @@index([orgId, status])
+  @@index([documentId])
+  @@map("emails")
+}
+
+model EmailEvent {
+  id        BigInt   @id @default(autoincrement())
+  emailId   String   @map("email_id") @db.Uuid
+  type      String
+  source    String
+  payload   Json     @default("{}")
+  occurredAt DateTime @default(now()) @map("occurred_at")
+
+  email Email @relation(fields: [emailId], references: [id], onDelete: Cascade)
+
+  @@index([emailId])
+  @@map("email_events")
 }

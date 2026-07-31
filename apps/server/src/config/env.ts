@@ -37,6 +37,19 @@ export const envSchema = z.object({
    * где загрузка встроенного Chromium недоступна).
    */
   PLAYWRIGHT_CHANNEL: z.string().default(''),
+
+  /** Почта. Локально — Mailpit на 1025 без авторизации. */
+  MAIL_PROVIDER: z.enum(['smtp', 'dashamail']).default('smtp'),
+  SMTP_HOST: z.string().default('localhost'),
+  SMTP_PORT: z.coerce.number().int().positive().default(1025),
+  SMTP_SECURE: z
+    .union([z.boolean(), z.string()])
+    .default(false)
+    .transform((v) => v === true || v === 'true' || v === '1'),
+  SMTP_USER: z.string().default(''),
+  SMTP_PASSWORD: z.string().default(''),
+  SMTP_SPF_INCLUDE: z.string().default('laureat.ru'),
+  DASHAMAIL_API_KEY: z.string().default(''),
 });
 
 export type Env = z.infer<typeof envSchema>;
