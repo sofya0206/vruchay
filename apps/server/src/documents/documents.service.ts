@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { buildS3Key } from '../storage/s3-key';
 import { AllowedImage } from '../common/image-type';
+import { DEFAULT_COLUMNS } from '../recipients/recipients.service';
 import { CreateDocumentDto, ListDocumentsDto, UpdateDocumentDto } from './documents.dto';
 
 /**
@@ -50,7 +51,8 @@ export class DocumentsService {
   }
 
   async create(orgId: string, dto: CreateDocumentDto) {
-    // Документ без листа бесполезен — первый лист создаём сразу в той же транзакции.
+    // Документ без листа бесполезен, а таблица без колонок «имя» и «почта»
+    // не даст ни сгенерировать файл, ни отправить его — создаём всё сразу.
     return this.prisma.document.create({
       data: {
         orgId,
@@ -60,8 +62,14 @@ export class DocumentsService {
         sheets: {
           create: { position: 0, layout: [], schemaVersion: CURRENT_LAYOUT_SCHEMA_VERSION },
         },
+        columns: {
+          create: DEFAULT_COLUMNS.map((name, position) => ({ name, position })),
+        },
       },
-      include: { sheets: { orderBy: { position: 'asc' } } },
+      include: {
+        sheets: { orderBy: { position: 'asc' } },
+        columns: { orderBy: { position: 'asc' } },
+      },
     });
   }
 

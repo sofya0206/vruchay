@@ -6,6 +6,7 @@ import { StorageModule } from './storage/storage.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { DocumentsModule } from './documents/documents.module';
+import { RecipientsModule } from './recipients/recipients.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { DocumentsModule } from './documents/documents.module';
     StorageModule,
     AuthModule,
     DocumentsModule,
+    RecipientsModule,
   ],
   controllers: [HealthController],
 })

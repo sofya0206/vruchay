@@ -17,6 +17,7 @@ model Organization {
   members   OrgMember[]
   documents Document[]
   files     File[]
+  jobs      GenerationJob[]
 
   @@map("organizations")
 }
@@ -67,8 +68,11 @@ model Document {
   deletedAt      DateTime? @map("deleted_at")
 
   org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  sheets Sheet[]
-  files  File[]
+  sheets  Sheet[]
+  files   File[]
+  columns RecipientColumn[]
+  rows    RecipientRow[]
+  jobs    GenerationJob[]
 
   @@index([orgId, deletedAt])
   @@map("documents")
@@ -122,10 +126,82 @@ model File {
   createdAt     DateTime @default(now()) @map("created_at")
   deletedAt     DateTime? @map("deleted_at")
 
-  org             Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  document        Document?    @relation(fields: [documentId], references: [id], onDelete: SetNull)
-  sheetBackground Sheet[]      @relation("SheetBackground")
+  jobId String? @map("job_id") @db.Uuid
+
+  org             Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  document        Document?      @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  job             GenerationJob? @relation("JobFiles", fields: [jobId], references: [id], onDelete: SetNull)
+  sheetBackground Sheet[]        @relation("SheetBackground")
+  rows            RecipientRow[] @relation("RowFile")
 
   @@index([orgId, kind])
   @@map("files")
+}
+
+// ─── Получатели и генерация (Фаза 2) ──────────────────────────────────────
+
+model RecipientColumn {
+  id         String @id @default(uuid()) @db.Uuid
+  documentId String @map("document_id") @db.Uuid
+  position   Int
+  /** Имя переменной без знака процента: name, email, course. */
+  name       String
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, position])
+  @@unique([documentId, name])
+  @@map("recipient_columns")
+}
+
+model RecipientRow {
+  id         String  @id @default(uuid()) @db.Uuid
+  documentId String  @map("document_id") @db.Uuid
+  position   Int
+  /** Значения по именам колонок: {"name":"Иванов Иван","email":"..."} */
+  data       Json    @default("{}")
+  /** Отмеченные строки попадают в генерацию. */
+  checked    Boolean @default(true)
+  lastFileId String? @map("last_file_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  lastFile File?    @relation("RowFile", fields: [lastFileId], references: [id], onDelete: SetNull)
+
+  @@unique([documentId, position])
+  @@index([documentId, checked])
+  @@map("recipient_rows")
+}
+
+enum JobStatus {
+  queued
+  running
+  done
+  failed
+  canceled
+}
+
+model GenerationJob {
+  id         String    @id @default(uuid()) @db.Uuid
+  orgId      String    @map("org_id") @db.Uuid
+  documentId String    @map("document_id") @db.Uuid
+  format     String    @default("pdf")
+  status     JobStatus @default(queued)
+  total      Int       @default(0)
+  done       Int       @default(0)
+  failed     Int       @default(0)
+  error      String?
+
+  createdAt  DateTime  @default(now()) @map("created_at")
+  startedAt  DateTime? @map("started_at")
+  finishedAt DateTime? @map("finished_at")
+
+  org      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  document Document     @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  files    File[]       @relation("JobFiles")
+
+  @@index([orgId, status])
+  @@map("generation_jobs")
 }
