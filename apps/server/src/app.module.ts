@@ -3,9 +3,14 @@ import { ConfigModule } from '@nestjs/config';
 import { HealthController } from './health/health.controller';
 import { validateEnv } from './config/env';
 import { StorageModule } from './storage/storage.module';
+import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }), StorageModule],
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
+    PrismaModule,
+    StorageModule,
+  ],
   controllers: [HealthController],
 })
 export class AppModule {}
