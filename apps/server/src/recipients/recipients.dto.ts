@@ -48,3 +48,6 @@ export const importSchema = z.object({
   mode: z.enum(['append', 'replace']).default('append'),
 });
 export type ImportDto = z.infer<typeof importSchema>;
+
+/** Списки участников — это десятки килобайт; всё крупнее почти наверняка ошибка. */
+export const MAX_TABLE_BYTES = 10 * 1024 * 1024;

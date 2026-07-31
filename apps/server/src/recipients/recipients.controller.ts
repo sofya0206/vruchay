@@ -1,4 +1,18 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Logger,
+  Param,
+  Patch,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+import type { FastifyRequest } from 'fastify';
+import { parseSpreadsheet } from '../import/spreadsheet';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { CurrentUser } from '../common/current-user.decorator';
 import { AuthGuard } from '../auth/auth.guard';
@@ -12,6 +26,7 @@ import {
   AddRowDto,
   importSchema,
   ImportDto,
+  MAX_TABLE_BYTES,
   renameColumnSchema,
   RenameColumnDto,
   setCheckedSchema,
@@ -25,7 +40,51 @@ const uuidParam = new ZodValidationPipe(uuidSchema);
 @Controller('documents/:id/recipients')
 @UseGuards(AuthGuard)
 export class RecipientsController {
+  private readonly logger = new Logger(RecipientsController.name);
+
   constructor(private readonly recipients: RecipientsService) {}
+
+  /**
+   * Разбор загруженного файла: ничего не сохраняет, только показывает,
+   * что распознано. Пользователь проверяет сопоставление колонок
+   * и подтверждает импорт отдельным запросом.
+   */
+  @Post('parse')
+  async parse(
+    @CurrentUser() user: SessionUser,
+    @Param('id', uuidParam) id: string,
+    @Req() req: FastifyRequest,
+  ) {
+    await this.recipients.getTable(user.orgId, id);
+
+    const part = await req.file({ limits: { fileSize: MAX_TABLE_BYTES, files: 1 } });
+    if (!part) throw new BadRequestException('Файл не передан');
+
+    const filename = part.filename ?? '';
+    if (!/\.(xlsx|csv|txt|tsv)$/i.test(filename)) {
+      throw new BadRequestException('Поддерживаются файлы Excel (.xlsx) и CSV');
+    }
+
+    let buffer: Buffer;
+    try {
+      buffer = await part.toBuffer();
+    } catch {
+      throw new BadRequestException(
+        `Файл слишком большой, максимум ${Math.round(MAX_TABLE_BYTES / 1024 / 1024)} МБ`,
+      );
+    }
+
+    try {
+      return await parseSpreadsheet(buffer, filename);
+    } catch (err) {
+      // Внутрь ошибки библиотеки может попасть путь или структура файла —
+      // наружу отдаём только понятную формулировку.
+      this.logger.warn(`Не удалось разобрать файл «${filename}»: ${String(err)}`);
+      throw new BadRequestException(
+        'Не удалось прочитать файл. Проверьте, что это таблица Excel или CSV и в ней есть строка с названиями колонок',
+      );
+    }
+  }
 
   @Get()
   getTable(@CurrentUser() user: SessionUser, @Param('id', uuidParam) id: string) {
