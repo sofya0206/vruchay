@@ -8,10 +8,12 @@ import {
   Image as ImageIcon,
   LoaderCircle,
   Redo2,
+  Table2,
   Type,
   Undo2,
   ZoomIn,
 } from 'lucide-react';
+import { RecipientsTable } from '../recipients/RecipientsTable';
 import { sheetLayout, type SheetElement, type TextElement } from '@gramota/shared';
 import { Button } from '../ui/Button';
 import { StatusChip } from '../ui/Field';
@@ -50,6 +52,7 @@ type Gesture =
 export function EditorPage() {
   const { id = '' } = useParams();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [view, setView] = useState<'editor' | 'table'>('editor');
   const [zoom, setZoom] = useState(1);
   const [saved, setSaved] = useState<'saved' | 'saving' | 'dirty'>('saved');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -245,8 +248,17 @@ export function EditorPage() {
 
         <h1 className="font-serif text-lg">{page.title}</h1>
 
-        <div className="mx-2 h-5 w-px bg-[var(--line)]" />
+        <div className="flex rounded-lg bg-[var(--surface-sunken)] p-0.5">
+          <ViewTab active={view === 'editor'} onClick={() => setView('editor')} icon={<Type size={14} />}>
+            Макет
+          </ViewTab>
+          <ViewTab active={view === 'table'} onClick={() => setView('table')} icon={<Table2 size={14} />}>
+            Получатели
+          </ViewTab>
+        </div>
 
+        {view === 'table' ? null : (
+          <>
         <Button variant="primary" size="sm" icon={<Type size={15} />} onClick={addTextBlock}>
           Текст
         </Button>
@@ -322,8 +334,13 @@ export function EditorPage() {
             )}
           </StatusChip>
         </div>
+          </>
+        )}
       </header>
 
+      {view === 'table' ? (
+        <RecipientsTable documentId={id} />
+      ) : (
       <div className="flex min-h-0 flex-1">
         <div
           ref={containerRef}
@@ -410,7 +427,35 @@ export function EditorPage() {
           }}
         />
       </div>
+      )}
     </div>
+  );
+}
+
+function ViewTab({
+  active,
+  onClick,
+  icon,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={active}
+      className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm transition-colors ${
+        active
+          ? 'bg-[var(--surface)] font-medium text-[var(--text)] shadow-sm'
+          : 'text-[var(--text-muted)] hover:text-[var(--text)]'
+      }`}
+    >
+      {icon}
+      {children}
+    </button>
   );
 }
 
