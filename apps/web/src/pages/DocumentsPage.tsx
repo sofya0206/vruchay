@@ -7,6 +7,7 @@ import type { DocumentDetail, DocumentList } from '../api/types';
 import { useLogout, useMe } from '../auth/useAuth';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Field';
+import { InstallHint } from '../ui/InstallHint';
 
 export function DocumentsPage() {
   const qc = useQueryClient();
@@ -156,6 +157,8 @@ export function DocumentsPage() {
           ))}
         </ul>
       </main>
+
+      <InstallHint />
     </div>
   );
 }

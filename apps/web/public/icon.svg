@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Фирменный знак: лавровый зелёный фон и наградная медаль с лентой.
+       Тот же образ, что и в шапке приложения, — иконка на устройстве
+       должна узнаваться как то же самое приложение. -->
+  <rect width="512" height="512" rx="112" fill="#1F5D3F"/>
+  <g fill="none" stroke="#FBFAF7" stroke-width="26" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="256" cy="204" r="86"/>
+    <path d="M196 282 L172 420 L256 372 L340 420 L316 282"/>
+  </g>
+</svg>
