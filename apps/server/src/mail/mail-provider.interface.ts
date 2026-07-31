@@ -47,8 +47,15 @@ export interface MailProvider {
 
   send(message: OutgoingMessage): Promise<{ providerMessageId: string }>;
 
-  /** Какие DNS-записи должен прописать владелец домена. */
-  getDomainSetup(domain: string): Promise<DnsRecord[]>;
+  /**
+   * Какие DNS-записи должен прописать владелец домена.
+   *
+   * verificationToken уникален для каждой заявки: без него записи были бы
+   * одинаковыми для всех организаций, и любой клиент «подтвердил» бы чужой
+   * домен, просто повторив общий SPF. Прописать уникальную запись может
+   * только тот, у кого есть доступ к зоне DNS.
+   */
+  getDomainSetup(domain: string, verificationToken: string): Promise<DnsRecord[]>;
 
   /** Проверка, что записи реально видны в DNS. */
   checkDomain(domain: string, records: DnsRecord[]): Promise<DomainStatus>;

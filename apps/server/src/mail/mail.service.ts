@@ -1,9 +1,16 @@
+import { randomUUID } from 'node:crypto';
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { SmtpProvider } from './smtp.provider';
-import { isValidEmail, renderHtmlTemplate, renderSubject } from './mail-template';
+import {
+  isValidEmail,
+  renderHtmlTemplate,
+  renderSubject,
+  sanitizeEmailHtml,
+} from './mail-template';
 import type { MailProvider } from './mail-provider.interface';
+import { redact } from '../common/redact';
 
 @Injectable()
 export class MailService {
@@ -28,14 +35,28 @@ export class MailService {
       throw new BadRequestException('Некорректное имя домена');
     }
 
+    // Домен, уже подтверждённый другой организацией, заявить нельзя:
+    // иначе можно было бы слать письма от имени чужой федерации.
+    const claimed = await this.prisma.mailDomain.findFirst({
+      where: { domain: normalized, status: 'verified', orgId: { not: orgId } },
+      select: { id: true },
+    });
+    if (claimed) {
+      throw new BadRequestException(
+        'Этот домен уже подтверждён другой организацией. Если он принадлежит вам, напишите в поддержку',
+      );
+    }
+
     const provider = this.providerFor('smtp');
-    const records = await provider.getDomainSetup(normalized);
+    const verificationToken = randomUUID();
+    const records = await provider.getDomainSetup(normalized, verificationToken);
 
     return this.prisma.mailDomain.create({
       data: {
         orgId,
         domain: normalized,
         provider: provider.name,
+        verificationToken,
         dnsRecords: records as unknown as object,
       },
     });
@@ -83,6 +104,14 @@ export class MailService {
     const domain = await this.prisma.mailDomain.findFirst({ where: { id: domainId, orgId } });
     if (!domain) throw new NotFoundException('Домен не найден');
 
+    // Пока владение доменом не доказано, отправитель на нём создаваться не должен:
+    // это и есть защита от рассылки от имени чужой организации.
+    if (domain.status !== 'verified') {
+      throw new BadRequestException(
+        'Домен ещё не подтверждён. Пропишите DNS-записи и нажмите «Проверить»',
+      );
+    }
+
     const normalized = email.trim().toLowerCase();
     if (!isValidEmail(normalized)) throw new BadRequestException('Некорректный адрес');
 
@@ -117,11 +146,15 @@ export class MailService {
       if (!sender) throw new NotFoundException('Отправитель не найден');
     }
 
+    // Чистим при сохранении, а не при отправке: пользователь сразу увидит,
+    // что именно сохранилось, и не обнаружит пропажу разметки в момент рассылки.
+    const clean = { ...data, bodyHtml: sanitizeEmailHtml(data.bodyHtml) };
+
     const existing = await this.prisma.emailTemplate.findFirst({ where: { orgId, documentId } });
     if (existing) {
-      return this.prisma.emailTemplate.update({ where: { id: existing.id }, data });
+      return this.prisma.emailTemplate.update({ where: { id: existing.id }, data: clean });
     }
-    return this.prisma.emailTemplate.create({ data: { orgId, documentId, ...data } });
+    return this.prisma.emailTemplate.create({ data: { orgId, documentId, ...clean } });
   }
 
   async getTemplate(orgId: string, documentId: string) {
@@ -142,6 +175,18 @@ export class MailService {
     const template = await this.getTemplate(orgId, documentId);
     if (!template) throw new BadRequestException('Сначала настройте шаблон письма');
     if (!template.sender) throw new BadRequestException('В шаблоне не выбран отправитель');
+
+    // Домен мог быть подтверждён раньше, а потом записи из DNS убрали.
+    // Проверяем перед каждой рассылкой, а не только при создании отправителя.
+    const domain = await this.prisma.mailDomain.findFirst({
+      where: { id: template.sender.domainId, orgId },
+      select: { status: true, domain: true },
+    });
+    if (domain?.status !== 'verified') {
+      throw new BadRequestException(
+        `Домен ${domain?.domain ?? ''} не подтверждён — отправка невозможна`,
+      );
+    }
 
     const rows = await this.prisma.recipientRow.findMany({
       where: { documentId, checked: true, document: { orgId, deletedAt: null } },
@@ -239,14 +284,16 @@ export class MailService {
         }),
       ]);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      // Ответ почтового шлюза почти всегда содержит адрес получателя
+      // («550 <ivanov@example.ru>: Recipient address rejected»), поэтому
+      // маскируем и перед записью в журнал, и перед сохранением в базу:
+      // причина отказа остаётся понятной, персональные данные не размножаются.
+      const message = redact(err instanceof Error ? err.message : String(err));
       this.logger.warn(`Письмо ${emailId} не отправлено: ${message}`);
       await this.prisma.email.update({
         where: { id: emailId },
         data: {
           status: 'failed',
-          // Наружу текст ошибки провайдера показывать можно: он про почту,
-          // а не про наши внутренности. Но обрезаем, чтобы не раздувать базу.
           error: message.slice(0, 500),
           statusUpdatedAt: new Date(),
         },

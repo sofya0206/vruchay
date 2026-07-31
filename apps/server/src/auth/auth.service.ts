@@ -1,6 +1,7 @@
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { hashPassword, verifyPassword } from './password';
+import { maskEmail } from '../common/redact';
 
 export interface SessionUser {
   userId: string;
@@ -35,7 +36,9 @@ export class AuthService {
     const ok = await verifyPassword(hash, password);
 
     if (!user || !ok) {
-      this.logger.warn(`Неудачная попытка входа для ${normalized}`);
+      // Адрес в журнал не пишем: иначе логи превращаются в готовый список
+      // действующих учётных записей для подбора паролей и фишинга.
+      this.logger.warn(`Неудачная попытка входа: ${maskEmail(normalized)}`);
       throw new UnauthorizedException(LOGIN_FAILED);
     }
 

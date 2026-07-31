@@ -63,7 +63,12 @@ export const qrElement = elementBase.extend({
 export const linkElement = elementBase.extend({
   type: z.literal('link'),
   props: z.object({
-    url: z.string().url(),
+    // Только http и https: z.string().url() пропускает javascript: и data:,
+    // а ссылка попадает в href на странице, которую печатает браузер.
+    url: z
+      .string()
+      .url()
+      .refine((v) => /^https?:\/\//i.test(v), 'Ссылка должна начинаться с http:// или https://'),
   }),
 });
 

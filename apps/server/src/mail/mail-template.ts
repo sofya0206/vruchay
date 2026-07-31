@@ -1,3 +1,4 @@
+import sanitizeHtml from 'sanitize-html';
 import { substituteVariables } from '@gramota/shared';
 
 /**
@@ -27,6 +28,50 @@ export function renderHtmlTemplate(template: string, data: Record<string, string
     Object.entries(data).map(([key, value]) => [key, escapeHtml(value)]),
   );
   return substituteVariables(template, escaped);
+}
+
+/**
+ * Очистка тела письма, которое пишет сам пользователь сервиса.
+ *
+ * Экранирование данных получателя защищает от подстановки через переменные,
+ * но сам шаблон — это тоже пользовательский ввод: его задаёт клиент через API,
+ * и без очистки туда попадут скрипты, фреймы и ссылки `javascript:`.
+ * Письмо уходит от имени клиентского домена, поэтому вредоносное содержимое
+ * ударит и по получателям, и по репутации домена.
+ */
+export function sanitizeEmailHtml(html: string): string {
+  return sanitizeHtml(html, {
+    allowedTags: [
+      'p', 'br', 'b', 'strong', 'i', 'em', 'u', 's',
+      'h1', 'h2', 'h3', 'h4',
+      'ul', 'ol', 'li', 'blockquote',
+      'a', 'img', 'hr', 'span', 'div',
+      'table', 'thead', 'tbody', 'tr', 'td', 'th',
+    ],
+    allowedAttributes: {
+      a: ['href', 'target', 'rel'],
+      img: ['src', 'alt', 'width', 'height'],
+      '*': ['style'],
+    },
+    // Схемы ссылок по белому списку: javascript: и data: отсекаются.
+    allowedSchemes: ['http', 'https', 'mailto'],
+    allowedSchemesByTag: { img: ['http', 'https', 'cid'] },
+    allowedStyles: {
+      '*': {
+        color: [/^#[0-9a-fA-F]{3,6}$/, /^rgb\(/],
+        'background-color': [/^#[0-9a-fA-F]{3,6}$/, /^rgb\(/],
+        'text-align': [/^left$|^right$|^center$/],
+        'font-size': [/^\d+(?:px|pt|em|%)$/],
+        'font-weight': [/^\d+$|^bold$|^normal$/],
+        margin: [/^[\d\s.a-z%]+$/],
+        padding: [/^[\d\s.a-z%]+$/],
+      },
+    },
+    // Внешние ссылки в письме открываются в новой вкладке без доступа к opener.
+    transformTags: {
+      a: sanitizeHtml.simpleTransform('a', { target: '_blank', rel: 'noopener noreferrer' }),
+    },
+  });
 }
 
 /** Тема письма — обычный текст, экранировать не нужно, но переводы строк убираем. */

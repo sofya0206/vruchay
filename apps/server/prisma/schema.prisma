@@ -230,6 +230,13 @@ model MailDomain {
   dnsRecords Json           @default("[]") @map("dns_records")
   /** Идентификатор домена на стороне почтового провайдера, если тот его выдаёт. */
   providerRef String?       @map("provider_ref")
+  /**
+   * Секрет подтверждения владения доменом. Уникален для каждой заявки:
+   * прописать его в DNS может только тот, у кого есть доступ к зоне.
+   * Без этого любая организация «подтвердила» бы чужой домен, просто
+   * повторив общие для всех записи SPF.
+   */
+  verificationToken String @default(uuid()) @map("verification_token")
 
   verifiedAt    DateTime? @map("verified_at")
   lastCheckedAt DateTime? @map("last_checked_at")

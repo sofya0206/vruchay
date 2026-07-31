@@ -67,8 +67,16 @@ export class SmtpProvider implements MailProvider {
    * Записи для собственного SMTP-шлюза. У провайдера с API этот список
    * приходит от него самого и включает ещё и DKIM с его ключом.
    */
-  getDomainSetup(domain: string): Promise<DnsRecord[]> {
+  getDomainSetup(domain: string, verificationToken: string): Promise<DnsRecord[]> {
     return Promise.resolve([
+      {
+        // Уникальная запись — единственное доказательство владения доменом.
+        // Записи SPF и DMARC одинаковы у всех клиентов и подтверждением быть не могут.
+        type: 'TXT',
+        host: '_laureat-verify',
+        value: `laureat-verify=${verificationToken}`,
+        purpose: 'Подтверждение владения доменом. Уникальна для вашей организации',
+      },
       {
         type: 'TXT',
         host: '@',

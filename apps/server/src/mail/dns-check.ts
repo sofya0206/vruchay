@@ -21,7 +21,10 @@ function normalize(value: string): string {
  * в поле host пишут короткое имя, у других — полное с доменом.
  */
 export function fullHost(host: string, domain: string): string {
-  const h = host.replace(/\.$/, '');
+  const h = host.trim().replace(/\.$/, '');
+  // «@» у регистраторов означает корень зоны, а не поддомен с таким именем.
+  // Без этой ветки получалось «@.example.com», и запись не находилась никогда.
+  if (h === '@' || h === '') return domain;
   return h.endsWith(domain) ? h : `${h}.${domain}`;
 }
 
