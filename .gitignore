@@ -8,3 +8,7 @@ coverage/
 .DS_Store
 .turbo/
 apps/server/generated/
+
+# Банковские и учётные реквизиты — не в репозиторий.
+# Шаблон с плейсхолдерами: docs/business/requisites.example.md
+docs/business/requisites.md
