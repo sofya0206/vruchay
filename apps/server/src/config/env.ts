@@ -1,0 +1,35 @@
+import { z } from 'zod';
+
+/**
+ * Переменные окружения проверяются один раз при старте — сервер падает сразу,
+ * а не через час в фоновой задаче из-за пустого ключа S3.
+ */
+export const envSchema = z.object({
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  PORT: z.coerce.number().int().positive().default(3000),
+
+  /** Публичный домен сервиса: попадает в ссылки верификации и в письма */
+  PUBLIC_URL: z.string().url().default('http://localhost:5173'),
+
+  DATABASE_URL: z.string().min(1),
+  REDIS_URL: z.string().min(1).default('redis://localhost:6379'),
+
+  S3_ENDPOINT: z.string().url(),
+  S3_ACCESS_KEY: z.string().min(1),
+  S3_SECRET_KEY: z.string().min(1),
+  S3_BUCKET: z.string().min(1),
+  S3_REGION: z.string().default('ru-1'),
+});
+
+export type Env = z.infer<typeof envSchema>;
+
+export function validateEnv(raw: Record<string, unknown>): Env {
+  const parsed = envSchema.safeParse(raw);
+  if (!parsed.success) {
+    const details = parsed.error.issues
+      .map((i) => `  ${i.path.join('.')}: ${i.message}`)
+      .join('\n');
+    throw new Error(`Некорректные переменные окружения:\n${details}`);
+  }
+  return parsed.data;
+}
