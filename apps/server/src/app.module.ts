@@ -7,6 +7,8 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { DocumentsModule } from './documents/documents.module';
 import { RecipientsModule } from './recipients/recipients.module';
+import { RenderModule } from './render/render.module';
+import { GenerationModule } from './generation/generation.module';
 
 @Module({
   imports: [
@@ -16,6 +18,8 @@ import { RecipientsModule } from './recipients/recipients.module';
     AuthModule,
     DocumentsModule,
     RecipientsModule,
+    RenderModule,
+    GenerationModule,
   ],
   controllers: [HealthController],
 })

@@ -25,6 +25,18 @@ export const envSchema = z.object({
   S3_SECRET_KEY: z.string().min(1),
   S3_BUCKET: z.string().min(1),
   S3_REGION: z.string().default('ru-1'),
+
+  /** Обрабатывать ли задания генерации в этом процессе. В проде воркер — отдельный контейнер. */
+  RUN_WORKER: z
+    .union([z.boolean(), z.string()])
+    .default(true)
+    .transform((v) => v === true || v === 'true' || v === '1'),
+  /**
+   * Канал браузера для Playwright. Пусто — встроенный Chromium из образа,
+   * 'chrome' — системный Google Chrome (так работает локальная разработка,
+   * где загрузка встроенного Chromium недоступна).
+   */
+  PLAYWRIGHT_CHANNEL: z.string().default(''),
 });
 
 export type Env = z.infer<typeof envSchema>;

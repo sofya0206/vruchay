@@ -16,7 +16,13 @@ async function bootstrap() {
   const env = validateEnv(process.env);
   const isProd = env.NODE_ENV === 'production';
 
-  const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter(), {
+  const adapter = new FastifyAdapter({
+    // По умолчанию Fastify отвечает 414 на параметр пути длиннее 100 символов,
+    // а подписанный токен страницы рендера длиннее.
+    maxParamLength: 512,
+  });
+
+  const app = await NestFactory.create<NestFastifyApplication>(AppModule, adapter, {
     // В проде подробности ошибок не должны утекать клиенту.
     logger: isProd ? ['error', 'warn', 'log'] : ['error', 'warn', 'log', 'debug'],
   });
