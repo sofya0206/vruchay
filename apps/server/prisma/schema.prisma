@@ -15,6 +15,8 @@ model Organization {
   name      String
   createdAt DateTime    @default(now()) @map("created_at")
   members   OrgMember[]
+  documents Document[]
+  files     File[]
 
   @@map("organizations")
 }
@@ -46,4 +48,84 @@ model OrgMember {
 
   @@id([orgId, userId])
   @@map("org_members")
+}
+
+// ─── Документы (Фаза 1) ───────────────────────────────────────────────────
+
+model Document {
+  id             String   @id @default(uuid()) @db.Uuid
+  orgId          String   @map("org_id") @db.Uuid
+  title          String
+  /** размер листа в миллиметрах: A4 альбомный = 297×210 */
+  pageWidthMm    Float    @default(297) @map("page_width_mm")
+  pageHeightMm   Float    @default(210) @map("page_height_mm")
+  /** показывать ли страницу проверки подлинности и какие поля на ней раскрывать */
+  verifyEnabled  Boolean  @default(true) @map("verify_enabled")
+  verifyFields   Json     @default("[]") @map("verify_fields")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  sheets Sheet[]
+  files  File[]
+
+  @@index([orgId, deletedAt])
+  @@map("documents")
+}
+
+model Sheet {
+  id               String  @id @default(uuid()) @db.Uuid
+  documentId       String  @map("document_id") @db.Uuid
+  position         Int
+  backgroundFileId String? @map("background_file_id") @db.Uuid
+  /**
+   * Массив элементов листа. Валидируется Zod-схемой sheetLayout из @gramota/shared —
+   * это общий контракт редактора, превью и серверного PDF-рендера.
+   * Отдельной таблицы элементов нет: по ним не нужны SQL-запросы, а редактор
+   * сохраняет макет целиком одним PATCH.
+   */
+  layout           Json    @default("[]")
+  schemaVersion    Int     @default(1) @map("schema_version")
+
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  background File?    @relation("SheetBackground", fields: [backgroundFileId], references: [id], onDelete: SetNull)
+
+  @@unique([documentId, position])
+  @@map("sheets")
+}
+
+enum FileKind {
+  background
+  asset
+  generated
+  font
+}
+
+model File {
+  id           String   @id @default(uuid()) @db.Uuid
+  orgId        String   @map("org_id") @db.Uuid
+  documentId   String?  @map("document_id") @db.Uuid
+  kind         FileKind
+  s3Key        String   @map("s3_key")
+  sizeBytes    Int      @map("size_bytes")
+  mime         String
+  originalName String   @default("") @map("original_name")
+  /**
+   * Публичный идентификатор для проверки подлинности: попадает в QR-код
+   * и в ссылку /verify/<publicId>. Генерируется у всех файлов сразу,
+   * даже до включения модуля верификации, — иначе выданные раньше
+   * сертификаты нельзя будет проверить задним числом.
+   */
+  publicId      String   @unique @default(uuid()) @map("public_id") @db.Uuid
+  verifyRevoked Boolean  @default(false) @map("verify_revoked")
+  createdAt     DateTime @default(now()) @map("created_at")
+  deletedAt     DateTime? @map("deleted_at")
+
+  org             Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  document        Document?    @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  sheetBackground Sheet[]      @relation("SheetBackground")
+
+  @@index([orgId, kind])
+  @@map("files")
 }
