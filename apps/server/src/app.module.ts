@@ -14,6 +14,7 @@ import { GenerationModule } from './generation/generation.module';
 import { MailModule } from './mail/mail.module';
 import { TildaModule } from './tilda/tilda.module';
 import { LeadsModule } from './leads/leads.module';
+import { PaymentsModule } from './payments/payments.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { LeadsModule } from './leads/leads.module';
     MailModule,
     TildaModule,
     LeadsModule,
+    PaymentsModule,
   ],
   controllers: [HealthController],
 })

@@ -61,6 +61,23 @@ export const envSchema = z.object({
   SMTP_PASSWORD: z.string().default(''),
   SMTP_SPF_INCLUDE: z.string().default('vruchay.ru'),
   DASHAMAIL_API_KEY: z.string().default(''),
+
+  /**
+   * Реквизиты продавца для счетов. В файле с реквизитами они лежать не могут:
+   * тот файл не попадает в репозиторий и на сервер не едет.
+   */
+  /** ЮKassa: пока пусто — приём платежей выключен, остальной сервис работает. */
+  YOOKASSA_SHOP_ID: z.string().default(''),
+  YOOKASSA_SECRET_KEY: z.string().default(''),
+
+  SELLER_NAME: z.string().default(''),
+  SELLER_INN: z.string().default(''),
+  SELLER_OGRNIP: z.string().default(''),
+  SELLER_ADDRESS: z.string().default(''),
+  SELLER_ACCOUNT: z.string().default(''),
+  SELLER_BANK: z.string().default(''),
+  SELLER_BIK: z.string().default(''),
+  SELLER_CORR_ACCOUNT: z.string().default(''),
 });
 
 export type Env = z.infer<typeof envSchema>;

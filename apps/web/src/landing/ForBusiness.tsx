@@ -1,5 +1,5 @@
 import { Building2, FileCheck2, Scale, Users } from 'lucide-react';
-import { LeadForm } from './LeadForm';
+import { Quiz } from './quiz/Quiz';
 
 /**
  * Блок для юридических лиц.
@@ -86,8 +86,13 @@ export function ForBusiness() {
           ))}
         </div>
 
-        <div className="mt-10">
-          <LeadForm />
+        <h3 className="mt-12 font-serif text-2xl">Подберём тариф за минуту</h3>
+        <p className="mt-1.5 max-w-xl text-sm text-[var(--text-muted)]">
+          Пять вопросов — и вы увидите, сколько это стоит именно в вашем случае
+          и почему получилось столько.
+        </p>
+        <div className="mt-6">
+          <Quiz />
         </div>
       </div>
     </section>

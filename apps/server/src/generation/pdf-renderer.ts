@@ -72,6 +72,36 @@ export class PdfRenderer implements OnModuleDestroy {
     return result;
   }
 
+  /**
+   * Печать готовой разметки, без открытия страницы приложения.
+   *
+   * Нужна для документов, которых нет в интерфейсе: счетов, актов. Заводить
+   * ради них маршрут и подписанный токен — лишняя механика там, где данные
+   * и так уже на сервере.
+   */
+  renderHtml(html: string): Promise<Buffer> {
+    const result = this.tail.then(() => this.renderHtmlNow(html));
+    this.tail = result.catch(() => undefined);
+    return result;
+  }
+
+  private async renderHtmlNow(html: string): Promise<Buffer> {
+    const browser = await this.getBrowser();
+    const page = await browser.newPage();
+    try {
+      page.setDefaultTimeout(PAGE_TIMEOUT_MS);
+      await page.setContent(html, { waitUntil: 'domcontentloaded' });
+      this.rendered++;
+      return await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        margin: { top: '14mm', right: '14mm', bottom: '14mm', left: '14mm' },
+      });
+    } finally {
+      await page.close().catch(() => undefined);
+    }
+  }
+
   private async renderNow(
     token: string,
     pageWidthMm: number,

@@ -545,7 +545,11 @@ model Lead {
   contact String
   email   String
   phone   String?
-  /** Сколько документов в год — по нему сразу видно, какой тариф предлагать. */
+  /** ИНН покупателя: без него счёт бесполезен для его бухгалтерии. */
+  inn     String?
+  /** Выбранный тариф — по нему выставляется счёт без переписки. */
+  tariff  String?
+  /** Сколько документов в год, если тариф не выбран. */
   volume  String?
   comment String?
 
@@ -563,4 +567,44 @@ model Lead {
 
   @@index([status, createdAt])
   @@map("leads")
+}
+
+/**
+ * Счёт на оплату.
+ *
+ * Нумерация сквозная в пределах года и обеспечивается уникальным индексом:
+ * два счёта с одним номером — это разбирательство с бухгалтерией клиента,
+ * а не мелкая опечатка.
+ *
+ * Реквизиты продавца в счёт не копируются: они одни на всё и берутся
+ * из окружения при отрисовке. Копия покупателя, наоборот, сохраняется —
+ * счёт должен остаться таким, каким его получили, даже если клиент
+ * потом переименуется.
+ */
+model Invoice {
+  id     String  @id @default(uuid()) @db.Uuid
+  leadId String? @map("lead_id") @db.Uuid
+
+  number Int
+  year   Int
+
+  buyerName String  @map("buyer_name")
+  buyerInn  String  @map("buyer_inn")
+  email     String
+
+  tariff      String
+  description String
+  /** Сумма в копейках: в рублях с плавающей точкой деньги считать нельзя. */
+  amountKopecks Int  @map("amount_kopecks")
+
+  paidAt    DateTime? @map("paid_at")
+  /** Идентификатор платежа у платёжного сервиса, когда он появится. */
+  paymentId String?   @map("payment_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  sentAt    DateTime? @map("sent_at")
+
+  @@unique([year, number])
+  @@index([email])
+  @@map("invoices")
 }
