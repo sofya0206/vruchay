@@ -417,6 +417,24 @@ export class MailService {
     });
   }
 
+  /**
+   * Служебное уведомление самим себе — например, о новой заявке на счёт.
+   * Мимо журнала писем: это внутренняя переписка, а не выдача документов.
+   */
+  async sendNotice(orgId: string, to: string, subject: string, body: string): Promise<void> {
+    const sender = await this.defaultSender(orgId);
+    if (!sender) {
+      this.logger.warn('Уведомление не отправлено: нет отправителя с подтверждённым доменом');
+      return;
+    }
+    await this.providerFor('smtp').send({
+      from: { email: sender.email, name: sender.displayName },
+      to,
+      subject,
+      html: `<pre style="font:14px/1.5 system-ui;white-space:pre-wrap">${escapeHtml(body)}</pre>`,
+    });
+  }
+
   async listEmails(orgId: string, documentId?: string) {
     return this.prisma.email.findMany({
       where: { orgId, ...(documentId ? { documentId } : {}) },

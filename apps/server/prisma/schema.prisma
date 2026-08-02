@@ -519,3 +519,48 @@ model Review {
   @@index([orgId])
   @@map("reviews")
 }
+
+enum LeadStatus {
+  new
+  in_progress
+  won
+  lost
+}
+
+/**
+ * Заявка на счёт с посадочной страницы.
+ *
+ * Организация не покупает нажатием кнопки: сначала ей нужны договор, счёт
+ * и ответы юристу. Пока эта заявка уходила письмом на общий ящик, она жила
+ * ровно до первого завала входящих — а это единственный вход для крупных
+ * клиентов, ради которых сервис и делается.
+ *
+ * Организация к заявке не привязана: её ещё нет в системе, человек только
+ * присматривается.
+ */
+model Lead {
+  id String @id @default(uuid()) @db.Uuid
+
+  orgName String  @map("org_name")
+  contact String
+  email   String
+  phone   String?
+  /** Сколько документов в год — по нему сразу видно, какой тариф предлагать. */
+  volume  String?
+  comment String?
+
+  status LeadStatus @default(new)
+  /** Что с заявкой сделали: кому передали, о чём договорились. */
+  note   String?
+
+  /** Нужны для разбора злоупотреблений; стираются вместе с остальными следами. */
+  ip        String? @db.Inet
+  userAgent String? @map("user_agent")
+  /** Откуда пришёл: адрес страницы, с которой отправлена форма. */
+  source    String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([status, createdAt])
+  @@map("leads")
+}

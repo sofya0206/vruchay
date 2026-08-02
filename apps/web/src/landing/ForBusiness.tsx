@@ -1,5 +1,5 @@
 import { Building2, FileCheck2, Scale, Users } from 'lucide-react';
-import { Button } from '../ui/Button';
+import { LeadForm } from './LeadForm';
 
 /**
  * Блок для юридических лиц.
@@ -86,20 +86,8 @@ export function ForBusiness() {
           ))}
         </div>
 
-        <div className="mt-10 flex flex-wrap items-center gap-4 rounded-xl bg-[var(--accent-soft)] p-6">
-          <div className="min-w-64 flex-1">
-            <h3 className="font-serif text-xl text-[var(--accent)]">
-              Пришлём счёт и договор
-            </h3>
-            <p className="mt-2 text-sm leading-relaxed">
-              Напишите, сколько документов в год выдаёте и на какое юридическое
-              лицо оформлять. В ответ придут договор, договор-поручение
-              и счёт — их можно сразу отдать юристу и в бухгалтерию.
-            </p>
-          </div>
-          <a href="mailto:info@vruchay.ru?subject=Запрос%20счёта%20—%20Вручай">
-            <Button variant="primary">Запросить счёт</Button>
-          </a>
+        <div className="mt-10">
+          <LeadForm />
         </div>
       </div>
     </section>
