@@ -13,7 +13,9 @@
 	}
 	handle {
 		root * /srv/www
-		try_files {path} /index.html
+		# Сначала предварительно отрисованный файл, и только потом заглушка:
+		# роботу должна доставаться готовая разметка, а не пустой div.
+		try_files {path} {path}/index.html /index.html
 		file_server
 	}
 
