@@ -24,7 +24,7 @@ jobs:
             echo "Секреты стейджинга не настроены — пропускаю (это нормально до покупки VPS)."
             exit 0
           fi
-      - uses: appleboy/ssh-action@v1
+      - uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1
         if: ${{ secrets.STAGING_SSH_HOST != '' }}
         with:
           host: ${{ secrets.STAGING_SSH_HOST }}

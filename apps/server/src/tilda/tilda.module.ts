@@ -6,11 +6,12 @@ import { TildaPublicController } from './tilda-public.controller';
 import { TildaService } from './tilda.service';
 import { TildaProcessor } from './tilda.processor';
 import { OtpService } from './otp.service';
+import { RetentionService } from './retention.service';
 
 @Module({
   imports: [MailModule, GenerationModule],
   controllers: [TildaController, TildaPublicController],
-  providers: [TildaService, TildaProcessor, OtpService],
+  providers: [TildaService, TildaProcessor, OtpService, RetentionService],
   exports: [TildaService],
 })
 export class TildaModule {}

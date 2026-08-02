@@ -1,8 +1,7 @@
 import { createHash, randomInt, timingSafeEqual } from 'node:crypto';
-import { Injectable, OnModuleDestroy } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import IORedis from 'ioredis';
-import type { Env } from '../config/env';
+import { Injectable } from '@nestjs/common';
+import type IORedis from 'ioredis';
+import { InjectRedis } from '../common/redis.module';
 
 /**
  * Одноразовые коды подтверждения адреса.
@@ -20,18 +19,8 @@ const TTL_SECONDS = 10 * 60;
 const MAX_ATTEMPTS = 5;
 
 @Injectable()
-export class OtpService implements OnModuleDestroy {
-  private readonly redis: IORedis;
-
-  constructor(config: ConfigService<Env, true>) {
-    this.redis = new IORedis(config.get('REDIS_URL', { infer: true }), {
-      maxRetriesPerRequest: null,
-    });
-  }
-
-  async onModuleDestroy(): Promise<void> {
-    this.redis.disconnect();
-  }
+export class OtpService {
+  constructor(@InjectRedis() private readonly redis: IORedis) {}
 
   private key(requestId: string): string {
     return `otp:${requestId}`;

@@ -1,35 +1,24 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  HttpException,
-  HttpStatus,
-  Injectable,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { FastifyRequest } from 'fastify';
 import { THROTTLE_KEY, ThrottleOptions } from './throttle.decorator';
-
-interface Hit {
-  count: number;
-  resetAt: number;
-}
+import { RateLimitService } from './rate-limit.service';
 
 /**
- * Ограничение частоты запросов со скользящим окном.
+ * Ограничение частоты обращений к помеченным маршрутам.
  *
- * Счётчики держатся в памяти процесса — этого достаточно, пока приложение
- * работает в одном экземпляре (наша конфигурация: один prod-сервер).
- * При переходе на несколько экземпляров хранилище нужно заменить на Redis,
- * иначе лимит будет умножаться на число процессов.
+ * Ключ — маршрут плюс адрес обращения: лимит на вход не должен расходоваться
+ * заявками с формы и наоборот. Счётчики общие для всех процессов приложения,
+ * см. RateLimitService.
  */
 @Injectable()
 export class ThrottleGuard implements CanActivate {
-  private readonly hits = new Map<string, Hit>();
-  private lastCleanup = 0;
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly limiter: RateLimitService,
+  ) {}
 
-  constructor(private readonly reflector: Reflector) {}
-
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const options = this.reflector.get<ThrottleOptions | undefined>(
       THROTTLE_KEY,
       context.getHandler(),
@@ -37,36 +26,16 @@ export class ThrottleGuard implements CanActivate {
     if (!options) return true;
 
     const req = context.switchToHttp().getRequest<FastifyRequest>();
-    const now = Date.now();
-    this.cleanup(now);
-
     const key = `${context.getClass().name}.${context.getHandler().name}:${req.ip}`;
-    const windowMs = parseWindow(options.timeWindow);
-    const hit = this.hits.get(key);
+    const result = await this.limiter.hit(key, parseWindow(options.timeWindow), options.max);
 
-    if (!hit || hit.resetAt <= now) {
-      this.hits.set(key, { count: 1, resetAt: now + windowMs });
-      return true;
-    }
-
-    hit.count += 1;
-    if (hit.count > options.max) {
-      const retryAfter = Math.ceil((hit.resetAt - now) / 1000);
+    if (!result.allowed) {
       throw new HttpException(
-        { message: `Слишком много попыток. Повторите через ${retryAfter} с.` },
+        { message: `Слишком много попыток. Повторите через ${result.retryAfterSeconds} с.` },
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }
     return true;
-  }
-
-  /** Раз в минуту выбрасываем истёкшие окна, чтобы карта не росла бесконечно. */
-  private cleanup(now: number): void {
-    if (now - this.lastCleanup < 60_000) return;
-    this.lastCleanup = now;
-    for (const [key, hit] of this.hits) {
-      if (hit.resetAt <= now) this.hits.delete(key);
-    }
   }
 }
 
