@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import source from '../legal/privacy.md?raw';
 import { renderMarkdown } from '../legal/markdown';
+import { Meta } from '../seo/Meta';
 
 /**
  * Политика обработки персональных данных.
@@ -43,6 +44,12 @@ export function PrivacyPage() {
   const { filled, missing } = fill(source);
 
   return (
+    <>
+      <Meta
+        title="Политика обработки персональных данных — Вручай"
+        description="Как сервис «Вручай» обрабатывает персональные данные участников и заказчиков: цели, сроки хранения, права субъекта."
+        path="/privacy"
+      />
     <div className="min-h-full bg-[var(--ground)]">
       <header className="border-b border-[var(--line)] bg-[var(--surface)]">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-6 py-3">
@@ -68,5 +75,6 @@ export function PrivacyPage() {
         {renderMarkdown(filled)}
       </main>
     </div>
+    </>
   );
 }

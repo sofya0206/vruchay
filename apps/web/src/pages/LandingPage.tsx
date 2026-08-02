@@ -15,6 +15,8 @@ import { Pricing } from '../landing/Pricing';
 import { ForBusiness } from '../landing/ForBusiness';
 import { Certificate } from '../landing/Certificate';
 import { Scope } from '../landing/Scope';
+import { Meta } from '../seo/Meta';
+import { LANDING_JSON_LD } from '../seo/landing-schema';
 
 /**
  * Посадочная страница.
@@ -50,6 +52,12 @@ const STEPS = [
 export function LandingPage() {
   return (
     <div className="min-h-full bg-[var(--ground)]">
+      <Meta
+        title="Вручай — грамоты и сертификаты списком, с вашей почты"
+        description="Загружаете список участников — получаете именные документы и письма с вашего домена. Данные остаются в России. Первые 50 документов бесплатно."
+        path="/"
+        jsonLd={LANDING_JSON_LD}
+      />
       <Header />
       <Hero />
       <HowItWorks />

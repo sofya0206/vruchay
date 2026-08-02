@@ -1,0 +1,13 @@
+# Индексируем только публичную часть. Кабинет и страница печати
+# в выдаче не нужны и могут раскрыть чужие документы.
+User-agent: *
+Allow: /$
+Allow: /privacy
+Disallow: /login
+Disallow: /settings
+Disallow: /invoices
+Disallow: /documents
+Disallow: /render
+Disallow: /api/
+
+Sitemap: https://vruchay.ru/sitemap.xml
