@@ -25,6 +25,7 @@ model Organization {
   integrations TildaIntegration[]
   tildaRequests TildaRequest[]
   consents    Consent[]
+  reviews     Review[]
 
   @@map("organizations")
 }
@@ -36,6 +37,7 @@ model User {
   name         String      @default("")
   createdAt    DateTime    @default(now()) @map("created_at")
   memberships  OrgMember[]
+  reviews      Review[]
 
   @@map("users")
 }
@@ -433,6 +435,14 @@ enum ConsentPurpose {
   certificate
   marketing
   verification
+  /** Согласие клиента на публикацию его отзыва с именем и организацией. */
+  review_publication
+}
+
+enum ReviewStatus {
+  pending
+  published
+  rejected
 }
 
 /**
@@ -471,4 +481,41 @@ model Consent {
   @@index([orgId, subjectEmail])
   @@index([documentId])
   @@map("consents")
+}
+
+/**
+ * Отзыв клиента о сервисе.
+ *
+ * Оставить его может только вошедший пользователь: отзыв от анонимного
+ * посетителя ничего не доказывает и открывает форму для спама. Публикуется
+ * не сразу — сначала проверка. До публикации требуется отдельное согласие
+ * на обнародование имени и организации: без него это персональные данные,
+ * которые мы не вправе выкладывать на сайт.
+ */
+model Review {
+  id     String @id @default(uuid()) @db.Uuid
+  orgId  String @map("org_id") @db.Uuid
+  userId String @map("user_id") @db.Uuid
+
+  /** Как подписать отзыв. Заполняется автором, а не берётся из профиля. */
+  authorName String  @map("author_name")
+  authorRole String  @map("author_role")
+  orgName    String  @map("org_name")
+  text       String
+  /** Необязательная оценка от 1 до 5. */
+  rating     Int?
+
+  status      ReviewStatus @default(pending)
+  /** Почему отклонён — видно автору, чтобы он мог поправить. */
+  moderatorNote String?    @map("moderator_note")
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  publishedAt DateTime? @map("published_at")
+
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status, publishedAt])
+  @@index([orgId])
+  @@map("reviews")
 }

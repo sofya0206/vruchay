@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Faq } from '../landing/Faq';
+import { Pricing } from '../landing/Pricing';
+import { ForBusiness } from '../landing/ForBusiness';
 
 /**
  * Посадочная страница.
@@ -24,34 +26,6 @@ import { Faq } from '../landing/Faq';
  * интерфейсных переходов до 300 мс, полное отключение при
  * prefers-reduced-motion.
  */
-
-const TARIFFS = [
-  {
-    name: 'Старт',
-    price: '29 000 ₽',
-    period: 'в год',
-    volume: 'до 5 000 документов',
-    perDoc: '5,80 ₽ за документ',
-    features: ['Редактор макетов', 'Списки и импорт из Excel', 'Рассылка с нашего домена', 'Один пользователь'],
-  },
-  {
-    name: 'Про',
-    price: '69 000 ₽',
-    period: 'в год',
-    volume: 'до 20 000 документов',
-    perDoc: '3,45 ₽ за документ',
-    features: ['Всё из «Старта»', 'Отправка с вашего домена', 'Форма на сайте и Тильда', 'До пяти пользователей', 'Доступ по API'],
-    highlight: true,
-  },
-  {
-    name: 'Федерация',
-    price: '149 000 ₽',
-    period: 'в год',
-    volume: 'до 60 000 документов',
-    perDoc: '2,48 ₽ за документ',
-    features: ['Всё из «Про»', 'Импорт протоколов соревнований', 'Правила награждения по местам', 'Пользователи без ограничений', 'Приоритетная поддержка'],
-  },
-];
 
 const STEPS = [
   {
@@ -78,6 +52,7 @@ export function LandingPage() {
       <Hero />
       <HowItWorks />
       <Difference />
+      <ForBusiness />
       <Legal />
       <Pricing />
       <Faq />
@@ -288,76 +263,6 @@ function Legal() {
             </li>
           ))}
         </ul>
-      </div>
-    </section>
-  );
-}
-
-function Pricing() {
-  return (
-    <section id="ceny" className="mx-auto scroll-mt-16 max-w-5xl px-6 py-16">
-      <h2 className="font-serif text-3xl">Цены</h2>
-      <p className="mt-2 max-w-xl text-[var(--text-muted)]">
-        Организациям выгоднее годовая подписка, разовым мероприятиям — оплата по факту.
-      </p>
-
-      <div className="mt-10 grid gap-5 lg:grid-cols-3">
-        {TARIFFS.map((t) => (
-          <div
-            key={t.name}
-            className={`flex flex-col rounded-xl p-6 ring-1 transition-shadow duration-200 hover:shadow-[0_12px_32px_-16px_rgba(20,32,26,0.3)] ${
-              t.highlight
-                ? 'bg-[var(--surface)] ring-2 ring-[var(--accent)]'
-                : 'bg-[var(--surface)] ring-[var(--line)]'
-            }`}
-          >
-            <div className="flex items-baseline gap-2">
-              <h3 className="font-serif text-xl">{t.name}</h3>
-              {t.highlight && (
-                <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--accent)]">
-                  чаще всего берут
-                </span>
-              )}
-            </div>
-            <p className="mt-4 text-2xl">
-              {t.price} <span className="text-sm text-[var(--text-muted)]">{t.period}</span>
-            </p>
-            <p className="mt-1 text-sm text-[var(--text-muted)]">
-              {t.volume} · {t.perDoc}
-            </p>
-            <ul className="mt-5 flex-1 space-y-2 text-sm">
-              {t.features.map((f) => (
-                <li key={f} className="flex gap-2">
-                  <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-[var(--accent)]" />
-                  {f}
-                </li>
-              ))}
-            </ul>
-            <Link to="/login" className="mt-6">
-              <Button variant={t.highlight ? 'primary' : 'secondary'} className="w-full">
-                Начать
-              </Button>
-            </Link>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-6 grid gap-5 rounded-xl bg-[var(--surface-sunken)] p-6 sm:grid-cols-2">
-        <div>
-          <h3 className="font-medium">Разовое мероприятие</h3>
-          <p className="mt-1.5 text-sm leading-relaxed text-[var(--text-muted)]">
-            3 ₽ за выданный документ: создание, письмо и страница проверки.
-            Пакеты со скидкой — 1 000 документов за 2 500 ₽, 5 000 за 11 000 ₽.
-            Пакеты без срока действия.
-          </p>
-        </div>
-        <div>
-          <h3 className="font-medium">Первые 50 — бесплатно</h3>
-          <p className="mt-1.5 text-sm leading-relaxed text-[var(--text-muted)]">
-            Без водяных знаков и без карты. Пятидесяти документов хватает,
-            чтобы провести настоящее награждение и понять, подходит ли сервис.
-          </p>
-        </div>
       </div>
     </section>
   );
