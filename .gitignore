@@ -12,3 +12,6 @@ apps/server/generated/
 # Банковские и учётные реквизиты — не в репозиторий.
 # Шаблон с плейсхолдерами: docs/business/requisites.example.md
 docs/business/requisites.md
+# Готовые документы содержат адрес регистрации ИП — тоже не коммитим.
+# Собираются командой: node docs/business/render-documents.mjs
+docs/business/generated/
