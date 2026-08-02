@@ -1,0 +1,94 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Раз в неделю: уязвимость в зависимости может появиться и без наших коммитов.
+    - cron: '0 6 * * 1'
+
+# По умолчанию — только чтение. Каждая работа при необходимости расширяет права сама.
+permissions:
+  contents: read
+
+jobs:
+  secrets:
+    name: Поиск утёкших секретов
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Полная история: секрет мог утечь в старом коммите и быть «исправлен»
+          # последующим — из истории он никуда не делся.
+          fetch-depth: 0
+
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  dependencies:
+    name: Уязвимости в зависимостях
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Аудит зависимостей
+        # Роняем сборку только на высоких и критических: на «умеренных»
+        # конвейер краснел бы постоянно и его перестали бы читать.
+        run: pnpm audit --audit-level high
+
+      - name: Проверка на подмену внутренних пакетов
+        # Наши пакеты называются @gramota/*. Если такое имя появится в публичном
+        # реестре, установка может подтянуть чужой код вместо нашего.
+        # Внутренние пакеты обязаны разрешаться только через workspace.
+        run: |
+          if grep -rE '"@gramota/[a-z-]+":\s*"(?!workspace:)' --include=package.json -P . ; then
+            echo "::error::Внутренний пакет подключён не через workspace: — риск подмены имени"
+            exit 1
+          fi
+          echo "Все внутренние пакеты подключены через workspace:"
+
+  code:
+    name: Статический анализ кода
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Semgrep
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: >-
+            p/typescript
+            p/nodejs
+            p/owasp-top-ten
+            p/secrets
+        continue-on-error: true
+
+  images:
+    name: Уязвимости в образах
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Сборка образа сервера
+        run: docker build -f apps/server/Dockerfile -t vruchay-server:scan .
+
+      - name: Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: vruchay-server:scan
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'

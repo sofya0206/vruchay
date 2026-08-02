@@ -1,0 +1,45 @@
+# Правила поиска утёкших секретов.
+# Базовый набор gitleaks плюс то, что специфично для нашего проекта.
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "vruchay-session-secret"
+description = "Секрет сессии в открытом виде"
+regex = '''SESSION_SECRET\s*[:=]\s*["']?[A-Za-z0-9+/=]{32,}'''
+tags = ["secret", "session"]
+
+[[rules]]
+id = "vruchay-dashamail-key"
+description = "Ключ почтового API"
+regex = '''DASHAMAIL_API_KEY\s*[:=]\s*["']?[A-Za-z0-9_-]{16,}'''
+tags = ["secret", "mail"]
+
+[[rules]]
+id = "vruchay-s3-secret"
+description = "Ключ доступа к объектному хранилищу"
+regex = '''S3_SECRET_KEY\s*[:=]\s*["']?(?!gramota-secret)[A-Za-z0-9+/=]{16,}'''
+tags = ["secret", "storage"]
+
+[[rules]]
+id = "vruchay-bank-account"
+description = "Расчётный счёт в коде или документации"
+# Реквизиты живут в requisites.md, который в .gitignore. Если счёт всплыл
+# где-то ещё — это ошибка, а не секрет как таковой.
+regex = '''\b4080281\d{13}\b'''
+tags = ["pii", "banking"]
+
+[allowlist]
+description = "Значения для локальной разработки — не секреты"
+paths = [
+  '''\.env\.example$''',
+  '''docker-compose\.dev\.yml$''',
+  '''\.claude/skills/.*''',
+]
+regexes = [
+  # Плейсхолдеры и значения локальной среды.
+  '''CHANGE_ME''',
+  '''gramota-secret''',
+  '''postgresql://gramota:gramota@localhost''',
+]

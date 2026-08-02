@@ -1,32 +1,66 @@
-# Прод/стейджинг. Требует .env рядом (см. RUNBOOK.md):
-#   IMAGE_TAG, DOMAIN, DATABASE_URL (managed PostgreSQL), REDIS_URL,
-#   S3_* , SMTP_* / DASHAMAIL_* (по фазам).
-# PostgreSQL в проде — управляемый (Timeweb Cloud/Selectel DBaaS), в compose его нет.
+# Прод и стейджинг. Требует .env рядом — см. RUNBOOK.md.
+#
+# PostgreSQL живёт здесь же, в контейнере: при наших объёмах управляемая база
+# простаивала бы (ADR-0002). Условие этого решения — ежедневный дамп в S3
+# и ежемесячная проверка восстановления, без них так делать нельзя.
 
-name: gramota
+name: vruchay
 
 services:
   api:
     image: ghcr.io/OWNER/gramota-server:${IMAGE_TAG:-latest}
     restart: always
     env_file: .env
+    environment:
+      # Задания обрабатывает отдельный контейнер, здесь только HTTP.
+      RUN_WORKER: 'false'
     depends_on:
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    mem_limit: 1g
     healthcheck:
       test: ['CMD', 'node', '-e', "fetch('http://localhost:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 5s
       retries: 3
 
-  # worker включится в Фазе 2 (генерация PDF):
-  # worker:
-  #   image: ghcr.io/OWNER/gramota-server:${IMAGE_TAG:-latest}
-  #   command: node dist/worker.js
-  #   restart: always
-  #   env_file: .env
-  #   mem_limit: 2g
-  #   depends_on:
-  #     - redis
+  worker:
+    image: ghcr.io/OWNER/gramota-server:${IMAGE_TAG:-latest}
+    command: ['node', 'dist/worker.js']
+    restart: always
+    env_file: .env
+    environment:
+      RUN_WORKER: 'true'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    # Жёсткий лимит: Chromium течёт по памяти при длительной работе, и без
+    # ограничения он утянул бы за собой базу на том же сервере. При превышении
+    # ядро убьёт воркер, а не PostgreSQL, и restart вернёт его в строй.
+    mem_limit: 2g
+    # Chromium использует разделяемую память; стандартных 64 МБ ему мало.
+    shm_size: 512m
+
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    # Порт наружу не публикуется: база доступна только из сети compose.
+    mem_limit: 2g
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7-alpine
@@ -34,6 +68,7 @@ services:
     volumes:
       - redis-data:/data
     command: ['redis-server', '--appendonly', 'yes']
+    mem_limit: 512m
 
   web:
     image: ghcr.io/OWNER/gramota-web:${IMAGE_TAG:-latest}
@@ -53,6 +88,7 @@ services:
       - api
 
 volumes:
+  pg-data:
   redis-data:
   caddy-data:
   caddy-config:
