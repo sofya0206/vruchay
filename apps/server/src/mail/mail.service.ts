@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { SmtpProvider } from './smtp.provider';
 import {
+  escapeHtml,
   isValidEmail,
   renderHtmlTemplate,
   renderSubject,
@@ -11,6 +12,16 @@ import {
 } from './mail-template';
 import type { MailProvider } from './mail-provider.interface';
 import { redact } from '../common/redact';
+
+/**
+ * Запасной текст письма — когда документ выдан по заявке с формы,
+ * а шаблон письма организация ещё не настроила. Без переменных:
+ * подставлять нечего, а пустые места в письме хуже нейтрального текста.
+ */
+const DEFAULT_SUBJECT = 'Ваш документ';
+const DEFAULT_BODY_HTML =
+  '<p style="font-size:15px">Здравствуйте!</p>' +
+  '<p style="font-size:15px">Ваш документ во вложении к этому письму.</p>';
 
 @Injectable()
 export class MailService {
@@ -235,13 +246,76 @@ export class MailService {
     return { queued: created.length, skipped, emailIds: created.map((e) => e.id) };
   }
 
+  /**
+   * Письмо по одной заявке с публичной формы.
+   *
+   * Шаблон документа используется, если он настроен: организация уже описала
+   * там и текст, и отправителя. Если шаблона нет — заявка всё равно должна
+   * дойти до человека, поэтому отправляем служебным текстом.
+   * Запись в журнале создаётся в обоих случаях: выдача документа постороннему
+   * человеку обязана быть видна владельцу.
+   */
+  async queueSingle(
+    orgId: string,
+    documentId: string,
+    toEmail: string,
+    data: Record<string, string>,
+    fileId: string,
+  ): Promise<string> {
+    if (!isValidEmail(toEmail)) throw new BadRequestException('Некорректный адрес');
+
+    const template = await this.getTemplate(orgId, documentId);
+    const sender = template?.sender ?? (await this.defaultSender(orgId));
+    if (!sender) {
+      throw new BadRequestException('Не настроен отправитель с подтверждённым доменом');
+    }
+
+    // Домен мог перестать быть подтверждённым уже после настройки шаблона.
+    const domain = await this.prisma.mailDomain.findFirst({
+      where: { id: sender.domainId, orgId },
+      select: { status: true },
+    });
+    if (domain?.status !== 'verified') {
+      throw new BadRequestException('Домен отправителя не подтверждён — отправка невозможна');
+    }
+
+    const email = await this.prisma.email.create({
+      data: {
+        orgId,
+        documentId,
+        templateId: template?.id,
+        fileId,
+        toEmail: toEmail.trim().toLowerCase(),
+        subject: template ? renderSubject(template.subject, data) : DEFAULT_SUBJECT,
+        provider: this.providerFor('smtp').name,
+      },
+    });
+    return email.id;
+  }
+
   /** Отправка одного письма. Вызывается воркером. */
   async sendOne(emailId: string): Promise<void> {
     const email = await this.prisma.email.findUnique({
       where: { id: emailId },
       include: { template: { include: { sender: true } }, file: true },
     });
-    if (!email || !email.template?.sender) return;
+    if (!email) return;
+
+    // Письма по заявкам с форм шаблона могут не иметь — отправитель тогда
+    // берётся по умолчанию, а тело письма служебное.
+    const sender = email.template?.sender ?? (await this.defaultSender(email.orgId));
+    if (!sender) {
+      this.logger.warn(`Письмо ${emailId}: нет отправителя с подтверждённым доменом`);
+      await this.prisma.email.update({
+        where: { id: emailId },
+        data: {
+          status: 'failed',
+          error: 'Нет отправителя с подтверждённым доменом',
+          statusUpdatedAt: new Date(),
+        },
+      });
+      return;
+    }
 
     const row = email.rowId
       ? await this.prisma.recipientRow.findUnique({ where: { id: email.rowId } })
@@ -260,10 +334,12 @@ export class MailService {
         : undefined;
 
       const { providerMessageId } = await this.providerFor(email.provider).send({
-        from: { email: email.template.sender.email, name: email.template.sender.displayName },
+        from: { email: sender.email, name: sender.displayName },
         to: email.toEmail,
         subject: email.subject,
-        html: renderHtmlTemplate(email.template.bodyHtml, data),
+        html: email.template
+          ? renderHtmlTemplate(email.template.bodyHtml, data)
+          : DEFAULT_BODY_HTML,
         attachments,
         reference: email.id,
       });
@@ -299,6 +375,46 @@ export class MailService {
         },
       });
     }
+  }
+
+  /**
+   * Отправитель по умолчанию — для писем, у которых нет своего шаблона
+   * (код подтверждения, выдача по заявке с формы). Домен обязан быть
+   * подтверждён: правило «слать только со своего домена» без исключений.
+   */
+  private async defaultSender(orgId: string) {
+    return this.prisma.sender.findFirst({
+      where: { orgId, domain: { status: 'verified' } },
+      orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+    });
+  }
+
+  /**
+   * Служебное письмо с кодом подтверждения.
+   *
+   * Идёт мимо шаблонов и журнала писем: это не рассылка документа, а разовая
+   * проверка адреса. В журнал такие письма не пишем — иначе он забьётся
+   * технической перепиской и в нём не найти реальную выдачу документов.
+   */
+  async sendCode(orgId: string, to: string, code: string): Promise<void> {
+    const sender = await this.defaultSender(orgId);
+    if (!sender) {
+      throw new BadRequestException(
+        'Не настроен отправитель с подтверждённым доменом — код выслать некуда',
+      );
+    }
+
+    await this.providerFor('smtp').send({
+      from: { email: sender.email, name: sender.displayName },
+      to,
+      subject: `${code} — код для получения документа`,
+      // Код в теме письма: человек видит его в списке писем, не открывая.
+      html:
+        `<p style="font-size:15px">Ваш код подтверждения:</p>` +
+        `<p style="font-size:28px;letter-spacing:.2em;font-weight:600">${escapeHtml(code)}</p>` +
+        `<p style="font-size:13px;color:#5f6b64">Код действует 10 минут. ` +
+        `Если вы не запрашивали документ, просто проигнорируйте это письмо.</p>`,
+    });
   }
 
   async listEmails(orgId: string, documentId?: string) {

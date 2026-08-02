@@ -1,7 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Award, FileText, LogOut, Plus, Search, Trash2 } from 'lucide-react';
+import { Award, FileText, LogOut, Plus, Search, Settings, Trash2 } from 'lucide-react';
 import { api } from '../api/client';
 import type { DocumentDetail, DocumentList } from '../api/types';
 import { useLogout, useMe } from '../auth/useAuth';
@@ -54,6 +54,13 @@ export function DocumentsPage() {
             <span className="hidden text-sm text-[var(--text-muted)] sm:inline">
               {me.data?.email}
             </span>
+            <Link
+              to="/settings"
+              className="inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
+            >
+              <Settings size={15} />
+              <span className="hidden sm:inline">Настройки</span>
+            </Link>
             <Button
               size="sm"
               variant="ghost"

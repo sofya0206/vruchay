@@ -28,12 +28,12 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
   private connection?: IORedis;
   private queue?: Queue<GenerationJobData>;
   private worker?: Worker<GenerationJobData>;
-  private renderer?: PdfRenderer;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
     private readonly config: ConfigService<Env, true>,
+    private readonly renderer: PdfRenderer,
   ) {}
 
   onModuleInit(): void {
@@ -47,11 +47,6 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    this.renderer = new PdfRenderer(
-      this.config.get('PUBLIC_URL', { infer: true }),
-      this.config.get('PLAYWRIGHT_CHANNEL', { infer: true }) || undefined,
-    );
-
     this.worker = new Worker<GenerationJobData>(
       GENERATION_QUEUE,
       (job) => this.process(job.data.jobId),
@@ -64,7 +59,6 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
 
   async onModuleDestroy(): Promise<void> {
     await this.worker?.close();
-    await this.renderer?.close();
     await this.queue?.close();
     this.connection?.disconnect();
   }
@@ -102,7 +96,7 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
           secret,
           Math.floor(Date.now() / 1000),
         );
-        const body = await this.renderer!.render(
+        const body = await this.renderer.render(
           token,
           job.document.pageWidthMm,
           job.document.pageHeightMm,

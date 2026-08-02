@@ -10,6 +10,7 @@ import { RecipientsModule } from './recipients/recipients.module';
 import { RenderModule } from './render/render.module';
 import { GenerationModule } from './generation/generation.module';
 import { MailModule } from './mail/mail.module';
+import { TildaModule } from './tilda/tilda.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { MailModule } from './mail/mail.module';
     RenderModule,
     GenerationModule,
     MailModule,
+    TildaModule,
   ],
   controllers: [HealthController],
 })

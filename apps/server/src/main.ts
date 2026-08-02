@@ -9,6 +9,7 @@ import helmet from '@fastify/helmet';
 import { MAX_IMAGE_BYTES } from './common/image-type';
 import { AppModule } from './app.module';
 import { validateEnv } from './config/env';
+import { registerPublicCors } from './tilda/public-cors';
 
 const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60;
 
@@ -64,6 +65,8 @@ async function bootstrap() {
   await app.register(fastifyMultipart, {
     limits: { fileSize: MAX_IMAGE_BYTES, files: 1, fields: 10 },
   });
+
+  registerPublicCors(app.getHttpAdapter().getInstance());
 
   app.setGlobalPrefix('api', { exclude: ['health'] });
   await app.listen(env.PORT, '0.0.0.0');

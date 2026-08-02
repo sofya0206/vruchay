@@ -22,6 +22,9 @@ model Organization {
   senders     Sender[]
   templates   EmailTemplate[]
   emails      Email[]
+  integrations TildaIntegration[]
+  tildaRequests TildaRequest[]
+  consents    Consent[]
 
   @@map("organizations")
 }
@@ -340,4 +343,132 @@ model EmailEvent {
 
   @@index([emailId])
   @@map("email_events")
+}
+
+// ─── Публичные формы: Тильда и виджеты (Фаза 4) ────────────────────────────
+
+enum TildaAuthMode {
+  none
+  email_code
+}
+
+model TildaIntegration {
+  id    String @id @default(uuid()) @db.Uuid
+  orgId String @map("org_id") @db.Uuid
+  name  String
+
+  /** Попадает в адрес скрипта на странице клиента, поэтому виден всем. */
+  token String @unique @default(uuid()) @db.Uuid
+
+  /** Домены страниц, с которых принимаются заявки. Пустой список = не принимать. */
+  allowedDomains String[] @map("allowed_domains")
+  /** Какие документы разрешено запрашивать через эту интеграцию. */
+  documentIds    String[] @map("document_ids") @db.Uuid
+
+  authMode TildaAuthMode @default(email_code) @map("auth_mode")
+  /** Один файл на пару «документ + адрес»: повторный запрос отдаёт готовый. */
+  singleFilePerEmail Boolean @default(true) @map("single_file_per_email")
+  dailyLimit         Int     @default(500) @map("daily_limit")
+
+  successMessage String  @default("Спасибо! Документ отправлен на вашу почту") @map("success_message")
+  showDownload   Boolean @default(true) @map("show_download")
+  sendEmail      Boolean @default(true) @map("send_email")
+  copyToEmail    String? @map("copy_to_email")
+  active         Boolean @default(true)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  org      Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  requests TildaRequest[]
+
+  @@index([orgId])
+  @@map("tilda_integrations")
+}
+
+enum TildaRequestStatus {
+  pending_otp
+  processing
+  done
+  failed
+  rejected
+}
+
+model TildaRequest {
+  id            String @id @default(uuid()) @db.Uuid
+  integrationId String @map("integration_id") @db.Uuid
+  orgId         String @map("org_id") @db.Uuid
+  documentId    String @map("document_id") @db.Uuid
+
+  email  String
+  /** Остальные поля формы: становятся переменными документа. */
+  fields Json   @default("{}")
+
+  /** Нужны для разбора злоупотреблений; хранятся ограниченный срок. */
+  ip        String? @db.Inet
+  userAgent String? @map("user_agent")
+
+  status  TildaRequestStatus @default(processing)
+  fileId  String?            @map("file_id") @db.Uuid
+  emailId String?            @map("email_id") @db.Uuid
+  error   String?
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  doneAt    DateTime? @map("done_at")
+
+  integration TildaIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  org         Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  consents    Consent[]
+
+  /**
+   * Один выданный документ на пару «документ + адрес». Частичный уникальный
+   * индекс только по завершённым заявкам создаётся отдельной миграцией:
+   * Prisma частичные индексы в схеме не описывает.
+   */
+  @@index([integrationId, createdAt])
+  @@index([documentId, email])
+  @@map("tilda_requests")
+}
+
+enum ConsentPurpose {
+  certificate
+  marketing
+  verification
+}
+
+/**
+ * Журнал согласий.
+ *
+ * Доказывать наличие согласия при споре обязан оператор, и «пользователь же
+ * нажал галочку» без записи не работает. Договор-поручение отдельно обязывает
+ * нас предоставлять эти сведения заказчику по запросу.
+ */
+model Consent {
+  id    String @id @default(uuid()) @db.Uuid
+  orgId String @map("org_id") @db.Uuid
+
+  requestId  String? @map("request_id") @db.Uuid
+  documentId String? @map("document_id") @db.Uuid
+
+  subjectEmail String         @map("subject_email")
+  purpose      ConsentPurpose
+  granted      Boolean
+
+  /**
+   * Отпечаток текста согласия, который человек видел в момент нажатия.
+   * Без него нельзя доказать, на что именно он соглашался: текст меняется.
+   */
+  textVersion String  @map("text_version")
+  formId      String? @map("form_id")
+
+  ip        String? @db.Inet
+  userAgent String? @map("user_agent")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  org     Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  request TildaRequest? @relation(fields: [requestId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, subjectEmail])
+  @@index([documentId])
+  @@map("consents")
 }

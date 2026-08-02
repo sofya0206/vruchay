@@ -1,5 +1,7 @@
 import { chromium, type Browser, type Page } from 'playwright';
-import { Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import type { Env } from '../config/env';
 
 /**
  * Печать страницы приложения в PDF.
@@ -8,22 +10,38 @@ import { Logger } from '@nestjs/common';
  * а страниц может быть тысяча. Раз в RESTART_AFTER файлов браузер
  * перезапускается — Chromium при длительной работе течёт по памяти,
  * а рядом с ним на том же сервере живёт база.
+ *
+ * Экземпляр один на процесс и общий для массовой генерации и заявок с форм.
+ * Отрисовки выстроены в очередь: параллельные вкладки съели бы память,
+ * которой у воркера ровно 2 ГБ, а перезапуск браузера посреди чужой
+ * отрисовки закрыл бы её вкладку. Очередь заодно даёт заявке с формы
+ * попасть между двумя строками пакета, а не ждать пакет целиком.
  */
 
 const RESTART_AFTER = 200;
 const PAGE_TIMEOUT_MS = 30_000;
 const READY_TIMEOUT_MS = 15_000;
 
-export class PdfRenderer {
+@Injectable()
+export class PdfRenderer implements OnModuleDestroy {
   private readonly logger = new Logger(PdfRenderer.name);
   private browser: Browser | null = null;
   private rendered = 0;
+  /** Хвост очереди отрисовок: каждая ждёт завершения предыдущей. */
+  private tail: Promise<unknown> = Promise.resolve();
 
-  constructor(
-    private readonly baseUrl: string,
-    /** На проде — встроенный Chromium из образа, локально — системный Chrome. */
-    private readonly channel?: string,
-  ) {}
+  private readonly baseUrl: string;
+  /** На проде — встроенный Chromium из образа, локально — системный Chrome. */
+  private readonly channel?: string;
+
+  constructor(config: ConfigService<Env, true>) {
+    this.baseUrl = config.get('PUBLIC_URL', { infer: true });
+    this.channel = config.get('PLAYWRIGHT_CHANNEL', { infer: true }) || undefined;
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    await this.close();
+  }
 
   private async getBrowser(): Promise<Browser> {
     if (this.browser && this.rendered < RESTART_AFTER) return this.browser;
@@ -39,7 +57,21 @@ export class PdfRenderer {
     return this.browser;
   }
 
-  async render(
+  /** Ставит отрисовку в общую очередь. Ошибка одной не рвёт цепочку следующих. */
+  render(
+    token: string,
+    pageWidthMm: number,
+    pageHeightMm: number,
+    format: 'pdf' | 'jpg',
+  ): Promise<Buffer> {
+    const result = this.tail.then(() =>
+      this.renderNow(token, pageWidthMm, pageHeightMm, format),
+    );
+    this.tail = result.catch(() => undefined);
+    return result;
+  }
+
+  private async renderNow(
     token: string,
     pageWidthMm: number,
     pageHeightMm: number,
