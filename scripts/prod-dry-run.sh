@@ -34,7 +34,7 @@ cp docker-compose.prod.yml "$WORK/"
 # контейнера базы, и в строку подключения. Разойдутся — миграции не подключатся.
 PGPASS=$(openssl rand -hex 16)
 cat > "$WORK/.env" <<ENV
-IMAGE_PREFIX=local/gramota
+IMAGE_PREFIX=local
 IMAGE_TAG=dryrun
 DOMAIN=:8081
 PUBLIC_URL=http://localhost:8081
@@ -64,14 +64,25 @@ p.write_text(t)
 PY
 
 echo "3/4 Запуск"
-docker compose -p "$PROJECT" -f "$WORK/docker-compose.prod.yml" --env-file "$WORK/.env" \
-  up -d --wait api worker web
+dc() { docker compose -p "$PROJECT" -f "$WORK/docker-compose.prod.yml" --env-file "$WORK/.env" "$@"; }
+
+# Журналы при сбое — весь смысл проверки. Без них видно только «контейнер
+# нездоров», а причина уезжает вместе с удалённым хозяйством.
+if ! dc up -d --wait api worker web; then
+  echo
+  echo "--- журнал миграций ---"; dc logs --no-log-prefix migrate 2>&1 | tail -20
+  echo "--- журнал приложения ---"; dc logs --no-log-prefix api 2>&1 | tail -30
+  echo "--- журнал воркера ---"; dc logs --no-log-prefix worker 2>&1 | tail -20
+  echo
+  echo "Запуск не удался — смотрите журналы выше."
+  exit 1
+fi
 
 echo "4/4 Проверки"
 FAILED=0
 say() { if [ "$2" = ok ]; then printf '  ✓ %s\n' "$1"; else printf '  ✗ %s — %s\n' "$1" "$2"; FAILED=1; fi; }
 
-logs=$(docker compose -p "$PROJECT" -f "$WORK/docker-compose.prod.yml" logs migrate 2>&1)
+logs=$(dc logs migrate 2>&1)
 say "миграции применены" "$(echo "$logs" | grep -qiE 'migrations? (have been )?(successfully )?applied|already in sync' && echo ok || echo 'смотрите logs migrate')"
 
 code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 http://localhost:8081/health || echo нет)
@@ -80,10 +91,10 @@ say "приложение отвечает" "$([ "$code" = 200 ] && echo ok || e
 code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 http://localhost:8081/ || echo нет)
 say "страница отдаётся" "$([ "$code" = 200 ] && echo ok || echo "код $code")"
 
-state=$(docker compose -p "$PROJECT" -f "$WORK/docker-compose.prod.yml" ps --format '{{.Service}} {{.State}}' | grep '^worker' || true)
+state=$(dc ps --format '{{.Service}} {{.State}}' | grep '^worker' || true)
 say "воркер работает" "$(echo "$state" | grep -q running && echo ok || echo "${state:-не запущен}")"
 
-wlogs=$(docker compose -p "$PROJECT" -f "$WORK/docker-compose.prod.yml" logs worker 2>&1)
+wlogs=$(dc logs worker 2>&1)
 say "воркер без ошибок запуска" "$(echo "$wlogs" | grep -qiE 'error|ошибк' && echo 'есть ошибки в журнале' || echo ok)"
 
 echo

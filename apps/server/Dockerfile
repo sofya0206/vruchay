@@ -34,6 +34,12 @@ RUN node_modules/.bin/playwright install --with-deps chromium \
     && chmod -R a+rX /ms-playwright \
     && rm -rf /var/lib/apt/lists/*
 
+# Клиент Prisma генерируется здесь, а не только на этапе сборки: `pnpm deploy`
+# собирает node_modules заново, и созданный ранее клиент вместе с двоичным
+# движком запросов в него не попадает. Приложение при этом собирается и
+# запускается — и падает при первом же обращении к базе.
+RUN node_modules/.bin/prisma generate
+
 # Приложение работает не от root: если Chromium удастся скомпрометировать,
 # у злоумышленника не будет прав на изменение образа и системных файлов.
 RUN useradd --create-home --shell /usr/sbin/nologin app \
