@@ -35,7 +35,8 @@ export class PdfRenderer implements OnModuleDestroy {
   private readonly channel?: string;
 
   constructor(config: ConfigService<Env, true>) {
-    this.baseUrl = config.get('PUBLIC_URL', { infer: true });
+    this.baseUrl =
+      config.get('RENDER_BASE_URL', { infer: true }) ?? config.get('PUBLIC_URL', { infer: true });
     this.channel = config.get('PLAYWRIGHT_CHANNEL', { infer: true }) || undefined;
   }
 

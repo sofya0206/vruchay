@@ -19,11 +19,19 @@ RUN pnpm --filter @gramota/shared build \
 
 FROM base AS runtime
 ENV NODE_ENV=production
+# Браузеры — в общий каталог, а не в домашний каталог того, кто их ставил.
+# Ставит их root, а работает приложение от пользователя app: в /root/.cache
+# он не заглянет и браузер не найдёт. Проверяется это только запуском —
+# сборка образа проходит успешно в любом случае.
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 COPY --from=build /out /app
 
-# Chromium для генерации PDF ставится вместе с системными зависимостями.
+# Chromium ставится тем же playwright, что лежит в зависимостях приложения:
+# версия библиотеки и номер сборки браузера должны совпадать, иначе
+# библиотека будет искать браузер, которого нет.
 # В образе он есть у обеих ролей: контейнер один, команда запуска разная.
-RUN npx --yes playwright@1.62.0 install --with-deps chromium \
+RUN node_modules/.bin/playwright install --with-deps chromium \
+    && chmod -R a+rX /ms-playwright \
     && rm -rf /var/lib/apt/lists/*
 
 # Приложение работает не от root: если Chromium удастся скомпрометировать,
@@ -31,6 +39,13 @@ RUN npx --yes playwright@1.62.0 install --with-deps chromium \
 RUN useradd --create-home --shell /usr/sbin/nologin app \
     && chown -R app:app /app /home/app
 USER app
+
+# Браузер запускается здесь же, при сборке, и именно от пользователя app.
+# Каталог с браузерами задаётся переменной, и ошибиться в нём легко, а
+# проявилась бы ошибка только в проде и только на первом же награждении:
+# сборка образа без этой строки проходит успешно в любом случае.
+RUN node -e "require('playwright').chromium.launch({args:['--no-sandbox']}).then(b=>b.close())" \
+    && echo 'Chromium запускается от пользователя app'
 
 EXPOSE 3000
 CMD ["node", "dist/main.js"]

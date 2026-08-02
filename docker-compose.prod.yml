@@ -7,19 +7,40 @@
 name: vruchay
 
 services:
+  # Миграции выполняются отдельным разовым контейнером до старта приложения.
+  # Не в entrypoint api: тогда при двух экземплярах они запустились бы дважды
+  # одновременно, а prisma не рассчитана на параллельное применение.
+  migrate:
+    image: ${IMAGE_PREFIX}/gramota-server:${IMAGE_TAG:-latest}
+    # Двоичный файл из образа, а не через npx: npx при отсутствии локальной
+    # копии молча скачает другую версию из сети, а нам нужен громкий отказ.
+    command: ['node_modules/.bin/prisma', 'migrate', 'deploy']
+    env_file: .env
+    restart: 'no'
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   api:
-    image: ghcr.io/OWNER/gramota-server:${IMAGE_TAG:-latest}
+    image: ${IMAGE_PREFIX}/gramota-server:${IMAGE_TAG:-latest}
     restart: always
     env_file: .env
     environment:
       # Задания обрабатывает отдельный контейнер, здесь только HTTP.
       RUN_WORKER: 'false'
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
         condition: service_started
     mem_limit: 1g
+    # Приложению не нужна ни одна возможность ядра, а повышение прав внутри
+    # контейнера не нужно тем более: обе двери закрываем явно.
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
     healthcheck:
       test: ['CMD', 'node', '-e', "fetch('http://localhost:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 30s
@@ -27,13 +48,19 @@ services:
       retries: 3
 
   worker:
-    image: ghcr.io/OWNER/gramota-server:${IMAGE_TAG:-latest}
+    image: ${IMAGE_PREFIX}/gramota-server:${IMAGE_TAG:-latest}
     command: ['node', 'dist/worker.js']
     restart: always
     env_file: .env
     environment:
       RUN_WORKER: 'true'
+      # Страница печати берётся у соседнего контейнера, а не через интернет.
+      RENDER_BASE_URL: http://web:8080
     depends_on:
+      web:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
@@ -44,6 +71,13 @@ services:
     mem_limit: 2g
     # Chromium использует разделяемую память; стандартных 64 МБ ему мало.
     shm_size: 512m
+    # Здесь это важнее, чем у приложения: Chromium запускается без собственной
+    # песочницы (в контейнере она требует прав, которые опаснее самой песочницы),
+    # поэтому ограничиваем снаружи. Chromium с ключом --no-sandbox не требует
+    # ни одной возможности ядра — проверено запуском в этом же образе.
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
 
   postgres:
     image: postgres:16-alpine
@@ -71,7 +105,7 @@ services:
     mem_limit: 512m
 
   web:
-    image: ghcr.io/OWNER/gramota-web:${IMAGE_TAG:-latest}
+    image: ${IMAGE_PREFIX}/gramota-web:${IMAGE_TAG:-latest}
     restart: always
     environment:
       DOMAIN: ${DOMAIN}
@@ -85,7 +119,8 @@ services:
       - caddy-data:/data
       - caddy-config:/config
     depends_on:
-      - api
+      api:
+        condition: service_healthy
 
 volumes:
   pg-data:

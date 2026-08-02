@@ -73,6 +73,12 @@ docker compose -f docker-compose.prod.yml up -d
   `IMAGE_TAG=<sha> docker compose -f docker-compose.prod.yml up -d`.
 - Откат: тот же compose с предыдущим IMAGE_TAG (sha из истории CI).
 
+## Первый запуск
+
+Пошаговый план на день выката — [docs/launch-day.md](docs/launch-day.md):
+заказ сервера, записи DNS, подготовка машины, ключ шифрования копий,
+выкат, создание владельца, включение резервного копирования, наблюдение.
+
 ## Резервные копии
 
 Скрипты: [`scripts/backup.sh`](scripts/backup.sh) и

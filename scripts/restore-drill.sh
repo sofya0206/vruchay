@@ -7,10 +7,12 @@
 # ключ шифрования, дамп без прав на расширения, несовпадение версии
 # PostgreSQL, обрезанный при выгрузке файл.
 #
-# Запускать на staging, а не на боевом сервере.
+# Запускать на staging, а не на боевом сервере. Восстанавливает в отдельную
+# базу того же контейнера — боевую не трогает.
 #
 #   BACKUP_S3_BUCKET=s3://vruchay-backups \
 #   AGE_IDENTITY=/path/to/key.txt \
+#   POSTGRES_USER=vruchay \
 #   RESTORE_DATABASE=vruchay_drill \
 #   ./scripts/restore-drill.sh [имя-файла]
 set -euo pipefail
@@ -36,13 +38,17 @@ aws s3 cp "${BACKUP_S3_BUCKET}/db/${FILE}" "$WORK/dump.age" \
 age --decrypt --identity "$AGE_IDENTITY" "$WORK/dump.age" | gunzip > "$WORK/dump.sql"
 echo "Расшифровано: $(wc -c < "$WORK/dump.sql") байт"
 
-dropdb --if-exists "$RESTORE_DATABASE"
-createdb "$RESTORE_DATABASE"
-psql --quiet --dbname "$RESTORE_DATABASE" --file "$WORK/dump.sql" > /dev/null
+COMPOSE_FILE="${COMPOSE_FILE:-/opt/vruchay/docker-compose.prod.yml}"
+PGUSER="${POSTGRES_USER:-vruchay}"
+dc() { docker compose -f "$COMPOSE_FILE" exec -T postgres "$@"; }
+
+dc dropdb -U "$PGUSER" --if-exists "$RESTORE_DATABASE"
+dc createdb -U "$PGUSER" "$RESTORE_DATABASE"
+dc psql -U "$PGUSER" --quiet --dbname "$RESTORE_DATABASE" < "$WORK/dump.sql" > /dev/null
 
 echo
 echo "Что восстановилось:"
-psql --dbname "$RESTORE_DATABASE" --tuples-only --command "
+dc psql -U "$PGUSER" --dbname "$RESTORE_DATABASE" --tuples-only --command "
   select 'организаций: ' || count(*) from organizations
   union all select 'пользователей: ' || count(*) from users
   union all select 'документов: ' || count(*) from documents

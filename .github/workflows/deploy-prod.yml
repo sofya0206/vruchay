@@ -1,0 +1,65 @@
+name: Deploy prod
+
+# Только вручную и только с указанием образа. Автоматического выката на бой
+# нет намеренно: обновление боевого сервиса — решение человека, который в этот
+# момент готов смотреть на журнал и откатывать.
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Хеш коммита (тег образа в GHCR). Возьмите из успешной сборки CI.'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  # Два выката одновременно оставили бы сервер в неизвестном состоянии.
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Проверка формата тега
+        run: |
+          if ! echo "${{ inputs.image_tag }}" | grep -qE '^[0-9a-f]{40}$'; then
+            echo "Тег должен быть полным хешем коммита из CI, а не latest или веткой."
+            exit 1
+          fi
+
+      - name: Выкат
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1
+        with:
+          host: ${{ secrets.PROD_SSH_HOST }}
+          username: ${{ secrets.PROD_SSH_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd /opt/vruchay
+
+            # Прежний тег запоминается до правки: с ним откатываются одной командой.
+            PREV=$(grep '^IMAGE_TAG=' .env | cut -d= -f2)
+            echo "Был ${PREV}, ставим ${{ inputs.image_tag }}"
+
+            sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=${{ inputs.image_tag }}/" .env
+            docker compose -f docker-compose.prod.yml pull
+            # Службы перечислены явно: миграции завершаются по замыслу, и
+            # ожидание «все контейнеры живы» приняло бы это за сбой. Compose
+            # всё равно выполнит их первыми — по depends_on.
+            docker compose -f docker-compose.prod.yml up -d --wait api worker web
+
+            echo "Откат при необходимости: sed -i 's/^IMAGE_TAG=.*/IMAGE_TAG=${PREV}/' .env && docker compose -f docker-compose.prod.yml up -d --wait api worker web"
+
+      - name: Проверка после выката
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1
+        with:
+          host: ${{ secrets.PROD_SSH_HOST }}
+          username: ${{ secrets.PROD_SSH_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            cd /opt/vruchay
+            COMPOSE_FILE=docker-compose.prod.yml ./scripts/smoke.sh https://vruchay.ru
