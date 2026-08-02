@@ -1,4 +1,6 @@
-# DOMAIN задаётся переменной окружения контейнера caddy (например app.example.ru).
+# DOMAIN задаётся переменной окружения контейнера caddy (например vruchay.ru).
+# S3_ORIGIN — адрес объектного хранилища: оттуда грузятся фоны сертификатов,
+# и без него они не отобразятся ни в редакторе, ни на странице печати.
 # Для локальной проверки прод-сборки: DOMAIN=localhost:8080 — Caddy отдаст http.
 {$DOMAIN} {
 	encode gzip
@@ -13,5 +15,25 @@
 		root * /srv/www
 		try_files {path} /index.html
 		file_server
+	}
+
+	header {
+		# Политика содержимого — последний рубеж, если куда-то всё же просочится
+		# чужая разметка. Задаётся здесь, а не в приложении: она действует
+		# на HTML-документ, а его отдаёт Caddy.
+		#
+		# style-src разрешает inline: макет сертификата целиком построен
+		# на атрибутах style у блоков, иначе редактор и печать сломаются.
+		# script-src inline не разрешает — скрипты только из собранных файлов.
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: {$S3_ORIGIN}; font-src 'self' data:; connect-src 'self' {$S3_ORIGIN}; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
+
+		# Страницу нельзя встроить во фрейм: защита от подмены интерфейса поверх нашего.
+		X-Frame-Options "DENY"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# Возможности браузера, которые сервису не нужны, отключаем явно.
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
 	}
 }

@@ -16,6 +16,7 @@ import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { CurrentUser } from '../common/current-user.decorator';
 import { detectImageType, MAX_IMAGE_BYTES } from '../common/image-type';
 import { AuthGuard } from '../auth/auth.guard';
+import { Roles, RolesGuard } from '../auth/roles.guard';
 import type { SessionUser } from '../auth/auth.service';
 import { DocumentsService } from './documents.service';
 import {
@@ -33,7 +34,7 @@ import {
 const uuidParam = new ZodValidationPipe(uuidSchema);
 
 @Controller('documents')
-@UseGuards(AuthGuard)
+@UseGuards(AuthGuard, RolesGuard)
 export class DocumentsController {
   constructor(private readonly documents: DocumentsService) {}
 
@@ -68,6 +69,7 @@ export class DocumentsController {
   }
 
   @Delete(':id')
+  @Roles('owner', 'admin')
   remove(@CurrentUser() user: SessionUser, @Param('id', uuidParam) id: string) {
     return this.documents.softDelete(user.orgId, id);
   }

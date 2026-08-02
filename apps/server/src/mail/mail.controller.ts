@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { CurrentUser } from '../common/current-user.decorator';
 import { AuthGuard } from '../auth/auth.guard';
+import { Roles, RolesGuard } from '../auth/roles.guard';
 import type { SessionUser } from '../auth/auth.service';
 import { uuidSchema } from '../documents/documents.dto';
 import { MailService } from './mail.service';
@@ -24,7 +25,7 @@ const templateSchema = z.object({
 });
 
 @Controller('mail')
-@UseGuards(AuthGuard)
+@UseGuards(AuthGuard, RolesGuard)
 export class MailController {
   constructor(
     private readonly mail: MailService,
@@ -37,6 +38,7 @@ export class MailController {
   }
 
   @Post('domains')
+  @Roles('owner', 'admin')
   addDomain(
     @CurrentUser() user: SessionUser,
     @Body(new ZodValidationPipe(addDomainSchema)) dto: { domain: string },
@@ -45,16 +47,19 @@ export class MailController {
   }
 
   @Post('domains/:id/check')
+  @Roles('owner', 'admin')
   checkDomain(@CurrentUser() user: SessionUser, @Param('id', uuidParam) id: string) {
     return this.mail.checkDomain(user.orgId, id);
   }
 
   @Delete('domains/:id')
+  @Roles('owner', 'admin')
   deleteDomain(@CurrentUser() user: SessionUser, @Param('id', uuidParam) id: string) {
     return this.mail.deleteDomain(user.orgId, id);
   }
 
   @Post('senders')
+  @Roles('owner', 'admin')
   addSender(
     @CurrentUser() user: SessionUser,
     @Body(new ZodValidationPipe(addSenderSchema))

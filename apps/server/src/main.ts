@@ -28,8 +28,23 @@ async function bootstrap() {
   });
 
   await app.register(helmet, {
-    // CSP настраивается отдельно вместе с фронтендом; сейчас важнее остальные заголовки.
-    contentSecurityPolicy: false,
+    /**
+     * API отдаёт только JSON и файлы, поэтому политика здесь максимально узкая:
+     * если ответ каким-то образом будет интерпретирован как документ, выполнять
+     * в нём нечего. Политика для самого приложения задаётся в Caddyfile —
+     * она действует на HTML-страницу, которую отдаёт Caddy, а не API.
+     */
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+        baseUri: ["'none'"],
+        formAction: ["'none'"],
+      },
+    },
+    // Ответы API не должны попадать в чужие документы как ресурсы.
+    crossOriginResourcePolicy: { policy: 'same-origin' },
+    referrerPolicy: { policy: 'no-referrer' },
   });
 
   await app.register(fastifyCookie);
