@@ -10,6 +10,7 @@ import {
   Table2,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { Faq } from '../landing/Faq';
 
 /**
  * Посадочная страница.
@@ -79,6 +80,7 @@ export function LandingPage() {
       <Difference />
       <Legal />
       <Pricing />
+      <Faq />
       <FinalCta />
       <Footer />
     </div>
@@ -178,7 +180,7 @@ function CertificatePreview() {
 
 function HowItWorks() {
   return (
-    <section id="kak" className="border-y border-[var(--line)] bg-[var(--surface)]">
+    <section id="kak" className="scroll-mt-16 border-y border-[var(--line)] bg-[var(--surface)]">
       <div className="mx-auto max-w-5xl px-6 py-16">
         <h2 className="font-serif text-3xl">Три шага</h2>
         <p className="mt-2 max-w-xl text-[var(--text-muted)]">
@@ -293,7 +295,7 @@ function Legal() {
 
 function Pricing() {
   return (
-    <section id="ceny" className="mx-auto max-w-5xl px-6 py-16">
+    <section id="ceny" className="mx-auto scroll-mt-16 max-w-5xl px-6 py-16">
       <h2 className="font-serif text-3xl">Цены</h2>
       <p className="mt-2 max-w-xl text-[var(--text-muted)]">
         Организациям выгоднее годовая подписка, разовым мероприятиям — оплата по факту.
