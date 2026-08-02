@@ -102,3 +102,18 @@ VPS настраиваем сами, TLS выпускает Caddy.
 2. Добавить проверку ролей в контроллеры до появления приглашения пользователей.
 3. Подключить сканирование секретов и зависимостей в CI.
 4. Составить модель угроз и сценарий реагирования на утечку до публичного запуска.
+
+## Скилы по интерфейсу и текстам (добавлены 02.08.2026)
+
+Восемь скилов из [emilkowalski/skills](https://github.com/emilkowalski/skills), лицензия MIT:
+`apple-design`, `emil-design-eng`, `animation-vocabulary`, `improve-animations`,
+`find-animation-opportunities`, `review-animations`, `pick-ui-library`, `prototype`.
+Автор — Emil Kowalski, работал в Vercel и Linear. Про движение, полировку
+интерфейса и выбор библиотек.
+
+`conversion-copywriter` из [mikefutia/conversion-copywriter-skill](https://github.com/mikefutia/conversion-copywriter-skill),
+лицензия MIT. Метод Гарри Драя (marketingexamples.com): не писать, пока нет
+фактов; каждая несущая строка проходит три проверки — можно ли увидеть,
+можно ли проверить, мог ли это написать конкурент.
+
+Ни один из авторов не связан с Anthropic.

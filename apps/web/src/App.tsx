@@ -6,6 +6,7 @@ import { EditorPage } from './pages/EditorPage';
 import { RenderPage } from './pages/RenderPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { PrivacyPage } from './pages/PrivacyPage';
+import { LandingPage } from './pages/LandingPage';
 
 export function App() {
   const me = useMe();
@@ -22,11 +23,14 @@ export function App() {
     return <div className="grid h-full place-items-center text-slate-500">Загрузка…</div>;
   }
 
+  // Незалогиненный посетитель на главной видит рассказ о сервисе, а не форму
+  // входа: до входа ему нечего вводить, он ещё решает, нужен ли сервис вообще.
   if (!me.data) {
     return (
       <Routes>
+        <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     );
   }
