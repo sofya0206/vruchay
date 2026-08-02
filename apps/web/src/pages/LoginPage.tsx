@@ -76,6 +76,13 @@ export function LoginPage() {
             {login.isPending ? 'Входим' : 'Войти'}
           </Button>
         </form>
+
+        {/* Ссылка на политику обязана быть доступна всем, а не только вошедшим. */}
+        <p className="mt-6 text-center text-xs text-[var(--text-muted)]">
+          <a href="/privacy" className="underline underline-offset-2 hover:text-[var(--text)]">
+            Политика обработки персональных данных
+          </a>
+        </p>
       </div>
     </div>
   );

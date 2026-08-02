@@ -5,6 +5,7 @@ import { DocumentsPage } from './pages/DocumentsPage';
 import { EditorPage } from './pages/EditorPage';
 import { RenderPage } from './pages/RenderPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { PrivacyPage } from './pages/PrivacyPage';
 
 export function App() {
   const me = useMe();
@@ -12,6 +13,10 @@ export function App() {
   // Страница печати работает без сессии: её открывает браузер воркера
   // по одноразовому подписанному токену. Проверку входа она обходит намеренно.
   if (window.location.pathname === '/render') return <RenderPage />;
+
+  // Политика обработки данных открыта всем: закон требует неограниченного
+  // доступа к ней, а не доступа для вошедших.
+  if (window.location.pathname === '/privacy') return <PrivacyPage />;
 
   if (me.isPending) {
     return <div className="grid h-full place-items-center text-slate-500">Загрузка…</div>;

@@ -56,6 +56,17 @@ jobs:
           context: .
           file: apps/web/Dockerfile
           push: true
+          # Данные предпринимателя для политики обработки данных: в репозитории
+          # их нет, поэтому приходят секретами. Без них страница политики
+          # честно сообщит, что опубликована не полностью.
+          build-args: |
+            VITE_OPERATOR_NAME=${{ secrets.OPERATOR_NAME }}
+            VITE_OPERATOR_INN=${{ secrets.OPERATOR_INN }}
+            VITE_OPERATOR_OGRNIP=${{ secrets.OPERATOR_OGRNIP }}
+            VITE_OPERATOR_ADDRESS=${{ secrets.OPERATOR_ADDRESS }}
+            VITE_OPERATOR_EMAIL=${{ secrets.OPERATOR_EMAIL }}
+            VITE_OPERATOR_PHONE=${{ secrets.OPERATOR_PHONE }}
+            VITE_POLICY_DATE=${{ secrets.POLICY_DATE }}
           tags: |
             ghcr.io/${{ github.repository_owner }}/gramota-web:latest
             ghcr.io/${{ github.repository_owner }}/gramota-web:${{ github.sha }}

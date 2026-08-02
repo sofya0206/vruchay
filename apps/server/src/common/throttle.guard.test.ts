@@ -1,10 +1,17 @@
-import { describe, expect, it, vi } from 'vitest';
-import { ExecutionContext } from '@nestjs/common';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { ExecutionContext, Logger } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type IORedis from 'ioredis';
 import { ThrottleGuard, parseWindow } from './throttle.guard';
 import { ThrottleOptions } from './throttle.decorator';
 import { RateLimitService } from './rate-limit.service';
+
+// Проверка недоступного Redis намеренно вызывает запись об ошибке. В выводе
+// тестов ей не место: красная строка про сбой там, где всё идёт по плану,
+// приучает не смотреть на такие строки вообще.
+beforeAll(() => {
+  vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+});
 
 function contextFor(ip: string): ExecutionContext {
   const handler = function login() {};
