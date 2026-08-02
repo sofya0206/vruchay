@@ -82,6 +82,40 @@ for (const file of templates) {
   console.log(`✓ ${file} — ${status}`);
 }
 
+// Реквизиты продавца нужны серверу для счетов, а файл с ними на сервер
+// не едет. Собираем готовый блок окружения — его останется скопировать
+// в /opt/vruchay/.env. Папка generated в .gitignore, как и сам requisites.md.
+const SELLER_ENV = {
+  SELLER_NAME: 'НАИМЕНОВАНИЕ',
+  SELLER_INN: 'ИНН',
+  SELLER_OGRNIP: 'ОГРНИП',
+  SELLER_ADDRESS: 'АДРЕС',
+  SELLER_ACCOUNT: 'РАСЧЁТНЫЙ_СЧЁТ',
+  SELLER_BANK: 'БАНК',
+  SELLER_BIK: 'БИК',
+  SELLER_CORR_ACCOUNT: 'КОРР_СЧЁТ',
+};
+
+const missing = [];
+const envLines = Object.entries(SELLER_ENV).map(([envKey, reqKey]) => {
+  const value = values[reqKey];
+  if (!value || value === 'УТОЧНИТЬ') missing.push(reqKey);
+  return `${envKey}=${value && value !== 'УТОЧНИТЬ' ? value : ''}`;
+});
+
+writeFileSync(
+  join(OUTPUT, 'seller.env'),
+  ['# Реквизиты продавца для счетов. Скопировать в /opt/vruchay/.env на сервере.',
+   '# Файл собран из requisites.md и в репозиторий не попадает.',
+   ...envLines, ''].join('\n'),
+  'utf8',
+);
+console.log(
+  missing.length
+    ? `⚠ seller.env собран, но не хватает: ${missing.join(', ')}`
+    : '✓ seller.env — реквизиты для счетов готовы',
+);
+
 console.log(`\nДокументы собраны в docs/business/generated/ (папка не коммитится).`);
 if (totalRemaining) {
   console.log('Оставшиеся плейсхолдеры заполняются под конкретную сделку.');

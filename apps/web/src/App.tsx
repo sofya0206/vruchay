@@ -5,6 +5,7 @@ import { DocumentsPage } from './pages/DocumentsPage';
 import { EditorPage } from './pages/EditorPage';
 import { RenderPage } from './pages/RenderPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { InvoicesPage } from './pages/InvoicesPage';
 import { PrivacyPage } from './pages/PrivacyPage';
 import { LandingPage } from './pages/LandingPage';
 
@@ -40,6 +41,7 @@ export function App() {
       <Route path="/" element={<DocumentsPage />} />
       <Route path="/documents/:id" element={<EditorPage />} />
       <Route path="/settings" element={<SettingsPage />} />
+      <Route path="/invoices" element={<InvoicesPage />} />
       <Route path="/login" element={<Navigate to="/" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

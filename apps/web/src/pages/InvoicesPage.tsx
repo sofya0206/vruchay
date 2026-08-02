@@ -1,0 +1,227 @@
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, Check, FileText, Send } from 'lucide-react';
+import { api } from '../api/client';
+import { Button } from '../ui/Button';
+import { StatusChip } from '../ui/Field';
+
+/**
+ * Счета и заявки.
+ *
+ * Собственная бухгалтерия владельца сервиса, а не данные организаций-клиентов,
+ * — поэтому раздел доступен только владельцу и администратору, а проверка
+ * прав стоит на сервере.
+ *
+ * Кнопка «Оплачено» здесь не про удобство, а про честность: часть переводов
+ * автомат не разберёт — назначение платежа без номера счёта, частичная
+ * оплата, переплата. Угадывать в таких случаях нельзя, поэтому решает человек.
+ */
+
+interface Invoice {
+  id: string;
+  number: number;
+  year: number;
+  buyerName: string;
+  buyerInn: string;
+  email: string;
+  tariff: string;
+  amountKopecks: number;
+  paidAt: string | null;
+  sentAt: string | null;
+  createdAt: string;
+}
+
+interface Lead {
+  id: string;
+  orgName: string;
+  contact: string;
+  email: string;
+  phone: string | null;
+  inn: string | null;
+  tariff: string | null;
+  volume: string | null;
+  comment: string | null;
+  status: string;
+  createdAt: string;
+}
+
+const money = (kopecks: number) =>
+  (kopecks / 100).toLocaleString('ru-RU', { minimumFractionDigits: 2 });
+
+const when = (iso: string) => new Date(iso).toLocaleDateString('ru-RU');
+
+export function InvoicesPage() {
+  const [tab, setTab] = useState<'invoices' | 'leads'>('invoices');
+
+  return (
+    <div className="min-h-full">
+      <header className="border-b border-[var(--line)] bg-[var(--surface)]">
+        <div className="mx-auto flex max-w-5xl items-center gap-3 px-6 py-3">
+          <Link
+            to="/"
+            className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)] hover:text-[var(--text)]"
+          >
+            <ArrowLeft size={16} />К документам
+          </Link>
+          <span className="ml-auto font-serif text-lg">Счета и заявки</span>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-5xl px-6 py-8">
+        <div role="tablist" className="inline-flex rounded-xl bg-[var(--surface-sunken)] p-1">
+          {(
+            [
+              ['invoices', 'Счета'],
+              ['leads', 'Заявки'],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              role="tab"
+              aria-selected={tab === value}
+              onClick={() => setTab(value)}
+              className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors duration-200 ${
+                tab === value
+                  ? 'bg-[var(--surface)] text-[var(--text)]'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text)]'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-6">{tab === 'invoices' ? <Invoices /> : <Leads />}</div>
+      </main>
+    </div>
+  );
+}
+
+function Invoices() {
+  const qc = useQueryClient();
+  const invoices = useQuery({
+    queryKey: ['invoices'],
+    queryFn: () => api.get<Invoice[]>('/invoices'),
+  });
+
+  const markPaid = useMutation({
+    mutationFn: (id: string) => api.post<{ ok: true }>(`/invoices/${id}/paid`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['invoices'] }),
+  });
+  const resend = useMutation({
+    mutationFn: (id: string) => api.post<{ ok: true }>(`/invoices/${id}/send`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['invoices'] }),
+  });
+
+  if (invoices.data?.length === 0) {
+    return (
+      <p className="rounded-xl bg-[var(--surface-sunken)] p-5 text-sm text-[var(--text-muted)]">
+        Счетов пока нет. Они выставляются сами, когда организация проходит подбор
+        тарифа на сайте и указывает ИНН.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {invoices.data?.map((inv) => (
+        <article
+          key={inv.id}
+          className="flex flex-wrap items-center gap-x-5 gap-y-3 rounded-xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]"
+        >
+          <div className="min-w-56 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-medium">№ {inv.number}</span>
+              {inv.paidAt ? (
+                <StatusChip tone="done">
+                  <Check size={13} /> Оплачен {when(inv.paidAt)}
+                </StatusChip>
+              ) : (
+                <StatusChip tone="progress">Ждёт оплаты</StatusChip>
+              )}
+              {!inv.sentAt && <StatusChip tone="neutral">Не отправлен</StatusChip>}
+            </div>
+            <p className="mt-1 text-sm">{inv.buyerName}</p>
+            <p className="text-xs text-[var(--text-muted)]">
+              ИНН {inv.buyerInn} · {inv.email} · от {when(inv.createdAt)}
+            </p>
+          </div>
+
+          <div className="text-right">
+            <p className="text-lg">{money(inv.amountKopecks)} ₽</p>
+            <p className="text-xs text-[var(--text-muted)]">{inv.tariff}</p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <a href={`/api/invoices/${inv.id}/pdf`} target="_blank" rel="noopener noreferrer">
+              <Button size="sm" icon={<FileText size={14} />}>
+                Счёт
+              </Button>
+            </a>
+            <Button
+              size="sm"
+              icon={<Send size={14} />}
+              onClick={() => resend.mutate(inv.id)}
+              disabled={resend.isPending}
+            >
+              Отправить
+            </Button>
+            {!inv.paidAt && (
+              <Button
+                size="sm"
+                variant="primary"
+                icon={<Check size={14} />}
+                onClick={() => markPaid.mutate(inv.id)}
+                disabled={markPaid.isPending}
+              >
+                Оплачено
+              </Button>
+            )}
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function Leads() {
+  const leads = useQuery({ queryKey: ['leads'], queryFn: () => api.get<Lead[]>('/leads') });
+
+  if (leads.data?.length === 0) {
+    return (
+      <p className="rounded-xl bg-[var(--surface-sunken)] p-5 text-sm text-[var(--text-muted)]">
+        Заявок пока нет.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {leads.data?.map((lead) => (
+        <article
+          key={lead.id}
+          className="rounded-xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]"
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-medium">{lead.orgName}</span>
+            {lead.tariff && <StatusChip tone="progress">{lead.tariff}</StatusChip>}
+            {/* Заявка без ИНН счётом не стала — это видно сразу. */}
+            {!lead.inn && <StatusChip tone="neutral">без ИНН, счёт не выставлен</StatusChip>}
+            <span className="ml-auto text-xs text-[var(--text-muted)]">{when(lead.createdAt)}</span>
+          </div>
+          <p className="mt-1 text-sm">
+            {lead.contact} · {lead.email}
+            {lead.phone ? ` · ${lead.phone}` : ''}
+          </p>
+          {lead.volume && <p className="text-xs text-[var(--text-muted)]">{lead.volume}</p>}
+          {lead.comment && (
+            <p className="mt-2 text-sm whitespace-pre-line text-[var(--text-muted)]">
+              {lead.comment}
+            </p>
+          )}
+        </article>
+      ))}
+    </div>
+  );
+}
