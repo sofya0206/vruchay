@@ -117,12 +117,14 @@ export function renderMarkdown(source: string): ReactNode[] {
 
     // Таблица: строка заголовка, строка-разделитель, дальше данные.
     if (line.includes('|') && lines[i + 1]?.includes('---')) {
-      const cells = (row: string) =>
-        row
-          .split('|')
-          .map((c) => c.trim())
-          .filter((_, n, all) => n !== 0 || all.length === 1 ? true : true)
-          .filter((c, n, all) => !(c === '' && (n === 0 || n === all.length - 1)));
+      // Строка таблицы обрамлена вертикальными чертами, поэтому по краям
+      // после разбиения остаются пустые ячейки — их и убираем.
+      const cells = (row: string) => {
+        const parts = row.split('|').map((c) => c.trim());
+        if (parts[0] === '') parts.shift();
+        if (parts[parts.length - 1] === '') parts.pop();
+        return parts;
+      };
       const head = cells(line);
       i += 2;
       const rows: string[][] = [];
