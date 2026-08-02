@@ -7,7 +7,7 @@ interface InstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
-const DISMISSED_KEY = 'laureat.install-hint-dismissed';
+const DISMISSED_KEY = 'vruchay.install-hint-dismissed';
 
 function isStandalone(): boolean {
   return (

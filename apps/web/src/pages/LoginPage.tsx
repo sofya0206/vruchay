@@ -25,7 +25,7 @@ export function LoginPage() {
             <Award size={22} strokeWidth={1.75} />
           </span>
           <div>
-            <h1 className="text-2xl leading-tight font-semibold">Лауреат</h1>
+            <h1 className="text-2xl leading-tight font-semibold">Вручай</h1>
             <p className="text-sm text-[var(--text-muted)]">Наградные документы</p>
           </div>
         </div>

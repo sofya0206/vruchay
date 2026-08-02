@@ -19,8 +19,8 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,woff2,png,svg}'],
       },
       manifest: {
-        name: 'Лауреат — наградные документы',
-        short_name: 'Лауреат',
+        name: 'Вручай — наградные документы',
+        short_name: 'Вручай',
         description: 'Сертификаты, грамоты и дипломы: создание и рассылка участникам',
         lang: 'ru',
         start_url: '/',

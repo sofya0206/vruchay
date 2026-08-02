@@ -49,7 +49,7 @@ export function DocumentsPage() {
           <span className="grid h-8 w-8 place-items-center rounded-lg bg-[var(--accent)] text-[var(--accent-contrast)]">
             <Award size={17} strokeWidth={1.75} />
           </span>
-          <span className="font-serif text-lg">Лауреат</span>
+          <span className="font-serif text-lg">Вручай</span>
           <div className="ml-auto flex items-center gap-3">
             <span className="hidden text-sm text-[var(--text-muted)] sm:inline">
               {me.data?.email}

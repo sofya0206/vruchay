@@ -58,7 +58,7 @@ export class SmtpProvider implements MailProvider {
         content: a.content,
         contentType: a.contentType,
       })),
-      headers: message.reference ? { 'X-Laureat-Ref': message.reference } : undefined,
+      headers: message.reference ? { 'X-Vruchay-Ref': message.reference } : undefined,
     });
     return { providerMessageId: String(info.messageId) };
   }
@@ -73,8 +73,8 @@ export class SmtpProvider implements MailProvider {
         // Уникальная запись — единственное доказательство владения доменом.
         // Записи SPF и DMARC одинаковы у всех клиентов и подтверждением быть не могут.
         type: 'TXT',
-        host: '_laureat-verify',
-        value: `laureat-verify=${verificationToken}`,
+        host: '_vruchay-verify',
+        value: `vruchay-verify=${verificationToken}`,
         purpose: 'Подтверждение владения доменом. Уникальна для вашей организации',
       },
       {

@@ -48,7 +48,7 @@ export const envSchema = z.object({
     .transform((v) => v === true || v === 'true' || v === '1'),
   SMTP_USER: z.string().default(''),
   SMTP_PASSWORD: z.string().default(''),
-  SMTP_SPF_INCLUDE: z.string().default('laureat.ru'),
+  SMTP_SPF_INCLUDE: z.string().default('vruchay.ru'),
   DASHAMAIL_API_KEY: z.string().default(''),
 });
 

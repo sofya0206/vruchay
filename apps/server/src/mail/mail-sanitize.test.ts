@@ -26,10 +26,10 @@ describe('очистка тела письма', () => {
 
   it('сохраняет нормальную вёрстку письма', () => {
     const html =
-      '<p>Здравствуйте, <b>%name</b>!</p><p><a href="https://laureat.ru">Проверить документ</a></p>';
+      '<p>Здравствуйте, <b>%name</b>!</p><p><a href="https://vruchay.ru">Проверить документ</a></p>';
     const clean = sanitizeEmailHtml(html);
     expect(clean).toContain('<b>%name</b>');
-    expect(clean).toContain('https://laureat.ru');
+    expect(clean).toContain('https://vruchay.ru');
     // Внешние ссылки открываются без доступа к странице-источнику.
     expect(clean).toContain('rel="noopener noreferrer"');
   });
