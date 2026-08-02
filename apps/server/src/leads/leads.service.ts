@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
+import { InvoicesService } from '../invoices/invoices.service';
 import { maskEmail, redact } from '../common/redact';
 import type { LeadDto, LeadStatusDto } from './leads.dto';
 
@@ -25,7 +26,15 @@ export class LeadsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
+    private readonly invoices: InvoicesService,
   ) {}
+
+  /** Цены тарифов в копейках. Совпадают с посадочной страницей. */
+  private static readonly PRICES: Record<string, number> = {
+    Старт: 2_900_000,
+    Про: 6_900_000,
+    Максимум: 14_900_000,
+  };
 
   async create(dto: LeadDto, ctx: LeadContext): Promise<{ ok: true }> {
     // Ловушка: отвечаем как при успехе, чтобы автомат не понял, что распознан.
@@ -40,6 +49,8 @@ export class LeadsService {
         contact: dto.contact,
         email: dto.email,
         phone: dto.phone || null,
+        inn: dto.inn || null,
+        tariff: dto.tariff || null,
         volume: dto.volume || null,
         comment: dto.comment || null,
         ip: ctx.ip,
@@ -54,6 +65,26 @@ export class LeadsService {
     void this.notify(lead.id, dto).catch((err: unknown) => {
       this.logger.error(`Уведомление о заявке ${lead.id} не ушло: ${redact(String(err))}`);
     });
+
+    // Счёт выставляется сам, если заявки хватает: тариф известен и есть ИНН.
+    // Без ИНН счёт бесполезен бухгалтерии клиента, без тарифа непонятна сумма —
+    // в этих случаях остаётся обычная заявка, и мы отвечаем письмом.
+    const amount = dto.tariff ? LeadsService.PRICES[dto.tariff] : undefined;
+    if (amount && dto.inn && this.invoices.configured) {
+      void this.invoices
+        .issueAndSend({
+          leadId: lead.id,
+          buyerName: dto.orgName,
+          buyerInn: dto.inn,
+          email: dto.email,
+          tariff: dto.tariff!,
+          description: `Доступ к сервису «Вручай», тариф «${dto.tariff!}», 12 месяцев`,
+          amountKopecks: amount,
+        })
+        .catch((err: unknown) => {
+          this.logger.error(`Счёт по заявке ${lead.id} не выставлен: ${redact(String(err))}`);
+        });
+    }
 
     return { ok: true };
   }

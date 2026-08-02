@@ -435,6 +435,31 @@ export class MailService {
     });
   }
 
+  /** Письмо с готовым вложением — счёт, акт и прочее, чего нет в журнале выдачи. */
+  async sendDocument(params: {
+    orgId: string;
+    to: string;
+    subject: string;
+    html: string;
+    filename: string;
+    content: Buffer;
+  }): Promise<void> {
+    const sender = await this.defaultSender(params.orgId);
+    if (!sender) {
+      this.logger.warn('Документ не отправлен: нет отправителя с подтверждённым доменом');
+      return;
+    }
+    await this.providerFor('smtp').send({
+      from: { email: sender.email, name: sender.displayName },
+      to: params.to,
+      subject: params.subject,
+      html: params.html,
+      attachments: [
+        { filename: params.filename, content: params.content, contentType: 'application/pdf' },
+      ],
+    });
+  }
+
   async listEmails(orgId: string, documentId?: string) {
     return this.prisma.email.findMany({
       where: { orgId, ...(documentId ? { documentId } : {}) },

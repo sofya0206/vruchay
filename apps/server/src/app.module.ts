@@ -15,6 +15,7 @@ import { MailModule } from './mail/mail.module';
 import { TildaModule } from './tilda/tilda.module';
 import { LeadsModule } from './leads/leads.module';
 import { PaymentsModule } from './payments/payments.module';
+import { InvoicesModule } from './invoices/invoices.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { PaymentsModule } from './payments/payments.module';
     TildaModule,
     LeadsModule,
     PaymentsModule,
+    InvoicesModule,
   ],
   controllers: [HealthController],
 })

@@ -12,6 +12,9 @@ export const leadSchema = z.object({
   contact: z.string().trim().min(2, 'Как к вам обращаться?').max(120),
   email: z.string().trim().toLowerCase().email('Проверьте адрес электронной почты').max(254),
   phone: z.string().trim().max(40).optional(),
+  /** ИНН: 10 знаков у организации, 12 у предпринимателя. */
+  inn: z.string().trim().regex(/^\d{10}$|^\d{12}$/, 'ИНН состоит из 10 или 12 цифр').optional(),
+  tariff: z.string().trim().max(60).optional(),
   volume: z.string().trim().max(120).optional(),
   comment: z.string().trim().max(2000).optional(),
   /** Поле-ловушка: человек его не видит и не заполняет. */
