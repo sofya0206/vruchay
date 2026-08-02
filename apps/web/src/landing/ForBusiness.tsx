@@ -52,10 +52,11 @@ export function ForBusiness() {
       className="scroll-mt-16 border-y border-[var(--line)] bg-[var(--surface)]"
     >
       <div className="mx-auto max-w-5xl px-6 py-16">
-        <h2 className="font-serif text-3xl">Организациям</h2>
+        <h2 className="font-serif text-3xl">Если документы выдаёт организация</h2>
         <p className="mt-2 max-w-2xl text-[var(--text-muted)]">
-          Если наградные документы выдаёт юридическое лицо, вопросов больше,
-          чем «красиво ли получится». Вот ответы на те, что задают до подписания.
+          У юридического лица вопросов больше, чем «красиво ли получится».
+          Вот ответы на те, что задают до подписания. Если вы проводите одно
+          мероприятие и договор вам не нужен — этот раздел можно пропустить.
         </p>
 
         <ul className="mt-6 flex flex-wrap gap-2">

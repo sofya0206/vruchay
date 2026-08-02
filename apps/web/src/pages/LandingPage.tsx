@@ -13,6 +13,8 @@ import { Button } from '../ui/Button';
 import { Faq } from '../landing/Faq';
 import { Pricing } from '../landing/Pricing';
 import { ForBusiness } from '../landing/ForBusiness';
+import { Certificate } from '../landing/Certificate';
+import { Scope } from '../landing/Scope';
 
 /**
  * Посадочная страница.
@@ -51,6 +53,7 @@ export function LandingPage() {
       <Header />
       <Hero />
       <HowItWorks />
+      <Scope />
       <Difference />
       <ForBusiness />
       <Legal />
@@ -97,12 +100,11 @@ function Hero() {
             <ShieldCheck size={13} /> Данные участников остаются в России
           </p>
           <h1 className="font-serif text-4xl leading-[1.1] sm:text-5xl">
-            Именные грамоты
-            <br />
-            на весь список — <span className="text-[var(--accent)]">за одно нажатие</span>
+            Грамоты, дипломы, сертификаты — всему списку{' '}
+            <span className="text-[var(--accent)]">за одно нажатие</span>
           </h1>
           <p className="mt-5 max-w-lg text-lg leading-relaxed text-[var(--text-muted)]">
-            Загружаете список участников — получаете готовые документы и письма
+            Загружаете список участников — получаете именные документы и письма
             с вашего собственного адреса. Не по одному в Word, не вечером перед
             награждением.
           </p>
@@ -117,39 +119,28 @@ function Hero() {
           <p className="mt-4 text-sm text-[var(--text-muted)]">
             Первые 50 документов — бесплатно и без водяных знаков.
           </p>
+
+          {/* Два пути названы сразу: иначе организатор одного турнира решит,
+              что сервис только для организаций с договорами, и уйдёт. */}
+          <dl className="mt-8 grid gap-4 border-t border-[var(--line)] pt-6 sm:grid-cols-2">
+            <div>
+              <dt className="text-sm font-medium">Организациям</dt>
+              <dd className="mt-1 text-sm text-[var(--text-muted)]">
+                Подписка на год, счёт и договор. Федерации, школы, вузы, клубы.
+              </dd>
+            </div>
+            <div>
+              <dt className="text-sm font-medium">Одному мероприятию</dt>
+              <dd className="mt-1 text-sm text-[var(--text-muted)]">
+                3 ₽ за документ, оплата картой. Без договоров и переговоров.
+              </dd>
+            </div>
+          </dl>
         </div>
 
-        <CertificatePreview />
+        <Certificate />
       </div>
     </section>
-  );
-}
-
-/** Показать результат нагляднее, чем описать словами. */
-function CertificatePreview() {
-  return (
-    <div className="vru-enter vru-delay relative mx-auto w-full max-w-md">
-      <div className="rotate-[-1.5deg] rounded-xl bg-[var(--surface)] p-8 shadow-[0_20px_60px_-20px_rgba(20,32,26,0.35)] ring-1 ring-[var(--line)] transition-transform duration-300 hover:rotate-0">
-        <div className="rounded-lg border border-[var(--award)]/30 p-6 text-center">
-          <p className="text-[10px] tracking-[0.25em] text-[var(--text-muted)] uppercase">
-            Ассоциация тренеров
-          </p>
-          <p className="mt-6 font-serif text-2xl">Грамота</p>
-          <p className="mt-4 text-sm text-[var(--text-muted)]">награждается</p>
-          <p className="mt-1 font-serif text-xl">Кузьмина-Караваева Анна</p>
-          <p className="mt-3 text-sm text-[var(--text-muted)]">
-            за первое место на дистанции 200 м
-          </p>
-          <div className="mt-6 flex items-end justify-between">
-            <span className="text-[10px] text-[var(--text-muted)]">2 августа 2026</span>
-            <span className="grid h-10 w-10 place-items-center rounded bg-[var(--surface-sunken)] text-[var(--text-muted)]">
-              <QrCode size={20} />
-            </span>
-          </div>
-        </div>
-      </div>
-      <div className="absolute -right-3 -bottom-3 -z-10 h-full w-full rotate-[2deg] rounded-xl bg-[var(--surface-sunken)] ring-1 ring-[var(--line)]" />
-    </div>
   );
 }
 
