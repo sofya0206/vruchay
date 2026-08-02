@@ -43,6 +43,14 @@ function readRequisites() {
 }
 
 const values = readRequisites();
+
+// Дата редакции — не реквизит, а момент сборки документа. Подставляется
+// автоматически: иначе в договоре останется дата, когда болванку писали.
+values.ДАТА_РЕДАКЦИИ ??= new Date().toLocaleDateString('ru-RU', {
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+});
 const unfilled = Object.entries(values).filter(([, v]) => v === 'УТОЧНИТЬ');
 if (unfilled.length) {
   console.warn(`⚠ Не заполнено в реквизитах: ${unfilled.map(([k]) => k).join(', ')}`);
