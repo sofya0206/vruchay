@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+import QRCode from 'qrcode';
 import { substituteVariables, type SheetElement, type SheetLayout } from '@gramota/shared';
 
 /**
@@ -17,6 +19,12 @@ export interface SheetRendererProps {
   data?: Record<string, string>;
   /** В редакторе показываем сами переменные, а не подстановку. */
   showRawVariables?: boolean;
+  /**
+   * Адрес проверки подлинности этого экземпляра: /verify/<publicId>.
+   * Есть только при печати — в редакторе экземпляра ещё не существует,
+   * и QR там показывается образцом.
+   */
+  verifyUrl?: string | null;
   selectedId?: string | null;
   onSelect?: (id: string | null) => void;
 }
@@ -28,6 +36,7 @@ export function SheetRenderer({
   backgroundUrl,
   data,
   showRawVariables = false,
+  verifyUrl,
   selectedId,
   onSelect,
 }: SheetRendererProps) {
@@ -53,6 +62,7 @@ export function SheetRenderer({
             element={el}
             data={data}
             showRawVariables={showRawVariables}
+            verifyUrl={verifyUrl}
             interactive={Boolean(onSelect)}
             selected={selectedId === el.id}
             onSelect={onSelect}
@@ -66,15 +76,54 @@ interface ElementViewProps {
   element: SheetElement;
   data?: Record<string, string>;
   showRawVariables: boolean;
+  verifyUrl?: string | null;
   interactive: boolean;
   selected: boolean;
   onSelect?: (id: string) => void;
+}
+
+/**
+ * QR как картинка.
+ *
+ * Именно <img> с data-URL, а не canvas: страницу печати открывает
+ * headless-браузер и ждёт загрузки всех изображений, прежде чем печатать.
+ * Картинка попадает в это ожидание сама, а нарисованный на canvas код
+ * мог бы не успеть — и в PDF оказался бы пустой квадрат.
+ */
+function QrImage({ value, color }: { value: string; color: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    void QRCode.toDataURL(value, {
+      margin: 0,
+      // Уровень коррекции M: терпит загрязнение и типографский брак,
+      // но не раздувает узор так, как высокие уровни.
+      errorCorrectionLevel: 'M',
+      color: { dark: color, light: '#00000000' },
+      // Крупная сторона: код печатают, и растр не должен мылить при
+      // масштабировании в миллиметры.
+      width: 512,
+    }).then((url) => alive && setSrc(url));
+    return () => {
+      alive = false;
+    };
+  }, [value, color]);
+
+  if (!src) return null;
+  return <img src={src} alt="" draggable={false} className="h-full w-full select-none" />;
+}
+
+/** Адрес сервиса: на печати страница открыта по внутреннему адресу. */
+function origin(): string {
+  return typeof window === 'undefined' ? 'https://vruchay.ru' : window.location.origin;
 }
 
 function ElementView({
   element,
   data,
   showRawVariables,
+  verifyUrl,
   interactive,
   selected,
   onSelect,
@@ -117,9 +166,20 @@ function ElementView({
           color: props.color,
           fontWeight: props.bold ? 700 : 400,
           fontStyle: props.italic ? 'italic' : 'normal',
+          textDecoration: props.underline ? 'underline' : 'none',
+          textTransform: props.uppercase ? 'uppercase' : 'none',
           lineHeight: props.lineHeight,
           letterSpacing: `${props.letterSpacing}pt`,
           textAlign: props.align,
+          // Обводка кладётся под буквы (paint-order), иначе она съедала бы
+          // изнутри тонкие засечки и рукописные росчерки.
+          ...(props.strokeWidth > 0
+            ? {
+                WebkitTextStrokeWidth: `${props.strokeWidth}mm`,
+                WebkitTextStrokeColor: props.strokeColor,
+                paintOrder: 'stroke fill',
+              }
+            : {}),
           whiteSpace: 'pre-wrap',
           wordBreak: 'break-word',
           overflow: 'hidden',
@@ -146,13 +206,25 @@ function ElementView({
   }
 
   if (element.type === 'qr') {
-    // Пока заглушка: настоящий QR появится вместе со страницей проверки подлинности.
+    /*
+     * Что кодируем:
+     *  — свой шаблон, если организация его задала (с подстановкой переменных);
+     *  — иначе адрес проверки подлинности этого экземпляра.
+     *
+     * В редакторе экземпляра ещё нет, поэтому кодируем образец: человек
+     * должен видеть настоящий узор, чтобы оценить размер и читаемость.
+     * Пустой квадрат на его месте выглядел бы поломкой.
+     */
+    const template = element.props.template.trim();
+    const value = template
+      ? showRawVariables
+        ? template
+        : substituteVariables(template, data ?? {})
+      : (verifyUrl ?? `${origin()}/verify/00000000-0000-0000-0000-000000000000`);
+
     return (
-      <div
-        {...common}
-        style={{ ...box, border: '1px dashed #94a3b8', display: 'grid', placeItems: 'center' }}
-      >
-        <span style={{ fontSize: '3mm', color: '#64748b' }}>QR</span>
+      <div {...common} style={box}>
+        <QrImage value={value} color={element.props.color} />
       </div>
     );
   }

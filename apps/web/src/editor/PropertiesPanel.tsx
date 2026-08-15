@@ -3,11 +3,18 @@ import {
   AlignLeft,
   AlignRight,
   Bold,
+  CaseUpper,
   Italic,
   MousePointerSquareDashed,
   Trash2,
+  Underline,
 } from 'lucide-react';
 import type { SheetElement, TextElement } from '@gramota/shared';
+import type { DocumentDetail } from '../api/types';
+import { EventFields, type EventValues } from './EventFields';
+import { VerifySettings } from './VerifySettings';
+import { VariableHint } from './VariableHint';
+import { ColorField } from './ColorField';
 import { Button } from '../ui/Button';
 import { Input, Label, Select, Textarea } from '../ui/Field';
 
@@ -26,20 +33,36 @@ interface Props {
   element: SheetElement | null;
   onChange: (patch: Partial<TextElement['props']>, commit?: boolean) => void;
   onDelete: () => void;
+  /** Материал целиком — для его собственных настроек, когда блок не выбран. */
+  doc?: DocumentDetail;
+  onSaveEvent?: (
+    values: Partial<EventValues> & { verifyEnabled?: boolean; verifyFields?: string[] },
+  ) => void;
 }
 
-export function PropertiesPanel({ element, onChange, onDelete }: Props) {
+export function PropertiesPanel({ element, onChange, onDelete, doc, onSaveEvent }: Props) {
   if (!element) {
     return (
-      <aside className="w-72 shrink-0 border-l border-[var(--line)] bg-[var(--surface)] p-6">
-        <MousePointerSquareDashed
-          size={22}
-          className="mb-3 text-[var(--text-muted)]"
-          strokeWidth={1.5}
-        />
-        <p className="text-sm text-[var(--text-muted)]">
-          Выберите блок на листе, чтобы изменить его свойства.
-        </p>
+      <aside className="w-72 shrink-0 overflow-auto border-l border-[var(--line)] bg-[var(--surface)] p-4">
+        {doc && onSaveEvent ? (
+          <>
+            <EventFields doc={doc} onSave={onSaveEvent} />
+            <div className="mt-6">
+              <VerifySettings doc={doc} onSave={onSaveEvent} />
+            </div>
+          </>
+        ) : (
+          <>
+            <MousePointerSquareDashed
+              size={22}
+              className="mb-3 text-[var(--text-muted)]"
+              strokeWidth={1.5}
+            />
+            <p className="text-sm text-[var(--text-muted)]">
+              Выберите блок на листе, чтобы изменить его свойства.
+            </p>
+          </>
+        )}
       </aside>
     );
   }
@@ -69,10 +92,7 @@ export function PropertiesPanel({ element, onChange, onDelete }: Props) {
           onBlur={(e) => onChange({ text: e.target.value })}
           rows={3}
         />
-        <span className="mt-1.5 block text-xs text-[var(--text-muted)]">
-          Переменная подставит данные получателя:{' '}
-          <code className="rounded bg-[var(--surface-sunken)] px-1 font-mono">%name</code>
-        </span>
+        <VariableHint text={p.text} />
       </label>
 
       <label className="block">
@@ -86,27 +106,21 @@ export function PropertiesPanel({ element, onChange, onDelete }: Props) {
         </Select>
       </label>
 
-      <div className="flex gap-3">
-        <label className="flex-1">
-          <Label>Кегль, pt</Label>
-          <Input
-            type="number"
-            min={4}
-            max={200}
-            value={p.fontSize}
-            onChange={(e) => onChange({ fontSize: Number(e.target.value) || 4 })}
-            className="tabular"
-          />
-        </label>
-        <label className="w-24">
-          <Label>Цвет</Label>
-          <input
-            type="color"
-            value={p.color}
-            onChange={(e) => onChange({ color: e.target.value })}
-            className="h-[38px] w-full cursor-pointer rounded-lg bg-[var(--surface)] ring-1 ring-[var(--line-strong)]"
-          />
-        </label>
+      <label className="block">
+        <Label>Кегль, pt</Label>
+        <Input
+          type="number"
+          min={4}
+          max={200}
+          value={p.fontSize}
+          onChange={(e) => onChange({ fontSize: Number(e.target.value) || 4 })}
+          className="tabular w-28"
+        />
+      </label>
+
+      <div>
+        <Label>Цвет</Label>
+        <ColorField value={p.color} onChange={(color) => onChange({ color })} />
       </div>
 
       <div>
@@ -144,6 +158,46 @@ export function PropertiesPanel({ element, onChange, onDelete }: Props) {
           >
             <Italic size={16} />
           </IconToggle>
+          <IconToggle
+            active={p.underline}
+            onClick={() => onChange({ underline: !p.underline })}
+            title="Подчёркнутый"
+          >
+            <Underline size={16} />
+          </IconToggle>
+          <IconToggle
+            active={p.uppercase}
+            onClick={() => onChange({ uppercase: !p.uppercase })}
+            title="ПРОПИСНЫМИ"
+          >
+            <CaseUpper size={16} />
+          </IconToggle>
+        </div>
+      </div>
+
+      {/* Обводка нужна там, где текст ложится на пёстрый фон и сливается
+          с ним. Толщину даём в миллиметрах, как и всё остальное в макете. */}
+      <div>
+        <Label>Обводка букв</Label>
+        <div className="flex items-center gap-2">
+          <Input
+            type="number"
+            min={0}
+            max={2}
+            step={0.05}
+            value={p.strokeWidth}
+            onChange={(e) => onChange({ strokeWidth: Math.min(2, Math.max(0, Number(e.target.value) || 0)) })}
+            className="w-20"
+          />
+          <span className="text-sm text-[var(--text-muted)]">мм</span>
+          <div className="min-w-0 flex-1">
+            <ColorField
+              value={p.strokeColor}
+              onChange={(strokeColor) => onChange({ strokeColor })}
+              disabled={p.strokeWidth === 0}
+              label="Цвет обводки"
+            />
+          </div>
         </div>
       </div>
 

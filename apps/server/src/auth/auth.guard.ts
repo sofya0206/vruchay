@@ -1,6 +1,7 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import type { FastifyRequest } from 'fastify';
 import { AuthService, SessionUser } from './auth.service';
+import { TokensService } from '../tokens/tokens.service';
 
 export interface AuthenticatedRequest extends FastifyRequest {
   currentUser: SessionUser;
@@ -13,10 +14,23 @@ export interface AuthenticatedRequest extends FastifyRequest {
  */
 @Injectable()
 export class AuthGuard implements CanActivate {
-  constructor(private readonly auth: AuthService) {}
+  constructor(
+    private readonly auth: AuthService,
+    private readonly tokens: TokensService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest<FastifyRequest>();
+
+    // Сперва токен API: чужая система входить человеком не умеет.
+    // Дальше приложению всё равно, кто пришёл, — правила доступа
+    // к чужим материалам от способа входа не зависят.
+    const byToken = await this.tokens.resolve(req.headers.authorization);
+    if (byToken) {
+      (req as unknown as AuthenticatedRequest).currentUser = byToken;
+      return true;
+    }
+
     const userId: unknown = req.session?.get('userId');
     const orgId: unknown = req.session?.get('orgId');
 

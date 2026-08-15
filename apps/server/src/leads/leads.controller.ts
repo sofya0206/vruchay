@@ -4,6 +4,7 @@ import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { Throttle } from '../common/throttle.decorator';
 import { ThrottleGuard } from '../common/throttle.guard';
 import { AuthGuard } from '../auth/auth.guard';
+import { PlatformOnlyGuard } from '../auth/platform-only.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
 import { uuidSchema } from '../documents/documents.dto';
 import { LeadsService } from './leads.service';
@@ -30,9 +31,15 @@ export class LeadsPublicController {
   }
 }
 
-/** Разбор заявок в кабинете. Видит только владелец сервиса. */
+/**
+ * Разбор заявок в кабинете. Видит только владелец сервиса.
+ *
+ * PlatformOnlyGuard — по той же причине, что и у счетов: роль «владелец»
+ * есть у каждой организации, а здесь лежат контакты всех, кто оставил
+ * заявку на посадочной, вместе с адресами обращения.
+ */
 @Controller('leads')
-@UseGuards(AuthGuard, RolesGuard)
+@UseGuards(AuthGuard, PlatformOnlyGuard, RolesGuard)
 export class LeadsController {
   constructor(private readonly leads: LeadsService) {}
 

@@ -36,12 +36,18 @@ async function createOwner(): Promise<void> {
     return;
   }
 
-  const org = await prisma.organization.create({ data: { name: orgName } });
+  // Организация из консоли заводится оператором, а не саморегистрацией:
+  // тариф оплаченный (лимит бесплатной пробы к ней не относится), адрес
+  // считается подтверждённым — его ввёл сам оператор, проверять нечего.
+  // Иначе оператор запер бы сам себя: письмо с подтверждением ему пришлось
+  // бы ждать от почты, которая на этом шаге ещё не настроена.
+  const org = await prisma.organization.create({ data: { name: orgName, plan: 'paid' } });
   await prisma.user.create({
     data: {
       email,
       name: process.env.OWNER_NAME ?? '',
       passwordHash: await hashPassword(password),
+      emailVerifiedAt: new Date(),
       memberships: { create: { orgId: org.id, role: 'owner' } },
     },
   });

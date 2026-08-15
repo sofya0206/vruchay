@@ -217,7 +217,7 @@ function PayAsYouGo() {
             провести настоящее награждение и понять, подходит ли сервис.
           </p>
         </div>
-        <Link to="/login" className="mt-6">
+        <Link to="/register" className="mt-6">
           <Button variant="primary" className="w-full">
             Начать бесплатно
           </Button>

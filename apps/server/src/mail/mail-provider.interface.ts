@@ -21,6 +21,14 @@ export interface OutgoingMessage {
   subject: string;
   html: string;
   attachments?: MailAttachment[];
+  /**
+   * Куда придёт ответ, если он отличается от отправителя.
+   *
+   * Нужен, когда письмо уходит с нашего домена от имени организации:
+   * в отправителе стоит адрес на vruchay.ru, чтобы сходились SPF и DKIM,
+   * а отвечать участник должен организации, а не нам.
+   */
+  replyTo?: string;
   /** Свой идентификатор письма: попадает в заголовки и возвращается в вебхуках. */
   reference?: string;
 }
@@ -36,7 +44,16 @@ export interface DnsRecord {
 export type DomainStatus = 'pending' | 'verified' | 'failed';
 
 export interface NormalizedEvent {
+  /** Наш идентификатор письма, если провайдер его вернул. Иначе пусто. */
   reference: string;
+  /**
+   * Идентификатор письма у провайдера и адрес получателя — запасные
+   * способы найти письмо, когда своя ссылка не вернулась. Мы кладём её
+   * в заголовок отправляемого письма, а вернёт ли провайдер чужой
+   * заголовок в уведомлении — его дело, не наше.
+   */
+  providerMessageId?: string;
+  email?: string;
   type: 'sent' | 'delivered' | 'opened' | 'bounced' | 'failed';
   occurredAt: Date;
   payload: Record<string, unknown>;

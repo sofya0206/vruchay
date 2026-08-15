@@ -52,7 +52,7 @@ const money = (kopecks: number) =>
 const when = (iso: string) => new Date(iso).toLocaleDateString('ru-RU');
 
 export function InvoicesPage() {
-  const [tab, setTab] = useState<'invoices' | 'leads'>('invoices');
+  const [tab, setTab] = useState<'invoices' | 'leads' | 'orgs'>('invoices');
 
   return (
     <div className="min-h-full">
@@ -62,7 +62,7 @@ export function InvoicesPage() {
             to="/"
             className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)] hover:text-[var(--text)]"
           >
-            <ArrowLeft size={16} />К документам
+            <ArrowLeft size={16} />К материалам
           </Link>
           <span className="ml-auto font-serif text-lg">Счета и заявки</span>
         </div>
@@ -74,6 +74,7 @@ export function InvoicesPage() {
             [
               ['invoices', 'Счета'],
               ['leads', 'Заявки'],
+              ['orgs', 'Организации'],
             ] as const
           ).map(([value, label]) => (
             <button
@@ -92,7 +93,11 @@ export function InvoicesPage() {
           ))}
         </div>
 
-        <div className="mt-6">{tab === 'invoices' ? <Invoices /> : <Leads />}</div>
+        <div className="mt-6">
+          {tab === 'invoices' && <Invoices />}
+          {tab === 'leads' && <Leads />}
+          {tab === 'orgs' && <Organizations />}
+        </div>
       </main>
     </div>
   );
@@ -103,6 +108,7 @@ function Invoices() {
   const invoices = useQuery({
     queryKey: ['invoices'],
     queryFn: () => api.get<Invoice[]>('/invoices'),
+    retry: false,
   });
 
   const markPaid = useMutation({
@@ -113,6 +119,12 @@ function Invoices() {
     mutationFn: (id: string) => api.post<{ ok: true }>(`/invoices/${id}/send`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['invoices'] }),
   });
+
+  if (invoices.isPending) return <p className="text-[var(--text-muted)]">Загрузка…</p>;
+  // Отказ и пустой список — разные вещи, и раньше оба давали пустую
+  // страницу без единого слова: человек не понимал, у него нет счетов
+  // или у него нет доступа.
+  if (invoices.isError) return <NoAccess />;
 
   if (invoices.data?.length === 0) {
     return (
@@ -185,8 +197,28 @@ function Invoices() {
   );
 }
 
+/** Один и тот же ответ на «сюда нельзя» — во всех трёх вкладках. */
+function NoAccess() {
+  return (
+    <div className="rounded-xl bg-[var(--surface-sunken)] p-5 text-sm text-[var(--text-muted)]">
+      <p className="text-[var(--text)]">Этот раздел — для владельца сервиса.</p>
+      <p className="mt-1">
+        Здесь наша собственная бухгалтерия, а не данные вашей организации. Всё, что нужно вам,
+        находится в «Настройках» и в списке материалов.
+      </p>
+    </div>
+  );
+}
+
 function Leads() {
-  const leads = useQuery({ queryKey: ['leads'], queryFn: () => api.get<Lead[]>('/leads') });
+  const leads = useQuery({
+    queryKey: ['leads'],
+    queryFn: () => api.get<Lead[]>('/leads'),
+    retry: false,
+  });
+
+  if (leads.isPending) return <p className="text-[var(--text-muted)]">Загрузка…</p>;
+  if (leads.isError) return <NoAccess />;
 
   if (leads.data?.length === 0) {
     return (
@@ -219,6 +251,93 @@ function Leads() {
             <p className="mt-2 text-sm whitespace-pre-line text-[var(--text-muted)]">
               {lead.comment}
             </p>
+          )}
+        </article>
+      ))}
+    </div>
+  );
+}
+
+interface PlatformOrg {
+  id: string;
+  name: string;
+  plan: 'free' | 'paid';
+  createdAt: string;
+  ownerEmail: string;
+  ownerName: string;
+  issued: number;
+}
+
+/**
+ * Организации-клиенты и их тариф.
+ *
+ * До этой вкладки перевод с пробы на оплаченный тариф делался правкой
+ * в базе: команда, которую страшно выполнять после поступления денег
+ * в конце дня, и о которой негде прочитать, кто и когда её выполнял.
+ * Теперь это кнопка, и она пишется в журнал.
+ *
+ * Внутрь организаций отсюда не заглянуть: видно название, тариф и сколько
+ * выпущено. Списки участников — дело клиента, и техническая возможность
+ * их читать не заводится.
+ */
+function Organizations() {
+  const qc = useQueryClient();
+  const orgs = useQuery({
+    queryKey: ['platform-orgs'],
+    queryFn: () => api.get<PlatformOrg[]>('/platform/organizations'),
+    retry: false,
+  });
+
+  const setPlan = useMutation({
+    mutationFn: (v: { id: string; plan: 'free' | 'paid' }) =>
+      api.patch(`/platform/organizations/${v.id}/plan`, { plan: v.plan }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['platform-orgs'] }),
+  });
+
+  if (orgs.isPending) return <p className="text-[var(--text-muted)]">Загрузка…</p>;
+  if (orgs.isError) return <NoAccess />;
+
+  const items = orgs.data ?? [];
+  if (items.length === 0) return <p className="text-[var(--text-muted)]">Организаций пока нет.</p>;
+
+  return (
+    <div className="space-y-2">
+      {items.map((org) => (
+        <article
+          key={org.id}
+          className="flex flex-wrap items-center gap-3 rounded-2xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]"
+        >
+          <div className="min-w-52 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="font-medium">{org.name}</span>
+              <StatusChip tone={org.plan === 'paid' ? 'done' : 'neutral'}>
+                {org.plan === 'paid' ? 'оплачен' : 'бесплатная проба'}
+              </StatusChip>
+            </div>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">
+              {org.ownerName ? `${org.ownerName} · ` : ''}
+              {org.ownerEmail || 'владелец не найден'} · выпущено {org.issued} · с{' '}
+              {when(org.createdAt)}
+            </p>
+          </div>
+
+          {org.plan === 'free' ? (
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={setPlan.isPending}
+              onClick={() => setPlan.mutate({ id: org.id, plan: 'paid' })}
+            >
+              Перевести на оплаченный
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              disabled={setPlan.isPending}
+              onClick={() => setPlan.mutate({ id: org.id, plan: 'free' })}
+            >
+              Вернуть на пробу
+            </Button>
           )}
         </article>
       ))}

@@ -20,3 +20,15 @@ createRoot(document.getElementById('root')!).render(
     </QueryClientProvider>
   </StrictMode>,
 );
+
+// Заставку из разметки убираем, как только приложение отрисовалось.
+// Плавно, а не рывком: резкая подмена картинки читается как сбой.
+const splash = document.getElementById('splash');
+if (splash) {
+  splash.style.transition = 'opacity 0.25s ease-out';
+  splash.style.opacity = '0';
+  splash.addEventListener('transitionend', () => splash.remove(), { once: true });
+  // Страховка: если переход не случится (вкладка в фоне — браузер
+  // не проигрывает анимации), заставка всё равно должна исчезнуть.
+  setTimeout(() => splash.remove(), 600);
+}

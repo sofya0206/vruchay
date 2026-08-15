@@ -5,15 +5,19 @@ import {
   Check,
   ChevronLeft,
   Dot,
-  Image as ImageIcon,
   LoaderCircle,
+  Mail,
   Redo2,
+  ShieldCheck,
   Table2,
   Type,
   Undo2,
   ZoomIn,
 } from 'lucide-react';
 import { RecipientsTable } from '../recipients/RecipientsTable';
+import { EmailTemplateEditor } from '../mail/EmailTemplateEditor';
+import { InsertMenu } from '../editor/InsertMenu';
+import { RegistryTable } from '../documents/RegistryTable';
 import { sheetLayout, type SheetElement, type TextElement } from '@gramota/shared';
 import { Button } from '../ui/Button';
 import { StatusChip } from '../ui/Field';
@@ -22,6 +26,8 @@ import type { DocumentDetail } from '../api/types';
 import { SheetRenderer } from '../render/SheetRenderer';
 import { PropertiesPanel } from '../editor/PropertiesPanel';
 import { useLayoutHistory } from '../editor/useLayoutHistory';
+import { FitPageDialog } from '../editor/FitPageDialog';
+import { fitPageToImage, readImageSize, type PageFit } from '../editor/fit-page';
 import {
   clamp,
   fitZoom,
@@ -52,11 +58,12 @@ type Gesture =
 export function EditorPage() {
   const { id = '' } = useParams();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [view, setView] = useState<'editor' | 'table'>('editor');
+  const [view, setView] = useState<'editor' | 'table' | 'mail' | 'registry'>('editor');
   const [zoom, setZoom] = useState(1);
   const [saved, setSaved] = useState<'saved' | 'saving' | 'dirty'>('saved');
   const containerRef = useRef<HTMLDivElement>(null);
   const gesture = useRef<Gesture | null>(null);
+  const backgroundInput = useRef<HTMLInputElement>(null);
 
   const doc = useQuery({
     queryKey: ['document', id],
@@ -67,9 +74,27 @@ export function EditorPage() {
   const history = useLayoutHistory([]);
   const { reset, beginGesture, endGesture } = history;
 
+  /*
+   * Макет с сервера кладём в историю только при смене листа.
+   *
+   * Следить за объектом листа целиком нельзя: он пересоздаётся при каждом
+   * ответе сервера, а `reset` обнуляет историю. Достаточно было обновить
+   * данные — скажем, загрузить бланк, — и все прежние шаги отмены пропадали.
+   */
+  const sheetId = sheet?.id;
+  const loaded = useRef<string | null>(null);
   useEffect(() => {
-    if (sheet) reset(sheet.layout);
-  }, [sheet, reset]);
+    if (!sheet || loaded.current === sheet.id) return;
+    loaded.current = sheet.id;
+    reset(sheet.layout);
+  }, [sheet, sheetId, reset]);
+
+  // Колонки таблицы получателей — из них складывается подменю переменных
+  // при вставке текста.
+  const recipients = useQuery({
+    queryKey: ['recipient-columns', id],
+    queryFn: () => api.get<{ columns: { name: string }[] }>(`/documents/${id}/recipients`),
+  });
 
   const background = useQuery({
     queryKey: ['file-url', sheet?.backgroundFileId],
@@ -94,6 +119,42 @@ export function EditorPage() {
       void background.refetch();
     },
   });
+
+  /** Что предложить, если бланк не тех пропорций, что лист. */
+  const [fit, setFit] = useState<PageFit | null>(null);
+
+  const resizePage = useMutation({
+    mutationFn: (size: { widthMm: number; heightMm: number }) =>
+      api.patch(`/documents/${id}`, {
+        pageWidthMm: size.widthMm,
+        pageHeightMm: size.heightMm,
+      }),
+    onSuccess: () => void doc.refetch(),
+  });
+
+  /** Собственные настройки материала: мероприятие и проверка по QR. */
+  const saveEvent = useMutation({
+    mutationFn: (values: Record<string, unknown>) => api.patch(`/documents/${id}`, values),
+    onSuccess: () => void doc.refetch(),
+  });
+
+  /**
+   * Размеры картинки читаем в браузере, до отправки: файл уже здесь,
+   * и гонять его на сервер ради двух чисел незачем. Вопрос задаём после
+   * успешной загрузки — предлагать подогнать лист под бланк, который
+   * не загрузился, бессмысленно.
+   */
+  async function onPickBackground(file: File) {
+    const size = await readImageSize(file).catch(() => null);
+    await uploadBackground.mutateAsync(file);
+    if (!size || !doc.data) return;
+
+    const result = fitPageToImage(
+      { widthMm: doc.data.pageWidthMm, heightMm: doc.data.pageHeightMm },
+      size,
+    );
+    if (result.mismatched) setFit(result);
+  }
 
   // Автосохранение: откладываем запись, пока пользователь продолжает править.
   const { layout, version } = history;
@@ -121,7 +182,12 @@ export function EditorPage() {
     const observer = new ResizeObserver(recompute);
     observer.observe(el);
     return () => observer.disconnect();
-  }, [doc.data]);
+    // view в зависимостях обязателен: на вкладках «Получатели» и «Письмо»
+    // холст размонтируется вместе с наблюдателем за размером. При возврате
+    // появляется новый узел, а эффект без view не перезапускался — масштаб
+    // оставался тем, что посчитан для схлопнутого контейнера, и лист
+    // показывался в 13% вместо «во весь экран».
+  }, [doc.data, view]);
 
   const selected = useMemo(
     () => layout.find((el) => el.id === selectedId) ?? null,
@@ -204,20 +270,39 @@ export function EditorPage() {
 
   const page = doc.data;
 
-  function addTextBlock() {
-    const el: TextElement = {
+  /**
+   * Добавляет элемент в середину листа.
+   *
+   * Свойства прогоняем через схему, а не задаём вручную: умолчания живут
+   * в одном месте, и новый блок гарантированно такой же, каким его увидит
+   * печать. Иначе редактор и рендер разошлись бы на первом же новом поле.
+   */
+  function addElement(
+    type: 'text' | 'qr' | 'link',
+    size: { w: number; h: number },
+    text?: string,
+  ) {
+    const seed: Record<string, unknown> =
+      type === 'text'
+        ? { text: text ?? 'Награждается %name' }
+        : type === 'link'
+          ? { text: 'Проверить подлинность', url: 'https://vruchay.ru' }
+          : {};
+
+    const el = {
       id: crypto.randomUUID(),
-      type: 'text',
-      x: page.pageWidthMm / 2 - 60,
-      y: page.pageHeightMm / 2 - 10,
-      w: 120,
-      h: 20,
+      type,
+      x: page.pageWidthMm / 2 - size.w / 2,
+      y: page.pageHeightMm / 2 - size.h / 2,
+      w: size.w,
+      h: size.h,
       rotation: 0,
       z: layout.length,
       props: sheetLayout.parse([
-        { id: 'tmp', type: 'text', x: 0, y: 0, w: 1, h: 1, props: { text: 'Награждается %name' } },
-      ])[0].props as TextElement['props'],
-    };
+        { id: 'tmp', type, x: 0, y: 0, w: 1, h: 1, props: seed },
+      ])[0].props,
+    } as SheetElement;
+
     history.setLayout((prev) => [...prev, el]);
     setSelectedId(el.id);
   }
@@ -243,7 +328,12 @@ export function EditorPage() {
           className="flex items-center gap-1.5 text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--text)]"
         >
           <ChevronLeft size={16} />
-          Документы
+          {/* Именно «Материалы», как называется страница, куда ведёт ссылка.
+              Разница со словом «документ» здесь по существу: материал —
+              это заготовка, а документы — то, что из неё выпускается
+              («создать документы», «осталось 50 документов»). Ссылка,
+              обещавшая «Документы», приводила на «Материалы». */}
+          Материалы
         </Link>
 
         <h1 className="font-serif text-lg">{page.title}</h1>
@@ -255,28 +345,42 @@ export function EditorPage() {
           <ViewTab active={view === 'table'} onClick={() => setView('table')} icon={<Table2 size={14} />}>
             Получатели
           </ViewTab>
+          <ViewTab active={view === 'mail'} onClick={() => setView('mail')} icon={<Mail size={14} />}>
+            Письмо
+          </ViewTab>
+          <ViewTab
+            active={view === 'registry'}
+            onClick={() => setView('registry')}
+            icon={<ShieldCheck size={14} />}
+          >
+            Реестр
+          </ViewTab>
         </div>
 
-        {view === 'table' ? null : (
+        {view !== 'editor' ? null : (
           <>
-        <Button variant="primary" size="sm" icon={<Type size={15} />} onClick={addTextBlock}>
-          Текст
-        </Button>
+        <InsertMenu
+          onInsert={addElement}
+          variables={recipients.data?.columns.map((c) => c.name) ?? []}
+          onBackground={() => backgroundInput.current?.click()}
+          backgroundLoading={uploadBackground.isPending}
+          hasBackground={Boolean(sheet.backgroundFileId)}
+        />
 
-        <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-[var(--surface)] px-2.5 py-1.5 text-sm ring-1 ring-[var(--line-strong)] transition-colors hover:bg-[var(--surface-sunken)]">
-          <ImageIcon size={15} />
-          {uploadBackground.isPending ? 'Загрузка…' : 'Фон'}
-          <input
-            type="file"
-            accept="image/png,image/jpeg"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) uploadBackground.mutate(file);
-              e.target.value = '';
-            }}
-          />
-        </label>
+        {/* Поле выбора файла спрятано и живёт отдельно от меню: меню
+            закрывается по нажатию, а системное окно выбора должно открыться
+            уже после этого — иначе оно закрылось бы вместе с меню. */}
+        <input
+          ref={backgroundInput}
+          type="file"
+          accept="image/png,image/jpeg"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) void onPickBackground(file);
+            e.target.value = '';
+          }}
+        />
 
         {uploadBackground.isError && (
           <span role="alert" className="text-sm text-[var(--danger)]">
@@ -285,19 +389,26 @@ export function EditorPage() {
         )}
 
         <div className="ml-auto flex items-center gap-2">
+          {/* С подписью, а не одними стрелками: две одинаковые серые иконки
+              не читаются как «отмена», и человек их просто не находит.
+              Заблокированное состояние тоже обязательно — активная кнопка,
+              по которой ничего не происходит, выглядит как сломанная. */}
           <Button
             size="sm"
             variant="ghost"
             icon={<Undo2 size={15} />}
             onClick={history.undo}
+            disabled={!history.canUndo}
             title="Отменить (Ctrl+Z)"
-            aria-label="Отменить"
-          />
+          >
+            Отменить
+          </Button>
           <Button
             size="sm"
             variant="ghost"
             icon={<Redo2 size={15} />}
             onClick={history.redo}
+            disabled={!history.canRedo}
             title="Вернуть (Ctrl+Shift+Z)"
             aria-label="Вернуть"
           />
@@ -339,13 +450,41 @@ export function EditorPage() {
       </header>
 
       {view === 'table' ? (
-        <RecipientsTable documentId={id} />
+        <RecipientsTable
+          documentId={id}
+          onGoToMail={() => setView('mail')}
+          onGoToRegistry={() => setView('registry')}
+        />
+      ) : view === 'registry' ? (
+        <RegistryTable documentId={id} />
+      ) : view === 'mail' ? (
+        <div className="min-h-0 flex-1 overflow-auto">
+          <EmailTemplateEditor documentId={id} />
+        </div>
       ) : (
       <div className="flex min-h-0 flex-1">
         <div
           ref={containerRef}
-          className="grid flex-1 place-items-center overflow-auto bg-[var(--surface-sunken)] p-6"
+          className="relative grid flex-1 place-items-center overflow-auto bg-[var(--surface-sunken)] p-6"
         >
+          {/* Подсказка следующего шага. Человек открывает пустой редактор
+              и не знает, с чего начать: сначала бланк, потом текст.
+              Исчезает сама, как только шаг сделан, — постоянная подсказка
+              быстро становится мусором на экране. */}
+          {!sheet.backgroundFileId && layout.length === 0 && (
+            <div className="pointer-events-none absolute inset-x-0 top-6 z-10 flex justify-center">
+              <p className="rounded-full bg-[var(--surface)] px-4 py-2 text-sm text-[var(--text-muted)] shadow-sm ring-1 ring-[var(--line)]">
+                Начните с бланка: «Вставить» → «Бланк». Потом положите на него текст.
+              </p>
+            </div>
+          )}
+          {sheet.backgroundFileId && layout.length === 0 && (
+            <div className="pointer-events-none absolute inset-x-0 top-6 z-10 flex justify-center">
+              <p className="rounded-full bg-[var(--surface)] px-4 py-2 text-sm text-[var(--text-muted)] shadow-sm ring-1 ring-[var(--line)]">
+                Бланк на месте. Теперь «Вставить» → «Текст» — и выберите, что подставлять.
+              </p>
+            </div>
+          )}
           <div
             className="relative shadow-lg"
             style={{
@@ -419,6 +558,8 @@ export function EditorPage() {
 
         <PropertiesPanel
           element={selected}
+          doc={doc.data}
+          onSaveEvent={(values) => saveEvent.mutate(values)}
           onChange={patchProps}
           onDelete={() => {
             if (!selectedId) return;
@@ -427,6 +568,18 @@ export function EditorPage() {
           }}
         />
       </div>
+      )}
+
+      {fit && (
+        <FitPageDialog
+          current={{ widthMm: page.pageWidthMm, heightMm: page.pageHeightMm }}
+          suggested={fit.suggested}
+          onFit={() => {
+            resizePage.mutate(fit.suggested);
+            setFit(null);
+          }}
+          onKeep={() => setFit(null)}
+        />
       )}
     </div>
   );

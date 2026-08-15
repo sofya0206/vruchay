@@ -30,6 +30,22 @@ ENV VITE_OPERATOR_NAME=$VITE_OPERATOR_NAME \
     VITE_OPERATOR_PHONE=$VITE_OPERATOR_PHONE \
     VITE_POLICY_DATE=$VITE_POLICY_DATE
 
+# Сборка заканчивается предварительной отрисовкой (apps/web/prerender.mjs):
+# она открывает собранные страницы в настоящем браузере и сохраняет готовую
+# разметку — иначе роботу Яндекса приходит пустой div. Поэтому браузер нужен
+# уже здесь. Скачиваем его явно, а не полагаясь на postinstall самого
+# playwright: pnpm 10 по умолчанию postinstall-скрипты зависимостей не
+# выполняет, и браузер молча не появился бы.
+#
+# В рабочий образ ниже не попадает ничего из этого — там только Caddy и dist.
+# ipv4first — не украшательство: у сервера нет глобального IPv6, а Node
+# по умолчанию идёт по тому адресу, который вернул DNS первым. Каждая загрузка
+# сначала упиралась в ENETUNREACH и только через полминуты повторяла по IPv4.
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN NODE_OPTIONS=--dns-result-order=ipv4first \
+    pnpm --filter @gramota/web exec playwright install --with-deps chromium \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN pnpm --filter @gramota/shared build && pnpm --filter @gramota/web build
 
 FROM caddy:2-alpine

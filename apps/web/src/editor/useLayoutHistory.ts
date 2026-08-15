@@ -17,6 +17,21 @@ export function useLayoutHistory(initial: SheetLayout) {
   const future = useRef<SheetLayout[]>([]);
   const [version, setVersion] = useState(0);
 
+  /*
+   * Длины стопок держим ещё и в состоянии.
+   *
+   * Сами стопки живут в ref — их нельзя пересоздавать на каждый кадр
+   * перетаскивания. Но кнопкам «Отменить» и «Вернуть» нужно знать, есть ли
+   * что отменять, а изменение ref перерисовку не вызывает: кнопка осталась бы
+   * активной, когда отменять уже нечего, и наоборот. Нажатие в пустоту
+   * выглядит как «кнопка не работает» — ровно так это и было воспринято.
+   */
+  const [depth, setDepth] = useState({ past: 0, future: 0 });
+  const syncDepth = useCallback(
+    () => setDepth({ past: past.current.length, future: future.current.length }),
+    [],
+  );
+
   const setLayout = useCallback(
     (next: SheetLayout | ((prev: SheetLayout) => SheetLayout), commit = true) => {
       setLayoutState((prev) => {
@@ -27,9 +42,12 @@ export function useLayoutHistory(initial: SheetLayout) {
         }
         return value;
       });
-      if (commit) setVersion((v) => v + 1);
+      if (commit) {
+        setVersion((v) => v + 1);
+        syncDepth();
+      }
     },
-    [],
+    [syncDepth],
   );
 
   /**
@@ -43,7 +61,8 @@ export function useLayoutHistory(initial: SheetLayout) {
       future.current = [];
       return prev;
     });
-  }, []);
+    syncDepth();
+  }, [syncDepth]);
 
   /**
    * Завершить жест. Двигает счётчик версии — именно по нему срабатывает
@@ -60,7 +79,8 @@ export function useLayoutHistory(initial: SheetLayout) {
       return previous;
     });
     setVersion((v) => v + 1);
-  }, []);
+    syncDepth();
+  }, [syncDepth]);
 
   const redo = useCallback(() => {
     setLayoutState((prev) => {
@@ -71,14 +91,27 @@ export function useLayoutHistory(initial: SheetLayout) {
       return next;
     });
     setVersion((v) => v + 1);
-  }, []);
+    syncDepth();
+  }, [syncDepth]);
 
-  /** Загрузка макета с сервера: история при этом обнуляется. */
-  const reset = useCallback((value: SheetLayout) => {
-    past.current = [];
-    future.current = [];
-    setLayoutState(value);
-  }, []);
+  /**
+   * Загрузка макета с сервера: история при этом обнуляется.
+   *
+   * Вызывать это можно только при смене листа. Раньше сброс висел на объекте
+   * листа целиком, а он пересоздаётся при каждом ответе сервера — и любое
+   * обновление данных (например, после загрузки бланка) стирало всю историю
+   * правок. Человек нажимал «Отменить» и не понимал, почему ничего
+   * не происходит.
+   */
+  const reset = useCallback(
+    (value: SheetLayout) => {
+      past.current = [];
+      future.current = [];
+      setLayoutState(value);
+      syncDepth();
+    },
+    [syncDepth],
+  );
 
   return {
     layout,
@@ -89,7 +122,7 @@ export function useLayoutHistory(initial: SheetLayout) {
     redo,
     reset,
     version,
-    canUndo: past.current.length > 0,
-    canRedo: future.current.length > 0,
+    canUndo: depth.past > 0,
+    canRedo: depth.future > 0,
   };
 }

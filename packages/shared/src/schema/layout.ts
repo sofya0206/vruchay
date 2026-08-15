@@ -36,6 +36,22 @@ export const textElement = elementBase.extend({
     letterSpacing: z.number().default(0),
     bold: z.boolean().default(false),
     italic: z.boolean().default(false),
+    underline: z.boolean().default(false),
+    /**
+     * ПРОПИСНЫЕ БУКВЫ — оформлением, а не правкой самого текста.
+     * Важно для подстановки: фамилия приходит из таблицы как «Иванов»,
+     * и переписывать её в верхний регистр вручную негде.
+     */
+    uppercase: z.boolean().default(false),
+    /**
+     * Обводка вокруг букв, в миллиметрах. Нужна, когда текст ложится
+     * на пёстрый фон и без неё сливается.
+     */
+    strokeWidth: z.number().min(0).max(2).default(0),
+    strokeColor: z
+      .string()
+      .regex(/^#[0-9a-fA-F]{6}$/)
+      .default('#ffffff'),
     /** уменьшать размер шрифта, чтобы текст влез в блок */
     autoFit: z.boolean().default(false),
   }),

@@ -27,12 +27,22 @@ const OPERATOR: Record<string, string | undefined> = {
   ДАТА_РЕДАКЦИИ: import.meta.env.VITE_POLICY_DATE,
 };
 
-function fill(text: string): { filled: string; missing: string[] } {
+/**
+ * Подставляет данные оператора и сообщает обо всём, что осталось незаполненным.
+ *
+ * Ищем любую пару двойных фигурных скобок, а не только известные имена.
+ * Разница не теоретическая: в тексте жили заглушки вида `{{СРОК: 6 часов}}`,
+ * которые под прежний шаблон не подходили — они молча выводились
+ * на опубликованную страницу, а проверка «чего не хватает» их не замечала.
+ * Документ выглядел готовым, будучи недописанным.
+ */
+export function fill(text: string): { filled: string; missing: string[] } {
   const missing: string[] = [];
-  const filled = text.replace(/\{\{([A-ZА-ЯЁ_]+)\}\}/g, (whole, name: string) => {
-    const value = OPERATOR[name];
+  const filled = text.replace(/\{\{([^}]+)\}\}/g, (whole, name: string) => {
+    const key = name.trim();
+    const value = OPERATOR[key];
     if (!value) {
-      missing.push(name);
+      missing.push(key);
       return whole;
     }
     return value;

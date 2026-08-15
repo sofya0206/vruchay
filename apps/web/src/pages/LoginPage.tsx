@@ -1,4 +1,5 @@
 import { FormEvent, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Award, LoaderCircle } from 'lucide-react';
 import { useLogin } from '../auth/useAuth';
 import { ApiError } from '../api/client';
@@ -77,8 +78,17 @@ export function LoginPage() {
           </Button>
         </form>
 
+        {/* Без этой ссылки тот, кто пришёл с посадочной по кнопке «Войти»,
+            упирается в тупик: формы регистрации на странице входа нет. */}
+        <p className="mt-6 text-center text-sm text-[var(--text-muted)]">
+          Ещё нет учётной записи?{' '}
+          <Link to="/register" className="underline underline-offset-2 hover:text-[var(--text)]">
+            Зарегистрироваться
+          </Link>
+        </p>
+
         {/* Ссылка на политику обязана быть доступна всем, а не только вошедшим. */}
-        <p className="mt-6 text-center text-xs text-[var(--text-muted)]">
+        <p className="mt-4 text-center text-xs text-[var(--text-muted)]">
           <a href="/privacy" className="underline underline-offset-2 hover:text-[var(--text)]">
             Политика обработки персональных данных
           </a>

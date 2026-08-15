@@ -13,9 +13,17 @@ export interface PublicConfig {
   authMode: 'none' | 'email_code';
   successMessage: string;
   showDownload: boolean;
-  /** Тексты согласий: показываются в форме и попадают в журнал вместе с версией. */
+  /** Подпись у галочки согласия: показывается в окне и попадает в журнал с версией. */
   consentText: string;
+  /** Куда ведёт ссылка «подробнее» рядом с галочкой. */
+  privacyUrl: string;
   consentVersion: string;
+  /** Подставлять имя и адрес из личного кабинета площадки. */
+  prefillFromAccount: boolean;
+  /** Можно ли править подставленное. Выключено — только подтвердить. */
+  allowEdit: boolean;
+  showShare: boolean;
+  showVerifyLink: boolean;
 }
 
 export const TILDA_STYLES = `
@@ -34,6 +42,19 @@ export const TILDA_STYLES = `
 .vru-err{color:#a3302a;font-size:13px;margin-top:10px;min-height:18px}
 .vru-close{position:absolute;top:14px;right:16px;border:0;background:none;cursor:pointer;
   font-size:22px;color:#5f6b64;line-height:1}
+.vru-field{text-align:left;margin-bottom:12px}
+.vru-label{display:block;font-size:13px;color:#5f6b64;margin-bottom:4px}
+.vru-input{width:100%;box-sizing:border-box;padding:10px 12px;font-size:15px;
+  border:1px solid #cfccc2;border-radius:10px;outline:none;background:#fff;color:#16211c}
+.vru-input:focus{border-color:#1f5d3f;box-shadow:0 0 0 3px rgba(31,93,63,.15)}
+.vru-input[readonly]{background:#f2f1ec;color:#5f6b64}
+.vru-ghost{margin-top:10px;width:100%;padding:10px;border:1px solid #cfccc2;border-radius:10px;
+  cursor:pointer;background:#fff;color:#16211c;font-size:14px}
+.vru-share{display:flex;gap:8px;justify-content:center;margin-top:14px;flex-wrap:wrap}
+.vru-share a,.vru-share button{display:inline-flex;align-items:center;justify-content:center;
+  padding:8px 14px;border:1px solid #cfccc2;border-radius:10px;background:#fff;color:#16211c;
+  font-size:13px;text-decoration:none;cursor:pointer}
+.vru-verify{display:block;margin-top:12px;font-size:13px;color:#5f6b64}
 .vru-spin{width:26px;height:26px;margin:0 auto 14px;border:3px solid #e3e1da;
   border-top-color:#1f5d3f;border-radius:50%;animation:vru-rot .8s linear infinite}
 @keyframes vru-rot{to{transform:rotate(360deg)}}
@@ -49,13 +70,26 @@ export function buildTildaScript(baseUrl: string, config: PublicConfig): string 
   return `/* Вручай — выдача наградных документов. Форма на этой странице. */
 (function () {
   'use strict';
+
+  // Скрипт можно подключать хоть в HEAD, хоть рядом с самим блоком —
+  // так проще объяснять, и не надо лезть в шаблон сайта. Но тогда на
+  // странице с двумя блоками он загрузится дважды, и вторая загрузка
+  // навесила бы вторую кнопку на каждый блок.
+  if (window.__vruchayLoaded) return;
+  window.__vruchayLoaded = true;
+
   var API = ${js(baseUrl)};
   var CFG = {
     token: ${js(config.token)},
     authMode: ${js(config.authMode)},
     successMessage: ${js(config.successMessage)},
     showDownload: ${config.showDownload},
-    consentVersion: ${js(config.consentVersion)}
+    consentVersion: ${js(config.consentVersion)},
+    consentText: ${js(config.consentText)},
+    privacyUrl: ${js(config.privacyUrl)},
+    prefill: ${config.prefillFromAccount},
+    allowEdit: ${config.allowEdit},
+    showShare: ${config.showShare}
   };
 
   function el(tag, cls, html) {
@@ -131,6 +165,45 @@ export function buildTildaScript(baseUrl: string, config: PublicConfig): string 
       a.style.boxSizing = 'border-box';
       box.appendChild(a);
     }
+    // Делимся ссылкой на страницу проверки, а не самим файлом: файл
+    // отдаётся по временной ссылке и вдобавок содержит фамилию с адресом,
+    // а страница проверки для того и сделана, чтобы её показывать.
+    if (CFG.showShare && status.verifyUrl) shareRow(box, status.verifyUrl);
+    if (status.verifyUrl) {
+      var v = el('a', 'vru-verify', 'Проверить подлинность документа');
+      v.href = status.verifyUrl;
+      v.target = '_blank';
+      v.rel = 'noopener';
+      box.appendChild(v);
+    }
+  }
+
+  function shareRow(box, url) {
+    var row = el('div', 'vru-share');
+    var text = 'Мой документ';
+    var links = [
+      ['ВКонтакте', 'https://vk.com/share.php?url=' + encodeURIComponent(url)],
+      ['Telegram', 'https://t.me/share/url?url=' + encodeURIComponent(url) + '&text=' + encodeURIComponent(text)],
+      ['WhatsApp', 'https://wa.me/?text=' + encodeURIComponent(text + ' ' + url)]
+    ];
+    for (var i = 0; i < links.length; i++) {
+      var a = el('a', null, links[i][0]);
+      a.href = links[i][1];
+      a.target = '_blank';
+      a.rel = 'noopener';
+      row.appendChild(a);
+    }
+    // Кнопка «скопировать» нужна тем, у кого своя сеть или мессенджер,
+    // которого в списке нет. Их всегда больше, чем кажется.
+    var copy = el('button', null, 'Скопировать ссылку');
+    copy.onclick = function () {
+      if (!navigator.clipboard) return;
+      navigator.clipboard.writeText(url).then(function () {
+        copy.textContent = 'Скопировано';
+      }, function () { /* доступ к буферу запрещён — молчим, ссылка видна */ });
+    };
+    row.appendChild(copy);
+    box.appendChild(row);
   }
 
   function fail(box, message) {
@@ -185,6 +258,154 @@ export function buildTildaScript(baseUrl: string, config: PublicConfig): string 
     return out;
   }
 
+  /**
+   * Имя и адрес вошедшего участника.
+   *
+   * Три источника по убыванию надёжности.
+   *
+   * 1. Атрибуты самого блока — их площадка подставляет **своим шаблоном
+   *    на сервере**: WordPress через короткий код, Битрикс через $USER.
+   *    Это и надёжнее, и понятнее: видно, откуда взялось значение.
+   * 2. Поля ma_name и ma_email — так делает личный кабинет Тильды.
+   * 3. Глобальный объект площадки — на случай, если она кладёт данные туда.
+   *
+   * Ничего не требуем: не нашли — человек наберёт сам. Сценарий обязан
+   * работать и без подстановки, иначе на любой новой площадке кнопка
+   * просто переставала бы что-либо делать.
+   */
+  function account(node) {
+    var out = { name: '', email: '' };
+    if (!CFG.prefill) return out;
+
+    if (node) {
+      out.name = (node.getAttribute('data-name') || '').trim();
+      out.email = (node.getAttribute('data-email') || '').trim();
+    }
+
+    var byName = function (n) {
+      var f = document.querySelector('[name="' + n + '"]');
+      return f && f.value ? String(f.value).trim() : '';
+    };
+    if (!out.name) out.name = byName('ma_name');
+    if (!out.email) out.email = byName('ma_email');
+
+    try {
+      var m = window.tildamembers || window.tildaMembers || window.vruchayUser;
+      if (m) {
+        if (!out.name && m.name) out.name = String(m.name).trim();
+        if (!out.email && m.email) out.email = String(m.email).trim();
+      }
+    } catch (e) { /* чужой объект оказался не тем, чем ожидали */ }
+
+    return out;
+  }
+
+  function send(box, payload) {
+    box.innerHTML = '';
+    box.appendChild(el('div', 'vru-spin'));
+    box.appendChild(el('p', 'vru-title', 'Отправляем заявку'));
+
+    post('/api/v1/tilda/submit', payload)
+      .then(function (r) {
+        if (r.status === 'need_code') return askCode(r.requestId, box);
+        // Документ выдавали раньше: спрашиваем, доступен ли он ещё
+        // для скачивания, вместо того чтобы обещать кнопку наугад.
+        if (r.status === 'already_issued') {
+          return fetch(API + '/api/v1/tilda/status/' + r.requestId)
+            .then(function (res) { return res.json(); })
+            .then(function (s) { done(box, r.requestId, s); })
+            .catch(function () { done(box, r.requestId, { canDownload: false }); });
+        }
+        showWaiting(r.requestId, box);
+      })
+      .catch(function (err) { fail(box, err.message); });
+  }
+
+  /**
+   * Окно «проверьте данные».
+   *
+   * Показывается там, где человек ничего не набирал: данные подставлены
+   * кабинетом, и подтвердить их он обязан сам. Без этого шага сервис
+   * впечатал бы в наградной документ то, что где-то лежало, — а исправить
+   * фамилию в уже выданном документе куда дороже, чем прочитать её сейчас.
+   */
+  function confirmStep(box, documentId, prefill) {
+    box.innerHTML = '';
+    box.appendChild(el('p', 'vru-title', 'Проверьте данные'));
+    box.appendChild(el('p', 'vru-text',
+      CFG.allowEdit
+        ? 'Так они будут напечатаны в документе. Если что-то не так — поправьте.'
+        : 'Так они будут напечатаны в документе.'));
+
+    var mk = function (label, value, type) {
+      var wrap = el('div', 'vru-field');
+      var l = el('label', 'vru-label');
+      l.textContent = label;
+      var input = el('input', 'vru-input');
+      input.type = type || 'text';
+      input.value = value || '';
+      if (!CFG.allowEdit) input.readOnly = true;
+      wrap.appendChild(l);
+      wrap.appendChild(input);
+      box.appendChild(wrap);
+      return input;
+    };
+
+    var nameInput = mk('Фамилия и имя', prefill.name);
+    var emailInput = mk('Куда прислать документ', prefill.email, 'email');
+
+    var consent = el('label', 'vru-label');
+    consent.style.display = 'flex';
+    consent.style.gap = '8px';
+    consent.style.alignItems = 'flex-start';
+    consent.style.textAlign = 'left';
+    var check = el('input');
+    check.type = 'checkbox';
+    var span = el('span');
+    // textContent, а не innerHTML: текст приходит из настроек, и вставлять
+    // его как разметку значило бы открыть путь чужому скрипту на страницу
+    // клиента.
+    span.textContent = CFG.consentText + ' ';
+    var more = el('a', null, 'Подробнее');
+    more.href = CFG.privacyUrl;
+    more.target = '_blank';
+    more.rel = 'noopener';
+    more.style.color = '#1f5d3f';
+    span.appendChild(more);
+    consent.appendChild(check);
+    consent.appendChild(span);
+    box.appendChild(consent);
+
+    var btn = el('button', 'vru-btn', 'Всё верно, получить документ');
+    var err = el('div', 'vru-err');
+    box.appendChild(btn);
+    box.appendChild(err);
+
+    btn.onclick = function () {
+      err.textContent = '';
+      if (!check.checked) {
+        err.textContent = 'Отметьте согласие на обработку персональных данных';
+        return;
+      }
+      if (!emailInput.value.trim()) {
+        err.textContent = 'Укажите адрес, куда прислать документ';
+        return;
+      }
+      send(box, {
+        token: CFG.token,
+        documentId: documentId,
+        email: emailInput.value.trim(),
+        // Адрес учётной записи идёт отдельно от адреса доставки: по нему
+        // держится однократная выдача, даже если доставку разрешено менять.
+        accountEmail: prefill.email || undefined,
+        fields: { name: nameInput.value.trim() },
+        consent: true,
+        consentMarketing: false,
+        consentVersion: CFG.consentVersion
+      });
+    };
+  }
+
   function handle(form) {
     form.addEventListener('submit', function (e) {
       e.preventDefault();
@@ -198,39 +419,60 @@ export function buildTildaScript(baseUrl: string, config: PublicConfig): string 
         return fail(box, 'Отметьте согласие на обработку персональных данных');
       }
 
-      box.appendChild(el('div', 'vru-spin'));
-      box.appendChild(el('p', 'vru-title', 'Отправляем заявку'));
-
-      post('/api/v1/tilda/submit', {
+      var acc = account(form);
+      send(box, {
         token: CFG.token,
         documentId: data.documentId,
-        email: data.email,
+        email: data.email || acc.email,
+        accountEmail: acc.email || undefined,
         fields: data.fields,
         consent: true,
         consentMarketing: data.consentMarketing,
         consentVersion: CFG.consentVersion,
         website: data.website
-      })
-        .then(function (r) {
-          if (r.status === 'need_code') return askCode(r.requestId, box);
-          // Документ выдавали раньше: спрашиваем, доступен ли он ещё
-          // для скачивания, вместо того чтобы обещать кнопку наугад.
-          if (r.status === 'already_issued') {
-            return fetch(API + '/api/v1/tilda/status/' + r.requestId)
-              .then(function (res) { return res.json(); })
-              .then(function (s) { done(box, r.requestId, s); })
-              .catch(function () { done(box, r.requestId, { canDownload: false }); });
-          }
-          showWaiting(r.requestId, box);
-        })
-        .catch(function (err) { fail(box, err.message); });
+      });
     }, true);
+  }
+
+  /**
+   * Вход одной кнопкой — без формы вообще.
+   *
+   * Клиенту достаточно положить на страницу курса один блок с кодом
+   * документа. Собирать форму из полей, которые всё равно заполнятся
+   * сами, — лишняя работа и лишний повод ошибиться.
+   */
+  function initButtons() {
+    var nodes = document.querySelectorAll('[data-vruchay-certificate]');
+    for (var i = 0; i < nodes.length; i++) {
+      (function (node) {
+        // Один блок — одна кнопка, сколько бы раз ни звали.
+        if (node.getAttribute('data-vruchay-ready')) return;
+        node.setAttribute('data-vruchay-ready', '1');
+
+        var documentId = (node.getAttribute('data-doc-id') || '').trim();
+        if (!documentId) return;
+
+        var btn = el('button', 'vru-btn', node.getAttribute('data-label') || 'Получить документ');
+        btn.style.width = 'auto';
+        btn.style.padding = '11px 22px';
+        btn.onclick = function () {
+          var box = el('div');
+          overlay(box);
+          // Данные берём у самого блока: на странице может стоять
+          // несколько кнопок на разные документы, и каждой полагаются
+          // свои значения, а не первые попавшиеся на странице.
+          confirmStep(box, documentId, account(node));
+        };
+        node.appendChild(btn);
+      })(nodes[i]);
+    }
   }
 
   function init() {
     // Формы Тильды и обычные формы с признаком нашей интеграции.
     var forms = document.querySelectorAll('form.t-form, form[data-vruchay]');
     for (var i = 0; i < forms.length; i++) handle(forms[i]);
+    initButtons();
   }
 
   if (document.readyState === 'loading') {

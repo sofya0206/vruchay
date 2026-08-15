@@ -10,7 +10,11 @@ import {
   renderSubject,
   sanitizeEmailHtml,
 } from './mail-template';
-import type { MailProvider } from './mail-provider.interface';
+import type { MailProvider, NormalizedEvent } from './mail-provider.interface';
+import { advanceStatus, type EmailStatus } from './email-status';
+import { sharedDomainRefusal } from './shared-domain-limit';
+import { platformSender, type ResolvedSender } from './platform-sender';
+import { withOpenPixel } from './open-tracking';
 import { redact } from '../common/redact';
 
 /**
@@ -185,18 +189,23 @@ export class MailService {
   async queueForDocument(orgId: string, documentId: string) {
     const template = await this.getTemplate(orgId, documentId);
     if (!template) throw new BadRequestException('Сначала настройте шаблон письма');
-    if (!template.sender) throw new BadRequestException('В шаблоне не выбран отправитель');
 
-    // Домен мог быть подтверждён раньше, а потом записи из DNS убрали.
-    // Проверяем перед каждой рассылкой, а не только при создании отправителя.
-    const domain = await this.prisma.mailDomain.findFirst({
-      where: { id: template.sender.domainId, orgId },
-      select: { status: true, domain: true },
-    });
-    if (domain?.status !== 'verified') {
-      throw new BadRequestException(
-        `Домен ${domain?.domain ?? ''} не подтверждён — отправка невозможна`,
-      );
+    if (template.sender) {
+      // Домен мог быть подтверждён раньше, а потом записи из DNS убрали.
+      // Проверяем перед каждой рассылкой, а не только при создании отправителя.
+      const domain = await this.prisma.mailDomain.findFirst({
+        where: { id: template.sender.domainId, orgId },
+        select: { status: true, domain: true },
+      });
+      if (domain?.status !== 'verified') {
+        throw new BadRequestException(
+          `Домен ${domain?.domain ?? ''} не подтверждён — отправка невозможна`,
+        );
+      }
+    } else if (!(await this.resolveSender(orgId))) {
+      // Отправителя в шаблоне нет — письма уйдут с нашего домена. Отказываем
+      // только если и его нет: тогда слать действительно нечем.
+      throw new BadRequestException('Отправка писем не настроена — обратитесь в поддержку');
     }
 
     const rows = await this.prisma.recipientRow.findMany({
@@ -222,6 +231,15 @@ export class MailService {
         continue;
       }
       toQueue.push({ rowId: row.id, email, data });
+    }
+
+    // Объём с общего домена ограничен: пока у организации нет своего
+    // домена, репутация `noreply@vruchay.ru` общая на всех, и один
+    // недобросовестный заказчик портит доставляемость остальным.
+    // Со своего домена ограничения нет — там репутация его собственная.
+    if (!template.sender) {
+      const refusal = await this.checkSharedDomainVolume(orgId, toQueue.length);
+      if (refusal) throw new BadRequestException(refusal);
     }
 
     const created = await this.prisma.$transaction(
@@ -265,18 +283,24 @@ export class MailService {
     if (!isValidEmail(toEmail)) throw new BadRequestException('Некорректный адрес');
 
     const template = await this.getTemplate(orgId, documentId);
-    const sender = template?.sender ?? (await this.defaultSender(orgId));
+    const sender = template?.sender
+      ? { email: template.sender.email, displayName: template.sender.displayName, domainId: template.sender.domainId }
+      : await this.resolveSender(orgId);
     if (!sender) {
-      throw new BadRequestException('Не настроен отправитель с подтверждённым доменом');
+      throw new BadRequestException('Отправка писем не настроена — обратитесь в поддержку');
     }
 
     // Домен мог перестать быть подтверждённым уже после настройки шаблона.
-    const domain = await this.prisma.mailDomain.findFirst({
-      where: { id: sender.domainId, orgId },
-      select: { status: true },
-    });
-    if (domain?.status !== 'verified') {
-      throw new BadRequestException('Домен отправителя не подтверждён — отправка невозможна');
+    // Проверяем только свой домен организации: у отправителя на нашем домене
+    // domainId нет, и проверять там нечего — он подтверждён по построению.
+    if (sender.domainId) {
+      const domain = await this.prisma.mailDomain.findFirst({
+        where: { id: sender.domainId, orgId },
+        select: { status: true },
+      });
+      if (domain?.status !== 'verified') {
+        throw new BadRequestException('Домен отправителя не подтверждён — отправка невозможна');
+      }
     }
 
     const email = await this.prisma.email.create({
@@ -303,14 +327,16 @@ export class MailService {
 
     // Письма по заявкам с форм шаблона могут не иметь — отправитель тогда
     // берётся по умолчанию, а тело письма служебное.
-    const sender = email.template?.sender ?? (await this.defaultSender(email.orgId));
+    const sender = email.template?.sender
+      ? { email: email.template.sender.email, displayName: email.template.sender.displayName }
+      : await this.resolveSender(email.orgId);
     if (!sender) {
-      this.logger.warn(`Письмо ${emailId}: нет отправителя с подтверждённым доменом`);
+      this.logger.error(`Письмо ${emailId}: отправка не настроена — нет PLATFORM_MAIL_FROM`);
       await this.prisma.email.update({
         where: { id: emailId },
         data: {
           status: 'failed',
-          error: 'Нет отправителя с подтверждённым доменом',
+          error: 'Отправка писем не настроена',
           statusUpdatedAt: new Date(),
         },
       });
@@ -335,11 +361,13 @@ export class MailService {
 
       const { providerMessageId } = await this.providerFor(email.provider).send({
         from: { email: sender.email, name: sender.displayName },
+        replyTo: sender.replyTo,
         to: email.toEmail,
         subject: email.subject,
-        html: email.template
-          ? renderHtmlTemplate(email.template.bodyHtml, data)
-          : DEFAULT_BODY_HTML,
+        html: this.trackOpens(
+          email.template ? renderHtmlTemplate(email.template.bodyHtml, data) : DEFAULT_BODY_HTML,
+          email.id,
+        ),
         attachments,
         reference: email.id,
       });
@@ -378,15 +406,219 @@ export class MailService {
   }
 
   /**
-   * Отправитель по умолчанию — для писем, у которых нет своего шаблона
-   * (код подтверждения, выдача по заявке с формы). Домен обязан быть
-   * подтверждён: правило «слать только со своего домена» без исключений.
+   * Подставляет в письмо отметку о прочтении.
+   *
+   * Без внешнего адреса сервиса ссылку собрать не из чего — тогда письмо
+   * уходит без картинки. Это правильное поведение: письмо важнее статистики,
+   * и ронять рассылку из-за незаполненной переменной окружения нельзя.
    */
-  private async defaultSender(orgId: string) {
+  private trackOpens(html: string, emailId: string): string {
+    const publicUrl = process.env.PUBLIC_URL;
+    return publicUrl ? withOpenPixel(html, publicUrl, emailId) : html;
+  }
+
+  /**
+   * Письмо открыли.
+   *
+   * Назад по цепочке состояний не идём: у отменённого или не доставленного
+   * письма отметка о прочтении означала бы, что где-то ошибка, а не что
+   * участник его прочёл. Поэтому обновляем только то, что уже отправлено
+   * или доставлено.
+   *
+   * Событие пишем каждый раз, а состояние — только при первом открытии:
+   * в реестре нужно «прочитано», а сколько раз открывали, видно в журнале
+   * событий, если понадобится разбираться.
+   */
+  async markOpened(emailId: string): Promise<void> {
+    try {
+      const updated = await this.prisma.email.updateMany({
+        where: { id: emailId, status: { in: ['sent', 'delivered'] } },
+        data: { status: 'opened', statusUpdatedAt: new Date() },
+      });
+      if (updated.count === 0) return;
+
+      await this.prisma.emailEvent.create({
+        data: { emailId, type: 'opened', source: 'pixel' },
+      });
+    } catch (err) {
+      // Несуществующий идентификатор — обычное дело: письма удаляются
+      // по срокам хранения, а картинка в старом письме остаётся навсегда.
+      this.logger.debug(`Отметка о прочтении ${emailId}: ${(err as Error).message}`);
+    }
+  }
+
+  /**
+   * События от почтового провайдера: доставлено, не доставлено, открыто.
+   *
+   * До этого «доставлено» было недостижимо: SMTP сообщает только о том,
+   * что письмо принято шлюзом, а дошло ли оно до ящика — знает провайдер.
+   * Из-за этого недоставленное письмо выглядело как отправленное, и на
+   * жалобу «мне ничего не пришло» ответить было нечем.
+   *
+   * Порядок состояний соблюдаем: событие никогда не отматывает письмо
+   * назад. Уведомления приходят не по порядку — «доставлено» вполне может
+   * прийти после «открыто», — и наивная запись затирала бы прочтение
+   * доставкой.
+   */
+  async applyProviderEvents(events: NormalizedEvent[]): Promise<number> {
+    let applied = 0;
+
+    for (const event of events) {
+      const email = await this.findEmailForEvent(event);
+      if (!email) continue;
+
+      try {
+        await this.prisma.emailEvent.create({
+          data: { emailId: email.id, type: event.type, source: 'webhook' },
+        });
+      } catch (err) {
+        this.logger.debug(`Событие ${event.type} для ${email.id}: ${(err as Error).message}`);
+      }
+
+      const next = advanceStatus(email.status as EmailStatus, event.type);
+      if (next) {
+        await this.prisma.email.update({
+          where: { id: email.id },
+          data: { status: next, statusUpdatedAt: event.occurredAt },
+        });
+      }
+      applied++;
+    }
+
+    return applied;
+  }
+
+  /**
+   * Сколько писем с общего домена организация уже отправила за сутки.
+   *
+   * Считаем по записям писем, а не отдельным счётчиком: счётчик пришлось
+   * бы держать в согласии с реальностью при каждой ошибке и отмене,
+   * а записи и есть то, что ушло. Тот же приём, что и в бесплатной пробе.
+   *
+   * Письма со своего домена в счёт не идут: у них своя репутация.
+   */
+  private async checkSharedDomainVolume(orgId: string, adding: number): Promise<string | null> {
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const sentToday = await this.prisma.email.count({
+      where: {
+        orgId,
+        queuedAt: { gte: since },
+        // Письма с чужого, подтверждённого домена сюда не попадают:
+        // у них в шаблоне указан отправитель организации.
+        template: { senderId: null },
+      },
+    });
+
+    return sharedDomainRefusal({ sentToday, adding });
+  }
+
+  /**
+   * Ищет письмо, о котором пришло уведомление.
+   *
+   * Три способа по убыванию надёжности. Своя ссылка возвращается не
+   * всегда: мы кладём её в заголовок отправляемого письма, а вернёт ли
+   * провайдер чужой заголовок — его дело. Идентификатор провайдера мы
+   * сохранили при отправке сами, поэтому он надёжен. Адрес получателя —
+   * последнее средство: по нему берём самое свежее письмо, потому что
+   * одному и тому же человеку мы могли слать не раз.
+   *
+   * Из тела уведомления при этом не берётся ничего, кроме примет для
+   * поиска: организацию, документ и всё остальное мы знаем по своей записи.
+   */
+  private async findEmailForEvent(event: NormalizedEvent) {
+    const select = { id: true, status: true } as const;
+
+    if (event.reference) {
+      const byRef = await this.prisma.email.findUnique({
+        where: { id: event.reference },
+        select,
+      });
+      if (byRef) return byRef;
+    }
+
+    if (event.providerMessageId) {
+      const byProvider = await this.prisma.email.findFirst({
+        where: { providerMessageId: event.providerMessageId },
+        orderBy: { queuedAt: 'desc' },
+        select,
+      });
+      if (byProvider) return byProvider;
+    }
+
+    if (event.email) {
+      return this.prisma.email.findFirst({
+        where: { toEmail: event.email },
+        orderBy: { queuedAt: 'desc' },
+        select,
+      });
+    }
+
+    return null;
+  }
+
+  /**
+   * Отправитель организации с подтверждённым доменом, если он настроен.
+   *
+   * Возвращает запись из базы либо null. Запасной вариант на нашем домене
+   * подставляет resolveSender — здесь его нет намеренно: местам, которые
+   * проверяют статус домена, нужен именно доменный отправитель.
+   */
+  private async ownSender(orgId: string) {
     return this.prisma.sender.findFirst({
       where: { orgId, domain: { status: 'verified' } },
       orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
     });
+  }
+
+  /**
+   * Кто стоит в письме отправителем — с запасным вариантом на нашем домене.
+   *
+   * Подключение своего домена это полчаса возни с DNS и ожидание проверки.
+   * Требовать это до первой выдачи значит терять тех, кто хотел просто
+   * попробовать. Поэтому по умолчанию письма уходят с vruchay.ru, а свой
+   * домен подключается позже и только по желанию.
+   *
+   * Устроено так, чтобы получатель не запутался:
+   *
+   *  — в поле отправителя стоит название организации, а адрес наш. Подпись
+   *    DKIM и запись SPF относятся к vruchay.ru, поэтому письмо проходит
+   *    проверки. Ставить в адрес чужой домен, которым мы не владеем, нельзя:
+   *    такое письмо попадёт в спам или будет отклонено;
+   *  — ответ уходит организации, а не нам: без этого участник, нажавший
+   *    «Ответить», писал бы в пустоту.
+   */
+  private async resolveSender(orgId: string): Promise<ResolvedSender | null> {
+    const own = await this.ownSender(orgId);
+    if (own) {
+      return { email: own.email, displayName: own.displayName, domainId: own.domainId };
+    }
+
+    const platform = platformSender();
+    if (!platform) return null;
+
+    const org = await this.prisma.organization.findUnique({
+      where: { id: orgId },
+      select: {
+        name: true,
+        // Владельцев может быть несколько; берём одного и всегда того же,
+        // чтобы обратный адрес не менялся от письма к письму.
+        members: {
+          where: { role: 'owner' },
+          orderBy: { userId: 'asc' },
+          take: 1,
+          select: { user: { select: { email: true } } },
+        },
+      },
+    });
+
+    return {
+      email: platform.email,
+      // Название организации в отправителе, а не «Вручай»: участник должен
+      // видеть, кто его наградил, а не через какой сервис это сделано.
+      displayName: org?.name?.trim() || platform.name,
+      replyTo: org?.members[0]?.user.email,
+    };
   }
 
   /**
@@ -397,11 +629,9 @@ export class MailService {
    * технической перепиской и в нём не найти реальную выдачу документов.
    */
   async sendCode(orgId: string, to: string, code: string): Promise<void> {
-    const sender = await this.defaultSender(orgId);
+    const sender = await this.resolveSender(orgId);
     if (!sender) {
-      throw new BadRequestException(
-        'Не настроен отправитель с подтверждённым доменом — код выслать некуда',
-      );
+      throw new BadRequestException('Отправка писем не настроена — код выслать некуда');
     }
 
     await this.providerFor('smtp').send({
@@ -422,9 +652,9 @@ export class MailService {
    * Мимо журнала писем: это внутренняя переписка, а не выдача документов.
    */
   async sendNotice(orgId: string, to: string, subject: string, body: string): Promise<void> {
-    const sender = await this.defaultSender(orgId);
+    const sender = await this.resolveSender(orgId);
     if (!sender) {
-      this.logger.warn('Уведомление не отправлено: нет отправителя с подтверждённым доменом');
+      this.logger.error('Уведомление не отправлено: отправка писем не настроена');
       return;
     }
     await this.providerFor('smtp').send({
@@ -444,13 +674,14 @@ export class MailService {
     filename: string;
     content: Buffer;
   }): Promise<void> {
-    const sender = await this.defaultSender(params.orgId);
+    const sender = await this.resolveSender(params.orgId);
     if (!sender) {
-      this.logger.warn('Документ не отправлен: нет отправителя с подтверждённым доменом');
+      this.logger.error('Документ не отправлен: отправка писем не настроена');
       return;
     }
     await this.providerFor('smtp').send({
       from: { email: sender.email, name: sender.displayName },
+      replyTo: sender.replyTo,
       to: params.to,
       subject: params.subject,
       html: params.html,
@@ -458,6 +689,26 @@ export class MailService {
         { filename: params.filename, content: params.content, contentType: 'application/pdf' },
       ],
     });
+  }
+
+  /**
+   * Служебное письмо от самого сервиса, а не от организации.
+   *
+   * Все прочие отправки идут с подтверждённого домена организации — правило
+   * без исключений, потому что письмо о награждении должно приходить от того,
+   * кто награждает. Здесь случай обратный: организация только что создана,
+   * домена у неё нет и быть не может, а письмо выслать надо именно сейчас.
+   * Подтверждение адреса приходит от «Вручай» — так и должно.
+   *
+   * Отправитель берётся из SERVICE_MAIL_FROM и на организацию не смотрит.
+   */
+  async sendService(to: string, subject: string, html: string): Promise<void> {
+    const raw = process.env.SERVICE_MAIL_FROM ?? 'Вручай <noreply@vruchay.ru>';
+    // Разбираем «Имя <адрес>»; если формат другой — считаем всю строку адресом.
+    const m = raw.match(/^\s*(.*?)\s*<([^>]+)>\s*$/);
+    const from = m ? { name: m[1], email: m[2] } : { name: 'Вручай', email: raw.trim() };
+
+    await this.providerFor('smtp').send({ from, to, subject, html });
   }
 
   async listEmails(orgId: string, documentId?: string) {

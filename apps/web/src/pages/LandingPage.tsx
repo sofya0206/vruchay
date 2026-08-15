@@ -10,6 +10,7 @@ import {
   Table2,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { Reviews } from '../landing/Reviews';
 import { Faq } from '../landing/Faq';
 import { Pricing } from '../landing/Pricing';
 import { ForBusiness } from '../landing/ForBusiness';
@@ -53,8 +54,8 @@ export function LandingPage() {
   return (
     <div className="min-h-full bg-[var(--ground)]">
       <Meta
-        title="Вручай — грамоты и сертификаты списком, с вашей почты"
-        description="Загружаете список участников — получаете именные документы и письма с вашего домена. Данные остаются в России. Первые 50 документов бесплатно."
+        title="Вручай — подписать грамоты списком и разослать"
+        description="Загрузите свой бланк грамоты и список участников: сервис впишет имена и разошлёт по адресам. Данные остаются в России. Первые 50 документов бесплатно."
         path="/"
         jsonLd={LANDING_JSON_LD}
       />
@@ -64,6 +65,9 @@ export function LandingPage() {
       <Scope />
       <Difference />
       <ForBusiness />
+      {/* Отзывы до юридического блока: сперва «этим уже пользуются»,
+          потом «и это законно». Раздел сам исчезает, пока отзывов нет. */}
+      <Reviews />
       <Legal />
       <Pricing />
       <Faq />
@@ -107,17 +111,22 @@ function Hero() {
           <p className="mb-4 inline-flex items-center gap-2 rounded-full bg-[var(--accent-soft)] px-3 py-1 text-xs font-medium text-[var(--accent)]">
             <ShieldCheck size={13} /> Данные участников остаются в России
           </p>
+          {/* Акцент на подписывании, а не на создании: бланк у организатора
+              обычно уже есть — свой, утверждённый, с гербом и подписями.
+              Обещать «сделаем красиво» значит спорить с тем, что человеку
+              и так нравится. Работа, которой он тяготится, — надписать
+              триста грамот именами и разослать. */}
           <h1 className="font-serif text-4xl leading-[1.1] sm:text-5xl">
-            Грамоты, дипломы, сертификаты — всему списку{' '}
-            <span className="text-[var(--accent)]">за одно нажатие</span>
+            Ваш бланк грамоты —{' '}
+            <span className="text-[var(--accent)]">подписан всему списку</span>
           </h1>
           <p className="mt-5 max-w-lg text-lg leading-relaxed text-[var(--text-muted)]">
-            Загружаете список участников — получаете именные документы и письма
-            с вашего собственного адреса. Не по одному в Word, не вечером перед
-            награждением.
+            Загрузите свой бланк и список участников. Сервис впишет имена, места
+            и достижения — каждому своё — и разошлёт по адресам. Не по одному
+            в Word, не вечером перед награждением.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
-            <Link to="/login">
+            <Link to="/register">
               <Button variant="primary">Попробовать бесплатно</Button>
             </Link>
             <a href="#kak">
@@ -276,7 +285,7 @@ function FinalCta() {
           Соберите макет, загрузите список, отправьте. Пятьдесят документов на пробу
           не стоят ничего.
         </p>
-        <Link to="/login" className="mt-7 inline-block">
+        <Link to="/register" className="mt-7 inline-block">
           <Button variant="primary">Попробовать бесплатно</Button>
         </Link>
       </div>

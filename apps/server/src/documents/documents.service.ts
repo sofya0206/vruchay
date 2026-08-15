@@ -23,7 +23,7 @@ export class DocumentsService {
   async list(orgId: string, query: ListDocumentsDto) {
     const where: Prisma.DocumentWhereInput = {
       orgId,
-      deletedAt: null,
+      deletedAt: query.trashed ? { not: null } : null,
       ...(query.search
         ? { title: { contains: query.search, mode: Prisma.QueryMode.insensitive } }
         : {}),
@@ -42,12 +42,45 @@ export class DocumentsService {
           pageHeightMm: true,
           updatedAt: true,
           createdAt: true,
+          // Нужно корзине: по нему считается, сколько дней осталось
+          // до окончательного удаления.
+          deletedAt: true,
+          // Первый лист — чтобы показать документ прямо в списке. Без него
+          // список остаётся перечнем названий, по которому не понять,
+          // где какая грамота.
+          sheets: {
+            orderBy: { position: 'asc' },
+            take: 1,
+            select: { layout: true, backgroundFileId: true },
+          },
+          _count: { select: { sheets: true } },
         },
       }),
       this.prisma.document.count({ where }),
     ]);
 
-    return { items, total, limit: query.limit, offset: query.offset };
+    // Ссылки на фоны подписываем здесь, разом на всю страницу списка.
+    // Иначе каждая карточка тянула бы свой запрос, и список из двадцати
+    // документов давал бы двадцать лишних обращений к серверу.
+    const withPreview = await Promise.all(
+      items.map(async ({ sheets, _count, ...doc }) => {
+        const sheet = sheets[0];
+        return {
+          ...doc,
+          sheetCount: _count.sheets,
+          preview: {
+            layout: sheet?.layout ?? [],
+            // Ошибка подписи ссылки не должна ронять весь список:
+            // документ без фона показать всё равно лучше, чем ничего.
+            backgroundUrl: sheet?.backgroundFileId
+              ? await this.backgroundUrl(orgId, sheet.backgroundFileId).catch(() => null)
+              : null,
+          },
+        };
+      }),
+    );
+
+    return { items: withPreview, total, limit: query.limit, offset: query.offset };
   }
 
   async create(orgId: string, dto: CreateDocumentDto) {
@@ -73,6 +106,54 @@ export class DocumentsService {
     });
   }
 
+  /**
+   * Копия документа: макет и колонки те же, получатели — нет.
+   *
+   * Самое частое действие после первой удачной грамоты: «такую же, но для
+   * другого мероприятия». Получателей не копируем намеренно — это чужие
+   * персональные данные, и тащить их в новый документ никто не просил.
+   *
+   * Фон переиспользуем по ссылке на тот же файл, а не копией в хранилище:
+   * файл принадлежит той же организации, а лишняя копия — лишние деньги
+   * за хранение и лишний след тех же данных.
+   */
+  async duplicate(orgId: string, documentId: string) {
+    const source = await this.prisma.document.findFirst({
+      where: { id: documentId, orgId, deletedAt: null },
+      include: {
+        sheets: { orderBy: { position: 'asc' } },
+        columns: { orderBy: { position: 'asc' } },
+      },
+    });
+    if (!source) throw new NotFoundException('Документ не найден');
+
+    return this.prisma.document.create({
+      data: {
+        orgId,
+        title: `${source.title} — копия`,
+        pageWidthMm: source.pageWidthMm,
+        pageHeightMm: source.pageHeightMm,
+        verifyEnabled: source.verifyEnabled,
+        verifyFields: (source.verifyFields ?? []) as Prisma.InputJsonValue,
+        sheets: {
+          create: source.sheets.map((s) => ({
+            position: s.position,
+            // Prisma читает jsonb как JsonValue, а принимает InputJsonValue:
+            // разные типы, и в первом есть null, которого второй не берёт.
+            // Пустой макет — это пустой массив, а не отсутствие значения.
+            layout: (s.layout ?? []) as Prisma.InputJsonValue,
+            schemaVersion: s.schemaVersion,
+            backgroundFileId: s.backgroundFileId,
+          })),
+        },
+        columns: {
+          create: source.columns.map((c) => ({ name: c.name, position: c.position })),
+        },
+      },
+      include: { sheets: { orderBy: { position: 'asc' } } },
+    });
+  }
+
   async getOrFail(orgId: string, documentId: string) {
     const doc = await this.prisma.document.findFirst({
       where: { id: documentId, orgId, deletedAt: null },
@@ -93,12 +174,14 @@ export class DocumentsService {
 
   /** Мягкое удаление: документ уходит в корзину, файлы остаются доступны по verify-ссылкам. */
   async softDelete(orgId: string, documentId: string) {
-    await this.getOrFail(orgId, documentId);
+    // Название возвращаем наружу: в журнале действий строчка «удалён материал
+    // 3f7a…» бесполезна, а после удаления название взять уже неоткуда.
+    const doc = await this.getOrFail(orgId, documentId);
     await this.prisma.document.update({
       where: { id: documentId },
       data: { deletedAt: new Date() },
     });
-    return { ok: true };
+    return { ok: true, title: doc.title };
   }
 
   async restore(orgId: string, documentId: string) {
@@ -108,6 +191,72 @@ export class DocumentsService {
     if (!doc) throw new NotFoundException('Документ не найден');
     await this.prisma.document.update({ where: { id: documentId }, data: { deletedAt: null } });
     return { ok: true };
+  }
+
+  /**
+   * Окончательное удаление из корзины.
+   *
+   * Удаляем **всё**, включая выданные файлы: держать наградные документы
+   * с фамилиями после того, как организация их выбросила, — это хранение
+   * персональных данных без цели, прямо запрещённое ч. 7 ст. 5 152-ФЗ.
+   * Ссылки проверки при этом перестают работать: организация решила,
+   * что документа больше нет, и проверка обязана отвечать так же.
+   *
+   * Файлы из хранилища убираем до записи в базе. Обратный порядок оставлял бы
+   * при сбое осиротевшие объекты в бакете — их потом нечем найти.
+   */
+  async purge(orgId: string, documentId: string) {
+    const doc = await this.prisma.document.findFirst({
+      where: { id: documentId, orgId, deletedAt: { not: null } },
+      select: { id: true, title: true },
+    });
+    if (!doc) throw new NotFoundException('Документ не найден');
+
+    await this.purgeFiles(documentId);
+    await this.prisma.document.delete({ where: { id: documentId } });
+    return { ok: true, title: doc.title };
+  }
+
+  /**
+   * Убирает объекты документа из хранилища и записи о них из базы: фоны,
+   * картинки, выданные файлы.
+   *
+   * Записи удаляем **явно**. В схеме у файла связь с документом стоит
+   * `SetNull` — при удалении документа строка `files` не исчезла бы,
+   * а осталась бы висеть с `document_id = null`. А в ней лежит
+   * `original_name` вида «Иванов Пётр Ильич.pdf», то есть фамилия
+   * получателя пережила бы удаление документа.
+   */
+  private async purgeFiles(documentId: string): Promise<void> {
+    const files = await this.prisma.file.findMany({
+      where: { documentId },
+      select: { id: true, s3Key: true },
+    });
+
+    for (const file of files) {
+      // Пропавший объект — не повод останавливать очистку: цель в том,
+      // чтобы после неё в хранилище ничего не осталось.
+      if (file.s3Key) await this.storage.remove(file.s3Key).catch(() => undefined);
+    }
+    await this.prisma.file.deleteMany({ where: { documentId } });
+  }
+
+  /**
+   * Всё, что пролежало в корзине дольше срока. Вызывается по расписанию.
+   * Возвращает число удалённых — оно попадает в журнал, иначе про молчаливую
+   * ночную работу нельзя сказать, шла она вообще или нет.
+   */
+  async purgeExpired(olderThan: Date): Promise<number> {
+    const expired = await this.prisma.document.findMany({
+      where: { deletedAt: { not: null, lt: olderThan } },
+      select: { id: true },
+    });
+
+    for (const doc of expired) {
+      await this.purgeFiles(doc.id);
+      await this.prisma.document.delete({ where: { id: doc.id } });
+    }
+    return expired.length;
   }
 
   async addSheet(orgId: string, documentId: string) {

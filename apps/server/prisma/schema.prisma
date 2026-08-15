@@ -10,10 +10,34 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/// Бесплатная проба против оплаченного доступа. Считаем на организации,
+/// а не на пользователе: лимит принадлежит команде, иначе его обходили бы,
+/// приглашая в организацию новых коллег.
+enum OrgPlan {
+  free
+  paid
+}
+
 model Organization {
   id        String      @id @default(uuid()) @db.Uuid
   name      String
+  plan      OrgPlan     @default(free)
   createdAt DateTime    @default(now()) @map("created_at")
+
+  /// Код приглашения. Заводится при первом открытии раздела «Пригласить
+  /// друга», а не при регистрации: у большинства организаций его никогда
+  /// не спросят, а раздавать коды всем — значит занимать словарь коротких
+  /// сочетаний ради тех, кто им не воспользуется.
+  referralCode    String?  @unique @map("referral_code")
+  /// Кто пригласил. Начисленные бонусы нигде не хранятся: они выводятся из
+  /// этой связи и из числа выпущенных приглашёнными документов (см.
+  /// ReferralService). Отдельный счётчик пришлось бы держать в согласии
+  /// с реальностью при каждом удалении и ошибке, а связь ничему
+  /// противоречить не может.
+  referredByOrgId String?  @map("referred_by_org_id") @db.Uuid
+  referredBy      Organization?  @relation("OrgReferrals", fields: [referredByOrgId], references: [id], onDelete: SetNull)
+  referrals       Organization[] @relation("OrgReferrals")
+
   members     OrgMember[]
   documents   Document[]
   files       File[]
@@ -26,6 +50,8 @@ model Organization {
   tildaRequests TildaRequest[]
   consents    Consent[]
   reviews     Review[]
+  auditEvents AuditEvent[]
+  apiTokens   ApiToken[]
 
   @@map("organizations")
 }
@@ -35,6 +61,10 @@ model User {
   email        String      @unique
   passwordHash String      @map("password_hash")
   name         String      @default("")
+  /// Пока не заполнено — адрес не подтверждён и войти нельзя. Учётные записи,
+  /// заведённые оператором из консоли, помечаются подтверждёнными сразу:
+  /// адрес там вводит сам оператор, проверять нечего.
+  emailVerifiedAt DateTime? @map("email_verified_at")
   createdAt    DateTime    @default(now()) @map("created_at")
   memberships  OrgMember[]
   reviews      Review[]
@@ -72,6 +102,23 @@ model Document {
   /** показывать ли страницу проверки подлинности и какие поля на ней раскрывать */
   verifyEnabled  Boolean  @default(true) @map("verify_enabled")
   verifyFields   Json     @default("[]") @map("verify_fields")
+
+  /*
+   * Мероприятие, за которое выдаются документы.
+   *
+   * Хранится у документа, а не в макете, потому что меняется чаще макета:
+   * бланк федерации один на сезон, а соревнований за сезон десятки. Пока
+   * этих полей не было, название и дата вписывались прямо в текст на листе,
+   * и на каждое соревнование приходилось делать копию шаблона.
+   *
+   * Дата строкой, а не датой: на грамотах пишут и «17 июня 2026 года»,
+   * и «17–19 июня 2026», и «сезон 2025/26». Календарное поле заставило бы
+   * выбирать одно из них и упростило бы задачу до неверной.
+   */
+  eventName   String @default("") @map("event_name")
+  eventDate   String @default("") @map("event_date")
+  eventPlace  String @default("") @map("event_place")
+  eventHours  String @default("") @map("event_hours")
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
   deletedAt      DateTime? @map("deleted_at")
@@ -378,6 +425,26 @@ model TildaIntegration {
   copyToEmail    String? @map("copy_to_email")
   active         Boolean @default(true)
 
+  /**
+   * Подставлять имя и почту из личного кабинета площадки.
+   *
+   * У Тильды внутри личного кабинета к формам добавляются `ma_name`
+   * и `ma_email` — имя и адрес вошедшего участника. Если они есть,
+   * человеку остаётся только подтвердить их, а не набирать заново.
+   *
+   * Данные приходят из браузера, поэтому сами по себе доказательством
+   * личности не служат: подтверждение по коду (`authMode`) остаётся
+   * отдельной настройкой и решает, доверяем мы подставленному адресу
+   * или проверяем его.
+   */
+  prefillFromAccount Boolean @default(true) @map("prefill_from_account")
+  /** Можно ли править подставленные данные. Выключено — только подтвердить. */
+  allowEdit          Boolean @default(true) @map("allow_edit")
+  /** Кнопки «поделиться» на окне успеха. */
+  showShare          Boolean @default(true) @map("show_share")
+  /** Ссылка на страницу проверки подлинности в окне успеха. */
+  showVerifyLink     Boolean @default(false) @map("show_verify_link")
+
   createdAt DateTime @default(now()) @map("created_at")
 
   org      Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
@@ -402,6 +469,19 @@ model TildaRequest {
   documentId    String @map("document_id") @db.Uuid
 
   email  String
+  /**
+   * Адрес учётной записи на площадке, откуда пришла заявка (`ma_email`
+   * у Тильды). Отличается от `email` тем, что человек его не набирал:
+   * он подставлен личным кабинетом, в который человек вошёл.
+   *
+   * Нужен, чтобы «один сертификат в руки» держалось даже когда адрес
+   * доставки разрешено менять. Иначе достаточно вписать другой адрес —
+   * и выдача пойдёт заново, сколько угодно раз. Здесь мы разделяем два
+   * разных вопроса: «куда прислать» и «кто это».
+   *
+   * Пусто, если подстановка выключена или площадка ничего не сообщила.
+   */
+  accountEmail String? @map("account_email")
   /** Остальные поля формы: становятся переменными документа. */
   fields Json   @default("{}")
 
@@ -607,4 +687,89 @@ model Invoice {
   @@unique([year, number])
   @@index([email])
   @@map("invoices")
+}
+
+/**
+ * Журнал действий.
+ *
+ * Отвечает на вопрос «кто и когда это сделал» — он возникает в первом же
+ * спорном случае: участник уверяет, что грамоту ему не присылали, а
+ * федерация не может ни подтвердить, ни опровергнуть. Без журнала
+ * единственный источник правды — память сотрудника.
+ *
+ * Пишем действия, у которых есть последствия снаружи: выпуск и рассылка
+ * документов, отзыв проверки, удаление, изменения в составе сотрудников.
+ * Открытие страниц и правку макета не пишем — это шум, в котором тонет
+ * то немногое, ради чего журнал заведён.
+ *
+ * Имя и адрес автора храним копией на момент события: сотрудник может
+ * уволиться и быть удалён, а запись обязана остаться читаемой.
+ */
+model AuditEvent {
+  id     BigInt @id @default(autoincrement())
+  orgId  String @map("org_id") @db.Uuid
+
+  /** Кто. null — действие системы, например ночная очистка по срокам. */
+  userId     String? @map("user_id") @db.Uuid
+  actorName  String  @default("") @map("actor_name")
+  actorEmail String  @default("") @map("actor_email")
+
+  /** Что: documents.purge, generation.start, mail.send и т.п. */
+  action String
+  /** Над чем: тип и идентификатор, чтобы можно было найти предмет спора. */
+  targetType String? @map("target_type")
+  targetId   String? @map("target_id")
+  /** Человекочитаемое описание — его и показываем в кабинете. */
+  summary String @default("")
+
+  /** Подробности события. Персональных данных сюда не кладём. */
+  meta Json @default("{}")
+
+  ip        String?  @db.Inet
+  createdAt DateTime @default(now()) @map("created_at")
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, createdAt])
+  @@index([targetType, targetId])
+  @@map("audit_events")
+}
+
+/**
+ * Токен для доступа к API без входа человеком: чужая система, скрипт
+ * федерации, помощник на основе ИИ.
+ *
+ * Храним хеш, а не сам токен. Токен показывается один раз при выдаче
+ * и больше нигде: список токенов в кабинете — первое, что прочтёт тот,
+ * кто получил доступ к чужой открытой вкладке, и там не должно быть
+ * ничего, чем можно воспользоваться.
+ */
+model ApiToken {
+  id    String @id @default(uuid()) @db.Uuid
+  orgId String @map("org_id") @db.Uuid
+
+  /** Понятное человеку название: «выгрузка из СпортОрг», «бот федерации». */
+  name String
+
+  /// sha256 от токена. Не argon2: токен — это 32 случайных байта, перебирать
+  /// его нечем, а проверка идёт на каждом запросе и обязана быть дешёвой.
+  tokenHash String @unique @map("token_hash")
+  /// Начало токена — чтобы владелец узнал свой среди нескольких.
+  prefix String
+
+  /// Права те же, что у сотрудника: обычный работает с материалами,
+  /// полный вдобавок удаляет. Управлять людьми токен не может никогда —
+  /// иначе он превращался бы в способ завести себе человеческий доступ.
+  role OrgRole @default(member)
+
+  createdByUserId String?   @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at")
+  /// Когда пользовались в последний раз — чтобы видеть забытые токены.
+  lastUsedAt DateTime? @map("last_used_at")
+  revokedAt  DateTime? @map("revoked_at")
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@map("api_tokens")
 }

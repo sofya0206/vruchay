@@ -17,6 +17,21 @@ import type { IntegrationDto, SubmitDto } from './tilda.dto';
 export const CONSENT_VERSION = '2026-08-02';
 
 /**
+ * Подпись у галочки согласия.
+ *
+ * Конкретная: названа цель («изготовить и прислать документ»), а не
+ * «согласие с условиями». Согласие по 152-ФЗ должно быть конкретным
+ * и информированным, и «я со всем согласен» этому не отвечает.
+ *
+ * Полный текст — по ссылке рядом: уместить в подпись состав данных,
+ * реквизиты оператора и срок хранения нельзя, а прочесть их человек
+ * должен иметь возможность.
+ */
+export const CONSENT_LABEL =
+  'Я даю согласие на обработку моих персональных данных — ' +
+  'фамилии, имени и адреса почты — чтобы мне изготовили и прислали документ';
+
+/**
  * Сколько живёт ссылка на скачивание. Документ уходит письмом, окно в браузере —
  * только удобство «здесь и сейчас»: вечная ссылка означала бы, что попавший
  * в чужую историю браузера адрес открывает чужой документ спустя месяцы.
@@ -96,11 +111,24 @@ export class TildaService {
 
     await this.assertDailyLimit(integration);
 
-    // Повторный запрос того же документа на тот же адрес: отдаём выданное,
-    // а не плодим дубликаты. Так же ведёт себя сервис, который мы заменяем.
+    // Повторный запрос того же документа: отдаём выданное, а не плодим
+    // дубликаты. Так же ведёт себя сервис, который мы заменяем.
+    //
+    // Ищем по двум приметам. Адрес учётной записи важнее: его человек
+    // не набирал, он подставлен кабинетом, в который человек вошёл, —
+    // и по нему выдача остаётся однократной, даже если адрес доставки
+    // разрешено менять. Проверка только по адресу доставки обходится
+    // за пять секунд: вписал другую почту и получил второй сертификат.
     if (integration.singleFilePerEmail) {
       const issued = await this.prisma.tildaRequest.findFirst({
-        where: { documentId: dto.documentId, email: dto.email, status: 'done' },
+        where: {
+          documentId: dto.documentId,
+          status: 'done',
+          OR: [
+            { email: dto.email },
+            ...(dto.accountEmail ? [{ accountEmail: dto.accountEmail }] : []),
+          ],
+        },
         select: { id: true },
       });
       if (issued) return { status: 'already_issued', requestId: issued.id };
@@ -114,6 +142,7 @@ export class TildaService {
         orgId: integration.orgId,
         documentId: dto.documentId,
         email: dto.email,
+        accountEmail: dto.accountEmail ?? null,
         fields: dto.fields,
         ip: ctx.ip,
         userAgent: ctx.userAgent?.slice(0, 500),
@@ -144,8 +173,17 @@ export class TildaService {
       authMode: integration.authMode,
       successMessage: integration.successMessage,
       showDownload: integration.showDownload,
-      consentText: '',
+      // Пустым этот текст оставлять нельзя. Раньше галочку рисовал сам
+      // клиент в своей форме на Тильде и подписывал её как хотел; в нашем
+      // окне подтверждения рисуем её мы — и галочка без текста означала бы
+      // согласие неизвестно на что, то есть отсутствие согласия.
+      consentText: CONSENT_LABEL,
+      privacyUrl: `${publicUrl()}/privacy`,
       consentVersion: CONSENT_VERSION,
+      prefillFromAccount: integration.prefillFromAccount,
+      allowEdit: integration.allowEdit,
+      showShare: integration.showShare,
+      showVerifyLink: integration.showVerifyLink,
     };
   }
 
@@ -186,7 +224,10 @@ export class TildaService {
         error: true,
         fileId: true,
         doneAt: true,
-        integration: { select: { successMessage: true, showDownload: true } },
+        documentId: true,
+        integration: {
+          select: { successMessage: true, showDownload: true, showVerifyLink: true },
+        },
       },
     });
     if (!request) throw new NotFoundException('Заявка не найдена');
@@ -198,8 +239,47 @@ export class TildaService {
       // файла наружу не отдаём. Условие ровно то же, что и на самом маршруте,
       // включая окно по времени: иначе кнопка предлагала бы то, чего уже нет.
       canDownload: request.integration.showDownload && this.downloadable(request),
+      verifyUrl: await this.verifyUrlFor(request),
       error: request.status === 'failed' ? 'Не удалось создать документ' : undefined,
     };
+  }
+
+  /**
+   * Ссылка на страницу проверки подлинности — или ничего.
+   *
+   * Отдаём, только когда ей есть что показать: проверка включена
+   * у документа, разрешена в настройках интеграции и у этого экземпляра
+   * не отозвана. Иначе человек пошёл бы по ссылке и увидел «документ
+   * не найден» про свой собственный, только что полученный.
+   *
+   * Отдельным запросом, а не соединением: у заявки в схеме нет связей
+   * с файлом и документом, и заводить их ради одной ссылки в окне успеха
+   * значило бы менять модель данных под нужды одного экрана. Запрос
+   * идёт только для завершённых заявок с включённой настройкой.
+   */
+  private async verifyUrlFor(request: {
+    status: string;
+    fileId: string | null;
+    documentId: string;
+    integration: { showVerifyLink: boolean };
+  }): Promise<string | undefined> {
+    if (request.status !== 'done' || !request.integration.showVerifyLink || !request.fileId) {
+      return undefined;
+    }
+
+    const [file, document] = await Promise.all([
+      this.prisma.file.findUnique({
+        where: { id: request.fileId },
+        select: { publicId: true, verifyRevoked: true },
+      }),
+      this.prisma.document.findUnique({
+        where: { id: request.documentId },
+        select: { verifyEnabled: true },
+      }),
+    ]);
+
+    if (!file || file.verifyRevoked || !document?.verifyEnabled) return undefined;
+    return `${publicUrl()}/verify/${file.publicId}`;
   }
 
   private downloadable(request: {
@@ -383,4 +463,8 @@ export class TildaService {
 
     this.logger.log(`Согласия записаны для ${maskEmail(dto.email)}, заявка ${requestId}`);
   }
+}
+
+function publicUrl(): string {
+  return (process.env.PUBLIC_URL ?? 'https://vruchay.ru').replace(/\/+$/, '');
 }

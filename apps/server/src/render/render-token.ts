@@ -12,6 +12,15 @@ import { createHmac, timingSafeEqual, createHash } from 'node:crypto';
 export interface RenderTokenPayload {
   jobId: string;
   rowId: string;
+  /**
+   * Идентификатор будущего экземпляра документа, выделенный до печати.
+   *
+   * Нужен, чтобы QR на грамоте вёл на проверку именно этого экземпляра.
+   * Файл создаётся уже после отрисовки, поэтому взять идентификатор
+   * из него в момент печати невозможно — его выделяет воркер заранее
+   * и передаёт сюда, а потом записывает в тот же файл.
+   */
+  publicId?: string;
   /** Unix-время истечения, в секундах. */
   exp: number;
 }
@@ -60,6 +69,7 @@ export function verifyRenderToken(
   }
 
   if (typeof payload.jobId !== 'string' || typeof payload.rowId !== 'string') return null;
+  if (payload.publicId !== undefined && typeof payload.publicId !== 'string') return null;
   if (typeof payload.exp !== 'number' || payload.exp <= nowSeconds) return null;
   return payload;
 }

@@ -1,12 +1,13 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Code2, Copy, Plus, Trash2 } from 'lucide-react';
+import { Copy, Plus, Trash2 } from 'lucide-react';
 import { settingsApi, type Integration } from '../api/settings';
 import { ApiError } from '../api/client';
 import type { DocumentList } from '../api/types';
 import { api } from '../api/client';
 import { Button } from '../ui/Button';
 import { Input, Label, Select, StatusChip } from '../ui/Field';
+import { EmbedCode } from './EmbedCode';
 
 /**
  * Формы на сайте.
@@ -28,6 +29,12 @@ export function Integrations() {
     queryFn: () => api.get<DocumentList>('/documents?limit=50'),
   });
   const refresh = () => qc.invalidateQueries({ queryKey: ['integrations'] });
+
+  // Названия документов по идентификатору: в карточке интеграции нужно
+  // показать, какой doc_id какому документу соответствует. Один идентификатор
+  // без названия человеку ничего не говорит, а вписывать в форму на сайте
+  // нужно именно его.
+  const titles = new Map(documents.data?.items.map((d) => [d.id, d.title]) ?? []);
 
   const create = useMutation({
     mutationFn: () =>
@@ -56,10 +63,13 @@ export function Integrations() {
   return (
     <section className="space-y-4">
       <header>
-        <h2 className="font-serif text-xl">Формы на сайте</h2>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Участник заполняет форму на вашей странице — сервис проверяет адрес, создаёт
-          документ и отправляет его письмом. Работает с Тильдой и с любой обычной формой.
+        <h2 className="font-serif text-xl">Выдача документов на сайте</h2>
+        <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)]">
+          Кнопка «Получить документ» на вашей странице: участник проверяет свои данные
+          и получает именной документ на почту. Внутри личного кабинета — курса,
+          закрытого раздела — имя и почта подставляются сами, набирать ничего не нужно.
+          Работает с Тильдой, WordPress, Битриксом и любым сайтом; обычные формы
+          на странице перехватываются по-прежнему.
         </p>
       </header>
 
@@ -104,7 +114,7 @@ export function Integrations() {
 
       <div className="space-y-4">
         {list.data?.map((it) => (
-          <IntegrationCard key={it.id} integration={it} onChanged={refresh} />
+          <IntegrationCard key={it.id} integration={it} titles={titles} onChanged={refresh} />
         ))}
       </div>
     </section>
@@ -113,9 +123,11 @@ export function Integrations() {
 
 function IntegrationCard({
   integration,
+  titles,
   onChanged,
 }: {
   integration: Integration;
+  titles: Map<string, string>;
   onChanged: () => void;
 }) {
   const [showRequests, setShowRequests] = useState(false);
@@ -134,9 +146,6 @@ function IntegrationCard({
     enabled: showRequests,
   });
 
-  const snippet =
-    `<link rel="stylesheet" href="${location.origin}/api/v1/tilda-css/${integration.token}">\n` +
-    `<script src="${location.origin}/api/v1/tilda-js/${integration.token}"></script>`;
 
   return (
     <article className="rounded-xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]">
@@ -171,7 +180,14 @@ function IntegrationCard({
         <Row term="Заявок всего">{integration._count?.requests ?? 0}</Row>
       </dl>
 
-      <Snippet code={snippet} />
+      <DocumentIds ids={integration.documentIds} titles={titles} />
+
+      <EmbedCode
+        origin={location.origin}
+        token={integration.token}
+        documentIds={integration.documentIds}
+        titles={titles}
+      />
 
       <Button
         size="sm"
@@ -228,39 +244,65 @@ function Row({ term, children }: { term: string; children: React.ReactNode }) {
   );
 }
 
-function Snippet({ code }: { code: string }) {
-  const [copied, setCopied] = useState(false);
+/**
+ * Идентификаторы документов, которые эта интеграция вправе выдавать.
+ *
+ * В готовый код для вставки они подставляются сами, но показывать их
+ * всё равно нужно: тем, кто собирает форму сам, идентификатор больше
+ * взять неоткуда — при создании интеграции документ выбирается
+ * по названию из списка.
+ */
+function DocumentIds({ ids, titles }: { ids: string[]; titles: Map<string, string> }) {
+  if (!ids.length) return null;
 
   return (
     <div className="mt-3 rounded-lg bg-[var(--surface-sunken)] p-3">
-      <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
-        <Code2 size={14} />
-        Вставьте это в блок HEAD страницы с формой
-        <Button
-          size="sm"
-          variant="ghost"
-          className="ml-auto"
-          icon={<Copy size={14} />}
-          onClick={() => {
-            void navigator.clipboard.writeText(code).then(() => {
-              setCopied(true);
-              setTimeout(() => setCopied(false), 1500);
-            });
-          }}
-        >
-          {copied ? 'Скопировано' : 'Копировать'}
-        </Button>
-      </div>
-      <pre className="mt-2 overflow-x-auto font-mono text-xs">{code}</pre>
-      <p className="mt-2 text-xs text-[var(--text-muted)]">
-        В форме нужны поля <code className="font-mono">name</code>,{' '}
-        <code className="font-mono">email</code>, скрытое{' '}
-        <code className="font-mono">doc_id</code> со значением документа и галочка{' '}
-        <code className="font-mono">consent</code> — согласие на обработку данных.
+      <p className="text-xs text-[var(--text-muted)]">
+        Коды документов — если собираете форму сами
       </p>
+      <ul className="mt-2 space-y-1.5">
+        {ids.map((id) => (
+          <li key={id} className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-[var(--text-muted)]">{titles.get(id) ?? 'Документ'}</span>
+            <code className="font-mono text-xs">{id}</code>
+            <CopyButton value={id} label={`Скопировать идентификатор документа ${titles.get(id) ?? ''}`} />
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
+
+/** Кнопка «Копировать» с подтверждением: без отклика непонятно, сработала ли. */
+function CopyButton({ value, label }: { value: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+
+  return (
+    <Button
+      size="sm"
+      variant="ghost"
+      icon={<Copy size={14} />}
+      aria-label={label}
+      onClick={() => {
+        void navigator.clipboard.writeText(value).then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        });
+      }}
+    >
+      {copied ? 'Скопировано' : 'Копировать'}
+    </Button>
+  );
+}
+
+/*
+ * Код для вставки переехал в EmbedCode: там выбор площадки и готовый
+ * кусок целиком, включая подключение скрипта.
+ *
+ * Прежний вариант со своей формой на странице никуда не делся — скрипт
+ * по-прежнему перехватывает обычные формы, и это описано в инструкции
+ * по подключению Тильды. Просто по умолчанию мы предлагаем путь короче.
+ */
 
 function requestLabel(status: string): string {
   const labels: Record<string, string> = {

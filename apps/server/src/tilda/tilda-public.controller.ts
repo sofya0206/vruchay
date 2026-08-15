@@ -22,6 +22,12 @@ const uuidParam = new ZodValidationPipe(uuidSchema);
 export class TildaPublicController {
   constructor(private readonly tilda: TildaService) {}
 
+  /*
+   * Косая черта в конце адреса принимается наравне с её отсутствием —
+   * это делает общая настройка ignoreTrailingSlash в main.ts, а не
+   * отдельные маршруты здесь: Fastify считает `путь` и `путь/` одним
+   * и тем же маршрутом и на попытку описать оба падает при запуске.
+   */
   @Get('tilda-css/:token')
   @Header('content-type', 'text/css; charset=utf-8')
   @Header('cache-control', 'public, max-age=86400')

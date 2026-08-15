@@ -19,11 +19,23 @@ interface ErrorBody {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  /*
+   * Заголовок типа содержимого ставим только когда тело действительно есть.
+   *
+   * Fastify отвечает 400 «Body cannot be empty when content-type is set to
+   * application/json» на запрос без тела, но с этим заголовком. Раньше он
+   * ставился всегда — и разом ломались все действия без тела: удаление
+   * документа, строки, колонки, домена, интеграции, проверка домена,
+   * отметка счёта оплаченным. Внешне это выглядело как «кнопка не работает»:
+   * запрос уходил, ответ приходил, ничего не менялось.
+   */
+  const hasJsonBody = init?.body !== undefined && !(init.body instanceof FormData);
+
   const res = await fetch(`/api${path}`, {
     credentials: 'same-origin',
     ...init,
     headers: {
-      ...(init?.body instanceof FormData ? {} : { 'content-type': 'application/json' }),
+      ...(hasJsonBody ? { 'content-type': 'application/json' } : {}),
       ...init?.headers,
     },
   });

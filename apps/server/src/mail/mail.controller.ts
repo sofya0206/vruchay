@@ -6,6 +6,8 @@ import { AuthGuard } from '../auth/auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
 import type { SessionUser } from '../auth/auth.service';
 import { uuidSchema } from '../documents/documents.dto';
+import { AuditActor } from '../audit/actor.decorator';
+import { AuditService, type Actor } from '../audit/audit.service';
 import { MailService } from './mail.service';
 import { MailProcessor } from './mail.processor';
 
@@ -30,6 +32,7 @@ export class MailController {
   constructor(
     private readonly mail: MailService,
     private readonly processor: MailProcessor,
+    private readonly audit: AuditService,
   ) {}
 
   @Get('domains')
@@ -88,10 +91,23 @@ export class MailController {
   @Post('send/:documentId')
   async send(
     @CurrentUser() user: SessionUser,
+    @AuditActor() actor: Actor,
     @Param('documentId', uuidParam) documentId: string,
   ) {
     const result = await this.mail.queueForDocument(user.orgId, documentId);
     await Promise.all(result.emailIds.map((id) => this.processor.enqueue(id)));
+
+    // Рассылка — действие наружу и необратимое: отправленное письмо
+    // не отзывается. Журнал должен помнить, кто её запустил.
+    await this.audit.record({
+      actor,
+      action: 'mail.send',
+      summary: `Разослано писем участникам: ${result.queued}`,
+      targetType: 'document',
+      targetId: documentId,
+      meta: { queued: result.queued, skipped: result.skipped.length },
+    });
+
     return { queued: result.queued, skipped: result.skipped };
   }
 

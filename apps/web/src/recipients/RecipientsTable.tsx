@@ -1,23 +1,76 @@
-import { useState } from 'react';
-import { Download, FileUp, LoaderCircle, Plus, Sparkles, Trash2, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Download, Eye, FileUp, LoaderCircle, Plus, Sparkles, Trash2, X } from 'lucide-react';
 import {
   useGeneration,
   useRecipientMutations,
   useRecipients,
+  useSend,
   type ParsedSheet,
+  type SendResult,
 } from '../api/recipients';
+import { PreviewDialog } from './PreviewDialog';
 import { Button } from '../ui/Button';
 import { Input, StatusChip } from '../ui/Field';
 import { ImportDialog } from './ImportDialog';
+import { GenerateDialog, type GenerateMode } from './GenerateDialog';
+import { InviteNudge } from '../referral/InviteNudge';
 
-export function RecipientsTable({ documentId }: { documentId: string }) {
+export function RecipientsTable({
+  documentId,
+  onGoToMail,
+  onGoToRegistry,
+}: {
+  documentId: string;
+  onGoToMail: () => void;
+  onGoToRegistry: () => void;
+}) {
   const table = useRecipients(documentId);
   const m = useRecipientMutations(documentId);
   const [jobId, setJobId] = useState<string | null>(null);
   const { job, start } = useGeneration(documentId, jobId);
+  const send = useSend(documentId);
   const [parsed, setParsed] = useState<ParsedSheet | null>(null);
   const [newColumn, setNewColumn] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [preview, setPreview] = useState(false);
+  const [asking, setAsking] = useState(false);
+  const [sent, setSent] = useState<SendResult | null>(null);
+
+  /*
+   * Рассылка запускается сама, когда выпуск закончился.
+   *
+   * Держим намерение в ref, а не в состоянии: оно не влияет на то, что
+   * нарисовано, и лишняя перерисовка тут не нужна.
+   *
+   * `sentForJob` обязателен и защищает не от лишней перерисовки, а от
+   * повторной рассылки: задание опрашивается по таймеру, и без этой отметки
+   * каждый следующий ответ «готово» отправлял бы участникам письма заново.
+   */
+  const wantSend = useRef(false);
+  const sentForJob = useRef<string | null>(null);
+
+  /**
+   * Незаконченные записи ячеек.
+   *
+   * Копится цепочкой: правок может быть несколько, а дождаться нужно всех.
+   * Ошибку глотаем — о ней уже сообщит сама запись, а выпуск из-за неё
+   * останавливать не за что.
+   */
+  const pendingSaves = useRef<Promise<unknown>>(Promise.resolve());
+  const trackSave = (promise: Promise<unknown>) => {
+    pendingSaves.current = Promise.all([pendingSaves.current, promise.catch(() => {})]);
+  };
+
+  useEffect(() => {
+    if (!job || job.status !== 'done' || job.done === 0) return;
+    if (!wantSend.current || sentForJob.current === job.id) return;
+
+    sentForJob.current = job.id;
+    send.mutate(undefined, {
+      onSuccess: (result) => setSent(result),
+      onError: (err) => setError((err as Error).message),
+    });
+  }, [job?.id, job?.status, job?.done, send]);
 
   if (table.isPending) return <p className="p-6 text-[var(--text-muted)]">Загрузка таблицы…</p>;
   if (!table.data) return <p className="p-6 text-[var(--text-muted)]">Таблица недоступна</p>;
@@ -35,9 +88,21 @@ export function RecipientsTable({ documentId }: { documentId: string }) {
     }
   }
 
-  async function onGenerate() {
+  async function onGenerate(mode: GenerateMode) {
     setError(null);
+    setSent(null);
+    setAsking(false);
+    wantSend.current = mode === 'files-and-send';
     try {
+      // Ждём, пока долетят правки ячеек.
+      //
+      // Ячейка сохраняется при уходе из неё, а самый обычный путь —
+      // дописать последнюю фамилию и сразу нажать «Создать документы».
+      // Нажатие уводит фокус, запись уходит на сервер, но выпуск читает
+      // строки уже на сервере — и в грамоте оказалась бы пустая фамилия.
+      // Секунды здесь никто не заметит, а испорченную партию заметят все.
+      await pendingSaves.current;
+
       const created = await start.mutateAsync();
       setJobId(created.id);
     } catch (err) {
@@ -114,21 +179,100 @@ export function RecipientsTable({ documentId }: { documentId: string }) {
               className="inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm ring-1 ring-[var(--line-strong)] transition-colors hover:bg-[var(--surface-sunken)]"
             >
               <Download size={15} />
-              Скачать архив
+              Скачать архивом
             </a>
           )}
+
+          {/* Посмотреть до выпуска: опечатка в макете, найденная после
+              рассылки пятисот грамот, стоит несравнимо дороже. */}
+          <Button
+            size="sm"
+            icon={<Eye size={15} />}
+            disabled={checkedCount === 0}
+            onClick={() => setPreview(true)}
+          >
+            Посмотреть
+          </Button>
 
           <Button
             variant="primary"
             size="sm"
             icon={running ? <LoaderCircle size={15} className="animate-spin" /> : <Sparkles size={15} />}
             disabled={running || checkedCount === 0}
-            onClick={onGenerate}
+            onClick={() => setAsking(true)}
           >
-            {running ? 'Создаём' : `Создать ${checkedCount || ''}`}
+            {running ? 'Создаём' : `Создать документы ${checkedCount || ''}`}
           </Button>
         </div>
       </div>
+
+      {/* Итог. Формулировка зависит от того, что человек выбрал: сказать
+          «созданы, никому не отправлены» тому, кто только что нажал
+          «создать и разослать», — значит напугать без причины. */}
+      {job?.status === 'done' && job.done > 0 && (
+        <div className="flex flex-wrap items-center gap-3 border-b border-[var(--line)] bg-[var(--accent-soft)] px-4 py-3 text-sm">
+          {send.isPending ? (
+            <span className="flex items-center gap-2">
+              <LoaderCircle size={14} className="animate-spin" />
+              Документы созданы: <span className="tabular font-medium">{job.done}</span>.
+              Отправляем письма…
+            </span>
+          ) : sent ? (
+            <>
+              <span>
+                Отправлено писем: <span className="tabular font-medium">{sent.queued}</span>
+                {sent.skipped.length > 0 && (
+                  <>
+                    , пропущено <span className="tabular font-medium">{sent.skipped.length}</span>
+                  </>
+                )}
+              </span>
+              <button
+                onClick={onGoToRegistry}
+                className="rounded-lg bg-[var(--surface)] px-2.5 py-1.5 ring-1 ring-[var(--line-strong)] hover:bg-[var(--surface-sunken)]"
+              >
+                Смотреть доставку
+              </button>
+            </>
+          ) : (
+            <>
+              <span>
+                Документы созданы: <span className="tabular font-medium">{job.done}</span>. Они
+                пока никому не отправлены.
+              </span>
+              <a
+                href={`/api/jobs/${job.id}/archive`}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface)] px-2.5 py-1.5 ring-1 ring-[var(--line-strong)] hover:bg-[var(--surface-sunken)]"
+              >
+                <Download size={14} />
+                Скачать себе
+              </a>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Просим рассказать о сервисе ровно здесь — сразу под сообщением
+          об удачном выпуске, пока человек видит результат. */}
+      {job?.status === 'done' && job.failed === 0 && <InviteNudge documentsMade={job.done} />}
+
+      {/* Кого рассылка обошла — поимённо. Число «пропущено 12» заставляет
+          сверять список руками, а причина у каждого своя. */}
+      {sent && sent.skipped.length > 0 && (
+        <details className="border-b border-[var(--line)] px-4 py-2 text-sm">
+          <summary className="cursor-pointer text-[var(--text-muted)]">
+            Кому письмо не ушло: {sent.skipped.length}
+          </summary>
+          <ul className="mt-2 space-y-1">
+            {sent.skipped.map((s, i) => (
+              <li key={i}>
+                <span className="font-medium">{s.name}</span>
+                <span className="text-[var(--text-muted)]"> — {s.reason}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
 
       {(error || job?.error) && (
         <p
@@ -167,20 +311,28 @@ export function RecipientsTable({ documentId }: { documentId: string }) {
                     className="accent-[var(--accent)]"
                   />
                 </th>
+                {/* Заголовок — по-человечески, переменная под ним мелким.
+                    Раньше колонки назывались «%name» и «%email»: для
+                    секретаря федерации это не название столбца, а шифр.
+                    Переменную всё равно показываем — она нужна, когда
+                    человек вписывает её в макет. */}
                 {columns.map((col) => (
                   <th
                     key={col.id}
-                    className="group border-b border-[var(--line)] px-3 py-2 text-left font-mono text-xs font-medium"
+                    className="group border-b border-[var(--line)] px-3 py-2 text-left text-sm font-medium"
                   >
                     <span className="inline-flex items-center gap-1.5">
-                      %{col.name}
+                      {columnTitle(col.name)}
                       <button
                         onClick={() => m.deleteColumn.mutate(col.id)}
-                        aria-label={`Удалить колонку ${col.name}`}
+                        aria-label={`Удалить колонку ${columnTitle(col.name)}`}
                         className="opacity-0 transition-opacity group-hover:opacity-100 hover:text-[var(--danger)]"
                       >
                         <X size={12} />
                       </button>
+                    </span>
+                    <span className="block font-mono text-xs font-normal text-[var(--text-muted)]">
+                      %{col.name}
                     </span>
                   </th>
                 ))}
@@ -208,7 +360,12 @@ export function RecipientsTable({ documentId }: { documentId: string }) {
                         onBlur={(e) => {
                           const value = e.target.value;
                           if (value !== (row.data[col.name] ?? '')) {
-                            m.updateRow.mutate({ rowId: row.id, data: { [col.name]: value } });
+                            trackSave(
+                              m.updateRow.mutateAsync({
+                                rowId: row.id,
+                                data: { [col.name]: value },
+                              }),
+                            );
                           }
                         }}
                         className="w-full bg-transparent px-3 py-1.5 outline-none focus:bg-[var(--surface)] focus:ring-2 focus:ring-[var(--focus)]"
@@ -245,6 +402,42 @@ export function RecipientsTable({ documentId }: { documentId: string }) {
           }}
         />
       )}
+
+      {preview && (
+        <PreviewDialog
+          documentId={documentId}
+          rows={rows.filter((r) => r.checked)}
+          onClose={() => setPreview(false)}
+        />
+      )}
+
+      {asking && (
+        <GenerateDialog
+          documentId={documentId}
+          rows={rows.filter((r) => r.checked)}
+          onCancel={() => setAsking(false)}
+          onConfirm={(mode) => void onGenerate(mode)}
+          onGoToMail={() => {
+            setAsking(false);
+            onGoToMail();
+          }}
+        />
+      )}
     </div>
   );
+}
+
+/**
+ * Название колонки по-человечески.
+ *
+ * Служебные имена придумали мы, и в макет их вписывать удобно, но в шапке
+ * таблицы «%name» — не название столбца, а шифр. Своим колонкам организация
+ * даёт имена сама, и их показываем как есть.
+ */
+function columnTitle(name: string): string {
+  const known: Record<string, string> = {
+    name: 'ФИО',
+    email: 'Адрес почты',
+  };
+  return known[name] ?? name;
 }

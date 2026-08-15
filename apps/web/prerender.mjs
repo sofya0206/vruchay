@@ -32,6 +32,7 @@ const TYPES = {
   '.css': 'text/css',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
+  '.woff2': 'font/woff2',
   '.webmanifest': 'application/manifest+json',
 };
 
@@ -51,6 +52,28 @@ function serve() {
   });
 }
 
+/**
+ * Заставка, которую надо вернуть в готовую разметку.
+ *
+ * Ловушка: отрисовка запускает само приложение, а оно убирает заставку,
+ * как только поднялось. Сохранённый HTML поэтому оказывается без неё —
+ * и на сервер уезжала сборка, где заставки нет вовсе. Так и случилось
+ * при выкате 07.08.2026: в бою её не оказалось.
+ *
+ * Возвращать нужно именно сюда: этот же файл отдаётся как запасной для
+ * всех прочих адресов, включая кабинет. Без заставки человек, открывший
+ * «Настройки», на мгновение видит посадочную страницу, и только потом
+ * её сменяет кабинет.
+ *
+ * Забираем блок до цикла: первая же запись перетирает dist/index.html.
+ */
+const source = await readFile(join(DIST, 'index.html'), 'utf8');
+const splash = source.match(/<div id="splash">[\s\S]*?<\/div>\s*<\/div>\s*<\/div>/)?.[0];
+if (!splash) {
+  console.error('✗ В собранной разметке нет заставки — проверьте apps/web/index.html');
+  process.exit(1);
+}
+
 const server = serve();
 await new Promise((resolve) => server.listen(PORT, resolve));
 
@@ -68,10 +91,16 @@ for (const route of ROUTES) {
     // только после того, как React собрал страницу.
     await page.waitForSelector('h1', { timeout: 10_000 });
 
-    const html = await page.content();
+    let html = await page.content();
     // Пустая разметка означала бы, что мы сохранили ту же заглушку,
     // ради ухода от которой всё и затевалось.
     if (!/<h1/.test(html)) throw new Error('в разметке нет заголовка');
+
+    // Возвращаем заставку, которую приложение убрало при отрисовке.
+    if (!html.includes('id="splash"')) {
+      html = html.replace('</body>', `${splash}\n  </body>`);
+      if (!html.includes('id="splash"')) throw new Error('не удалось вернуть заставку');
+    }
 
     const out = route === '/' ? join(DIST, 'index.html') : join(DIST, route, 'index.html');
     await mkdir(dirname(out), { recursive: true });

@@ -2,7 +2,9 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/commo
 import { ConfigService } from '@nestjs/config';
 import { Queue, Worker } from 'bullmq';
 import IORedis from 'ioredis';
+import { TRASH_DAYS } from '@gramota/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { DocumentsService } from '../documents/documents.service';
 import type { Env } from '../config/env';
 
 export const RETENTION_QUEUE = 'retention';
@@ -22,6 +24,9 @@ export const RETENTION_QUEUE = 'retention';
  * - согласия живут три года: столько же длится общий срок исковой давности,
  *   а именно в споре они и понадобятся. Адрес обращения в согласии, в отличие
  *   от заявки, стирать нельзя — он часть доказательства, а не служебный след.
+ *
+ * Сюда же попала корзина документов: цель у неё та же — не хранить дольше,
+ * чем нужно, — и отдельное ночное задание ради неё заводить незачем.
  */
 const ANONYMIZE_AFTER_DAYS = 90;
 const DROP_UNFINISHED_AFTER_DAYS = 30;
@@ -40,6 +45,7 @@ export class RetentionService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService<Env, true>,
+    private readonly documents: DocumentsService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -78,7 +84,13 @@ export class RetentionService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Вынесено отдельно от расписания, чтобы можно было запустить руками. */
-  async run(): Promise<{ anonymized: number; unfinished: number; requests: number; consents: number }> {
+  async run(): Promise<{
+    anonymized: number;
+    unfinished: number;
+    requests: number;
+    consents: number;
+    trashed: number;
+  }> {
     const now = Date.now();
     const before = (days: number) => new Date(now - days * DAY_MS);
 
@@ -107,16 +119,21 @@ export class RetentionService implements OnModuleInit, OnModuleDestroy {
       where: { createdAt: { lt: before(DROP_CONSENTS_AFTER_DAYS) } },
     });
 
+    // Корзина: документы вместе с выданными файлами и записями о них.
+    const trashed = await this.documents.purgeExpired(before(TRASH_DAYS));
+
     const result = {
       anonymized: anonymized.count,
       unfinished: unfinished.count,
       requests: requests.count,
       consents: consents.count,
+      trashed,
     };
     if (Object.values(result).some((n) => n > 0)) {
       this.logger.log(
         `Сроки хранения: обезличено ${result.anonymized}, удалено незавершённых ` +
-          `${result.unfinished}, заявок ${result.requests}, согласий ${result.consents}`,
+          `${result.unfinished}, заявок ${result.requests}, согласий ${result.consents}, ` +
+          `документов из корзины ${result.trashed}`,
       );
     }
     return result;

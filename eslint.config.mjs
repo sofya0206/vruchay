@@ -11,7 +11,13 @@ export default tseslint.config(
     // Служебные скрипты запускаются напрямую в Node, вне сборки приложения.
     files: ['**/*.mjs', 'docs/**/*.js'],
     languageOptions: {
-      globals: { console: 'readonly', process: 'readonly' },
+      globals: {
+        console: 'readonly',
+        process: 'readonly',
+        fetch: 'readonly',
+        Buffer: 'readonly',
+        URL: 'readonly',
+      },
     },
   },
   {

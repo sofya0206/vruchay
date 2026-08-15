@@ -10,9 +10,111 @@
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>Вручай — наградные документы</title>
+
+    <!--
+      Заставка на время загрузки.
+
+      Живёт прямо в разметке, а не в приложении: пока браузер скачивает
+      и запускает код, показывать её попросту некому — а именно эти первые
+      секунды на медленной связи человек и смотрит в пустую белую страницу.
+
+      Появляется не сразу, а через треть секунды: на быстрой связи
+      приложение поднимается раньше, и мелькнувшая заставка раздражала бы
+      сильнее, чем её отсутствие.
+    -->
+    <style>
+      #splash {
+        position: fixed;
+        inset: 0;
+        /* Поверх всего: приложение может успеть отрисовать часть себя
+           раньше, чем заставка уйдёт, и просвечивающая сквозь неё шапка
+           выглядит как поломка вёрстки. */
+        z-index: 9999;
+        display: grid;
+        place-items: center;
+        background: #fbfaf7;
+        opacity: 0;
+        animation: splash-in 0.4s ease-out 0.35s forwards;
+      }
+      #splash .mark {
+        width: 56px;
+        height: 56px;
+        border-radius: 16px;
+        background: #1f5d3f;
+        display: grid;
+        place-items: center;
+        animation: splash-beat 1.8s ease-in-out infinite;
+      }
+      #splash .word {
+        margin-top: 18px;
+        text-align: center;
+        font: 500 15px/1.4 ui-sans-serif, system-ui, -apple-system, sans-serif;
+        color: #5f6b64;
+      }
+      @keyframes splash-in {
+        to {
+          opacity: 1;
+        }
+      }
+      /* Медаль медленно «дышит»: признак, что дело идёт, без вертящегося
+         колеса — оно на наградной странице выглядит тревожно. */
+      @keyframes splash-beat {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.07);
+        }
+      }
+      @media (prefers-color-scheme: dark) {
+        #splash {
+          background: #10150f;
+        }
+        #splash .mark {
+          background: #4fa97a;
+        }
+        #splash .word {
+          color: #97a399;
+        }
+      }
+      /* Тем, кто просил систему не двигать картинки, показываем неподвижно. */
+      @media (prefers-reduced-motion: reduce) {
+        #splash {
+          animation: none;
+          opacity: 1;
+        }
+        #splash .mark {
+          animation: none;
+        }
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+
+    <div id="splash">
+      <div>
+        <div class="mark">
+          <svg
+            width="30"
+            height="30"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#ffffff"
+            stroke-width="1.75"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="8" r="6" />
+            <path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11" />
+          </svg>
+        </div>
+        <div class="word">Вручай</div>
+      </div>
+    </div>
+
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

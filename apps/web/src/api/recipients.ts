@@ -119,3 +119,41 @@ export function useGeneration(documentId: string, jobId: string | null) {
 
   return { job: job.data, start };
 }
+
+/** Кого рассылка пропустила и почему — показываем поимённо, а не числом. */
+export interface SendResult {
+  queued: number;
+  skipped: { name: string; reason: string }[];
+}
+
+/**
+ * Рассылка созданных документов участникам.
+ *
+ * Отдельное действие, а не продолжение выпуска: файлы часто делают заранее,
+ * а рассылают в день награждения. Маршрут на сервере был с самого начала,
+ * но вызвать его из кабинета было нечем — письма не уходили никому.
+ */
+export function useSend(documentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<SendResult>(`/mail/send/${documentId}`, {}),
+    onSuccess: () => {
+      // Реестр показывает состояние писем — после рассылки он устарел.
+      void qc.invalidateQueries({ queryKey: ['registry', documentId] });
+    },
+  });
+}
+
+/**
+ * Настроено ли письмо. Нужно до выпуска, а не после: узнать, что рассылать
+ * нечем, когда файлы уже созданы, — значит проделать половину работы впустую.
+ */
+export function useMailTemplate(documentId: string) {
+  return useQuery({
+    queryKey: ['email-template', documentId],
+    queryFn: () =>
+      api.get<{ subject: string; bodyHtml: string; attachGeneratedFile: boolean } | null>(
+        `/mail/templates/${documentId}`,
+      ),
+  });
+}

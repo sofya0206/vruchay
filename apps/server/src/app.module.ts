@@ -13,9 +13,18 @@ import { RenderModule } from './render/render.module';
 import { GenerationModule } from './generation/generation.module';
 import { MailModule } from './mail/mail.module';
 import { TildaModule } from './tilda/tilda.module';
+import { VerifyModule } from './verify/verify.module';
 import { LeadsModule } from './leads/leads.module';
 import { PaymentsModule } from './payments/payments.module';
 import { InvoicesModule } from './invoices/invoices.module';
+import { TeamModule } from './team/team.module';
+import { AuditModule } from './audit/audit.module';
+import { ReferralModule } from './referral/referral.module';
+import { ReviewsModule } from './reviews/reviews.module';
+import { OrgModule } from './org/org.module';
+import { TokensModule } from './tokens/tokens.module';
+import { BackupModule } from './backup/backup.module';
+import { PlatformModule } from './platform/platform.module';
 
 @Module({
   imports: [
@@ -31,9 +40,18 @@ import { InvoicesModule } from './invoices/invoices.module';
     GenerationModule,
     MailModule,
     TildaModule,
+    VerifyModule,
     LeadsModule,
     PaymentsModule,
     InvoicesModule,
+    TeamModule,
+    AuditModule,
+    ReferralModule,
+    ReviewsModule,
+    OrgModule,
+    TokensModule,
+    BackupModule,
+    PlatformModule,
   ],
   controllers: [HealthController],
 })

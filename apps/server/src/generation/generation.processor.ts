@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue, Worker } from 'bullmq';
@@ -91,8 +92,11 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
 
     for (const row of rows) {
       try {
+        // Идентификатор выделяем до печати: он попадает в QR на самом листе,
+        // а значит должен быть известен раньше, чем лист отрисован.
+        const publicId = randomUUID();
         const token = createRenderToken(
-          { jobId, rowId: row.id },
+          { jobId, rowId: row.id, publicId },
           secret,
           Math.floor(Date.now() / 1000),
         );
@@ -109,6 +113,7 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
             documentId: job.documentId,
             jobId,
             kind: 'generated',
+            publicId,
             s3Key: '',
             sizeBytes: body.length,
             mime: format === 'jpg' ? 'image/jpeg' : 'application/pdf',

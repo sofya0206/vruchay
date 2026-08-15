@@ -2,6 +2,7 @@ import { Controller, Get, Param, Post, Query, Res, UseGuards } from '@nestjs/com
 import type { FastifyReply } from 'fastify';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { AuthGuard } from '../auth/auth.guard';
+import { PlatformOnlyGuard } from '../auth/platform-only.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
 import { uuidSchema } from '../documents/documents.dto';
 import { InvoicesService } from './invoices.service';
@@ -12,9 +13,15 @@ const uuidParam = new ZodValidationPipe(uuidSchema);
 /**
  * Счета в кабинете. Видит и подтверждает только владелец сервиса: это
  * его собственная бухгалтерия, а не данные организации-клиента.
+ *
+ * Раньше здесь стояли только AuthGuard и роль «владелец» — а это значит
+ * «владелец любой организации». С открытой регистрацией любой желающий
+ * заводил себе организацию и читал всю нашу клиентскую книгу: имена
+ * покупателей, ИНН, адреса, суммы. PlatformOnlyGuard проверяет, что
+ * человек из нашей организации, а не просто владелец своей.
  */
 @Controller('invoices')
-@UseGuards(AuthGuard, RolesGuard)
+@UseGuards(AuthGuard, PlatformOnlyGuard, RolesGuard)
 export class InvoicesController {
   constructor(
     private readonly invoices: InvoicesService,

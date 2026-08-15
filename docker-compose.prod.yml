@@ -41,6 +41,19 @@ services:
     cap_drop: [ALL]
     security_opt:
       - no-new-privileges:true
+      # Стандартный профиль seccomp Docker применяет и без этой строки.
+      # Пишем её явно, чтобы она была видна: тогда `privileged: true` или
+      # `seccomp:unconfined`, добавленные когда-нибудь «на время, чтобы
+      # заработало», бросятся в глаза при чтении файла, а не отменят
+      # защиту молча.
+      #
+      # Своего, более узкого профиля здесь нет намеренно. Он имел бы смысл
+      # для приложения, но его пришлось бы держать общим с воркером, а там
+      # Chromium: набор системных вызовов у него широкий, меняется от версии
+      # к версии, и ошибка в профиле проявляется не отказом при старте,
+      # а сорванной печатью посреди партии из трёхсот грамот. Цена ошибки
+      # выше выигрыша.
+      - seccomp=builtin
     healthcheck:
       test: ['CMD', 'node', '-e', "fetch('http://localhost:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 30s
@@ -78,6 +91,7 @@ services:
     cap_drop: [ALL]
     security_opt:
       - no-new-privileges:true
+      - seccomp=builtin
 
   postgres:
     image: postgres:16-alpine
@@ -88,8 +102,33 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - pg-data:/var/lib/postgresql/data
+    # База — самое ценное, что есть на сервере, и ограничена она была
+    # только по памяти. Убираем всё лишнее, но не всё подряд.
+    #
+    # Пять возможностей ниже вернуть **обязательно**. Официальный образ
+    # postgres стартует от root: выправляет владельца и права каталога
+    # данных (CHOWN, DAC_OVERRIDE, FOWNER) и только потом переходит
+    # к пользователю postgres (SETUID, SETGID). Без них контейнер пишет
+    # «chmod: Operation not permitted», не проходит проверку здоровья
+    # и тянет за собой всё остальное — сервис ложится целиком.
+    #
+    # Так и случилось 07.08.2026 при выкате: голый `cap_drop: [ALL]`
+    # уронил боевую базу. Прежний комментарий здесь уверял, что
+    # «возможности ядра ей не нужны» — это была неправда, и стоила
+    # она получаса простоя.
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETUID, SETGID]
+    security_opt:
+      - no-new-privileges:true
+      - seccomp=builtin
     # Порт наружу не публикуется: база доступна только из сети compose.
-    mem_limit: 2g
+    #
+    # 1 ГБ, а не 2: на машине 4 ГБ, и потолки всех служб должны в неё влезать.
+    # Иначе воркер с Chromium и база могут одновременно дорасти до своих
+    # лимитов, ни один cgroup не сработает, и жертву выберет ядро — вероятнее
+    # всего базу, как самый крупный процесс. Терять базу вместо воркера,
+    # который перезапустится сам, нам совершенно незачем.
+    mem_limit: 1g
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER}']
       interval: 10s
@@ -103,12 +142,29 @@ services:
       - redis-data:/data
     command: ['redis-server', '--appendonly', 'yes']
     mem_limit: 512m
+    # Те же пять возможностей, что и у базы, и по той же причине: образ
+    # redis стартует от root, выправляет права каталога /data и переходит
+    # к пользователю redis. Без них — «find: ./appendonlydir: Permission
+    # denied» и бесконечный перезапуск.
+    #
+    # Нашим собственным образам (api, worker) этого не нужно: они стартуют
+    # сразу от пользователя app и ничего не переприсваивают.
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETUID, SETGID]
+    security_opt:
+      - no-new-privileges:true
+      - seccomp=builtin
 
   web:
     image: ${IMAGE_PREFIX}/gramota-web:${IMAGE_TAG:-latest}
     restart: always
     environment:
       DOMAIN: ${DOMAIN}
+      # Адрес с www: на него есть запись в DNS, значит Caddy обязан о нём
+      # знать. Иначе запрос доходит до сервера, но имени такого нет —
+      # сертификат не подобрать, и посетитель видит ошибку защищённого
+      # соединения вместо перенаправления.
+      WWW_DOMAIN: ${WWW_DOMAIN:-www.${DOMAIN}}
       # Адрес объектного хранилища попадает в политику содержимого:
       # оттуда грузятся фоны сертификатов, без него они не отобразятся.
       S3_ORIGIN: ${S3_ORIGIN}
@@ -118,6 +174,14 @@ services:
     volumes:
       - caddy-data:/data
       - caddy-config:/config
+    # Caddy — единственный контейнер, смотрящий наружу, и единственный,
+    # которому нужна возможность ядра: без NET_BIND_SERVICE он не займёт
+    # порты 80 и 443, работая не от корневого пользователя.
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt:
+      - no-new-privileges:true
+      - seccomp=builtin
     depends_on:
       api:
         condition: service_healthy

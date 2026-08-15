@@ -9,6 +9,8 @@ import type { SessionUser } from '../auth/auth.service';
 import { uuidSchema } from '../documents/documents.dto';
 import { StorageService } from '../storage/storage.service';
 import { contentDisposition } from '../storage/s3-key';
+import { AuditActor } from '../audit/actor.decorator';
+import { AuditService, type Actor } from '../audit/audit.service';
 import { GenerationService } from './generation.service';
 import { GenerationProcessor } from './generation.processor';
 
@@ -23,16 +25,28 @@ export class GenerationController {
     private readonly generation: GenerationService,
     private readonly processor: GenerationProcessor,
     private readonly storage: StorageService,
+    private readonly audit: AuditService,
   ) {}
 
   @Post('documents/:id/generate')
   async start(
     @CurrentUser() user: SessionUser,
+    @AuditActor() actor: Actor,
     @Param('id', uuidParam) id: string,
     @Body(new ZodValidationPipe(startSchema)) dto: StartDto,
   ) {
     const job = await this.generation.start(user.orgId, id, dto.format);
     await this.processor.enqueue(job.id);
+
+    await this.audit.record({
+      actor,
+      action: 'generation.start',
+      summary: `Выпуск документов: ${job.total}`,
+      targetType: 'document',
+      targetId: id,
+      meta: { jobId: job.id, format: dto.format, total: job.total },
+    });
+
     return job;
   }
 

@@ -21,6 +21,10 @@ set -euo pipefail
 : "${AGE_IDENTITY:?не задан файл с секретным ключом}"
 RESTORE_DATABASE="${RESTORE_DATABASE:-vruchay_drill}"
 
+# Тот же системный набор корневых сертификатов, что и в backup.sh: своему
+# набору AWS CLI сертификат хранилища Selectel не проходит. Подробности там же.
+export AWS_CA_BUNDLE="${AWS_CA_BUNDLE:-/etc/ssl/certs/ca-certificates.crt}"
+
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 

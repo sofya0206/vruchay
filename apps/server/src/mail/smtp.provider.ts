@@ -41,6 +41,14 @@ export class SmtpProvider implements MailProvider {
       host: this.config.get('SMTP_HOST', { infer: true }),
       port: this.config.get('SMTP_PORT', { infer: true }),
       secure,
+      // На незашифрованном порту шифрование поднимается через STARTTLS, и
+      // требовать его обязательно, когда есть пароль: иначе nodemailer при
+      // отсутствии STARTTLS молча отправит учётные данные открытым текстом.
+      // Пусть лучше отправка откажет, чем пароль уйдёт по сети как есть.
+      //
+      // Локальный Mailpit работает без пароля и без шифрования — там условие
+      // не выполняется, и разработка не ломается.
+      requireTLS: !secure && Boolean(user),
       // Локальный Mailpit работает без авторизации, боевой шлюз — с ней.
       auth: user ? { user, pass } : undefined,
     });
@@ -51,6 +59,7 @@ export class SmtpProvider implements MailProvider {
     const info = await this.getTransporter().sendMail({
       from: { name: message.from.name, address: message.from.email },
       to: message.to,
+      replyTo: message.replyTo,
       subject: message.subject,
       html: message.html,
       attachments: message.attachments?.map((a) => ({

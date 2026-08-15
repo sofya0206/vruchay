@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { SheetLayout } from '@gramota/shared';
+import { substituteVariables, type SheetLayout } from '@gramota/shared';
 import { SheetRenderer } from '../render/SheetRenderer';
 
 interface RenderData {
@@ -7,6 +7,8 @@ interface RenderData {
   pageHeightMm: number;
   sheets: { layout: SheetLayout; backgroundUrl: string | null }[];
   data: Record<string, string>;
+  /** Адрес проверки подлинности этого экземпляра — для QR на листе. */
+  verifyUrl?: string | null;
 }
 
 declare global {
@@ -15,6 +17,55 @@ declare global {
     __RENDER_READY__?: boolean;
     __RENDER_ERROR__?: string;
   }
+}
+
+/** Начертание, которым набран хотя бы один блок документа. */
+export interface UsedFont {
+  family: string;
+  /** 400 или 700 — ровно то, что попадёт в CSS */
+  weight: number;
+  style: 'normal' | 'italic';
+  /** Весь текст, набранный этим начертанием, уже с подставленными переменными. */
+  text: string;
+}
+
+/**
+ * Начертания, которыми набран этот документ, — по всем листам.
+ *
+ * Проверять весь набор редактора смысла нет: документ обычно использует
+ * два-три шрифта, а отказ из-за незагруженного восьмого остановил бы
+ * выпуск на ровном месте.
+ *
+ * Начертания различаются, а не сводятся к семейству, по двум причинам,
+ * и обе выяснились на боевой проверке:
+ *
+ *  — у многих семейств обычное и полужирное это разные файлы, и загрузка
+ *    одного ничего не говорит о другом. Проверка «по семейству» с весом
+ *    по умолчанию запрещала бы любой полужирный текст;
+ *  — шрифты разбиты на подмножества по unicode-range, и браузер качает лишь
+ *    те, что нужны показанным символам. Поэтому спрашивать надо про тот
+ *    самый текст: кириллическое имя и латинский заголовок берут разные файлы.
+ *
+ * Переменные подставляем той же функцией, что и рендер: в шаблоне стоит
+ * латинское «%name», а печатается кириллическое имя — то есть совсем
+ * другое подмножество.
+ */
+export function usedFonts(state: Pick<RenderData, 'sheets' | 'data'>): UsedFont[] {
+  const byKey = new Map<string, UsedFont>();
+  for (const sheet of state.sheets) {
+    for (const element of sheet.layout) {
+      if (element.type !== 'text' || !element.props.fontFamily) continue;
+      const { fontFamily: family, bold, italic } = element.props;
+      const weight = bold ? 700 : 400;
+      const style = italic ? 'italic' : 'normal';
+      const key = `${family}|${weight}|${style}`;
+      const text = substituteVariables(element.props.text, state.data ?? {});
+      const seen = byKey.get(key);
+      if (seen) seen.text += text;
+      else byKey.set(key, { family, weight, style, text });
+    }
+  }
+  return [...byKey.values()];
 }
 
 /**
@@ -56,6 +107,19 @@ export function RenderPage() {
       }),
     );
     void Promise.all([document.fonts.ready, ...images]).then(() => {
+      // fonts.ready разрешается и тогда, когда шрифт загрузить не удалось:
+      // он означает «загрузка завершилась», а не «завершилась успешно».
+      // Поэтому спрашиваем про каждое начертание отдельно. Без этой проверки
+      // недоступный шрифт даёт не ошибку, а пачку готовых документов,
+      // напечатанных не тем шрифтом, — и заметит это уже получатель.
+      const missing = usedFonts(state).filter(
+        (f) => !document.fonts.check(`${f.style} ${f.weight} 16px "${f.family}"`, f.text || ' '),
+      );
+      if (missing.length) {
+        const list = missing.map((f) => `${f.family} ${f.weight}${f.style === 'italic' ? ' курсив' : ''}`);
+        window.__RENDER_ERROR__ = `Не загрузились шрифты: ${list.join(', ')}`;
+        return;
+      }
       window.__RENDER_READY__ = true;
     });
   }, [state]);
@@ -71,6 +135,7 @@ export function RenderPage() {
             pageWidthMm={state.pageWidthMm}
             pageHeightMm={state.pageHeightMm}
             backgroundUrl={sheet.backgroundUrl}
+            verifyUrl={state.verifyUrl}
             data={state.data}
           />
         </div>

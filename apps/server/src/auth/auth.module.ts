@@ -1,12 +1,21 @@
-import { Global, Module } from '@nestjs/common';
+import { Global, Module, forwardRef } from '@nestjs/common';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { RegistrationService } from './registration.service';
+import { PasswordResetService } from './password-reset.service';
 import { AuthGuard } from './auth.guard';
+import { MailModule } from '../mail/mail.module';
 
 @Global()
 @Module({
+  // Письмо о подтверждении адреса шлёт почтовый модуль, а тот, в свою очередь,
+  // защищён обычной аутентификацией — отсюда взаимная зависимость модулей
+  // и forwardRef. Разрывать её выделением третьего модуля ради одного письма
+  // не стоит: связь тут по существу, а не по недосмотру.
+  imports: [forwardRef(() => MailModule)],
   controllers: [AuthController],
-  providers: [AuthService, AuthGuard],
+  providers: [AuthService, RegistrationService,
+    PasswordResetService, AuthGuard],
   exports: [AuthService, AuthGuard],
 })
 export class AuthModule {}

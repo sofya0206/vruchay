@@ -17,6 +17,7 @@
     "dev": "tsc -p tsconfig.cjs.json --watch"
   },
   "dependencies": {
+    "petrovich": "^0.2.1",
     "zod": "^4.0.0"
   },
   "devDependencies": {
