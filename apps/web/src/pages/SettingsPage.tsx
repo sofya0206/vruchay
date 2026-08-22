@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { MailDomains } from '../settings/MailDomains';
-import { Integrations } from '../settings/Integrations';
 import { Team } from '../settings/Team';
 import { ChangePassword } from '../settings/ChangePassword';
 import { Organization } from '../settings/Organization';
@@ -41,7 +40,23 @@ export function SettingsPage() {
         <hr className="border-[var(--line)]" />
         <MailDomains />
         <hr className="border-[var(--line)]" />
-        <Integrations />
+        {/* Сама настройка переехала на свою страницу: она идёт в два окна
+            и требует места под инструкцию. Здесь остаётся указатель — иначе
+            тот, кто привык искать её тут, решит, что возможность убрали. */}
+        <section>
+          <h2 className="font-serif text-xl">Выдача документов на сайте</h2>
+          <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)]">
+            Кнопка «Получить документ» на вашей странице: участник проверяет свои данные
+            и получает именной документ на почту.
+          </p>
+          <Link
+            to="/integrations"
+            className="mt-3 inline-flex items-center gap-2 text-sm text-[var(--accent)] hover:underline"
+          >
+            Настроить формы на сайте
+            <ArrowRight size={16} />
+          </Link>
+        </section>
         {/* Журнал и токены последними: нужны редко и не всем, а место
             наверху занимает то, чем пользуются каждый день. */}
         <hr className="border-[var(--line)]" />
