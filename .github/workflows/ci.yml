@@ -24,8 +24,9 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
-      - run: pnpm -r test
+      # Сборка раньше тестов: тесты web импортируют @gramota/shared из dist.
       - run: pnpm -r build
+      - run: pnpm -r test
 
   docker:
     runs-on: ubuntu-latest

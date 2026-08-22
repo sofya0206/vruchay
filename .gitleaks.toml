@@ -19,7 +19,9 @@ tags = ["secret", "mail"]
 [[rules]]
 id = "vruchay-s3-secret"
 description = "Ключ доступа к объектному хранилищу"
-regex = '''S3_SECRET_KEY\s*[:=]\s*["']?(?!gramota-secret)[A-Za-z0-9+/=]{16,}'''
+# Без (?!…): движок gitleaks (RE2) не умеет lookahead и падает при запуске.
+# Значение локальной среды gramota-secret исключено в allowlist ниже.
+regex = '''S3_SECRET_KEY\s*[:=]\s*["']?[A-Za-z0-9+/=]{16,}'''
 tags = ["secret", "storage"]
 
 [[rules]]
