@@ -1,36 +1,42 @@
-# Gramota — сервис массовой генерации именных грамот и сертификатов
+# Вручай — сервис цифровых документов
 
-Собственный аналог gramotadel.express: конструктор документов, таблица получателей,
-массовая генерация PDF, рассылка с собственного домена, интеграция с Tilda.
-Хостинг и обработка персональных данных — в РФ (152-ФЗ, РБ 99-З).
+Массовое создание, выдача и проверка именных документов: грамоты,
+сертификаты, дипломы. Загружаешь список людей, выбираешь макет —
+сервис выпускает PDF, рассылает по почте и даёт каждому документу
+страницу проверки по QR.
+
+Сайт: https://vruchay.ru. Данные и серверы — в РФ (152-ФЗ), Selectel,
+аттестованная зона.
+
+## Стек
+
+TypeScript · React 19 + Vite + Tailwind · NestJS 11 (Fastify) · Prisma +
+PostgreSQL · BullMQ + Redis · Playwright (PDF) · Docker + Caddy.
 
 ## Структура
 
-- `apps/server` — API (NestJS + Fastify) и worker (BullMQ, с Фазы 2)
-- `apps/web` — SPA (React + Vite)
-- `packages/shared` — общие типы и Zod-схема макета листа (контракт редактор ⇄ PDF-рендер)
+- `apps/web` — интерфейс (кабинет, редактор, посадочная)
+- `apps/server` — API и воркер генерации/рассылки
+- `packages/shared` — общие типы и схема макета (контракт редактор ⇄ PDF)
+- `docs/` — решения (ADR), инструкции, бизнес-документы
 
-## Локальная разработка
+## Запуск локально
 
 ```bash
 pnpm install
 docker compose -f docker-compose.dev.yml up -d   # postgres, redis, minio, mailpit
 cp .env.example apps/server/.env
-pnpm --filter @gramota/server prisma:migrate     # миграции БД
+pnpm --filter @gramota/server prisma:migrate
 pnpm dev                                          # server:3000 + web:5173
 ```
 
-- Веб: http://localhost:5173 (проксирует /api и /health на сервер)
-- Mailpit (перехват писем): http://localhost:8025
-- MinIO console: http://localhost:9001 (gramota / gramota-secret)
+Веб: http://localhost:5173 · Письма: http://localhost:8025 · MinIO: http://localhost:9001
 
-## Проверки
+Перед коммитом: `pnpm lint && pnpm -r test && pnpm -r build`.
 
-```bash
-pnpm lint && pnpm -r test && pnpm -r build
-```
+## Где что
 
-## Документы
-
-- План проекта и фаз: `~/.claude/plans/generic-snuggling-sun.md`
-- Эксплуатация (деплой, бэкапы, восстановление): `RUNBOOK.md`
+- Правила для кода и ИИ — `CLAUDE.md`
+- Эксплуатация: выкат, бэкапы, восстановление — `RUNBOOK.md`
+- Установка с нуля и передача проекта — `ПЕРЕДАЧА.md`, `docs/установка-по-шагам.md`
+- Идеи на потом — `docs/бэклог.md`
