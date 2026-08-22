@@ -172,14 +172,20 @@ export class TildaMyService {
     };
   }
 
-  /** Выданные документы этого человека в этой организации. */
+  /**
+   * Выданные документы этого человека в этой организации.
+   *
+   * Только по адресу, на который пришёл код. Адрес учётной записи
+   * площадка присылает из браузера, и кодом он не подтверждён: искать
+   * по нему значило бы отдать чужой перечень любому, кто впишет чужой
+   * адрес в это поле и подтвердит свой собственный.
+   */
   private ownedBy(session: Session) {
-    const emails = [session.email, session.accountEmail].filter(Boolean);
     return {
       orgId: session.orgId,
       status: 'done' as const,
       fileId: { not: null },
-      OR: [{ email: { in: emails } }, { accountEmail: { in: emails } }],
+      OR: [{ email: session.email }, { accountEmail: session.email }],
     };
   }
 

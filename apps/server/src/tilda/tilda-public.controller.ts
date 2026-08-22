@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -28,7 +29,6 @@ import {
   SubmitDto,
 } from './tilda.dto';
 import { TildaMyService } from './tilda-my.service';
-import { BadRequestException } from '@nestjs/common';
 import { buildTildaScript, TILDA_STYLES } from './tilda-snippet';
 import { parseTildaForm } from './tilda-create';
 
@@ -159,7 +159,7 @@ export class TildaPublicController {
       const message =
         err instanceof BadRequestException
           ? (err.getResponse() as { message?: string }).message ?? 'Не удалось подтвердить адрес'
-          : 'Ссылка устарела или уже использована';
+          : 'Ссылка уже использована или устарела. Если вы её уже нажимали — документ в пути, проверьте почту';
       return linkPage('Не получилось', message);
     }
   }
@@ -249,7 +249,13 @@ async function formFields(req: FastifyRequest, body: unknown): Promise<Record<st
   if (typeof req.isMultipart === 'function' && req.isMultipart()) {
     const out: Record<string, unknown> = {};
     for await (const part of req.parts()) {
-      if (part.type === 'field' && Object.keys(out).length < 40) out[part.fieldname] = part.value;
+      if (part.type === 'field') {
+        if (Object.keys(out).length < 40) out[part.fieldname] = part.value;
+      } else {
+        // Поток файла надо дочитать, иначе следующая часть не придёт
+        // и запрос повиснет до таймаута.
+        part.file.resume();
+      }
     }
     return out;
   }

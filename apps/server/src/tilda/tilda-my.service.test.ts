@@ -100,10 +100,13 @@ describe('мои документы', () => {
     ]);
   });
 
-  it('ищет по адресу доставки и по адресу учётной записи, в своей организации', async () => {
+  it('ищет только по подтверждённому адресу, в своей организации', async () => {
+    // Адрес учётной записи приходит из браузера и кодом не подтверждён.
+    // Расширять по нему поиск — отдать чужой перечень тому, кто впишет
+    // чужой адрес и подтвердит свой.
     const { my, prisma } = service();
     const { listId } = await my.start(
-      { token: TOKEN, email: 'lichniy@example.ru', accountEmail: 'rabochiy@example.ru' },
+      { token: TOKEN, email: 'svoy@example.ru', accountEmail: 'chuzhoy@example.ru' },
       ctx,
     );
     await my.confirm(listId, '123456');
@@ -111,10 +114,8 @@ describe('мои документы', () => {
     const where = prisma.tildaRequest.findMany.mock.calls[0][0].where;
     expect(where.orgId).toBe('org-1');
     expect(where.status).toBe('done');
-    expect(where.OR).toEqual([
-      { email: { in: ['lichniy@example.ru', 'rabochiy@example.ru'] } },
-      { accountEmail: { in: ['lichniy@example.ru', 'rabochiy@example.ru'] } },
-    ]);
+    expect(where.OR).toEqual([{ email: 'svoy@example.ru' }, { accountEmail: 'svoy@example.ru' }]);
+    expect(JSON.stringify(where)).not.toContain('chuzhoy');
   });
 
   it('отклоняет чужой источник', async () => {
