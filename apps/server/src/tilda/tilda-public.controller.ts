@@ -5,6 +5,7 @@ import {
   Get,
   Header,
   HttpCode,
+  Logger,
   Param,
   Post,
   Req,
@@ -62,6 +63,8 @@ p{font-size:15px;color:#5f6b64;line-height:1.45;margin:0}</style></head>
 @Controller('v1')
 @UseGuards(ThrottleGuard)
 export class TildaPublicController {
+  private readonly logger = new Logger(TildaPublicController.name);
+
   constructor(
     private readonly tilda: TildaService,
     private readonly my: TildaMyService,
@@ -117,9 +120,24 @@ export class TildaPublicController {
   @Post('tilda-create')
   // Тильда считает отправку удавшейся только по двухсотому ответу.
   @HttpCode(200)
-  @Throttle({ max: 10, timeWindow: '5 minutes' })
+  // Тильда шлёт со своих серверов, и все её сайты приходят с одних адресов:
+  // лимит по адресу здесь общий на всех клиентов сразу. От накрутки
+  // защищает суточный предел интеграции, а этот порог — только от шторма.
+  @Throttle({ max: 120, timeWindow: '5 minutes' })
   async create(@Body() body: unknown, @Req() req: FastifyRequest) {
-    const parsed = parseTildaForm(await formFields(req, body));
+    const fields = await formFields(req, body);
+
+    // Тильда при подключении шлёт проверочный запрос `test=test` без
+    // остальных полей и принимает адрес только по двухсотому ответу.
+    if ('test' in fields && !('secure' in fields)) {
+      this.logger.log(
+        `Проверочный запрос Тильды: источник «${req.headers.origin ?? req.headers.referer ?? 'не указан'}», ` +
+          `агент «${(req.headers['user-agent'] ?? '').slice(0, 80)}», поля: ${Object.keys(fields).join(', ')}`,
+      );
+      return { ok: true };
+    }
+
+    const parsed = parseTildaForm(fields);
 
     if (parsed.documentId.toLowerCase() === 'all') {
       // Перечень документов не уложить в ответ форме — его показывает
