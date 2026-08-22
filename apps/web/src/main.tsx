@@ -24,7 +24,17 @@ createRoot(document.getElementById('root')!).render(
 // Заставку из разметки убираем, как только приложение отрисовалось.
 // Плавно, а не рывком: резкая подмена картинки читается как сбой.
 const splash = document.getElementById('splash');
-if (splash) {
+if (splash && window.location.pathname === '/render') {
+  /*
+   * На странице печати заставки быть не должно вовсе.
+   *
+   * Она непрозрачная и лежит поверх всего, а браузер воркера снимает лист
+   * сразу по флагу готовности — и успевает застать её посреди перехода.
+   * В файл тогда уезжает не грамота, а логотип сервиса на пустом листе.
+   * Смотреть на эту страницу некому, поэтому убираем без перехода.
+   */
+  splash.remove();
+} else if (splash) {
   splash.style.transition = 'opacity 0.25s ease-out';
   splash.style.opacity = '0';
   splash.addEventListener('transitionend', () => splash.remove(), { once: true });
