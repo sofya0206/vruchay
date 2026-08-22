@@ -88,6 +88,8 @@ export function TildaGuide({
         <Step n={1} title="В Тильде: форма → Контент → Приём данных из формы">
           <p className="mt-0.5 text-xs text-[var(--text-muted)]">
             Включите «Свой скрипт для принятия данных» и вставьте этот адрес.
+            Если включено подтверждение почты, участнику придёт письмо со ссылкой —
+            одно нажатие, и документ в пути.
           </p>
           <Value title="адрес приёма данных">{`${origin}/api/v1/tilda-create`}</Value>
         </Step>
@@ -124,6 +126,19 @@ export function TildaGuide({
           </p>
         </Step>
       </ol>
+
+      <div className="mt-3 border-t border-[var(--line)] pt-3">
+        <p className="text-sm">«Мои документы» — всё, что человек получал через ваши формы</p>
+        <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+          Кнопка, по которой участник видит перечень своих документов и скачивает любой.
+          Подтверждение кодом на почту — всегда. Вставьте рядом с кодом из блока выше:
+        </p>
+        <Value title="код кнопки «Мои документы»">{'<div data-vruchay-my data-label="Мои документы"></div>'}</Value>
+        <p className="mt-1.5 text-xs text-[var(--text-muted)]">
+          Или форма в Тильде со скрытым полем <code className="font-mono">doc_id</code> = <code className="font-mono">all</code> —
+          так это делалось в ГрамотаДел.
+        </p>
+      </div>
 
       <p className="mt-3 border-t border-[var(--line)] pt-2 text-xs text-[var(--text-muted)]">
         Галочка согласия обязательна по закону о персональных данных: без неё заявка

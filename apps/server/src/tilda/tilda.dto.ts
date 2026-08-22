@@ -52,6 +52,29 @@ export const confirmSchema = z.object({
 });
 export type ConfirmDto = z.infer<typeof confirmSchema>;
 
+/** Запрос списка «мои документы». */
+export const myListSchema = z.object({
+  token: z.string().uuid('Некорректный токен интеграции'),
+  email: z.string().trim().toLowerCase().email('Проверьте адрес электронной почты').max(254),
+  accountEmail: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .max(254)
+    .optional()
+    .transform((v) => (v && z.string().email().safeParse(v).success ? v : undefined)),
+});
+export type MyListDto = z.infer<typeof myListSchema>;
+
+export const myConfirmSchema = z.object({
+  listId: z.string().uuid(),
+  code: z.string().trim().regex(/^\d{6}$/, 'Код состоит из шести цифр'),
+});
+export type MyConfirmDto = z.infer<typeof myConfirmSchema>;
+
+/** Код из ссылки в письме — длинный, набирать его не нужно. */
+export const linkCodeSchema = z.string().regex(/^[A-Za-z0-9_-]{32}$/);
+
 /** Настройки интеграции, которые задаёт клиент в личном кабинете. */
 export const integrationSchema = z.object({
   name: z.string().trim().min(1, 'Введите название').max(100),

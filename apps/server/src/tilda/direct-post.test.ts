@@ -36,6 +36,7 @@ function service(options: Options = {}) {
 
   const enqueue = vi.fn();
   const sendCode = vi.fn();
+  const sendConfirmLink = vi.fn();
 
   const prisma = {
     tildaIntegration: {
@@ -72,13 +73,17 @@ function service(options: Options = {}) {
 
   const tilda = new TildaService(
     prisma as never,
-    { issue: vi.fn().mockResolvedValue('123456') } as never,
-    { sendCode } as never,
+    {
+      issue: vi.fn((_id: string, o?: { long?: boolean }) =>
+        Promise.resolve(o?.long ? 'a'.repeat(32) : '123456'),
+      ),
+    } as never,
+    { sendCode, sendConfirmLink } as never,
     {} as never,
     { enqueue } as never,
   );
 
-  return { tilda, enqueue, sendCode };
+  return { tilda, enqueue, sendCode, sendConfirmLink };
 }
 
 function dto(extra: Record<string, unknown> = {}) {
@@ -106,11 +111,26 @@ describe('прямая отправка формы', () => {
     expect(enqueue).not.toHaveBeenCalled();
   });
 
-  it('принимается, когда адрес подтверждается кодом', async () => {
-    const { tilda, sendCode } = service({ authMode: 'email_code' });
+  it('принимается с подтверждением — но ссылкой, а не кодом', async () => {
+    // Окно для кода рисует наш скрипт, а при прямой отправке его на
+    // странице нет. Код ушёл бы в никуда.
+    const { tilda, sendCode, sendConfirmLink } = service({ authMode: 'email_code' });
 
     await expect(tilda.submit(dto(), DIRECT)).resolves.toMatchObject({ status: 'need_code' });
+    expect(sendCode).not.toHaveBeenCalled();
+    expect(sendConfirmLink).toHaveBeenCalledWith(
+      'org-1',
+      'anna@example.ru',
+      expect.stringMatching(/\/api\/v1\/tilda\/confirm\/request-1\/[A-Za-z0-9_-]{32}$/),
+    );
+  });
+
+  it('через скрипт по-прежнему шлёт код, а не ссылку', async () => {
+    const { tilda, sendCode, sendConfirmLink } = service({ authMode: 'email_code' });
+
+    await expect(tilda.submit(dto(), VIA_SCRIPT)).resolves.toMatchObject({ status: 'need_code' });
     expect(sendCode).toHaveBeenCalled();
+    expect(sendConfirmLink).not.toHaveBeenCalled();
   });
 
   it('принимается без кода, когда адрес есть в списке участников', async () => {

@@ -7,6 +7,7 @@ import { TildaPublicController } from './tilda-public.controller';
 import { TildaService } from './tilda.service';
 import { TildaProcessor } from './tilda.processor';
 import { OtpService } from './otp.service';
+import { TildaMyService } from './tilda-my.service';
 import { RetentionService } from './retention.service';
 
 @Module({
@@ -14,7 +15,7 @@ import { RetentionService } from './retention.service';
   // собраны в одном задании, а удаление документа умеет только его служба.
   imports: [MailModule, GenerationModule, DocumentsModule],
   controllers: [TildaController, TildaPublicController],
-  providers: [TildaService, TildaProcessor, OtpService, RetentionService],
+  providers: [TildaService, TildaProcessor, OtpService, TildaMyService, RetentionService],
   exports: [TildaService],
 })
 export class TildaModule {}

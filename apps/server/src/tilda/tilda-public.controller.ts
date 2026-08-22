@@ -1,17 +1,56 @@
-import { Body, Controller, Get, Header, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  HttpCode,
+  Param,
+  Post,
+  Req,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { Throttle } from '../common/throttle.decorator';
 import { ThrottleGuard } from '../common/throttle.guard';
 import { uuidSchema } from '../documents/documents.dto';
 import { TildaService } from './tilda.service';
-import { confirmSchema, ConfirmDto, submitSchema, SubmitDto } from './tilda.dto';
+import {
+  confirmSchema,
+  ConfirmDto,
+  linkCodeSchema,
+  myConfirmSchema,
+  MyConfirmDto,
+  myListSchema,
+  MyListDto,
+  submitSchema,
+  SubmitDto,
+} from './tilda.dto';
+import { TildaMyService } from './tilda-my.service';
+import { BadRequestException } from '@nestjs/common';
 import { buildTildaScript, TILDA_STYLES } from './tilda-snippet';
 import { parseTildaForm } from './tilda-create';
 
 const uuidParam = new ZodValidationPipe(uuidSchema);
+const linkCodeParam = new ZodValidationPipe(linkCodeSchema);
 /** Разбор идёт до проверки, поэтому схема применяется вручную, а не декоратором. */
 const submitBody = new ZodValidationPipe(submitSchema);
+
+/**
+ * Страница после нажатия ссылки в письме. Своя разметка, а не приложение:
+ * сюда приходят с чужого сайта, и грузить ради одной фразы весь кабинет
+ * незачем. Текст статический — пользовательских данных в нём нет.
+ */
+function linkPage(title: string, text: string): string {
+  return `<!doctype html><html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#fbfaf7;
+font-family:system-ui,-apple-system,sans-serif;color:#16211c}
+.c{max-width:380px;padding:28px;text-align:center}h1{font-size:20px;margin:0 0 8px}
+p{font-size:15px;color:#5f6b64;line-height:1.45;margin:0}</style></head>
+<body><div class="c"><h1>${title}</h1><p>${text}</p></div></body></html>`;
+}
 
 /**
  * Публичные эндпоинты форм. Сессии здесь нет — это открытая часть сервиса,
@@ -23,7 +62,10 @@ const submitBody = new ZodValidationPipe(submitSchema);
 @Controller('v1')
 @UseGuards(ThrottleGuard)
 export class TildaPublicController {
-  constructor(private readonly tilda: TildaService) {}
+  constructor(
+    private readonly tilda: TildaService,
+    private readonly my: TildaMyService,
+  ) {}
 
   /*
    * Косая черта в конце адреса принимается наравне с её отсутствием —
@@ -73,9 +115,20 @@ export class TildaPublicController {
    * проверку источника ради этого случая было бы ослаблением рабочего пути.
    */
   @Post('tilda-create')
+  // Тильда считает отправку удавшейся только по двухсотому ответу.
+  @HttpCode(200)
   @Throttle({ max: 10, timeWindow: '5 minutes' })
   async create(@Body() body: unknown, @Req() req: FastifyRequest) {
-    const parsed = parseTildaForm((body ?? {}) as Record<string, unknown>);
+    const parsed = parseTildaForm(await formFields(req, body));
+
+    if (parsed.documentId.toLowerCase() === 'all') {
+      // Перечень документов не уложить в ответ форме — его показывает
+      // наш скрипт на странице, и подключить его для этого придётся.
+      throw new BadRequestException(
+        'Список документов показывает скрипт на странице: подключите код из кабинета',
+      );
+    }
+
     const dto = submitBody.transform(parsed, { type: 'body' }) as SubmitDto;
 
     return this.tilda.submit(dto, {
@@ -85,6 +138,68 @@ export class TildaPublicController {
       userAgent: req.headers['user-agent'],
       directPost: true,
     });
+  }
+
+  /**
+   * Подтверждение по ссылке из письма — для заявок, отправленных прямо
+   * на наш адрес. Отвечает страницей, а не JSON: на неё приходят из почты.
+   */
+  @Get('tilda/confirm/:requestId/:code')
+  @Header('content-type', 'text/html; charset=utf-8')
+  @Header('cache-control', 'no-store')
+  @Throttle({ max: 15, timeWindow: '10 minutes' })
+  async confirmByLink(
+    @Param('requestId', uuidParam) requestId: string,
+    @Param('code', linkCodeParam) code: string,
+  ): Promise<string> {
+    try {
+      await this.tilda.confirm(requestId, code);
+      return linkPage('Адрес подтверждён', 'Документ готовится и придёт на эту почту в течение пары минут.');
+    } catch (err) {
+      const message =
+        err instanceof BadRequestException
+          ? (err.getResponse() as { message?: string }).message ?? 'Не удалось подтвердить адрес'
+          : 'Ссылка устарела или уже использована';
+      return linkPage('Не получилось', message);
+    }
+  }
+
+  // ─── Мои документы ──────────────────────────────────────────────────────
+
+  @Post('tilda/my')
+  @Throttle({ max: 10, timeWindow: '5 minutes' })
+  myStart(@Body(new ZodValidationPipe(myListSchema)) dto: MyListDto, @Req() req: FastifyRequest) {
+    return this.my.start(dto, { origin: req.headers.origin, referer: req.headers.referer });
+  }
+
+  @Post('tilda/my/confirm')
+  @Throttle({ max: 15, timeWindow: '10 minutes' })
+  myConfirm(@Body(new ZodValidationPipe(myConfirmSchema)) dto: MyConfirmDto) {
+    return this.my.confirm(dto.listId, dto.code);
+  }
+
+  @Get('tilda/my/:listId')
+  @Throttle({ max: 60, timeWindow: '10 minutes' })
+  myList(@Param('listId', uuidParam) listId: string) {
+    return this.my.list(listId);
+  }
+
+  @Get('tilda/my/:listId/download/:requestId')
+  @Throttle({ max: 60, timeWindow: '10 minutes' })
+  async myDownload(
+    @Param('listId', uuidParam) listId: string,
+    @Param('requestId', uuidParam) requestId: string,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    const file = await this.my.download(listId, requestId);
+    await reply
+      .header('content-type', file.mime)
+      .header(
+        'content-disposition',
+        `attachment; filename*=UTF-8''${encodeURIComponent(file.filename)}`,
+      )
+      .header('cache-control', 'no-store')
+      .send(file.stream);
   }
 
   @Post('tilda/confirm')
@@ -117,4 +232,26 @@ export class TildaPublicController {
   status(@Param('requestId', uuidParam) requestId: string) {
     return this.tilda.status(requestId);
   }
+}
+
+/**
+ * Поля формы из тела запроса — как бы Тильда его ни прислала.
+ *
+ * Обычно это `application/x-www-form-urlencoded`, и тело уже разобрано.
+ * Но форму могут отправить и как `multipart/form-data` — тогда разобранного
+ * тела нет, а поля надо собрать по частям. Файлы пропускаем: в заявке
+ * им взяться неоткуда, а читать их целиком — лишняя нагрузка.
+ */
+async function formFields(req: FastifyRequest, body: unknown): Promise<Record<string, unknown>> {
+  if (body && typeof body === 'object' && Object.keys(body as object).length > 0) {
+    return body as Record<string, unknown>;
+  }
+  if (typeof req.isMultipart === 'function' && req.isMultipart()) {
+    const out: Record<string, unknown> = {};
+    for await (const part of req.parts()) {
+      if (part.type === 'field' && Object.keys(out).length < 40) out[part.fieldname] = part.value;
+    }
+    return out;
+  }
+  return {};
 }

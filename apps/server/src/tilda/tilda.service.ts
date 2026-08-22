@@ -196,6 +196,14 @@ export class TildaService {
     await this.recordConsents(dto, request.id, integration.orgId, ctx);
 
     if (needsCode) {
+      if (ctx.directPost) {
+        // Окно для ввода кода рисует наш скрипт на странице, а при прямой
+        // отправке его там нет. Вместо кода — ссылка: одно нажатие в письме.
+        const code = await this.otp.issue(request.id, { long: true });
+        const url = `${publicUrl()}/api/v1/tilda/confirm/${request.id}/${code}`;
+        await this.mail.sendConfirmLink(integration.orgId, dto.email, url);
+        return { status: 'need_code', requestId: request.id };
+      }
       const code = await this.otp.issue(request.id);
       await this.mail.sendCode(integration.orgId, dto.email, code);
       return { status: 'need_code', requestId: request.id };

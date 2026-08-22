@@ -27,6 +27,7 @@ const CORS_PATHS = [
   '/api/v1/tilda/status/',
   // Приём формы прямо со страницы клиента — тоже межсайтовый запрос.
   '/api/v1/tilda-create',
+  '/api/v1/tilda/my',
 ];
 
 export function registerPublicCors(instance: FastifyInstance): void {
