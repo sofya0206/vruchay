@@ -54,6 +54,10 @@ RUN NODE_OPTIONS=--dns-result-order=ipv4first \
 # запускается — и падает при первом же обращении к базе.
 RUN node_modules/.bin/prisma generate
 
+# npm и corepack в рабочем образе не нужны: всё уже установлено. Их
+# собственные зависимости (tar, sigstore) регулярно всплывают в сканере.
+RUN rm -rf /usr/local/lib/node_modules /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
+
 # Приложение работает не от root: если Chromium удастся скомпрометировать,
 # у злоумышленника не будет прав на изменение образа и системных файлов.
 RUN useradd --create-home --shell /usr/sbin/nologin app \

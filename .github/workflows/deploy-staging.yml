@@ -15,17 +15,18 @@ jobs:
     if: >
       github.event_name == 'workflow_dispatch' ||
       github.event.workflow_run.conclusion == 'success'
+    env:
+      # В `if` шага контекст secrets недоступен, поэтому проверка через env.
+      HAS_SECRETS: ${{ secrets.STAGING_SSH_HOST != '' }}
     steps:
       - name: Deploy over SSH
-        env:
-          HAS_SECRETS: ${{ secrets.STAGING_SSH_HOST != '' }}
         run: |
           if [ "$HAS_SECRETS" != "true" ]; then
             echo "Секреты стейджинга не настроены — пропускаю (это нормально до покупки VPS)."
             exit 0
           fi
       - uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1
-        if: ${{ secrets.STAGING_SSH_HOST != '' }}
+        if: env.HAS_SECRETS == 'true'
         with:
           host: ${{ secrets.STAGING_SSH_HOST }}
           username: ${{ secrets.STAGING_SSH_USER }}
