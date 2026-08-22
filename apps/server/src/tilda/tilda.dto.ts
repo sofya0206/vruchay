@@ -61,6 +61,10 @@ export const integrationSchema = z.object({
     .max(20),
   documentIds: z.array(z.string().uuid()).min(1, 'Выберите хотя бы один документ').max(50),
   authMode: z.enum(['none', 'email_code']).default('email_code'),
+  /** Сверять адрес с реестром получателей документа до всего остального. */
+  checkList: z.boolean().default(false),
+  /** Принимать заявку только изнутри личного кабинета площадки. */
+  requireAccount: z.boolean().default(false),
   singleFilePerEmail: z.boolean().default(true),
   dailyLimit: z.coerce.number().int().min(1).max(10_000).default(500),
   successMessage: z.string().trim().max(300).default('Спасибо! Документ отправлен на вашу почту'),

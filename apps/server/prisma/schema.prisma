@@ -445,6 +445,23 @@ model TildaIntegration {
   /** Ссылка на страницу проверки подлинности в окне успеха. */
   showVerifyLink     Boolean @default(false) @map("show_verify_link")
 
+  /**
+   * Выдавать только тем, кто есть в реестре получателей документа.
+   *
+   * Проверка идёт до подтверждения адреса: посылать код тому, кому документ
+   * всё равно не положен, — значит слать письмо в никуда и подсказывать
+   * постороннему, что адрес обрабатывается.
+   */
+  checkList          Boolean @default(false) @map("check_list")
+  /**
+   * Принимать заявку, только если площадка сообщила адрес учётной записи.
+   *
+   * Означает «форма стоит внутри личного кабинета, и человек в него вошёл».
+   * Сам по себе доказательством не служит — данные приходят из браузера, —
+   * но отсекает заявки со страниц, куда форму скопировали.
+   */
+  requireAccount     Boolean @default(false) @map("require_account")
+
   createdAt DateTime @default(now()) @map("created_at")
 
   org      Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)

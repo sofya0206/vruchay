@@ -7,8 +7,11 @@ import { uuidSchema } from '../documents/documents.dto';
 import { TildaService } from './tilda.service';
 import { confirmSchema, ConfirmDto, submitSchema, SubmitDto } from './tilda.dto';
 import { buildTildaScript, TILDA_STYLES } from './tilda-snippet';
+import { parseTildaForm } from './tilda-create';
 
 const uuidParam = new ZodValidationPipe(uuidSchema);
+/** Разбор идёт до проверки, поэтому схема применяется вручную, а не декоратором. */
+const submitBody = new ZodValidationPipe(submitSchema);
 
 /**
  * Публичные эндпоинты форм. Сессии здесь нет — это открытая часть сервиса,
@@ -55,6 +58,32 @@ export class TildaPublicController {
       referer: req.headers.referer,
       ip: req.ip,
       userAgent: req.headers['user-agent'],
+    });
+  }
+
+  /**
+   * Приём формы прямо с сайта клиента, без нашего скрипта на странице.
+   *
+   * Адрес вписывается в Тильде в «Свой скрипт для приёма данных», и дальше
+   * страницу трогать не нужно. Тело приходит как обычная форма, а не JSON,
+   * и с приставками `mask_` у полей — разбирает его parseTildaForm.
+   *
+   * Путь отдельный от `tilda/submit` намеренно: тот принимает JSON от нашего
+   * скрипта, у которого источник в заголовках есть всегда, и смягчать там
+   * проверку источника ради этого случая было бы ослаблением рабочего пути.
+   */
+  @Post('tilda-create')
+  @Throttle({ max: 10, timeWindow: '5 minutes' })
+  async create(@Body() body: unknown, @Req() req: FastifyRequest) {
+    const parsed = parseTildaForm((body ?? {}) as Record<string, unknown>);
+    const dto = submitBody.transform(parsed, { type: 'body' }) as SubmitDto;
+
+    return this.tilda.submit(dto, {
+      origin: req.headers.origin,
+      referer: req.headers.referer,
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+      directPost: true,
     });
   }
 

@@ -50,6 +50,9 @@ importers:
       '@fastify/cookie':
         specifier: ^11.1.2
         version: 11.1.2
+      '@fastify/formbody':
+        specifier: ^9.0.0
+        version: 9.0.0
       '@fastify/helmet':
         specifier: ^13.1.0
         version: 13.1.0
@@ -1110,6 +1113,9 @@ packages:
 
   '@fastify/formbody@8.0.2':
     resolution: {integrity: sha512-84v5J2KrkXzjgBpYnaNRPqwgMsmY7ZDjuj0YVuMR3NXCJRCgKEZy/taSP1wUYGn0onfxJpLyRGDLa+NMaDJtnA==}
+
+  '@fastify/formbody@9.0.0':
+    resolution: {integrity: sha512-T/af26CSrUARBCvsEmv+DJLPfZlrRKESzqironxP1j7qzuLyKcoZtj6MuTGShuKx1THXugoie2oFbUJxXfGFzA==}
 
   '@fastify/forwarded@3.0.2':
     resolution: {integrity: sha512-NE8HgKLgYejV9lDpqkEFaDKMLYelJBVfHekhB0UKvX0ghagXRJqg68feg8er1NPXxG4N9i6vPxzt8E+3wHfcmA==}
@@ -5926,6 +5932,11 @@ snapshots:
     dependencies:
       fast-querystring: 1.1.2
       fastify-plugin: 5.1.0
+
+  '@fastify/formbody@9.0.0':
+    dependencies:
+      fast-querystring: 1.1.2
+      fastify-plugin: 6.0.0
 
   '@fastify/forwarded@3.0.2': {}
 

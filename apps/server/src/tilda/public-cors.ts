@@ -21,7 +21,13 @@ import type { FastifyInstance } from 'fastify';
 const PUBLIC_PREFIX = '/api/v1/tilda';
 
 /** Запросы скрипта, которые браузер шлёт из кода и потому проверяет предварительно. */
-const CORS_PATHS = ['/api/v1/tilda/submit', '/api/v1/tilda/confirm', '/api/v1/tilda/status/'];
+const CORS_PATHS = [
+  '/api/v1/tilda/submit',
+  '/api/v1/tilda/confirm',
+  '/api/v1/tilda/status/',
+  // Приём формы прямо со страницы клиента — тоже межсайтовый запрос.
+  '/api/v1/tilda-create',
+];
 
 export function registerPublicCors(instance: FastifyInstance): void {
   instance.addHook('onRequest', (req, reply, done) => {

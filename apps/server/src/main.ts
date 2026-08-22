@@ -5,6 +5,7 @@ import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify
 import fastifyCookie from '@fastify/cookie';
 import fastifySecureSession from '@fastify/secure-session';
 import fastifyMultipart from '@fastify/multipart';
+import fastifyFormbody from '@fastify/formbody';
 import helmet from '@fastify/helmet';
 import { MAX_IMAGE_BYTES } from './common/image-type';
 import { AppModule } from './app.module';
@@ -95,6 +96,14 @@ async function bootstrap() {
   await app.register(fastifyMultipart, {
     limits: { fileSize: MAX_IMAGE_BYTES, files: 1, fields: 10 },
   });
+
+  /*
+   * Формы Тильда отправляет как `application/x-www-form-urlencoded`,
+   * а Fastify сам разбирает только JSON. Предел взят с запасом на длинное
+   * поле COOKIES, которое Тильда прикладывает к каждой отправке, но так,
+   * чтобы этот открытый маршрут нельзя было забить телом на мегабайт.
+   */
+  await app.register(fastifyFormbody, { bodyLimit: 64 * 1024 });
 
   registerPublicCors(app.getHttpAdapter().getInstance());
 
