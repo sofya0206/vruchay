@@ -24,6 +24,9 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
+      # Клиент Prisma не лежит в репозитории — без него сборка сервера
+      # не знает типов базы и падает.
+      - run: pnpm --filter @gramota/server exec prisma generate
       # Сборка раньше тестов: тесты web импортируют @gramota/shared из dist.
       - run: pnpm -r build
       - run: pnpm -r test
