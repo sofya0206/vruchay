@@ -32,6 +32,7 @@ export interface ParsedSheet {
 const MAX_ROWS = 5000;
 const MAX_COLUMNS = 30;
 const HEADER_SEARCH_DEPTH = 15;
+const MAX_SHEETS = 20;
 
 export function isCsv(filename: string): boolean {
   return /\.(csv|txt|tsv)$/i.test(filename);
@@ -58,26 +59,75 @@ export function parseCsv(buffer: Buffer): string[][] {
   return result.data.map((row) => row.map((cell) => String(cell ?? '').trim()));
 }
 
-export async function parseWorkbook(buffer: Buffer): Promise<{ name: string; grid: string[][] }> {
+/**
+ * Из книги берём один лист — тот, на котором действительно список.
+ * Первым листом часто идёт обложка, инструкция или итоговая справка;
+ * если брать его вслепую, импорт падает с «не удалось определить шапку»,
+ * хотя нужная таблица лежит на соседнем листе.
+ */
+export async function parseWorkbook(
+  buffer: Buffer,
+): Promise<{ name: string; grid: string[][]; notes: string[] }> {
   const workbook = new ExcelJS.Workbook();
   // ExcelJS типизирован под собственный Buffer из своих зависимостей;
   // на рантайме это обычный Node.js Buffer.
   await workbook.xlsx.load(buffer as unknown as ArrayBuffer);
 
-  const sheet = workbook.worksheets.find((ws) => ws.state !== 'hidden') ?? workbook.worksheets[0];
-  if (!sheet) throw new Error('В файле нет ни одного листа');
+  const visible = workbook.worksheets.filter((ws) => ws.state !== 'hidden');
+  const sheets = (visible.length ? visible : workbook.worksheets).slice(0, MAX_SHEETS);
+  if (!sheets.length) throw new Error('В файле нет ни одного листа');
 
+  const read = sheets.map((sheet) => readSheet(sheet));
+  const withTable = read.filter((s) => looksLikeTable(s.grid));
+  const chosen = withTable[0] ?? read[0];
+
+  const notes: string[] = [];
+  if (chosen !== read[0]) {
+    notes.push(`Список найден на листе «${chosen.name}», предыдущие листы книги пропущены`);
+  }
+  const others = withTable.filter((s) => s !== chosen).map((s) => `«${s.name}»`);
+  if (others.length) {
+    notes.push(
+      `В книге есть ещё листы со списками: ${others.join(', ')}. ` +
+        `Загружен только «${chosen.name}» — остальные загрузите отдельно`,
+    );
+  }
+  if (chosen.errorCells > 0) {
+    notes.push(
+      `Ячеек с ошибками формул (#Н/Д, #ДЕЛ/0! и подобные): ${chosen.errorCells} — они прочитаны как пустые`,
+    );
+  }
+  return { name: chosen.name, grid: chosen.grid, notes };
+}
+
+function readSheet(sheet: ExcelJS.Worksheet): {
+  name: string;
+  grid: string[][];
+  errorCells: number;
+} {
   const grid: string[][] = [];
+  let errorCells = 0;
+  const width = Math.min(sheet.columnCount || 0, MAX_COLUMNS);
   sheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
     const values: string[] = [];
-    for (let col = 1; col <= Math.min(sheet.columnCount || 0, MAX_COLUMNS); col++) {
-      values.push(cellText(row.getCell(col)));
+    for (let col = 1; col <= width; col++) {
+      const cell = row.getCell(col);
+      if (isErrorValue(cell.value)) errorCells++;
+      values.push(cellText(cell));
     }
     grid[rowNumber - 1] = values;
   });
 
   fillMergedCells(sheet, grid);
-  return { name: sheet.name, grid: grid.map((r) => r ?? []) };
+  return { name: sheet.name, grid: grid.map((r) => r ?? []), errorCells };
+}
+
+/** Лист похож на список: нашлась строка-шапка и под ней есть хоть что-то. */
+function looksLikeTable(grid: string[][]): boolean {
+  const header = detectHeaderRow(grid);
+  const labels = (grid[header] ?? []).filter((c) => c.trim() !== '' && !looksLikeData(c)).length;
+  if (labels < 2) return false;
+  return grid.slice(header + 1).some((row) => row.some((c) => c.trim() !== ''));
 }
 
 /**
@@ -111,18 +161,41 @@ function decodeAddress(address: string): { row: number; col: number } | null {
 }
 
 function cellText(cell: ExcelJS.Cell): string {
-  const value = cell.value;
+  return valueText(cell.value);
+}
+
+/**
+ * Значение ячейки текстом. Результат формулы разбирается тем же кодом:
+ * внутри может оказаться дата, размеченный текст или ошибка вычисления.
+ */
+function valueText(value: unknown): string {
   if (value === null || value === undefined) return '';
   if (value instanceof Date) return formatDate(value);
   if (typeof value === 'object') {
+    const object = value as Record<string, unknown>;
+    // Ошибка вычисления (#Н/Д, #ДЕЛ/0!): значения нет. Раньше такая ячейка
+    // приводилась к строке и в диплом уезжало «[object Object]».
+    if ('error' in object) return '';
     // Формула: берём сохранённый результат. Если его нет — ячейка пустая,
     // и это отдельно попадает в предупреждения.
-    if ('result' in value) return value.result === undefined ? '' : String(value.result).trim();
-    if ('richText' in value) return value.richText.map((part) => part.text).join('').trim();
-    if ('text' in value) return String(value.text).trim();
+    if ('result' in object) return valueText(object.result);
+    if ('richText' in object) {
+      return (object.richText as { text: string }[])
+        .map((part) => part.text)
+        .join('')
+        .trim();
+    }
+    if ('text' in object) return valueText(object.text);
     return '';
   }
   return String(value).trim();
+}
+
+function isErrorValue(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false;
+  const object = value as Record<string, unknown>;
+  if ('error' in object) return true;
+  return 'result' in object && isErrorValue(object.result);
 }
 
 function formatDate(date: Date): string {
@@ -166,14 +239,65 @@ export function detectHeaderRow(grid: string[][]): number {
   return best.score === -Infinity ? 0 : best.index;
 }
 
+/** Перенос строки внутри заголовка — обычное дело; в имени колонки он лишний. */
+function normalizeHeader(value: string): string {
+  return value.replace(/\s+/g, ' ').trim();
+}
+
+function lastNonEmptyRow(grid: string[][], from: number): number {
+  let last = from - 1;
+  for (let i = from; i < grid.length; i++) {
+    if ((grid[i] ?? []).some((cell) => cell.trim() !== '')) last = i;
+  }
+  return last;
+}
+
+/**
+ * Двухэтажная шапка: «Контакты» объединено над «почта» и «телефон».
+ * Вторую строку берём в заголовок, только если она дополняет первую —
+ * иначе в шапку уедет первый участник. Признаки: слева стоит та же
+ * объединённая подпись (или пусто), ниже нет ничего похожего на данные,
+ * а сверху есть повторы от объединения или пропуски.
+ */
+function readHeader(grid: string[][], index: number): { header: string[]; rowsUsed: number } {
+  const first = (grid[index] ?? []).map((cell) => cell.trim());
+  const second = (grid[index + 1] ?? []).map((cell) => cell.trim());
+  const filled = second.filter((cell) => cell !== '');
+
+  const leftColumnFree = (second[0] ?? '') === '' || (second[0] ?? '') === (first[0] ?? '');
+  const topHasGapsOrMerges = first.some(
+    (cell, i) => (cell === '' && second[i]) || (cell !== '' && cell === first[i - 1]),
+  );
+  const complements =
+    filled.length >= 2 &&
+    filled.every((cell) => !looksLikeData(cell)) &&
+    leftColumnFree &&
+    topHasGapsOrMerges;
+
+  if (!complements) return { header: first, rowsUsed: 1 };
+
+  const width = Math.max(first.length, second.length);
+  const header = Array.from({ length: width }, (_, i) => {
+    const top = first[i] ?? '';
+    const bottom = second[i] ?? '';
+    if (!bottom || top === bottom) return top;
+    return top ? `${top} ${bottom}` : bottom;
+  });
+  return { header, rowsUsed: 2 };
+}
+
 export function buildSheet(name: string, grid: string[][]): ParsedSheet {
   const warnings: string[] = [];
   const headerRowIndex = detectHeaderRow(grid);
-  const headerRow = grid[headerRowIndex] ?? [];
+  const { header: headerRow, rowsUsed } = readHeader(grid, headerRowIndex);
+  const firstDataRow = headerRowIndex + rowsUsed;
+  // Хвост пустых строк тянется до последней когда-либо тронутой ячейки —
+  // в файле из Excel это сотни строк, и считать их «пропущенными» незачем.
+  const lastDataRow = lastNonEmptyRow(grid, firstDataRow);
 
   // Пустые колонки справа и посередине отбрасываем вместе с их данными.
   const keptColumns = headerRow
-    .map((value, index) => ({ value: value.trim(), index }))
+    .map((value, index) => ({ value: normalizeHeader(value), index }))
     .filter((c) => c.value !== '')
     .slice(0, MAX_COLUMNS);
 
@@ -188,7 +312,7 @@ export function buildSheet(name: string, grid: string[][]): ParsedSheet {
 
   let skippedEmptyRows = 0;
   const rows: string[][] = [];
-  for (let i = headerRowIndex + 1; i < grid.length && rows.length < MAX_ROWS; i++) {
+  for (let i = firstDataRow; i <= lastDataRow && rows.length < MAX_ROWS; i++) {
     const source = grid[i] ?? [];
     const values = keptColumns.map((c) => (source[c.index] ?? '').trim());
     if (values.every((v) => v === '')) {
@@ -203,10 +327,13 @@ export function buildSheet(name: string, grid: string[][]): ParsedSheet {
       `Шапка найдена в строке ${headerRowIndex + 1}; строки выше пропущены как заголовок файла`,
     );
   }
+  if (rowsUsed === 2) {
+    warnings.push('Шапка занимает две строки — заголовки склеены через пробел');
+  }
   if (skippedEmptyRows > 0) {
     warnings.push(`Пропущено пустых строк: ${skippedEmptyRows}`);
   }
-  if (grid.length - headerRowIndex - 1 > MAX_ROWS) {
+  if (lastDataRow - firstDataRow + 1 > MAX_ROWS) {
     warnings.push(`Взяты первые ${MAX_ROWS} строк — остальные не поместились`);
   }
   const emptyCells = rows.flat().filter((v) => v === '').length;
@@ -221,6 +348,9 @@ export function buildSheet(name: string, grid: string[][]): ParsedSheet {
 
 export async function parseSpreadsheet(buffer: Buffer, filename: string): Promise<ParsedSheet> {
   if (isCsv(filename)) return buildSheet('', parseCsv(buffer));
-  const { name, grid } = await parseWorkbook(buffer);
-  return buildSheet(name, grid);
+  const { name, grid, notes } = await parseWorkbook(buffer);
+  const sheet = buildSheet(name, grid);
+  // Замечания про саму книгу идут первыми: они объясняют, откуда взяты строки.
+  sheet.warnings.unshift(...notes);
+  return sheet;
 }
