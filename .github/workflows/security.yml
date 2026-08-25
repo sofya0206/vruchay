@@ -23,6 +23,11 @@ jobs:
   secrets:
     name: Поиск утёкших секретов
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # На pull_request действие спрашивает у GitHub список коммитов запроса.
+      # Без этого права ответ — 403, и работа падает ещё до всякого поиска.
+      pull-requests: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -34,6 +39,10 @@ jobs:
         uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Находки и так видны в отчёте работы. Писать их комментарием
+          # в запрос — это право на запись в запросы, которое больше
+          # ни для чего не нужно.
+          GITLEAKS_ENABLE_COMMENTS: false
 
   dependencies:
     name: Уязвимости в зависимостях
