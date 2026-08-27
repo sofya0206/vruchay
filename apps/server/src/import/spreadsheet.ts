@@ -2,6 +2,7 @@ import ExcelJS from 'exceljs';
 import Papa from 'papaparse';
 import iconv from 'iconv-lite';
 import { suggestColumnName } from './column-names';
+import { cleanCell, sanitizeRows, type ImportSuggestion } from './sanitize';
 
 /**
  * Разбор файлов со списками участников.
@@ -25,11 +26,18 @@ export interface ParsedSheet {
   rows: string[][];
   /** Сколько строк отброшено как полностью пустые. */
   skippedEmptyRows: number;
+  /** Что предлагается исправить; применяет пользователь, а не импорт. */
+  suggestions: ImportSuggestion[];
   /** Предупреждения для пользователя. */
   warnings: string[];
 }
 
-const MAX_ROWS = 5000;
+/**
+ * Потолок строк за один импорт. Разбор десяти тысяч строк из книги Excel
+ * занимает около секунды, поэтому упирается не парсер, а то, что дальше:
+ * подтверждение импорта и выпуск документов.
+ */
+export const MAX_ROWS = 10000;
 const MAX_COLUMNS = 30;
 const HEADER_SEARCH_DEPTH = 15;
 const MAX_SHEETS = 20;
@@ -241,7 +249,7 @@ export function detectHeaderRow(grid: string[][]): number {
 
 /** Перенос строки внутри заголовка — обычное дело; в имени колонки он лишний. */
 function normalizeHeader(value: string): string {
-  return value.replace(/\s+/g, ' ').trim();
+  return cleanCell(value);
 }
 
 function lastNonEmptyRow(grid: string[][], from: number): number {
@@ -311,16 +319,24 @@ export function buildSheet(name: string, grid: string[][]): ParsedSheet {
   });
 
   let skippedEmptyRows = 0;
-  const rows: string[][] = [];
-  for (let i = firstDataRow; i <= lastDataRow && rows.length < MAX_ROWS; i++) {
+  const raw: string[][] = [];
+  for (let i = firstDataRow; i <= lastDataRow && raw.length < MAX_ROWS; i++) {
     const source = grid[i] ?? [];
     const values = keptColumns.map((c) => (source[c.index] ?? '').trim());
     if (values.every((v) => v === '')) {
       skippedEmptyRows++;
       continue;
     }
-    rows.push(values);
+    raw.push(values);
   }
+
+  // Чистка идёт после вырезания колонок: предложения нумеруются так же,
+  // как колонки в диалоге импорта, иначе пользователь не поймёт, о какой речь.
+  const sanitized = sanitizeRows(
+    raw,
+    columns.map((c) => c.source),
+  );
+  const rows = sanitized.rows;
 
   if (headerRowIndex > 0) {
     warnings.push(
@@ -336,6 +352,7 @@ export function buildSheet(name: string, grid: string[][]): ParsedSheet {
   if (lastDataRow - firstDataRow + 1 > MAX_ROWS) {
     warnings.push(`Взяты первые ${MAX_ROWS} строк — остальные не поместились`);
   }
+  warnings.push(...sanitized.warnings);
   const emptyCells = rows.flat().filter((v) => v === '').length;
   if (rows.length && emptyCells / (rows.length * columns.length) > 0.3) {
     warnings.push(
@@ -343,7 +360,15 @@ export function buildSheet(name: string, grid: string[][]): ParsedSheet {
     );
   }
 
-  return { sheetName: name, headerRowIndex, columns, rows, skippedEmptyRows, warnings };
+  return {
+    sheetName: name,
+    headerRowIndex,
+    columns,
+    rows,
+    skippedEmptyRows,
+    suggestions: sanitized.suggestions,
+    warnings,
+  };
 }
 
 export async function parseSpreadsheet(buffer: Buffer, filename: string): Promise<ParsedSheet> {

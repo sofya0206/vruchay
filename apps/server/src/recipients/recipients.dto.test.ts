@@ -1,0 +1,67 @@
+import { describe, expect, it } from 'vitest';
+import { importSchema, MAX_IMPORT_BODY_BYTES } from './recipients.dto';
+import { MAX_ROWS } from '../import/spreadsheet';
+
+/**
+ * Пределы импорта проверяются вместе, а не поодиночке.
+ *
+ * Разбор файла, схема подтверждения и предел тела запроса — три разных места,
+ * и разъехаться им ничего не мешает. Один раз уже разъехались: разбор отдавал
+ * десять тысяч строк, схема принимала пять, и импорт падал ровно на том файле,
+ * ради которого потолок и поднимали.
+ */
+function rows(count: number, columns = 6): string[][] {
+  return Array.from({ length: count }, (_, i) =>
+    [
+      `Иванов Иван Петрович ${i + 1}`,
+      `ivanov${i + 1}@mail.ru`,
+      String((i % 3) + 1),
+      `Клуб «Сокол» ${i % 50}`,
+      `Тренер Петров ${i % 20}`,
+      '24.08.2026',
+    ].slice(0, columns),
+  );
+}
+
+const columns = ['name', 'email', 'place', 'team', 'coach', 'date'];
+
+describe('importSchema', () => {
+  it('принимает столько строк, сколько отдаёт разбор файла', () => {
+    const parsed = importSchema.safeParse({ columns, rows: rows(MAX_ROWS), mode: 'append' });
+    expect(parsed.success).toBe(true);
+  });
+
+  it('строку сверх потолка не принимает', () => {
+    const parsed = importSchema.safeParse({ columns, rows: rows(MAX_ROWS + 1), mode: 'append' });
+    expect(parsed.success).toBe(false);
+  });
+
+  it('по умолчанию дописывает, а не заменяет таблицу', () => {
+    const parsed = importSchema.parse({ columns: ['name'], rows: [['Иванов']] });
+    expect(parsed.mode).toBe('append');
+  });
+
+  it('имя колонки только латиницей — оно же имя переменной в макете', () => {
+    expect(importSchema.safeParse({ columns: ['ФИО'], rows: [['Иванов']] }).success).toBe(false);
+  });
+});
+
+describe('MAX_IMPORT_BODY_BYTES', () => {
+  it('вмещает подтверждение импорта на полный файл', () => {
+    // Русские буквы в UTF-8 занимают по два байта — на них предел и проверяем.
+    const body = JSON.stringify({ columns, rows: rows(MAX_ROWS), mode: 'append' });
+    expect(Buffer.byteLength(body)).toBeLessThan(MAX_IMPORT_BODY_BYTES);
+  });
+
+  it('вмещает и самый широкий список, какой пропускает схема', () => {
+    const wide = Array.from({ length: 30 }, (_, i) => `column_${i + 1}`);
+    const body = JSON.stringify({
+      columns: wide,
+      rows: Array.from({ length: MAX_ROWS }, (_, i) =>
+        wide.map((_, c) => `Значение ${c + 1} строки ${i + 1}`),
+      ),
+      mode: 'append',
+    });
+    expect(Buffer.byteLength(body)).toBeLessThan(MAX_IMPORT_BODY_BYTES);
+  });
+});

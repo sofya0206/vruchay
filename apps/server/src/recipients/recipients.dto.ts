@@ -40,10 +40,10 @@ export const setCheckedSchema = z.object({
 });
 export type SetCheckedDto = z.infer<typeof setCheckedSchema>;
 
-/** Импорт: до 5000 строк за раз — дальше упирается уже не парсер, а генерация. */
+/** Импорт: до 10 000 строк за раз — столько же берёт разбор файла (MAX_ROWS). */
 export const importSchema = z.object({
   columns: z.array(columnName).min(1).max(30),
-  rows: z.array(z.array(z.string().max(1000)).max(30)).max(5000),
+  rows: z.array(z.array(z.string().max(1000)).max(30)).max(10000),
   /** Дописать к существующим строкам или заменить таблицу целиком. */
   mode: z.enum(['append', 'replace']).default('append'),
 });
@@ -51,3 +51,13 @@ export type ImportDto = z.infer<typeof importSchema>;
 
 /** Списки участников — это десятки килобайт; всё крупнее почти наверняка ошибка. */
 export const MAX_TABLE_BYTES = 10 * 1024 * 1024;
+
+/**
+ * Предел тела запроса, из которого исходит Fastify (см. main.ts).
+ *
+ * Считается по importSchema: десять тысяч строк на шести колонках с русскими
+ * именами весят 1,4 МБ, на тридцати — около семи. Шестнадцать мегабайт дают
+ * запас на пределы схемы и при этом ограничивают память на один запрос;
+ * стандартного мегабайта не хватало, и импорт отвечал 413.
+ */
+export const MAX_IMPORT_BODY_BYTES = 16 * 1024 * 1024;

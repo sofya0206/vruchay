@@ -30,7 +30,7 @@ export class RecipientsService {
       this.prisma.recipientRow.findMany({
         where: { documentId },
         orderBy: { position: 'asc' },
-        take: 5000,
+        take: 10000,
       }),
       this.prisma.recipientRow.count({ where: { documentId, checked: true } }),
     ]);

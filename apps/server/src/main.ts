@@ -7,6 +7,7 @@ import fastifySecureSession from '@fastify/secure-session';
 import fastifyMultipart from '@fastify/multipart';
 import helmet from '@fastify/helmet';
 import { MAX_IMAGE_BYTES } from './common/image-type';
+import { MAX_IMPORT_BODY_BYTES } from './recipients/recipients.dto';
 import { AppModule } from './app.module';
 import { validateEnv } from './config/env';
 import { registerPublicCors } from './tilda/public-cors';
@@ -21,6 +22,19 @@ async function bootstrap() {
     // По умолчанию Fastify отвечает 414 на параметр пути длиннее 100 символов,
     // а подписанный токен страницы рендера длиннее.
     maxParamLength: 512,
+
+    /**
+     * Тело запроса больше одного мегабайта — по умолчанию Fastify отвечает
+     * 413. Столько весит подтверждение импорта: список на десять тысяч
+     * участников уезжает на сервер целиком, одним JSON, и на шести колонках
+     * это уже 1,4 МБ. Файл при этом принимается до десяти мегабайт, то есть
+     * разобрать его получалось, а сохранить — нет.
+     *
+     * Предел общий на все маршруты, поэтому он не «сколько не жалко»,
+     * а посчитанный: строк не больше MAX_ROWS, колонок не больше тридцати
+     * (importSchema), значений длиннее тысячи символов не бывает.
+     */
+    bodyLimit: MAX_IMPORT_BODY_BYTES,
 
     /**
      * Косая черта в конце адреса ничего не меняет.

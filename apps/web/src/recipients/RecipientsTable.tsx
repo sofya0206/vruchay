@@ -5,13 +5,13 @@ import {
   useRecipientMutations,
   useRecipients,
   useSend,
-  type ParsedSheet,
   type SendResult,
 } from '../api/recipients';
 import { PreviewDialog } from './PreviewDialog';
 import { Button } from '../ui/Button';
 import { Input, StatusChip } from '../ui/Field';
-import { ImportDialog } from './ImportDialog';
+import { ImportDialog, type ParsedSheetWithSuggestions } from './ImportDialog';
+import { detectPastedTable, MAX_PASTE_BYTES } from './clipboard';
 import { GenerateDialog, type GenerateMode } from './GenerateDialog';
 import { InviteNudge } from '../referral/InviteNudge';
 
@@ -29,7 +29,8 @@ export function RecipientsTable({
   const [jobId, setJobId] = useState<string | null>(null);
   const { job, start } = useGeneration(documentId, jobId);
   const send = useSend(documentId);
-  const [parsed, setParsed] = useState<ParsedSheet | null>(null);
+  const [parsed, setParsed] = useState<ParsedSheetWithSuggestions | null>(null);
+  const [parsedFrom, setParsedFrom] = useState<'file' | 'paste'>('file');
   const [newColumn, setNewColumn] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState(false);
@@ -61,6 +62,49 @@ export function RecipientsTable({
     pendingSaves.current = Promise.all([pendingSaves.current, promise.catch(() => {})]);
   };
 
+  /*
+   * Вставка таблицы из Excel.
+   *
+   * Слушаем документ, а не таблицу: фокус во время Ctrl+V может быть
+   * в ячейке, в поле новой колонки или нигде — событие вставки в этих
+   * случаях приходит в разные места, а вести себя должно одинаково.
+   *
+   * Текст уходит в тот же разбор, что и файл: заголовки, кодировка,
+   * пустые строки и чистка значений тогда работают одними правилами,
+   * а не двумя похожими.
+   */
+  useEffect(() => {
+    async function importText(text: string) {
+      setError(null);
+      // Имя файла условное: сервер по расширению выбирает разбор CSV,
+      // а разделитель — табуляцию или точку с запятой — определяет сам.
+      const file = new File([text], 'clipboard.tsv', { type: 'text/tab-separated-values' });
+      if (file.size > MAX_PASTE_BYTES) {
+        setError('Слишком большая вставка — сохраните список файлом и загрузите его');
+        return;
+      }
+      try {
+        const sheet = await m.parseFile.mutateAsync(file);
+        setParsedFrom('paste');
+        setParsed(sheet);
+      } catch (err) {
+        setError((err as Error).message);
+      }
+    }
+
+    function onPaste(event: ClipboardEvent) {
+      // Пока открыт диалог, вставка принадлежит ему.
+      if (parsed || preview || asking) return;
+      const text = event.clipboardData?.getData('text/plain') ?? '';
+      if (!detectPastedTable(text)) return;
+      event.preventDefault();
+      void importText(text);
+    }
+
+    document.addEventListener('paste', onPaste);
+    return () => document.removeEventListener('paste', onPaste);
+  }, [parsed, preview, asking, m.parseFile]);
+
   useEffect(() => {
     if (!job || job.status !== 'done' || job.done === 0) return;
     if (!wantSend.current || sentForJob.current === job.id) return;
@@ -82,7 +126,9 @@ export function RecipientsTable({
   async function onPickFile(file: File) {
     setError(null);
     try {
-      setParsed(await m.parseFile.mutateAsync(file));
+      const sheet = await m.parseFile.mutateAsync(file);
+      setParsedFrom('file');
+      setParsed(sheet);
     } catch (err) {
       setError((err as Error).message);
     }
@@ -294,7 +340,8 @@ export function RecipientsTable({
               <p className="font-medium">Список получателей пуст</p>
               <p className="mt-1 max-w-md text-sm text-[var(--text-muted)]">
                 Загрузите файл Excel или CSV — подойдёт обычный протокол соревнования,
-                шапку и лишние строки сервис распознает сам.
+                шапку и лишние строки сервис распознает сам. Или скопируйте таблицу
+                в Excel и вставьте сюда через Ctrl+V.
               </p>
             </div>
           </div>
@@ -393,6 +440,7 @@ export function RecipientsTable({
           sheet={parsed}
           existingColumns={columns.map((c) => c.name)}
           importing={m.importRows.isPending}
+          source={parsedFrom}
           onCancel={() => setParsed(null)}
           onConfirm={(cols, importRows, mode) => {
             m.importRows.mutate(
