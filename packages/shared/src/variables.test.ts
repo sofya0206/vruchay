@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mergeVariables, systemVariables } from './variables';
+import { SYSTEM_VARIABLE_NAMES, mergeVariables, systemVariables } from './variables';
 
 /*
  * Ошибка здесь печатается на бумаге и рассылается участникам. Пустое место
@@ -61,5 +61,87 @@ describe('соединение с колонками получателя', () =
     // в виду именно её. Подменять его данные нашими нельзя.
     const merged = mergeVariables({ date: '17 июня 2026' }, { issuedAt: AUG_4 });
     expect(merged.date).toBe('17 июня 2026');
+  });
+});
+
+describe('переменные, которые сервис считает сам', () => {
+  const merged = (data: Record<string, string>) => mergeVariables(data, { issuedAt: AUG_4 });
+
+  it('ФИО в дательном и родительном падежах', () => {
+    const v = merged({ name: 'Иванов Пётр Ильич' });
+    expect(v.name_dat).toBe('Иванову Петру Ильичу');
+    expect(v.name_gen).toBe('Иванова Петра Ильича');
+  });
+
+  it('короткая форма ФИО с неразрывными пробелами', () => {
+    const v = merged({ name: 'Иванов Пётр Ильич' });
+    expect(v.name_short).toBe('Иванов П. И.');
+    expect(v.name_short).not.toContain(' ');
+  });
+
+  it('место словом берётся из колонки «place»', () => {
+    // Так эту колонку называет подбор имён при импорте: «Место» → place.
+    expect(merged({ place: '1' }).place_word).toBe('первое');
+    expect(merged({ place: '3 место' }).place_word).toBe('третье');
+  });
+
+  it('без колонки «place» переменная не появляется', () => {
+    // Пустое значение подставилось бы в макет как пустота посреди фразы
+    // «за  место»; отсутствие переменной отчёт проверки поймает раньше.
+    expect(merged({ name: 'Иванов Пётр' }).place_word).toBeUndefined();
+  });
+
+  it('своя колонка сильнее любой из вычисленных', () => {
+    // Организатор вписал руками именно потому, что наша догадка
+    // его не устроила.
+    const v = merged({
+      name: 'Иванов Пётр',
+      name_dat: 'Петровичу Иванову',
+      name_gen: 'товарища Иванова',
+      name_short: 'И. Иванов',
+      place: '1',
+      place_word: 'Гран-при',
+    });
+    expect(v.name_dat).toBe('Петровичу Иванову');
+    expect(v.name_gen).toBe('товарища Иванова');
+    expect(v.name_short).toBe('И. Иванов');
+    expect(v.place_word).toBe('Гран-при');
+  });
+
+  it('без колонки «name» вместо ФИО пустота, а не «undefined» на грамоте', () => {
+    const v = merged({});
+    expect(v.name_dat).toBe('');
+    expect(v.name_gen).toBe('');
+    expect(v.name_short).toBe('');
+  });
+
+  it('все вычисляемые переменные объявлены в списке для редактора', () => {
+    // Иначе подсказка в редакторе скажет «переменная неизвестна»
+    // о том, что сервис на самом деле подставляет.
+    for (const name of ['name_dat', 'name_gen', 'name_short', 'place_word']) {
+      expect(SYSTEM_VARIABLE_NAMES).toContain(name);
+    }
+  });
+});
+
+describe('ФИО, разложенное импортом по колонкам', () => {
+  /*
+   * `column-names.ts` раскладывает шапку на «Фамилия», «Имя», «Отчество»,
+   * и тогда колонки «name» нет вовсе. Пол по отчеству при этом определялся
+   * бы, а имя на грамоте осталось бы пустым — расхождение, которое читается
+   * как поломка сервиса.
+   */
+  const split = { surname: 'Петрова', firstname: 'Мария', patronymic: 'Ивановна' };
+
+  it('падежи и короткая форма считаются от собранного ФИО', () => {
+    const v = mergeVariables(split, { issuedAt: AUG_4 });
+    expect(v.name_dat).toBe('Петровой Марии Ивановне');
+    expect(v.name_gen).toBe('Петровой Марии Ивановны');
+    expect(v.name_short).toBe('Петрова\u00A0М.\u00A0И.');
+  });
+
+  it('колонка «name» по-прежнему сильнее разложенных', () => {
+    const v = mergeVariables({ ...split, name: 'Иванов Пётр Ильич' }, { issuedAt: AUG_4 });
+    expect(v.name_dat).toBe('Иванову Петру Ильичу');
   });
 });

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { substituteVariables, type SheetLayout } from '@gramota/shared';
+import { substituteForRow, type SheetLayout } from '@gramota/shared';
 import { SheetRenderer } from '../render/SheetRenderer';
 
 interface RenderData {
@@ -59,7 +59,7 @@ export function usedFonts(state: Pick<RenderData, 'sheets' | 'data'>): UsedFont[
       const weight = bold ? 700 : 400;
       const style = italic ? 'italic' : 'normal';
       const key = `${family}|${weight}|${style}`;
-      const text = substituteVariables(element.props.text, state.data ?? {});
+      const text = substituteForRow(element.props.text, state.data ?? {});
       const seen = byKey.get(key);
       if (seen) seen.text += text;
       else byKey.set(key, { family, weight, style, text });

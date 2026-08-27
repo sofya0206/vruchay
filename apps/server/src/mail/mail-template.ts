@@ -1,5 +1,5 @@
 import sanitizeHtml from 'sanitize-html';
-import { substituteVariables } from '@gramota/shared';
+import { resolvePairedForms, rowGender, substituteForRow, substituteVariables } from '@gramota/shared';
 
 /**
  * Подготовка письма из шаблона.
@@ -27,7 +27,16 @@ export function renderHtmlTemplate(template: string, data: Record<string, string
   const escaped = Object.fromEntries(
     Object.entries(data).map(([key, value]) => [key, escapeHtml(value)]),
   );
-  return substituteVariables(template, escaped);
+  /*
+   * Парные формы раскрываются здесь по тем же правилам, что и на грамоте:
+   * иначе в письме напечаталось бы «награждён(а)» буквально, а в приложенном
+   * к нему документе — «награждена», и получатель увидел бы обе версии рядом.
+   *
+   * Пол считаем по неэкранированным данным: экранирование меняет апострофы
+   * и кавычки, а фамилии вроде «О'Коннор» встречаются.
+   */
+  const text = resolvePairedForms(template, rowGender(data));
+  return substituteVariables(text, escaped);
 }
 
 /**
@@ -76,7 +85,7 @@ export function sanitizeEmailHtml(html: string): string {
 
 /** Тема письма — обычный текст, экранировать не нужно, но переводы строк убираем. */
 export function renderSubject(template: string, data: Record<string, string>): string {
-  return substituteVariables(template, data).replace(/[\r\n]+/g, ' ').trim();
+  return substituteForRow(template, data).replace(/[\r\n]+/g, ' ').trim();
 }
 
 /**
