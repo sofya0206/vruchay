@@ -26,11 +26,26 @@ export interface ParsedSheet {
   rows: string[][];
   /** Сколько строк отброшено как полностью пустые. */
   skippedEmptyRows: number;
+  /** Как разобрана первая строка: как названия колонок или как данные. */
+  headerMode: 'headers' | 'none';
+  /**
+   * Первая строка похожа на данные, а не на заголовки. Диалог импорта
+   * показывает предупреждение: вставляют чаще всего диапазон без шапки.
+   */
+  firstRowLooksLikeData: boolean;
   /** Что предлагается исправить; применяет пользователь, а не импорт. */
   suggestions: ImportSuggestion[];
   /** Предупреждения для пользователя. */
   warnings: string[];
 }
+
+/**
+ * Как понимать первую строку.
+ *
+ * `auto` — решает разбор; `headers` и `none` выставляет пользователь
+ * переключателем в диалоге, когда разбор ошибся.
+ */
+export type HeaderMode = 'auto' | 'headers' | 'none';
 
 /**
  * Потолок строк за один импорт. Разбор десяти тысяч строк из книги Excel
@@ -294,9 +309,111 @@ function readHeader(grid: string[][], index: number): { header: string[]; rowsUs
   return { header, rowsUsed: 2 };
 }
 
-export function buildSheet(name: string, grid: string[][]): ParsedSheet {
+/**
+ * Строка похожа на данные, а не на шапку.
+ *
+ * Вставляют из Excel чаще всего выделенный диапазон без строки заголовков.
+ * Без этой проверки первый участник молча уезжает в названия колонок
+ * и теряется — в списке на награждение недосчитаться человека дороже всего.
+ */
+function looksLikeDataRow(row: string[]): boolean {
+  let labels = 0;
+  let data = 0;
+  for (const cell of row) {
+    if (cell.trim() === '') continue;
+    if (looksLikeData(cell)) data++;
+    else labels++;
+  }
+  if (labels + data === 0) return false;
+  return labels < 2 || data >= labels;
+}
+
+/** Собирает строки данных, отбрасывая пустые и лишние сверх потолка. */
+function collectRows(
+  grid: string[][],
+  firstDataRow: number,
+  lastDataRow: number,
+  pick: (row: string[]) => string[],
+): { raw: string[][]; skippedEmptyRows: number } {
+  let skippedEmptyRows = 0;
+  const raw: string[][] = [];
+  for (let i = firstDataRow; i <= lastDataRow && raw.length < MAX_ROWS; i++) {
+    const values = pick(grid[i] ?? []);
+    if (values.every((v) => v === '')) {
+      skippedEmptyRows++;
+      continue;
+    }
+    raw.push(values);
+  }
+  return { raw, skippedEmptyRows };
+}
+
+/** Номер последней колонки, где вообще что-то есть. */
+function lastFilledColumn(grid: string[][]): number {
+  let last = -1;
+  for (const row of grid) {
+    for (let i = row.length - 1; i > last; i--) {
+      if ((row[i] ?? '').trim() !== '') {
+        last = i;
+        break;
+      }
+    }
+  }
+  return last;
+}
+
+/**
+ * Разбор без шапки: колонки называются по порядку, все строки — данные.
+ * Так разбирается вставленный диапазон, в котором заголовки не выделяли.
+ */
+function buildWithoutHeader(name: string, grid: string[][]): ParsedSheet {
+  const width = Math.min(lastFilledColumn(grid) + 1, MAX_COLUMNS);
+  if (width < 1) throw new Error('Не удалось определить шапку таблицы');
+
+  const columns = Array.from({ length: width }, (_, i) => ({
+    source: `Колонка ${i + 1}`,
+    suggested: `column_${i + 1}`,
+  }));
+
+  const lastDataRow = lastNonEmptyRow(grid, 0);
+  const { raw, skippedEmptyRows } = collectRows(grid, 0, lastDataRow, (row) =>
+    Array.from({ length: width }, (_, i) => (row[i] ?? '').trim()),
+  );
+
+  const sanitized = sanitizeRows(
+    raw,
+    columns.map((c) => c.source),
+  );
+
+  const warnings = [
+    'Первая строка взята как данные, а колонки названы по порядку. ' +
+      'Если в первой строке всё-таки заголовки, переключите это в диалоге',
+  ];
+  if (skippedEmptyRows > 0) warnings.push(`Пропущено пустых строк: ${skippedEmptyRows}`);
+  if (lastDataRow + 1 > MAX_ROWS) {
+    warnings.push(`Взяты первые ${MAX_ROWS} строк — остальные не поместились`);
+  }
+  warnings.push(...sanitized.warnings);
+
+  return {
+    sheetName: name,
+    headerRowIndex: 0,
+    columns,
+    rows: sanitized.rows,
+    skippedEmptyRows,
+    headerMode: 'none',
+    firstRowLooksLikeData: true,
+    suggestions: sanitized.suggestions,
+    warnings,
+  };
+}
+
+export function buildSheet(name: string, grid: string[][], mode: HeaderMode = 'auto'): ParsedSheet {
+  if (mode === 'none') return buildWithoutHeader(name, grid);
+
   const warnings: string[] = [];
   const headerRowIndex = detectHeaderRow(grid);
+  const firstRowLooksLikeData = looksLikeDataRow(grid[headerRowIndex] ?? []);
   const { header: headerRow, rowsUsed } = readHeader(grid, headerRowIndex);
   const firstDataRow = headerRowIndex + rowsUsed;
   // Хвост пустых строк тянется до последней когда-либо тронутой ячейки —
@@ -318,16 +435,19 @@ export function buildSheet(name: string, grid: string[][]): ParsedSheet {
     return { source: c.value, suggested };
   });
 
-  let skippedEmptyRows = 0;
-  const raw: string[][] = [];
-  for (let i = firstDataRow; i <= lastDataRow && raw.length < MAX_ROWS; i++) {
-    const source = grid[i] ?? [];
-    const values = keptColumns.map((c) => (source[c.index] ?? '').trim());
-    if (values.every((v) => v === '')) {
-      skippedEmptyRows++;
-      continue;
-    }
-    raw.push(values);
+  const { raw, skippedEmptyRows } = collectRows(grid, firstDataRow, lastDataRow, (source) =>
+    keptColumns.map((c) => (source[c.index] ?? '').trim()),
+  );
+
+  /*
+   * Строк данных не осталось, а шапка похожа на данные — значит, шапки и не
+   * было: вставили один диапазон без заголовков. Разбирать это как шапку
+   * бессмысленно, там нечего импортировать. Переключаем сами, но говорим
+   * об этом предупреждением, и переключатель в диалоге остаётся за
+   * пользователем.
+   */
+  if (mode === 'auto' && !raw.length && firstRowLooksLikeData) {
+    return buildWithoutHeader(name, grid);
   }
 
   // Чистка идёт после вырезания колонок: предложения нумеруются так же,
@@ -345,6 +465,12 @@ export function buildSheet(name: string, grid: string[][]): ParsedSheet {
   }
   if (rowsUsed === 2) {
     warnings.push('Шапка занимает две строки — заголовки склеены через пробел');
+  }
+  if (firstRowLooksLikeData) {
+    warnings.push(
+      'Первая строка похожа на данные, а не на заголовки. Если заголовков нет, ' +
+        'переключите «в первой строке» на «данные» — иначе первый участник уедет в названия колонок',
+    );
   }
   if (skippedEmptyRows > 0) {
     warnings.push(`Пропущено пустых строк: ${skippedEmptyRows}`);
@@ -366,15 +492,21 @@ export function buildSheet(name: string, grid: string[][]): ParsedSheet {
     columns,
     rows,
     skippedEmptyRows,
+    headerMode: 'headers',
+    firstRowLooksLikeData,
     suggestions: sanitized.suggestions,
     warnings,
   };
 }
 
-export async function parseSpreadsheet(buffer: Buffer, filename: string): Promise<ParsedSheet> {
-  if (isCsv(filename)) return buildSheet('', parseCsv(buffer));
+export async function parseSpreadsheet(
+  buffer: Buffer,
+  filename: string,
+  mode: HeaderMode = 'auto',
+): Promise<ParsedSheet> {
+  if (isCsv(filename)) return buildSheet('', parseCsv(buffer), mode);
   const { name, grid, notes } = await parseWorkbook(buffer);
-  const sheet = buildSheet(name, grid);
+  const sheet = buildSheet(name, grid, mode);
   // Замечания про саму книгу идут первыми: они объясняют, откуда взяты строки.
   sheet.warnings.unshift(...notes);
   return sheet;

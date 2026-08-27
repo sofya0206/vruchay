@@ -5,13 +5,15 @@ import {
   useRecipientMutations,
   useRecipients,
   useSend,
+  type HeaderChoice,
+  type ParsedSheet,
   type SendResult,
 } from '../api/recipients';
 import { PreviewDialog } from './PreviewDialog';
 import { Button } from '../ui/Button';
 import { Input, StatusChip } from '../ui/Field';
-import { ImportDialog, type ParsedSheetWithSuggestions } from './ImportDialog';
-import { detectPastedTable, MAX_PASTE_BYTES } from './clipboard';
+import { ImportDialog } from './ImportDialog';
+import { planPaste } from './clipboard';
 import { GenerateDialog, type GenerateMode } from './GenerateDialog';
 import { InviteNudge } from '../referral/InviteNudge';
 
@@ -29,7 +31,7 @@ export function RecipientsTable({
   const [jobId, setJobId] = useState<string | null>(null);
   const { job, start } = useGeneration(documentId, jobId);
   const send = useSend(documentId);
-  const [parsed, setParsed] = useState<ParsedSheetWithSuggestions | null>(null);
+  const [parsed, setParsed] = useState<ParsedSheet | null>(null);
   const [parsedFrom, setParsedFrom] = useState<'file' | 'paste'>('file');
   const [newColumn, setNewColumn] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +59,13 @@ export function RecipientsTable({
    * Ошибку глотаем — о ней уже сообщит сама запись, а выпуск из-за неё
    * останавливать не за что.
    */
+  /**
+   * Файл, из которого разобран открытый диалог. Нужен, чтобы перечитать
+   * его же, когда человек переключает понимание первой строки: вставку
+   * из буфера второй раз не попросишь.
+   */
+  const parseSource = useRef<File | null>(null);
+
   const pendingSaves = useRef<Promise<unknown>>(Promise.resolve());
   const trackSave = (promise: Promise<unknown>) => {
     pendingSaves.current = Promise.all([pendingSaves.current, promise.catch(() => {})]);
@@ -74,36 +83,24 @@ export function RecipientsTable({
    * а не двумя похожими.
    */
   useEffect(() => {
-    async function importText(text: string) {
-      setError(null);
-      // Имя файла условное: сервер по расширению выбирает разбор CSV,
-      // а разделитель — табуляцию или точку с запятой — определяет сам.
-      const file = new File([text], 'clipboard.tsv', { type: 'text/tab-separated-values' });
-      if (file.size > MAX_PASTE_BYTES) {
-        setError('Слишком большая вставка — сохраните список файлом и загрузите его');
-        return;
-      }
-      try {
-        const sheet = await m.parseFile.mutateAsync(file);
-        setParsedFrom('paste');
-        setParsed(sheet);
-      } catch (err) {
-        setError((err as Error).message);
-      }
-    }
-
     function onPaste(event: ClipboardEvent) {
       // Пока открыт диалог, вставка принадлежит ему.
       if (parsed || preview || asking) return;
-      const text = event.clipboardData?.getData('text/plain') ?? '';
-      if (!detectPastedTable(text)) return;
+
+      const plan = planPaste(event);
+      if (plan.kind === 'ignore') return;
+
       event.preventDefault();
-      void importText(text);
+      if (plan.kind === 'too-big') {
+        setError('Слишком большая вставка — сохраните список файлом и загрузите его');
+        return;
+      }
+      void parseInto(plan.file, 'paste');
     }
 
     document.addEventListener('paste', onPaste);
     return () => document.removeEventListener('paste', onPaste);
-  }, [parsed, preview, asking, m.parseFile]);
+  }, [parsed, preview, asking, parseInto]);
 
   useEffect(() => {
     if (!job || job.status !== 'done' || job.done === 0) return;
@@ -123,11 +120,16 @@ export function RecipientsTable({
   const allChecked = rows.length > 0 && rows.every((r) => r.checked);
   const running = job?.status === 'queued' || job?.status === 'running';
 
-  async function onPickFile(file: File) {
+  /**
+   * Разбор для диалога. Один путь и для файла, и для вставки: правила
+   * разбора у них общие, различается только то, откуда взялись байты.
+   */
+  async function parseInto(file: File, from: 'file' | 'paste', headers: HeaderChoice = 'auto') {
     setError(null);
+    parseSource.current = file;
     try {
-      const sheet = await m.parseFile.mutateAsync(file);
-      setParsedFrom('file');
+      const sheet = await m.parseFile.mutateAsync({ file, headers });
+      setParsedFrom(from);
       setParsed(sheet);
     } catch (err) {
       setError((err as Error).message);
@@ -168,7 +170,7 @@ export function RecipientsTable({
             className="hidden"
             onChange={(e) => {
               const file = e.target.files?.[0];
-              if (file) void onPickFile(file);
+              if (file) void parseInto(file, 'file');
               e.target.value = '';
             }}
           />
@@ -437,10 +439,18 @@ export function RecipientsTable({
 
       {parsed && (
         <ImportDialog
+          // Перечитанный лист — это другой разбор: имена колонок и принятые
+          // предложения от прежнего к нему не относятся, диалог начинается заново.
+          key={parsed.headerMode}
           sheet={parsed}
           existingColumns={columns.map((c) => c.name)}
           importing={m.importRows.isPending}
           source={parsedFrom}
+          reparsing={m.parseFile.isPending}
+          onHeaderMode={(headers) => {
+            const file = parseSource.current;
+            if (file) void parseInto(file, parsedFrom, headers);
+          }}
           onCancel={() => setParsed(null)}
           onConfirm={(cols, importRows, mode) => {
             m.importRows.mutate(

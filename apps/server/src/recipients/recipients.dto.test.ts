@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { importSchema, MAX_IMPORT_BODY_BYTES } from './recipients.dto';
+import { randomUUID } from 'node:crypto';
+import {
+  importSchema,
+  MAX_IMPORT_BODY_BYTES,
+  parseQuerySchema,
+  setCheckedSchema,
+} from './recipients.dto';
 import { MAX_ROWS } from '../import/spreadsheet';
 
 /**
@@ -63,5 +69,37 @@ describe('MAX_IMPORT_BODY_BYTES', () => {
       mode: 'append',
     });
     expect(Buffer.byteLength(body)).toBeLessThan(MAX_IMPORT_BODY_BYTES);
+  });
+});
+
+describe('setCheckedSchema', () => {
+  const ids = (count: number) => Array.from({ length: count }, () => randomUUID());
+
+  it('отмечает пачкой столько же строк, сколько влезает в документ', () => {
+    // Иначе на полном списке «отметить все» упрётся в предел, которого
+    // в самом документе уже нет.
+    expect(setCheckedSchema.safeParse({ checked: true, rowIds: ids(MAX_ROWS) }).success).toBe(true);
+  });
+
+  it('строку сверх потолка не принимает', () => {
+    expect(setCheckedSchema.safeParse({ checked: true, rowIds: ids(MAX_ROWS + 1) }).success).toBe(
+      false,
+    );
+  });
+
+  it('без списка строк действует на весь документ', () => {
+    expect(setCheckedSchema.parse({ checked: false }).rowIds).toBeUndefined();
+  });
+});
+
+describe('parseQuerySchema', () => {
+  it('по умолчанию первую строку разбирает сам', () => {
+    expect(parseQuerySchema.parse({}).headers).toBe('auto');
+  });
+
+  it('принимает только известные значения', () => {
+    expect(parseQuerySchema.parse({ headers: 'none' }).headers).toBe('none');
+    expect(parseQuerySchema.parse({ headers: 'headers' }).headers).toBe('headers');
+    expect(parseQuerySchema.safeParse({ headers: 'первая' }).success).toBe(false);
   });
 });

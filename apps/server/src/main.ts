@@ -14,6 +14,9 @@ import { registerPublicCors } from './tilda/public-cors';
 
 const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60;
 
+/** Единственный маршрут, которому нужно тело больше мегабайта. */
+const IMPORT_ROUTE = '/api/documents/:id/recipients/import';
+
 async function bootstrap() {
   const env = validateEnv(process.env);
   const isProd = env.NODE_ENV === 'production';
@@ -22,19 +25,6 @@ async function bootstrap() {
     // По умолчанию Fastify отвечает 414 на параметр пути длиннее 100 символов,
     // а подписанный токен страницы рендера длиннее.
     maxParamLength: 512,
-
-    /**
-     * Тело запроса больше одного мегабайта — по умолчанию Fastify отвечает
-     * 413. Столько весит подтверждение импорта: список на десять тысяч
-     * участников уезжает на сервер целиком, одним JSON, и на шести колонках
-     * это уже 1,4 МБ. Файл при этом принимается до десяти мегабайт, то есть
-     * разобрать его получалось, а сохранить — нет.
-     *
-     * Предел общий на все маршруты, поэтому он не «сколько не жалко»,
-     * а посчитанный: строк не больше MAX_ROWS, колонок не больше тридцати
-     * (importSchema), значений длиннее тысячи символов не бывает.
-     */
-    bodyLimit: MAX_IMPORT_BODY_BYTES,
 
     /**
      * Косая черта в конце адреса ничего не меняет.
@@ -65,6 +55,25 @@ async function bootstrap() {
      * частные диапазоны здесь и есть «свои».
      */
     trustProxy: env.TRUST_PROXY,
+  });
+
+  /**
+   * Большое тело запроса разрешено ровно одному маршруту.
+   *
+   * Подтверждение импорта уезжает на сервер целиком, одним JSON: десять
+   * тысяч строк на шести колонках — это 1,4 МБ, а мегабайта по умолчанию
+   * Fastify не пропускает и отвечает 413. Поднимать предел всем маршрутам
+   * нельзя: под тем же сервером живут публичные адреса Тильды, виджетов
+   * и верификации, и там предел в мегабайт — не помеха, а защита от того,
+   * чтобы кто угодно занимал память сервиса шестнадцатью мегабайтами
+   * на запрос. Поэтому предел ставится точечно, хуком на регистрации
+   * маршрута: Fastify читает bodyLimit из настроек самого маршрута.
+   */
+  adapter.getInstance().addHook('onRoute', (route) => {
+    const methods = Array.isArray(route.method) ? route.method : [route.method];
+    if (methods.includes('POST') && route.url === IMPORT_ROUTE) {
+      route.bodyLimit = MAX_IMPORT_BODY_BYTES;
+    }
   });
 
   const app = await NestFactory.create<NestFastifyApplication>(AppModule, adapter, {

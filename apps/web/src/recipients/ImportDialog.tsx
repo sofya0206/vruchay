@@ -1,26 +1,8 @@
 import { useMemo, useState } from 'react';
 import { AlertTriangle, Wand2, X } from 'lucide-react';
-import type { ParsedSheet } from '../api/recipients';
+import type { ImportSuggestion, ParsedSheet } from '../api/recipients';
 import { Button } from '../ui/Button';
 import { Input, Label } from '../ui/Field';
-
-/**
- * Предложение по чистке значений: разбор находит капслок и кириллицу
- * в латинском адресе, но ничего не меняет сам — правку подтверждают здесь.
- * Готовые значения колонки приходят вместе с предложением, поэтому правила
- * написания фамилий живут на сервере в одном месте.
- */
-export interface ImportSuggestion {
-  kind: 'uppercase' | 'email-homoglyph';
-  column: number;
-  columnTitle: string;
-  count: number;
-  before: string;
-  after: string;
-  values: string[];
-}
-
-export type ParsedSheetWithSuggestions = ParsedSheet & { suggestions?: ImportSuggestion[] };
 
 /** Строки с принятыми правками. Непринятые предложения строк не касаются. */
 export function applySuggestions(
@@ -42,11 +24,15 @@ export function applySuggestions(
 }
 
 interface Props {
-  sheet: ParsedSheetWithSuggestions;
+  sheet: ParsedSheet;
   existingColumns: string[];
   importing: boolean;
   /** Откуда взяты строки — файл или вставка из буфера. */
   source?: 'file' | 'paste';
+  /** Идёт повторный разбор после переключения первой строки. */
+  reparsing?: boolean;
+  /** Перечитать файл, поняв первую строку иначе. */
+  onHeaderMode?: (mode: 'headers' | 'none') => void;
   onCancel: () => void;
   onConfirm: (columns: string[], rows: string[][], mode: 'append' | 'replace') => void;
 }
@@ -83,6 +69,8 @@ export function ImportDialog({
   existingColumns,
   importing,
   source = 'file',
+  reparsing = false,
+  onHeaderMode,
   onCancel,
   onConfirm,
 }: Props) {
@@ -95,6 +83,36 @@ export function ImportDialog({
   const rows = useMemo(
     () => applySuggestions(sheet.rows, suggestions, accepted),
     [sheet.rows, suggestions, accepted],
+  );
+
+  /*
+   * Переключатель первой строки.
+   *
+   * Из Excel копируют чаще всего выделенные данные, без строки заголовков,
+   * и тогда первый участник уезжает в названия колонок. Разбор такое
+   * замечает и говорит об этом, но последнее слово — за человеком:
+   * он видит предпросмотр и понимает, где чьё, лучше любой эвристики.
+   */
+  const headerChoice = (
+    <div className="flex flex-wrap items-center gap-2 text-sm">
+      <span className="text-[var(--text-muted)]">В первой строке:</span>
+      {(['headers', 'none'] as const).map((value) => (
+        <button
+          key={value}
+          type="button"
+          disabled={reparsing || !onHeaderMode || sheet.headerMode === value}
+          onClick={() => onHeaderMode?.(value)}
+          className={
+            sheet.headerMode === value
+              ? 'rounded-lg bg-[var(--accent-soft)] px-2.5 py-1 font-medium text-[var(--accent)]'
+              : 'rounded-lg px-2.5 py-1 ring-1 ring-[var(--line-strong)] hover:bg-[var(--surface-sunken)] disabled:opacity-50'
+          }
+        >
+          {value === 'headers' ? 'заголовки' : 'данные'}
+        </button>
+      ))}
+      {reparsing && <span className="text-[var(--text-muted)]">перечитываем…</span>}
+    </div>
   );
 
   const duplicates = names.filter((n, i) => n && names.indexOf(n) !== i);
@@ -121,6 +139,8 @@ export function ImportDialog({
         </header>
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+          {headerChoice}
+
           {sheet.warnings.length > 0 && (
             <ul className="space-y-1 rounded-lg bg-[var(--award-soft)] px-3 py-2.5 text-sm text-[var(--award)]">
               {sheet.warnings.map((w) => (

@@ -18,6 +18,16 @@ export const columnName = z
 /** Значения ячеек — только строки: в макет они попадают как текст. */
 export const rowData = z.record(columnName, z.string().max(1000));
 
+/**
+ * Как читать первую строку разбираемого файла — параметр запроса.
+ * Переключатель в диалоге импорта присылает сюда явный выбор человека,
+ * когда разбор угадал неверно.
+ */
+export const parseQuerySchema = z.object({
+  headers: z.enum(['auto', 'headers', 'none']).default('auto'),
+});
+export type ParseQueryDto = z.infer<typeof parseQuerySchema>;
+
 export const addColumnSchema = z.object({ name: columnName });
 export type AddColumnDto = z.infer<typeof addColumnSchema>;
 
@@ -35,8 +45,12 @@ export type UpdateRowDto = z.infer<typeof updateRowSchema>;
 
 export const setCheckedSchema = z.object({
   checked: z.boolean(),
-  /** Пусто — применить ко всем строкам документа. */
-  rowIds: z.array(z.string().uuid()).max(5000).optional(),
+  /**
+   * Пусто — применить ко всем строкам документа. Потолок тот же, что
+   * у импорта: отметить пачкой можно ровно столько строк, сколько влезает
+   * в документ, иначе на большом списке отметка упрётся в старый предел.
+   */
+  rowIds: z.array(z.string().uuid()).max(10000).optional(),
 });
 export type SetCheckedDto = z.infer<typeof setCheckedSchema>;
 

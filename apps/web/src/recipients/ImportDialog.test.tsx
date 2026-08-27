@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { applySuggestions, replacedLetters, type ImportSuggestion } from './ImportDialog';
+import { applySuggestions, replacedLetters } from './ImportDialog';
+import type { ImportSuggestion } from '../api/recipients';
 
 /**
  * Предложения по чистке меняют то, что уедет в базу, поэтому проверяем

@@ -265,6 +265,60 @@ describe('parseSpreadsheet, книга Excel', () => {
   });
 });
 
+describe('первая строка: заголовки или данные', () => {
+  const withoutHeader = [
+    ['Иванов Иван', 'ivanov@mail.ru', '1'],
+    ['Петров Пётр', 'petrov@mail.ru', '2'],
+  ];
+
+  it('по требованию читает первую строку как данные и называет колонки по порядку', () => {
+    const sheet = buildSheet('Лист1', withoutHeader, 'none');
+    expect(sheet.headerMode).toBe('none');
+    expect(sheet.columns.map((c) => c.source)).toEqual(['Колонка 1', 'Колонка 2', 'Колонка 3']);
+    expect(sheet.columns.map((c) => c.suggested)).toEqual(['column_1', 'column_2', 'column_3']);
+    expect(sheet.rows).toEqual(withoutHeader);
+    expect(sheet.warnings.join(' ')).toContain('Первая строка взята как данные');
+  });
+
+  it('предупреждает, когда первая строка похожа на данные', () => {
+    const sheet = buildSheet('Лист1', withoutHeader);
+    // Разбор не решает за пользователя: строки под шапкой есть, значит
+    // файл выглядит обычным. Но первый участник уехал бы в заголовки молча.
+    expect(sheet.headerMode).toBe('headers');
+    expect(sheet.firstRowLooksLikeData).toBe(true);
+    expect(sheet.warnings.join(' ')).toContain('Первая строка похожа на данные');
+  });
+
+  it('на обычной шапке не выдумывает предупреждения', () => {
+    const sheet = buildSheet('Лист1', [
+      ['ФИО', 'Электронная почта', 'Место'],
+      ['Иванов Иван', 'ivanov@mail.ru', '1'],
+    ]);
+    expect(sheet.firstRowLooksLikeData).toBe(false);
+    expect(sheet.warnings.join(' ')).not.toContain('похожа на данные');
+  });
+
+  it('одну строку без шапки разбирает как данные, а не как пустой список', () => {
+    // Так выглядит вставка одного участника: шапки нет, и разбирать
+    // единственную строку как заголовки — значит не импортировать ничего.
+    const sheet = buildSheet('', [['Иванов Иван', 'ivanov@mail.ru']]);
+    expect(sheet.headerMode).toBe('none');
+    expect(sheet.rows).toEqual([['Иванов Иван', 'ivanov@mail.ru']]);
+  });
+
+  it('выбор человека не пересматривает', () => {
+    // Явное «в первой строке заголовки» сильнее любой эвристики.
+    const sheet = buildSheet('', [['Иванов Иван', 'ivanov@mail.ru']], 'headers');
+    expect(sheet.headerMode).toBe('headers');
+    expect(sheet.rows).toEqual([]);
+  });
+
+  it('пустые колонки справа в имена не превращает', () => {
+    const sheet = buildSheet('Лист1', [['Иванов', 'i@mail.ru', '', '']], 'none');
+    expect(sheet.columns).toHaveLength(2);
+  });
+});
+
 describe('вставка из буфера обмена', () => {
   // Кабинет отправляет вставленный текст тем же маршрутом, что и файл,
   // под именем clipboard.tsv — разбор обязан узнать в нём таблицу.
@@ -276,6 +330,16 @@ describe('вставка из буфера обмена', () => {
     expect(sheet.rows).toEqual([
       ['Иванов Иван', 'i@mail.ru', '1'],
       ['Петров Пётр', 'p@mail.ru', '2'],
+    ]);
+  });
+
+  it('диапазон без шапки разбирает по требованию клиента', async () => {
+    const pasted = 'Иванов Иван\ti@mail.ru\nПетров Пётр\tp@mail.ru';
+    const sheet = await parseSpreadsheet(Buffer.from(pasted, 'utf8'), 'clipboard.tsv', 'none');
+    expect(sheet.headerMode).toBe('none');
+    expect(sheet.rows).toEqual([
+      ['Иванов Иван', 'i@mail.ru'],
+      ['Петров Пётр', 'p@mail.ru'],
     ]);
   });
 
