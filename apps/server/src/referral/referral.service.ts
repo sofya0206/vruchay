@@ -12,6 +12,13 @@ import { PrismaService } from '../prisma/prisma.service';
 const ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
 const CODE_LENGTH = 6;
 
+/**
+ * То, чем ReferralService читает базу: обычный клиент или транзакция.
+ * Транзакция Prisma не совпадает с PrismaService по типу, а нужны от них
+ * здесь одни и те же две таблицы.
+ */
+export type ReferralReader = Pick<PrismaService, 'organization' | 'file'>;
+
 export interface ReferralSummary {
   code: string;
   link: string;
@@ -59,16 +66,20 @@ export class ReferralService {
    *
    * Вызывается из проверки лимита, поэтому обязана быть дешёвой: два
    * запроса без соединений, оба по индексам.
+   *
+   * `client` позволяет вызвать это изнутри чужой транзакции. Проверка
+   * лимита идёт под замком на организацию, и запросы мимо транзакции
+   * читали бы состояние вне замка — то самое, от которого замок и защищает.
    */
-  async bonusDocuments(orgId: string): Promise<number> {
-    const org = await this.prisma.organization.findUnique({
+  async bonusDocuments(orgId: string, client: ReferralReader = this.prisma): Promise<number> {
+    const org = await client.organization.findUnique({
       where: { id: orgId },
       select: { referredByOrgId: true },
     });
     if (!org) return 0;
 
     const welcome = org.referredByOrgId ? this.welcomeBonus : 0;
-    const { working } = await this.countInvited(orgId);
+    const { working } = await this.countInvited(orgId, false, client);
     const rewarded = Math.min(working, this.maxRewarded);
 
     return welcome + rewarded * this.rewardPerFriend;
@@ -161,8 +172,12 @@ export class ReferralService {
    * документов. Просто зарегистрироваться недостаточно: иначе бонусы
    * зарабатывались бы заведением пустых организаций на свободные ящики.
    */
-  private async countInvited(orgId: string, withList = false) {
-    const invitedOrgs = await this.prisma.organization.findMany({
+  private async countInvited(
+    orgId: string,
+    withList = false,
+    client: ReferralReader = this.prisma,
+  ) {
+    const invitedOrgs = await client.organization.findMany({
       where: { referredByOrgId: orgId },
       select: { id: true, name: true, createdAt: true },
       orderBy: { createdAt: 'asc' },
@@ -171,7 +186,7 @@ export class ReferralService {
       return { total: 0, working: 0, invited: [] };
     }
 
-    const counts = await this.prisma.file.groupBy({
+    const counts = await client.file.groupBy({
       by: ['orgId'],
       where: { orgId: { in: invitedOrgs.map((o) => o.id) }, kind: 'generated' },
       _count: { _all: true },

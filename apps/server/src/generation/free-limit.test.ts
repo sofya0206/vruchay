@@ -24,7 +24,8 @@ function serviceWith({ plan, used, bonus = 0 }: Stub): GenerationService {
     file: { count: async () => used },
   };
   const referral = { bonusDocuments: async () => bonus };
-  return new GenerationService(prisma as never, referral as never);
+  const config = { get: () => 3 };
+  return new GenerationService(prisma as never, referral as never, config as never);
 }
 
 /** Проверка приватная — вызываем через тот же путь, что и приложение. */

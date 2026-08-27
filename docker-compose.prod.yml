@@ -28,6 +28,14 @@ services:
     environment:
       # Задания обрабатывает отдельный контейнер, здесь только HTTP.
       RUN_WORKER: 'false'
+      # Сколько пакетов одна организация держит в очереди одновременно.
+      ORG_ACTIVE_JOBS: ${ORG_ACTIVE_JOBS:-3}
+      # Пределы на «Одним PDF на печать». Связаны с mem_limit ниже напрямую:
+      # склейка не стримится, pdf-lib держит в памяти и исходники, и готовый
+      # документ. Поднимая одно, поднимайте и другое — иначе два
+      # одновременных скачивания уронят кабинет всем пользователям сразу.
+      PRINT_MERGE_LIMIT_FILES: ${PRINT_MERGE_LIMIT_FILES:-300}
+      PRINT_MERGE_LIMIT_MB: ${PRINT_MERGE_LIMIT_MB:-150}
     depends_on:
       migrate:
         condition: service_completed_successfully

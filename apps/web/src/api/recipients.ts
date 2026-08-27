@@ -39,6 +39,26 @@ export interface GenerationJob {
   error: string | null;
 }
 
+export interface CanceledJob extends GenerationJob {
+  /** Строки, до которых не дошли: за них не списано ни одного документа. */
+  refunded: number;
+}
+
+/** Кого выпуск не осилил и почему. */
+export interface JobFailure {
+  rowId: string;
+  name: string;
+  reason: string;
+}
+
+/** Что можно сделать с готовым пакетом прямо сейчас. */
+export interface DownloadOptions {
+  count: number;
+  pdfCount: number;
+  sizeBytes: number;
+  print: { allowed: boolean; reason: string | null; limitFiles: number; limitMb: number };
+}
+
 export function useRecipients(documentId: string) {
   return useQuery({
     queryKey: ['recipients', documentId],
@@ -117,7 +137,67 @@ export function useGeneration(documentId: string, jobId: string | null) {
     },
   });
 
-  return { job: job.data, start };
+  /**
+   * Отмена начатого выпуска.
+   *
+   * Пакет на тысячу строк идёт больше часа, и увидеть на второй минуте
+   * опечатку в макете — обычное дело. До сих пор оставалось только ждать,
+   * пока сервис допечатает и оплатит тысячу заведомо негодных грамот.
+   *
+   * Уже созданные документы остаются: человек отменяет остаток, а не
+   * отказывается от сделанного.
+   */
+  const cancel = useMutation({
+    mutationFn: (id: string) => api.post<CanceledJob>(`/jobs/${id}/cancel`, {}),
+    onSuccess: (canceled) => {
+      qc.setQueryData(['job', canceled.id], canceled);
+      // Остаток пробы вернулся к тому, что успели напечатать, — цифра
+      // на главной должна показать это сразу.
+      void qc.invalidateQueries({ queryKey: ['usage'] });
+    },
+  });
+
+  /**
+   * Продолжить прерванный выпуск.
+   *
+   * Отдельно от «Создать документы» намеренно: то — новый выпуск и новая
+   * оплата, а это доделывает то же задание. Падение на девятитысячной
+   * строке из десяти тысяч без такой кнопки означало бы выпуск заново
+   * и повторную оплату девяти тысяч документов.
+   */
+  const resume = useMutation({
+    mutationFn: (id: string) => api.post<GenerationJob>(`/jobs/${id}/resume`, {}),
+    onSuccess: (revived) => {
+      qc.setQueryData(['job', revived.id], revived);
+      void qc.invalidateQueries({ queryKey: ['usage'] });
+    },
+  });
+
+  return { job: job.data, start, cancel, resume };
+}
+
+/** Поимённый отчёт о неудачах выпуска. Спрашиваем только когда есть о чём. */
+export function useJobFailures(jobId: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: ['job-failures', jobId],
+    queryFn: () => api.get<JobFailure[]>(`/jobs/${jobId}/failures`),
+    enabled: Boolean(jobId) && enabled,
+  });
+}
+
+/**
+ * Что можно сделать с готовым пакетом.
+ *
+ * Спрашиваем до нажатия: общий PDF собирается в памяти, и большому пакету
+ * в ней не поместиться. Узнать об этом отказом в новой вкладке — значит
+ * получить голый JSON вместо файла.
+ */
+export function useDownloadOptions(jobId: string | null) {
+  return useQuery({
+    queryKey: ['download-options', jobId],
+    queryFn: () => api.get<DownloadOptions>(`/jobs/${jobId}/download-options`),
+    enabled: Boolean(jobId),
+  });
 }
 
 /** Кого рассылка пропустила и почему — показываем поимённо, а не числом. */
