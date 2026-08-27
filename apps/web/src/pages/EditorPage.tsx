@@ -5,6 +5,7 @@ import {
   Check,
   ChevronLeft,
   Dot,
+  ListChecks,
   LoaderCircle,
   Mail,
   Redo2,
@@ -18,6 +19,7 @@ import { RecipientsTable } from '../recipients/RecipientsTable';
 import { EmailTemplateEditor } from '../mail/EmailTemplateEditor';
 import { InsertMenu } from '../editor/InsertMenu';
 import { RegistryTable } from '../documents/RegistryTable';
+import { ValidationScreen } from '../validation/ValidationScreen';
 import { sheetLayout, type SheetElement, type TextElement } from '@gramota/shared';
 import { Button } from '../ui/Button';
 import { StatusChip } from '../ui/Field';
@@ -58,7 +60,7 @@ type Gesture =
 export function EditorPage() {
   const { id = '' } = useParams();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [view, setView] = useState<'editor' | 'table' | 'mail' | 'registry'>('editor');
+  const [view, setView] = useState<'editor' | 'table' | 'check' | 'mail' | 'registry'>('editor');
   const [zoom, setZoom] = useState(1);
   const [saved, setSaved] = useState<'saved' | 'saving' | 'dirty'>('saved');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -345,6 +347,15 @@ export function EditorPage() {
           <ViewTab active={view === 'table'} onClick={() => setView('table')} icon={<Table2 size={14} />}>
             Получатели
           </ViewTab>
+          {/* Между получателями и письмом: проверка идёт после того, как
+              список собран, и до того, как из него что-то выпустят. */}
+          <ViewTab
+            active={view === 'check'}
+            onClick={() => setView('check')}
+            icon={<ListChecks size={14} />}
+          >
+            Проверка
+          </ViewTab>
           <ViewTab active={view === 'mail'} onClick={() => setView('mail')} icon={<Mail size={14} />}>
             Письмо
           </ViewTab>
@@ -454,7 +465,10 @@ export function EditorPage() {
           documentId={id}
           onGoToMail={() => setView('mail')}
           onGoToRegistry={() => setView('registry')}
+          onGoToCheck={() => setView('check')}
         />
+      ) : view === 'check' ? (
+        <ValidationScreen documentId={id} onDone={() => setView('table')} />
       ) : view === 'registry' ? (
         <RegistryTable documentId={id} />
       ) : view === 'mail' ? (

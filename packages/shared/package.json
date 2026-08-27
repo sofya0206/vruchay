@@ -9,6 +9,18 @@
       "types": "./dist/cjs/index.d.ts",
       "import": "./dist/esm/index.js",
       "require": "./dist/cjs/index.js"
+    },
+    "./fonts": {
+      "types": "./dist/cjs/fonts/index.d.ts",
+      "import": "./dist/esm/fonts/index.js",
+      "require": "./dist/cjs/fonts/index.js"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "fonts": [
+        "./dist/cjs/fonts/index.d.ts"
+      ]
     }
   },
   "scripts": {
