@@ -9,6 +9,7 @@ import { CommonModule } from './common/common.module';
 import { AuthModule } from './auth/auth.module';
 import { DocumentsModule } from './documents/documents.module';
 import { RecipientsModule } from './recipients/recipients.module';
+import { AwardsModule } from './awards/awards.module';
 import { RenderModule } from './render/render.module';
 import { GenerationModule } from './generation/generation.module';
 import { MailModule } from './mail/mail.module';
@@ -36,6 +37,7 @@ import { PlatformModule } from './platform/platform.module';
     AuthModule,
     DocumentsModule,
     RecipientsModule,
+    AwardsModule,
     RenderModule,
     GenerationModule,
     MailModule,

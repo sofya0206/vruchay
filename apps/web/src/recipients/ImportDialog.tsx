@@ -50,6 +50,25 @@ export function ImportDialog({
         </header>
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+          {/*
+            Протокол соревнований показываем отдельно от обычной таблицы:
+            группы — главное, что нужно проверить глазами перед импортом.
+            Ошибка в разбиении на группы означает, что первых мест окажется
+            одно вместо восьми, и заметят это уже на награждении.
+          */}
+          {sheet.protocol && sheet.protocol.groups.length > 0 && (
+            <div className="rounded-lg bg-[var(--accent-soft)] px-3 py-2.5 text-sm text-[var(--accent)]">
+              <p className="font-medium">Распознан протокол соревнований</p>
+              <ul className="mt-1 space-y-0.5">
+                {sheet.protocol.groups.map((g) => (
+                  <li key={g.title}>
+                    {g.title} — строк: {g.rowCount}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {sheet.warnings.length > 0 && (
             <ul className="space-y-1 rounded-lg bg-[var(--award-soft)] px-3 py-2.5 text-sm text-[var(--award)]">
               {sheet.warnings.map((w) => (

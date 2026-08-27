@@ -10,7 +10,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "seed": "tsx prisma/seed.ts",
-    "migrate:deploy": "prisma migrate deploy"
+    "migrate:deploy": "prisma migrate deploy",
+    "fixtures:protocols": "tsx scripts/make-protocol-fixtures.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1098.0",

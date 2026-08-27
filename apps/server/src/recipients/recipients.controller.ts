@@ -12,7 +12,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { FastifyRequest } from 'fastify';
-import { parseSpreadsheet } from '../import/spreadsheet';
+import { parseRecipientFile } from '../import/recipient-file';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { CurrentUser } from '../common/current-user.decorator';
 import { AuthGuard } from '../auth/auth.guard';
@@ -75,7 +75,7 @@ export class RecipientsController {
     }
 
     try {
-      return await parseSpreadsheet(buffer, filename);
+      return await parseRecipientFile(buffer, filename);
     } catch (err) {
       // Внутрь ошибки библиотеки может попасть путь или структура файла —
       // наружу отдаём только понятную формулировку.
