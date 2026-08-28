@@ -6,3 +6,5 @@ export * from './declension';
 export * from './place-word';
 export * from './paired-forms';
 export * from './awards';
+export * from './validation/problems';
+export * from './validation/awarding-rules';

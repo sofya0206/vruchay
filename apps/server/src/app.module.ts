@@ -12,6 +12,7 @@ import { RecipientsModule } from './recipients/recipients.module';
 import { AwardsModule } from './awards/awards.module';
 import { RenderModule } from './render/render.module';
 import { GenerationModule } from './generation/generation.module';
+import { ValidationModule } from './validation/validation.module';
 import { MailModule } from './mail/mail.module';
 import { TildaModule } from './tilda/tilda.module';
 import { VerifyModule } from './verify/verify.module';
@@ -40,6 +41,7 @@ import { PlatformModule } from './platform/platform.module';
     AwardsModule,
     RenderModule,
     GenerationModule,
+    ValidationModule,
     MailModule,
     TildaModule,
     VerifyModule,

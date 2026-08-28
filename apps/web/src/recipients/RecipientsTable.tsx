@@ -4,6 +4,7 @@ import {
   Download,
   Eye,
   FileUp,
+  ListChecks,
   LoaderCircle,
   Play,
   Plus,
@@ -34,10 +35,12 @@ export function RecipientsTable({
   documentId,
   onGoToMail,
   onGoToRegistry,
+  onGoToCheck,
 }: {
   documentId: string;
   onGoToMail: () => void;
   onGoToRegistry: () => void;
+  onGoToCheck: () => void;
 }) {
   const table = useRecipients(documentId);
   const m = useRecipientMutations(documentId);
@@ -332,6 +335,17 @@ export function RecipientsTable({
             onClick={() => setPreview(true)}
           >
             Посмотреть
+          </Button>
+
+          {/* «Посмотреть» показывает одну грамоту, а бед в списке на триста
+              человек глазами не увидеть: они прячутся в отдельных строках. */}
+          <Button
+            size="sm"
+            icon={<ListChecks size={15} />}
+            disabled={checkedCount === 0}
+            onClick={onGoToCheck}
+          >
+            Проверить строки
           </Button>
 
           <Button
