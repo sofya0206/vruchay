@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { api } from '../api/client';
+import { useOrgProfile } from '../api/org';
 import { mergeVariables } from '@gramota/shared';
 import type { DocumentDetail, Sheet } from '../api/types';
 import { SheetRenderer } from '../render/SheetRenderer';
@@ -36,6 +37,7 @@ export function PreviewDialog({
     queryKey: ['document', documentId],
     queryFn: () => api.get<DocumentDetail>(`/documents/${documentId}`),
   });
+  const org = useOrgProfile();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -109,6 +111,7 @@ export function PreviewDialog({
                     // Проверочный код выделяется в момент печати, до неё
                     // его нет. Показываем словами, а не пустотой.
                     publicId: 'код появится при выпуске',
+                    orgName: org.data?.orgName,
                     event: {
                       name: doc.data?.eventName,
                       date: doc.data?.eventDate,

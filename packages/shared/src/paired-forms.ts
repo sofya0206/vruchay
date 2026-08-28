@@ -208,6 +208,10 @@ export function rowGender(data: Record<string, string>): Gender {
  * иначе организатор увидел бы на экране одно, на бумаге получил другое,
  * а в письме третье, и узнал бы об этом уже от участников.
  */
-export function substituteForRow(text: string, data: Record<string, string>): string {
-  return substituteVariables(resolvePairedForms(text, rowGender(data)), data);
+export function substituteForRow(
+  text: string,
+  data: Record<string, string>,
+  onMissing?: (name: string) => string,
+): string {
+  return substituteVariables(resolvePairedForms(text, rowGender(data)), data, onMissing);
 }

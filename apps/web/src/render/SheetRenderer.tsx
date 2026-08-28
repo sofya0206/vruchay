@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import {
+  keepVariable,
   substituteForRow,
   substituteVariables,
   type SheetElement,
@@ -22,8 +23,15 @@ export interface SheetRendererProps {
   backgroundUrl?: string | null;
   /** Значения переменных: %name и остальные колонки таблицы получателей. */
   data?: Record<string, string>;
-  /** В редакторе показываем сами переменные, а не подстановку. */
-  showRawVariables?: boolean;
+  /**
+   * Что делать с переменной, для которой значения нет.
+   *
+   * `blank` — убрать: на печати незаполненная переменная обязана исчезнуть,
+   * иначе «%event» уедет на бумагу. `token` — оставить сам «%event»:
+   * в редакторе и в миниатюрах списка пустое место читается как поломка
+   * макета, а токен показывает, чего не хватает.
+   */
+  unfilled?: 'blank' | 'token';
   /**
    * Адрес проверки подлинности этого экземпляра: /verify/<publicId>.
    * Есть только при печати — в редакторе экземпляра ещё не существует,
@@ -40,7 +48,7 @@ export function SheetRenderer({
   pageHeightMm,
   backgroundUrl,
   data,
-  showRawVariables = false,
+  unfilled = 'blank',
   verifyUrl,
   selectedId,
   onSelect,
@@ -66,7 +74,7 @@ export function SheetRenderer({
             key={el.id}
             element={el}
             data={data}
-            showRawVariables={showRawVariables}
+            unfilled={unfilled}
             verifyUrl={verifyUrl}
             interactive={Boolean(onSelect)}
             selected={selectedId === el.id}
@@ -80,7 +88,7 @@ export function SheetRenderer({
 interface ElementViewProps {
   element: SheetElement;
   data?: Record<string, string>;
-  showRawVariables: boolean;
+  unfilled: 'blank' | 'token';
   verifyUrl?: string | null;
   interactive: boolean;
   selected: boolean;
@@ -127,12 +135,13 @@ function origin(): string {
 function ElementView({
   element,
   data,
-  showRawVariables,
+  unfilled,
   verifyUrl,
   interactive,
   selected,
   onSelect,
 }: ElementViewProps) {
+  const onMissing = unfilled === 'token' ? keepVariable : undefined;
   const box: React.CSSProperties = {
     position: 'absolute',
     left: `${element.x}mm`,
@@ -156,7 +165,7 @@ function ElementView({
 
   if (element.type === 'text') {
     const { props } = element;
-    const text = showRawVariables ? props.text : substituteForRow(props.text, data ?? {});
+    const text = substituteForRow(props.text, data ?? {}, onMissing);
     return (
       <div
         {...common}
@@ -222,10 +231,8 @@ function ElementView({
      */
     const template = element.props.template.trim();
     const value = template
-      ? showRawVariables
-        ? template
-        : // QR кодирует адрес, а не фразу: парные формы здесь неуместны.
-          substituteVariables(template, data ?? {})
+      ? // QR кодирует адрес, а не фразу: парные формы здесь неуместны.
+        substituteVariables(template, data ?? {}, onMissing)
       : (verifyUrl ?? `${origin()}/verify/00000000-0000-0000-0000-000000000000`);
 
     return (

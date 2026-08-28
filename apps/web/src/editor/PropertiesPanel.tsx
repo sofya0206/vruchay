@@ -38,15 +38,24 @@ interface Props {
   onSaveEvent?: (
     values: Partial<EventValues> & { verifyEnabled?: boolean; verifyFields?: string[] },
   ) => void;
+  /** Что набрано в «О мероприятии» сейчас — чтобы холст обновлялся при вводе. */
+  onEventDraft?: (values: EventValues) => void;
 }
 
-export function PropertiesPanel({ element, onChange, onDelete, doc, onSaveEvent }: Props) {
+export function PropertiesPanel({
+  element,
+  onChange,
+  onDelete,
+  doc,
+  onSaveEvent,
+  onEventDraft,
+}: Props) {
   if (!element) {
     return (
       <aside className="w-72 shrink-0 overflow-auto border-l border-[var(--line)] bg-[var(--surface)] p-4">
         {doc && onSaveEvent ? (
           <>
-            <EventFields doc={doc} onSave={onSaveEvent} />
+            <EventFields doc={doc} onSave={onSaveEvent} onDraft={onEventDraft} />
             <div className="mt-6">
               <VerifySettings doc={doc} onSave={onSaveEvent} />
             </div>

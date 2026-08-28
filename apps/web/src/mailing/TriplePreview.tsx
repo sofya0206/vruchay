@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { BadgeCheck, ChevronLeft, ChevronRight } from 'lucide-react';
 import { mergeVariables } from '@gramota/shared';
 import { api } from '../api/client';
+import { useOrgProfile } from '../api/org';
 import type { DocumentDetail, Sheet } from '../api/types';
 import type { RecipientTable } from '../api/recipients';
 import { SheetRenderer } from '../render/SheetRenderer';
@@ -66,6 +67,7 @@ export function TriplePreview({
   const row = rows[index];
   const columns = recipients.data?.columns.map((c) => c.name) ?? [];
   const values = previewValues(row?.data, columns);
+  const orgName = useOrgProfile().data?.orgName;
 
   useEffect(() => {
     if (index >= rows.length) setIndex(0);
@@ -123,7 +125,7 @@ export function TriplePreview({
       </div>
 
       {tab === 'document' && (
-        <DocumentPreview doc={doc.data} data={values} position={index + 1} />
+        <DocumentPreview doc={doc.data} data={values} position={index + 1} orgName={orgName} />
       )}
 
       {tab === 'letter' && (
@@ -145,10 +147,12 @@ function DocumentPreview({
   doc,
   data,
   position,
+  orgName,
 }: {
   doc: DocumentDetail | undefined;
   data: Record<string, string>;
   position: number;
+  orgName?: string;
 }) {
   if (!doc) return <p className="text-center text-[var(--text-muted)]">Загрузка…</p>;
 
@@ -157,6 +161,7 @@ function DocumentPreview({
     number: position,
     // Проверочный код выделяется в момент выпуска — до него его нет.
     publicId: 'код появится при выпуске',
+    orgName,
     event: {
       name: doc.eventName,
       date: doc.eventDate,

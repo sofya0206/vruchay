@@ -57,9 +57,16 @@ const FIELDS: Array<{
 export function EventFields({
   doc,
   onSave,
+  onDraft,
 }: {
   doc: DocumentDetail;
   onSave: (values: Partial<EventValues>) => void;
+  /**
+   * Набранное прямо сейчас, ещё не сохранённое. Нужно холсту: он рисует
+   * подставленные значения, и без этого название появлялось бы на листе
+   * только после ухода с поля — то есть выглядело бы неработающим.
+   */
+  onDraft?: (values: EventValues) => void;
 }) {
   const [values, setValues] = useState<EventValues>(pick(doc));
   const [saved, setSaved] = useState(false);
@@ -68,6 +75,12 @@ export function EventFields({
   // Сбрасываем поля на серверные только когда сменился сам материал:
   // иначе ответ, пришедший во время набора, стёр бы недописанное слово.
   useEffect(() => setValues(pick(doc)), [doc.id]);
+
+  function edit(key: keyof EventValues, value: string) {
+    const next = { ...values, [key]: value };
+    setValues(next);
+    onDraft?.(next);
+  }
 
   function commit(key: keyof EventValues) {
     if (values[key] === doc[key]) return;
@@ -95,7 +108,7 @@ export function EventFields({
           <Input
             value={values[f.key]}
             placeholder={f.placeholder}
-            onChange={(e) => setValues({ ...values, [f.key]: e.target.value })}
+            onChange={(e) => edit(f.key, e.target.value)}
             onBlur={() => commit(f.key)}
             onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
           />

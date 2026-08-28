@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { extractVariables, sheetLayout, substituteVariables } from './layout';
+import { extractVariables, keepVariable, sheetLayout, substituteVariables } from './layout';
 
 describe('sheetLayout', () => {
   it('валидирует текстовый элемент с дефолтами', () => {
@@ -56,5 +56,13 @@ describe('переменные', () => {
     expect(substituteVariables('Привет, %name (%missing)!', { name: 'Иван' })).toBe(
       'Привет, Иван ()!',
     );
+  });
+
+  it('на холсте редактора ненайденная переменная остаётся токеном', () => {
+    // Пустое место человек читает как сломавшийся блок, а «%missing»
+    // прямо показывает, чего не хватает.
+    expect(
+      substituteVariables('Привет, %name (%missing)!', { name: 'Иван' }, keepVariable),
+    ).toBe('Привет, Иван (%missing)!');
   });
 });

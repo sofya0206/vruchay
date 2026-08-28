@@ -26,7 +26,11 @@ import { sheetLayout, type SheetElement, type TextElement } from '@gramota/share
 import { Button } from '../ui/Button';
 import { StatusChip } from '../ui/Field';
 import { api } from '../api/client';
+import { useOrgProfile } from '../api/org';
+import { useRecipients } from '../api/recipients';
 import type { DocumentDetail } from '../api/types';
+import type { EventValues } from '../editor/EventFields';
+import { canvasPreviewData } from '../editor/preview-data';
 import { SheetRenderer } from '../render/SheetRenderer';
 import { PropertiesPanel } from '../editor/PropertiesPanel';
 import { useLayoutHistory } from '../editor/useLayoutHistory';
@@ -78,6 +82,15 @@ export function EditorPage() {
   const [view, setView] = useState<View>(VIEWS.includes(asked as View) ? (asked as View) : 'editor');
   const [zoom, setZoom] = useState(1);
   const [saved, setSaved] = useState<'saved' | 'saving' | 'dirty'>('saved');
+  /*
+   * Что набрано в «О мероприятии» прямо сейчас, до сохранения.
+   *
+   * Нужно ради живого холста: поле сохраняется по уходу с него, и без
+   * черновика название появлялось бы на листе только после клика мимо.
+   * Человек при этом смотрит на лист, а не на поле, — и решает, что
+   * подстановка опять не работает.
+   */
+  const [eventDraft, setEventDraft] = useState<EventValues | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const gesture = useRef<Gesture | null>(null);
   const backgroundInput = useRef<HTMLInputElement>(null);
@@ -88,6 +101,9 @@ export function EditorPage() {
   });
 
   const sheet = doc.data?.sheets[0];
+  // Переход к другому материалу: чужой черновик мероприятия на холсте
+  // остался бы от прошлого документа.
+  useEffect(() => setEventDraft(null), [id]);
   const history = useLayoutHistory([]);
   const { reset, beginGesture, endGesture } = history;
 
@@ -106,12 +122,16 @@ export function EditorPage() {
     reset(sheet.layout);
   }, [sheet, sheetId, reset]);
 
-  // Колонки таблицы получателей — из них складывается подменю переменных
-  // при вставке текста.
-  const recipients = useQuery({
-    queryKey: ['recipient-columns', id],
-    queryFn: () => api.get<{ columns: { name: string }[] }>(`/documents/${id}/recipients`),
-  });
+  /*
+   * Список получателей: из колонок складывается подменю переменных
+   * при вставке текста, а из первой строки — образец для холста.
+   *
+   * Тот же запрос, что у вкладки «Получатели», а не свой: правки в таблице
+   * сбрасывают именно его, и лист в редакторе не остаётся с данными,
+   * которых в таблице уже нет.
+   */
+  const recipients = useRecipients(id);
+  const org = useOrgProfile();
 
   const background = useQuery({
     queryKey: ['file-url', sheet?.backgroundFileId],
@@ -209,6 +229,29 @@ export function EditorPage() {
   const selected = useMemo(
     () => layout.find((el) => el.id === selectedId) ?? null,
     [layout, selectedId],
+  );
+
+  /*
+   * Значения для холста: на листе должно стоять название мероприятия,
+   * а не «%event». Что именно подставляется и почему — в `preview-data.ts`.
+   *
+   * Черновик мероприятия сильнее сохранённого: он и есть то, что человек
+   * набирает прямо сейчас, глядя на лист.
+   */
+  const previewData = useMemo(
+    () =>
+      canvasPreviewData({
+        row: recipients.data?.rows[0]?.data,
+        orgName: org.data?.orgName,
+        event: {
+          name: eventDraft?.eventName ?? doc.data?.eventName,
+          date: eventDraft?.eventDate ?? doc.data?.eventDate,
+          place: eventDraft?.eventPlace ?? doc.data?.eventPlace,
+          hours: eventDraft?.eventHours ?? doc.data?.eventHours,
+        },
+        issuedAt: new Date(),
+      }),
+    [recipients.data, org.data, doc.data, eventDraft],
   );
 
   const updateBox = useCallback(
@@ -536,7 +579,8 @@ export function EditorPage() {
                 pageWidthMm={page.pageWidthMm}
                 pageHeightMm={page.pageHeightMm}
                 backgroundUrl={background.data?.url}
-                showRawVariables
+                data={previewData}
+                unfilled="token"
                 selectedId={selectedId}
                 onSelect={setSelectedId}
               />
@@ -598,6 +642,7 @@ export function EditorPage() {
           element={selected}
           doc={doc.data}
           onSaveEvent={(values) => saveEvent.mutate(values)}
+          onEventDraft={setEventDraft}
           onChange={patchProps}
           onDelete={() => {
             if (!selectedId) return;

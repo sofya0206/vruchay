@@ -119,6 +119,24 @@ export function extractVariables(layout: SheetLayout): string[] {
   return [...vars];
 }
 
-export function substituteVariables(text: string, data: Record<string, string>): string {
-  return text.replace(VARIABLE_RE, (_all, name: string) => data[name] ?? '');
+/**
+ * Подстановка значений в текст макета.
+ *
+ * `onMissing` решает, что печатать вместо переменной, для которой значения
+ * нет. На печати это пустая строка: незаполненная переменная обязана
+ * исчезнуть, а не оставить на бумаге «%event». В редакторе — наоборот,
+ * сам токен: пустое место на холсте человек читает как поломку макета,
+ * а «%event» прямо говорит, чего не хватает и что искать в панели.
+ */
+export function substituteVariables(
+  text: string,
+  data: Record<string, string>,
+  onMissing: (name: string) => string = () => '',
+): string {
+  return text.replace(VARIABLE_RE, (_all, name: string) => data[name] ?? onMissing(name));
+}
+
+/** Оставить переменную как есть — для холста редактора и миниатюр. */
+export function keepVariable(name: string): string {
+  return `%${name}`;
 }

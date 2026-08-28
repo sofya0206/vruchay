@@ -197,7 +197,7 @@ function Preview({ doc }: { doc: DocumentSummary }) {
         backgroundUrl={doc.preview?.backgroundUrl}
         // Показываем «%name», а не пустоту: в списке нет получателя,
         // и подставлять нечего — пустые места читались бы как ошибка макета.
-        showRawVariables
+        unfilled="token"
       />
     </SheetThumbnail>
   );
