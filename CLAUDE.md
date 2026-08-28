@@ -99,8 +99,19 @@
 
 ```bash
 docker compose -f docker-compose.dev.yml up -d     # база, Redis, хранилище, почта
-pnpm --filter @gramota/server start:dev            # сервер
+pnpm --filter @gramota/server dev                  # сервер
 pnpm --filter @gramota/web dev                     # кабинет на localhost:5173
+```
+
+Серверу нужен **свой** `apps/server/.env` — корневой `.env` предназначен для
+docker compose, и Nest его не читает. Заведите его из `.env.example`, иначе
+сервер поднимется без базы и хранилища.
+
+Когда закончили — погасите инфраструктуру, иначе контейнеры висят до
+перезагрузки:
+
+```bash
+docker compose -f docker-compose.dev.yml down
 ```
 
 Перед показом владельцу — обязательно:
