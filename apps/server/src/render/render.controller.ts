@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { mergeVariables } from '@gramota/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
-import type { Env } from '../config/env';
+import { baseUrl, type Env } from '../config/env';
 import { verifyRenderToken } from './render-token';
 
 /**
@@ -77,7 +77,7 @@ export class RenderController {
       // по внутреннему адресу контейнера, и он попал бы в код на бумаге.
       verifyUrl:
         doc.verifyEnabled && payload.publicId
-          ? `${(process.env.PUBLIC_URL ?? 'https://vruchay.ru').replace(/\/+$/, '')}/verify/${payload.publicId}`
+          ? `${baseUrl(this.config.get('PUBLIC_URL', { infer: true }))}/verify/${payload.publicId}`
           : null,
     };
   }

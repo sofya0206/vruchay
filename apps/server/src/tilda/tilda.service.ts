@@ -1,5 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { TildaIntegration } from '@prisma/client';
+import { baseUrl, type Env } from '../config/env';
 import { PrismaService } from '../prisma/prisma.service';
 import { maskEmail } from '../common/redact';
 import { isOriginAllowed, normalizeDomain } from './origin';
@@ -69,7 +71,13 @@ export class TildaService {
     private readonly mail: MailService,
     private readonly storage: StorageService,
     private readonly processor: TildaProcessor,
+    private readonly config: ConfigService<Env, true>,
   ) {}
+
+  /** Публичный адрес сервиса без косой черты — из проверенной схемы настроек. */
+  private publicUrl(): string {
+    return baseUrl(this.config.get('PUBLIC_URL', { infer: true }));
+  }
 
   /**
    * Отказы наружу намеренно обезличены: подробности сообщают злоумышленнику,
@@ -178,7 +186,7 @@ export class TildaService {
       // окне подтверждения рисуем её мы — и галочка без текста означала бы
       // согласие неизвестно на что, то есть отсутствие согласия.
       consentText: CONSENT_LABEL,
-      privacyUrl: `${publicUrl()}/privacy`,
+      privacyUrl: `${this.publicUrl()}/privacy`,
       consentVersion: CONSENT_VERSION,
       prefillFromAccount: integration.prefillFromAccount,
       allowEdit: integration.allowEdit,
@@ -279,7 +287,7 @@ export class TildaService {
     ]);
 
     if (!file || file.verifyRevoked || !document?.verifyEnabled) return undefined;
-    return `${publicUrl()}/verify/${file.publicId}`;
+    return `${this.publicUrl()}/verify/${file.publicId}`;
   }
 
   private downloadable(request: {
@@ -465,6 +473,3 @@ export class TildaService {
   }
 }
 
-function publicUrl(): string {
-  return (process.env.PUBLIC_URL ?? 'https://vruchay.ru').replace(/\/+$/, '');
-}

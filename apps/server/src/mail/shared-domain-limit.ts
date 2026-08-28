@@ -15,6 +15,11 @@
  * награждение — это от десятков до пары сотен писем за раз, и такой
  * поток проходит свободно. Упереться в потолок можно только рассылкой,
  * на которую наградной сервис не рассчитан.
+ *
+ * Сами числа приходят снаружи — из проверенной схемы настроек
+ * (SHARED_DOMAIN_DAILY_LIMIT и SHARED_DOMAIN_BATCH_LIMIT). Здесь их читать
+ * нельзя: пока файл лез в окружение сам, опечатка в имени переменной давала
+ * NaN, а любое сравнение с NaN ложно — предел молча пропускал всё подряд.
  */
 
 export interface SharedDomainLimits {
@@ -22,13 +27,6 @@ export interface SharedDomainLimits {
   perDay: number;
   /** И за один запуск рассылки. */
   perBatch: number;
-}
-
-export function sharedDomainLimits(): SharedDomainLimits {
-  return {
-    perDay: Number(process.env.SHARED_DOMAIN_DAILY_LIMIT ?? 500),
-    perBatch: Number(process.env.SHARED_DOMAIN_BATCH_LIMIT ?? 300),
-  };
 }
 
 export interface LimitCheck {
@@ -47,7 +45,7 @@ export interface LimitCheck {
  */
 export function sharedDomainRefusal(
   { sentToday, adding }: LimitCheck,
-  limits = sharedDomainLimits(),
+  limits: SharedDomainLimits,
 ): string | null {
   if (adding > limits.perBatch) {
     return (

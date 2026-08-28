@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { randomInt } from 'node:crypto';
+import { baseUrl, type Env } from '../config/env';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
@@ -46,19 +48,29 @@ export interface ReferralSummary {
 export class ReferralService {
   private readonly logger = new Logger(ReferralService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService<Env, true>,
+  ) {}
 
   private get welcomeBonus() {
-    return Number(process.env.REFERRAL_WELCOME_BONUS ?? 50);
+    return this.config.get('REFERRAL_WELCOME_BONUS', { infer: true });
   }
   private get rewardPerFriend() {
-    return Number(process.env.REFERRAL_REWARD ?? 50);
+    return this.config.get('REFERRAL_REWARD', { infer: true });
   }
   private get qualifyDocuments() {
-    return Number(process.env.REFERRAL_QUALIFY_DOCUMENTS ?? 10);
+    return this.config.get('REFERRAL_QUALIFY_DOCUMENTS', { infer: true });
   }
   private get maxRewarded() {
-    return Number(process.env.REFERRAL_MAX_REWARDED ?? 20);
+    return this.config.get('REFERRAL_MAX_REWARDED', { infer: true });
+  }
+  private get freeDocuments() {
+    return this.config.get('FREE_DOCUMENT_LIMIT', { infer: true });
+  }
+  /** Публичный адрес сервиса без косой черты — из проверенной схемы настроек. */
+  private get publicUrl() {
+    return baseUrl(this.config.get('PUBLIC_URL', { infer: true }));
   }
 
   /**
@@ -88,7 +100,7 @@ export class ReferralService {
   /** Всё, что показывает раздел «Пригласить друга». */
   async summary(orgId: string, orgName: string): Promise<ReferralSummary> {
     const code = await this.ensureCode(orgId);
-    const link = `${publicUrl()}/register?ref=${code}`;
+    const link = `${this.publicUrl}/register?ref=${code}`;
     const { total, working, invited } = await this.countInvited(orgId, true);
     const rewarded = Math.min(working, this.maxRewarded);
 
@@ -119,8 +131,8 @@ export class ReferralService {
       `${from} выдаём грамоты и сертификаты через сервис «Вручай»: ` +
       `загружаешь список участников — он сам делает именные файлы и рассылает их по почте. ` +
       `Вручную это занимало два дня, теперь — полчаса.\n\n` +
-      `Вот приглашение, по нему дают ${this.welcomeBonus + Number(process.env.FREE_DOCUMENT_LIMIT ?? 50)} ` +
-      `бесплатных документов вместо ${Number(process.env.FREE_DOCUMENT_LIMIT ?? 50)}:\n${link}`
+      `Вот приглашение, по нему дают ${this.welcomeBonus + this.freeDocuments} ` +
+      `бесплатных документов вместо ${this.freeDocuments}:\n${link}`
     );
   }
 
@@ -225,8 +237,4 @@ function generateCode(): string {
     code += ALPHABET[randomInt(ALPHABET.length)];
   }
   return code;
-}
-
-function publicUrl(): string {
-  return (process.env.PUBLIC_URL ?? 'https://vruchay.ru').replace(/\/+$/, '');
 }

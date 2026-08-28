@@ -1,5 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { EmailKind, Prisma } from '@prisma/client';
+import { baseUrl, type Env } from '../config/env';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { MailProcessor } from '../mail/mail.processor';
@@ -45,6 +47,7 @@ export class MailingService {
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
     private readonly processor: MailProcessor,
+    private readonly config: ConfigService<Env, true>,
   ) {}
 
   // ─── Шаблоны писем по потокам ────────────────────────────────────────────
@@ -246,7 +249,7 @@ export class MailingService {
             advertiserName: template.advertiserName ?? '',
             // Ссылка отписки в проверочном письме ведёт в никуда намеренно:
             // письма в журнале нет, отписываться не от чего.
-            unsubscribeUrl: `${process.env.PUBLIC_URL ?? ''}/api/v1/u/preview`,
+            unsubscribeUrl: `${baseUrl(this.config.get('PUBLIC_URL', { infer: true }))}/api/v1/u/preview`,
           }
         : { kind: 'transactional', bodyHtml: body },
     );
@@ -274,7 +277,9 @@ export class MailingService {
     const doc = await this.assertDocument(orgId, documentId);
 
     const failed = await this.prisma.email.findMany({
-      where: { orgId, documentId, status: { in: ['bounced', 'failed'] } },
+      // Письма с обезличенным адресом пропускаем: по истечении срока хранения
+      // ночная задача стирает адрес участника, и слать по нему уже некуда.
+      where: { orgId, documentId, status: { in: ['bounced', 'failed'] }, NOT: { toEmail: '' } },
       orderBy: { queuedAt: 'asc' },
       include: { template: true },
     });

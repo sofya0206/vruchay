@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { EmailKind } from '@prisma/client';
+import { baseUrl, type Env } from '../config/env';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { SmtpProvider } from './smtp.provider';
@@ -37,7 +39,13 @@ export class MailService {
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
     private readonly smtp: SmtpProvider,
+    private readonly config: ConfigService<Env, true>,
   ) {}
+
+  /** Публичный адрес сервиса без косой черты — из проверенной схемы настроек. */
+  private get publicUrl(): string {
+    return baseUrl(this.config.get('PUBLIC_URL', { infer: true }));
+  }
 
   /** Пока провайдер один; когда появится DashaMail — выбор по домену отправителя. */
   private providerFor(_provider: string): MailProvider {
@@ -469,7 +477,7 @@ export class MailService {
       kind: 'marketing',
       bodyHtml,
       advertiserName: email.template?.advertiserName ?? '',
-      unsubscribeUrl: unsubscribeUrl(process.env.PUBLIC_URL ?? '', email.id),
+      unsubscribeUrl: unsubscribeUrl(this.publicUrl, email.id),
     });
   }
 
@@ -481,7 +489,7 @@ export class MailService {
    * и ронять рассылку из-за незаполненной переменной окружения нельзя.
    */
   private trackOpens(html: string, emailId: string): string {
-    const publicUrl = process.env.PUBLIC_URL;
+    const publicUrl = this.publicUrl;
     return publicUrl ? withOpenPixel(html, publicUrl, emailId) : html;
   }
 
@@ -578,7 +586,13 @@ export class MailService {
       },
     });
 
-    return sharedDomainRefusal({ sentToday, adding });
+    return sharedDomainRefusal(
+      { sentToday, adding },
+      {
+        perDay: this.config.get('SHARED_DOMAIN_DAILY_LIMIT', { infer: true }),
+        perBatch: this.config.get('SHARED_DOMAIN_BATCH_LIMIT', { infer: true }),
+      },
+    );
   }
 
   /**
@@ -662,7 +676,10 @@ export class MailService {
       return { email: own.email, displayName: own.displayName, domainId: own.domainId };
     }
 
-    const platform = platformSender();
+    const platform = platformSender(
+      this.config.get('PLATFORM_MAIL_FROM', { infer: true }),
+      this.config.get('SERVICE_MAIL_FROM', { infer: true }),
+    );
     if (!platform) return null;
 
     const org = await this.prisma.organization.findUnique({
@@ -793,7 +810,7 @@ export class MailService {
    * Отправитель берётся из SERVICE_MAIL_FROM и на организацию не смотрит.
    */
   async sendService(to: string, subject: string, html: string): Promise<void> {
-    const raw = process.env.SERVICE_MAIL_FROM ?? 'Вручай <noreply@vruchay.ru>';
+    const raw = this.config.get('SERVICE_MAIL_FROM', { infer: true });
     // Разбираем «Имя <адрес>»; если формат другой — считаем всю строку адресом.
     const m = raw.match(/^\s*(.*?)\s*<([^>]+)>\s*$/);
     const from = m ? { name: m[1], email: m[2] } : { name: 'Вручай', email: raw.trim() };

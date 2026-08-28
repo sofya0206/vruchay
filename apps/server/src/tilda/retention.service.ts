@@ -25,13 +25,31 @@ export const RETENTION_QUEUE = 'retention';
  *   а именно в споре они и понадобятся. Адрес обращения в согласии, в отличие
  *   от заявки, стирать нельзя — он часть доказательства, а не служебный след.
  *
- * Сюда же попала корзина документов: цель у неё та же — не хранить дольше,
- * чем нужно, — и отдельное ночное задание ради неё заводить незачем.
+ * Сюда же попали корзина документов и журнал писем: цель у них та же — не
+ * хранить дольше, чем нужно, — и отдельное ночное задание ради каждого
+ * заводить незачем.
  */
 const ANONYMIZE_AFTER_DAYS = 90;
 const DROP_UNFINISHED_AFTER_DAYS = 30;
 const DROP_REQUESTS_AFTER_DAYS = 365;
 const DROP_CONSENTS_AFTER_DAYS = 3 * 365;
+
+/**
+ * Через сколько дней из журнала писем убирается адрес участника.
+ *
+ * Год — столько же, сколько живёт заявка с публичной формы, и по той же
+ * причине: вопрос «а мне точно отправляли?» приходит в пределах сезона,
+ * следующего за награждением. Дальше адрес не нужен ни для чего.
+ *
+ * Убираем только адрес. Сам факт отправки, поток письма, статус доставки
+ * и время остаются: это не персональные данные, а история выдачи документа,
+ * и по ней организация отвечает на вопросы о своём награждении. Обезличенное
+ * письмо помечено пустым адресом — отдельного признака для этого не заводим.
+ */
+const ANONYMIZE_EMAILS_AFTER_DAYS = 365;
+
+/** Пустой адрес значит «уже обезличено»: повторно такие письма не трогаем. */
+const ANONYMIZED_ADDRESS = '';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -86,6 +104,7 @@ export class RetentionService implements OnModuleInit, OnModuleDestroy {
   /** Вынесено отдельно от расписания, чтобы можно было запустить руками. */
   async run(): Promise<{
     anonymized: number;
+    emails: number;
     unfinished: number;
     requests: number;
     consents: number;
@@ -102,6 +121,22 @@ export class RetentionService implements OnModuleInit, OnModuleDestroy {
         NOT: { ip: null, userAgent: null },
       },
       data: { ip: null, userAgent: null, fields: {} },
+    });
+
+    /*
+     * Адреса участников в журнале писем.
+     *
+     * Само письмо не удаляем: на нём держится история выдачи, которую
+     * показывает карточка документа в реестре, и связанные с ним события
+     * доставки. Стирается ровно адрес — то единственное в этой таблице,
+     * что относится к участнику лично.
+     */
+    const emails = await this.prisma.email.updateMany({
+      where: {
+        queuedAt: { lt: before(ANONYMIZE_EMAILS_AFTER_DAYS) },
+        NOT: { toEmail: ANONYMIZED_ADDRESS },
+      },
+      data: { toEmail: ANONYMIZED_ADDRESS },
     });
 
     const unfinished = await this.prisma.tildaRequest.deleteMany({
@@ -124,6 +159,7 @@ export class RetentionService implements OnModuleInit, OnModuleDestroy {
 
     const result = {
       anonymized: anonymized.count,
+      emails: emails.count,
       unfinished: unfinished.count,
       requests: requests.count,
       consents: consents.count,
@@ -131,9 +167,9 @@ export class RetentionService implements OnModuleInit, OnModuleDestroy {
     };
     if (Object.values(result).some((n) => n > 0)) {
       this.logger.log(
-        `Сроки хранения: обезличено ${result.anonymized}, удалено незавершённых ` +
-          `${result.unfinished}, заявок ${result.requests}, согласий ${result.consents}, ` +
-          `документов из корзины ${result.trashed}`,
+        `Сроки хранения: обезличено заявок ${result.anonymized}, писем ${result.emails}, ` +
+          `удалено незавершённых ${result.unfinished}, заявок ${result.requests}, ` +
+          `согласий ${result.consents}, документов из корзины ${result.trashed}`,
       );
     }
     return result;

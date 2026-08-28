@@ -1,8 +1,9 @@
-import { Controller, Get, Logger, NotFoundException, Param } from '@nestjs/common';
+import { Controller, Get, Logger, NotFoundException, Param, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { PrismaService } from '../prisma/prisma.service';
-import { RateLimitService } from '../common/rate-limit.service';
+import { Throttle } from '../common/throttle.decorator';
+import { ThrottleGuard } from '../common/throttle.guard';
 import { ReplacementService } from '../registry/replacement.service';
 
 const uuidParam = new ZodValidationPipe(z.string().uuid());
@@ -21,22 +22,30 @@ const uuidParam = new ZodValidationPipe(z.string().uuid());
  * превратился бы в выгрузку базы участников.
  */
 @Controller('v1/verify')
+@UseGuards(ThrottleGuard)
 export class VerifyController {
   private readonly logger = new Logger(VerifyController.name);
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly rateLimit: RateLimitService,
     private readonly replacement: ReplacementService,
   ) {}
 
+  /*
+   * Перебор ограничиваем по обращающемуся, а не по коду документа.
+   *
+   * Раньше счёт вёлся ключом `verify:<код>`: у каждого документа было своё
+   * окно, и перебор разных кодов не задевал ни одного из них. Вдобавок ответ
+   * счётчика никто не проверял — ограничение вызывалось и не действовало,
+   * а каждая проверка ещё и писала в базу счётчик документа. То есть
+   * посторонний мог без входа нагружать базу сколько угодно.
+   *
+   * Тридцати проверок в минуту с одного адреса хватает с запасом: страницу
+   * открывает человек с бумагой в руках, а не список.
+   */
   @Get(':publicId')
+  @Throttle({ max: 30, timeWindow: '1 minute' })
   async check(@Param('publicId', uuidParam) publicId: string) {
-    // Идентификатор случайный и его не подобрать, но перебор всё равно
-    // ограничиваем: без этого страница стала бы способом выяснять,
-    // какие документы вообще существуют.
-    await this.rateLimit.hit(`verify:${publicId}`, 60_000, 30);
-
     const file = await this.prisma.file.findUnique({
       where: { publicId },
       select: {

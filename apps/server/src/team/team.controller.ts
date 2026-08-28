@@ -6,6 +6,8 @@ import { CurrentUser } from '../common/current-user.decorator';
 import { AuthGuard } from '../auth/auth.guard';
 import { HumansOnlyGuard } from '../auth/humans-only.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
+import { Throttle } from '../common/throttle.decorator';
+import { ThrottleGuard } from '../common/throttle.guard';
 import type { SessionUser } from '../auth/auth.service';
 import { uuidSchema } from '../documents/documents.dto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -173,12 +175,18 @@ const acceptSchema = z.object({
 /**
  * Принятие приглашения — без входа: человек ещё не может войти,
  * в том и смысл приглашения.
+ *
+ * Раз без входа — значит под ограничением частоты, как и остальные
+ * публичные адреса: иначе токен приглашения можно перебирать сколько
+ * угодно, а каждая попытка заводит пароль и открывает сессию.
  */
 @Controller('team-invite')
+@UseGuards(ThrottleGuard)
 export class TeamInviteController {
   constructor(private readonly team: TeamService) {}
 
   @Post('accept')
+  @Throttle({ max: 10, timeWindow: '15 minutes' })
   async accept(
     @Body(new ZodValidationPipe(acceptSchema)) dto: z.infer<typeof acceptSchema>,
     @Req() req: FastifyRequest,

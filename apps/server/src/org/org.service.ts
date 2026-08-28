@@ -1,4 +1,6 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import type { Env } from '../config/env';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReferralService } from '../referral/referral.service';
 
@@ -17,6 +19,7 @@ export class OrgService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly referral: ReferralService,
+    private readonly config: ConfigService<Env, true>,
   ) {}
 
   async profile(orgId: string, userId: string) {
@@ -72,7 +75,7 @@ export class OrgService {
       return { plan: 'paid' as const, used, limit: null, left: null, bonus: 0 };
     }
 
-    const base = Number(process.env.FREE_DOCUMENT_LIMIT ?? 50);
+    const base = this.config.get('FREE_DOCUMENT_LIMIT', { infer: true });
     const bonus = await this.referral.bonusDocuments(orgId);
     const limit = base + bonus;
 

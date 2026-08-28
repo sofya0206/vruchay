@@ -3,6 +3,7 @@ import { BadRequestException } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { PasswordResetService } from './password-reset.service';
 import { verifyPassword } from './password';
+import { testConfig } from '../config/env.test-utils';
 
 /*
  * Восстановление забытого пароля.
@@ -58,7 +59,7 @@ function serviceWith({ user, stored = null }: Case) {
     },
   };
 
-  const svc = new PasswordResetService(prisma as never, mail as never, redis as never);
+  const svc = new PasswordResetService(prisma as never, mail as never, redis as never, testConfig() as never);
   return { svc, sent, redis, updated };
 }
 

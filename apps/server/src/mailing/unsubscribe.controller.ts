@@ -1,8 +1,9 @@
-import { Controller, Get, Header, Param, Req } from '@nestjs/common';
+import { Controller, Get, Header, Param, Req, UseGuards } from '@nestjs/common';
 import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
-import { RateLimitService } from '../common/rate-limit.service';
+import { Throttle } from '../common/throttle.decorator';
+import { ThrottleGuard } from '../common/throttle.guard';
 import { escapeHtml } from '../mail/mail-template';
 import { MailingService } from './mailing.service';
 
@@ -24,13 +25,12 @@ const emailIdParam = new ZodValidationPipe(z.string().uuid());
  * иначе перебор ссылок сообщал бы, кому и что мы отправляли.
  */
 @Controller('v1/u')
+@UseGuards(ThrottleGuard)
 export class UnsubscribeController {
-  constructor(
-    private readonly mailing: MailingService,
-    private readonly rateLimit: RateLimitService,
-  ) {}
+  constructor(private readonly mailing: MailingService) {}
 
   @Get(':emailId')
+  @Throttle({ max: 30, timeWindow: '5 minutes' })
   @Header('Content-Type', 'text/html; charset=utf-8')
   @Header('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'")
   @Header('Cache-Control', 'no-store')
@@ -44,16 +44,21 @@ export class UnsubscribeController {
     );
   }
 
+  /*
+   * Подтверждение отписки. Ограничение — на обоих шагах: раньше счётчик
+   * здесь вызывался, но его ответ никто не смотрел, и запрос шёл дальше
+   * в любом случае, а первый шаг не считался вовсе.
+   *
+   * Тридцать обращений за пять минут с одного адреса — с большим запасом
+   * на человека, который жмёт кнопку по нескольку раз, и мало для перебора
+   * идентификаторов писем.
+   */
   @Get(':emailId/confirm')
+  @Throttle({ max: 30, timeWindow: '5 minutes' })
   @Header('Content-Type', 'text/html; charset=utf-8')
   @Header('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'")
   @Header('Cache-Control', 'no-store')
   async confirm(@Param('emailId', emailIdParam) emailId: string, @Req() req: FastifyRequest) {
-    // Перебор ограничиваем: идентификатор случайный и его не подобрать,
-    // но без ограничения страница стала бы способом выяснять, какие
-    // письма существуют, по времени ответа.
-    await this.rateLimit.hit(`unsubscribe:${req.ip}`, 60_000, 20);
-
     await this.mailing.unsubscribe(emailId, {
       ip: req.ip,
       userAgent: req.headers['user-agent'],

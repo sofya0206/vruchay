@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { RegistryActionsService } from './registry-actions.service';
+import { testConfig } from '../config/env.test-utils';
 
 /** Файл в реестре, каким его видит перевыпуск. */
 interface FileFixture {
@@ -88,6 +89,7 @@ function serviceWith(world: World): { service: RegistryActionsService; recorded:
     generation as never,
     {} as never,
     {} as never,
+    testConfig() as never,
   );
   return { service, recorded };
 }

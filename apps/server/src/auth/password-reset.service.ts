@@ -1,6 +1,8 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { randomBytes, createHash } from 'node:crypto';
 import type Redis from 'ioredis';
+import { baseUrl, type Env } from '../config/env';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { InjectRedis } from '../common/redis.module';
@@ -34,7 +36,13 @@ export class PasswordResetService {
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
     @InjectRedis() private readonly redis: Redis,
+    private readonly config: ConfigService<Env, true>,
   ) {}
+
+  /** Публичный адрес сервиса без косой черты — из проверенной схемы настроек. */
+  private publicUrl(): string {
+    return baseUrl(this.config.get('PUBLIC_URL', { infer: true }));
+  }
 
   /**
    * Отправить ссылку.
@@ -68,7 +76,7 @@ export class PasswordResetService {
     // чем содержимое письма, и по хешу ссылку не восстановить.
     await this.redis.set(TOKEN_PREFIX + hashToken(token), user.id, 'EX', TOKEN_TTL_SECONDS);
 
-    const link = `${publicUrl()}/reset?token=${encodeURIComponent(token)}`;
+    const link = `${this.publicUrl()}/reset?token=${encodeURIComponent(token)}`;
     await this.safeSend(
       email,
       'Вручай — восстановление пароля',
@@ -152,6 +160,3 @@ function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
 
-function publicUrl(): string {
-  return (process.env.PUBLIC_URL ?? 'https://vruchay.ru').replace(/\/+$/, '');
-}

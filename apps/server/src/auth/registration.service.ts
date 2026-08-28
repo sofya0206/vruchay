@@ -1,6 +1,8 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { randomBytes, createHash } from 'node:crypto';
 import type Redis from 'ioredis';
+import { baseUrl, type Env } from '../config/env';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { InjectRedis } from '../common/redis.module';
@@ -23,6 +25,7 @@ export class RegistrationService {
     private readonly mail: MailService,
     private readonly referral: ReferralService,
     @InjectRedis() private readonly redis: Redis,
+    private readonly config: ConfigService<Env, true>,
   ) {}
 
   /**
@@ -177,7 +180,7 @@ export class RegistrationService {
   }
 
   private publicUrl(): string {
-    return (process.env.PUBLIC_URL ?? 'https://vruchay.ru').replace(/\/+$/, '');
+    return baseUrl(this.config.get('PUBLIC_URL', { infer: true }));
   }
 }
 

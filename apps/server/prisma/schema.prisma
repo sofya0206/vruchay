@@ -165,6 +165,8 @@ model Document {
   rows      RecipientRow[]
   jobs      GenerationJob[]
   templates EmailTemplate[]
+  emails    Email[]
+  tildaRequests TildaRequest[]
 
   @@index([orgId, deletedAt])
   // Библиотека фильтруется по разделу внутри организации — это её главный запрос.
@@ -272,6 +274,7 @@ model File {
   sheetBackground Sheet[]        @relation("SheetBackground")
   rows            RecipientRow[] @relation("RowFile")
   emails          Email[]        @relation("EmailFile")
+  tildaRequests   TildaRequest[]
 
   @@unique([jobId, rowId])
   @@index([orgId, kind])
@@ -314,6 +317,7 @@ model RecipientRow {
   lastFile File?    @relation("RowFile", fields: [lastFileId], references: [id], onDelete: SetNull)
   /** Все файлы, когда-либо выпущенные по этой строке, — по одному на задание. */
   generated File[]  @relation("RowGenerated")
+  emails    Email[]
 
   @@unique([documentId, position])
   @@index([documentId, checked])
@@ -547,12 +551,33 @@ model Email {
   statusUpdatedAt DateTime  @default(now()) @map("status_updated_at")
 
   org      Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  /**
+   * Материал, по которому ушло письмо.
+   *
+   * Cascade, в отличие от файлов: файл мог уже уйти участнику и проверяться
+   * по QR-коду, а запись о письме нужна только рядом со своим материалом.
+   * Пока связи не было, удаление материала оставляло в базе адреса
+   * участников навсегда — вопреки сроку хранения, который остальным
+   * таблицам считает ночная задача.
+   */
+  document Document?      @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  /**
+   * Строка получателя. SetNull, а не Cascade: список получателей переливают
+   * заново при каждом повторном импорте, а журнал отправки за прошлое
+   * награждение от этого пропадать не должен.
+   */
+  row      RecipientRow?  @relation(fields: [rowId], references: [id], onDelete: SetNull)
   template EmailTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
   file     File?          @relation("EmailFile", fields: [fileId], references: [id], onDelete: SetNull)
   events   EmailEvent[]
+  tildaRequests TildaRequest[]
 
   @@index([orgId, status])
   @@index([documentId])
+  /// Карточка документа в реестре ищет письма ровно так: по выданному файлу.
+  @@index([fileId])
+  /// Ночная уборка выбирает письма старше срока хранения по всем организациям.
+  @@index([queuedAt])
   @@map("emails")
 }
 
@@ -675,6 +700,19 @@ model TildaRequest {
 
   integration TildaIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
   org         Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  /**
+   * Материал, документ по которому запрашивали. Cascade: заявка на удалённый
+   * материал не отвечает уже ни на один вопрос, а поля формы в ней —
+   * персональные данные участника.
+   */
+  document    Document         @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  /**
+   * Выданный файл и отправленное письмо: их могли удалить и без заявки.
+   * Поле письма называется sentEmail — `email` здесь уже занято адресом,
+   * который человек вписал в форму.
+   */
+  file        File?            @relation(fields: [fileId], references: [id], onDelete: SetNull)
+  sentEmail   Email?           @relation(fields: [emailId], references: [id], onDelete: SetNull)
   consents    Consent[]
 
   /**
@@ -821,6 +859,8 @@ model Lead {
 
   createdAt DateTime @default(now()) @map("created_at")
 
+  invoices Invoice[]
+
   @@index([status, createdAt])
   @@map("leads")
 }
@@ -860,8 +900,15 @@ model Invoice {
   createdAt DateTime @default(now()) @map("created_at")
   sentAt    DateTime? @map("sent_at")
 
+  /**
+   * Заявка, по которой выставлен счёт. SetNull: счёт — бухгалтерский
+   * документ и обязан пережить удаление заявки, из которой вырос.
+   */
+  lead Lead? @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
   @@unique([year, number])
   @@index([email])
+  @@index([leadId])
   @@map("invoices")
 }
 

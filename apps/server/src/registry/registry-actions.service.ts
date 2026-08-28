@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { Prisma } from '@prisma/client';
+import type { Env } from '../config/env';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReferralService } from '../referral/referral.service';
 import { GenerationProcessor } from '../generation/generation.processor';
@@ -37,6 +39,7 @@ export class RegistryActionsService {
     private readonly generation: GenerationProcessor,
     private readonly mail: MailService,
     private readonly mailProcessor: MailProcessor,
+    private readonly config: ConfigService<Env, true>,
   ) {}
 
   /**
@@ -324,7 +327,7 @@ export class RegistryActionsService {
     const org = await tx.organization.findUnique({ where: { id: orgId } });
     if (!org || org.plan !== 'free') return;
 
-    const base = Number(process.env.FREE_DOCUMENT_LIMIT ?? 50);
+    const base = this.config.get('FREE_DOCUMENT_LIMIT', { infer: true });
     const bonus = await this.referral.bonusDocuments(orgId, tx);
     const limit = base + bonus;
 

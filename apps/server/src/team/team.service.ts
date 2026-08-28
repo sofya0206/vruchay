@@ -1,7 +1,9 @@
 import { randomBytes, createHash } from 'node:crypto';
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { OrgRole } from '@prisma/client';
 import IORedis from 'ioredis';
+import { baseUrl, type Env } from '../config/env';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { InjectRedis } from '../common/redis.module';
@@ -32,6 +34,7 @@ export class TeamService {
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
     @InjectRedis() private readonly redis: IORedis,
+    private readonly config: ConfigService<Env, true>,
   ) {}
 
   /** Кто состоит в организации. Пароли и их хеши наружу не отдаём никогда. */
@@ -269,7 +272,7 @@ export class TeamService {
   }
 
   private publicUrl(): string {
-    return (process.env.PUBLIC_URL ?? 'https://vruchay.ru').replace(/\/+$/, '');
+    return baseUrl(this.config.get('PUBLIC_URL', { infer: true }));
   }
 }
 

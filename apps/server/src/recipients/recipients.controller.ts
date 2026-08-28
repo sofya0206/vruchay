@@ -17,6 +17,7 @@ import { parseRecipientFile } from '../import/recipient-file';
 import { refineColumns } from '../import/column-names';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { CurrentUser } from '../common/current-user.decorator';
+import { maskFileName, redact } from '../common/redact';
 import { AuthGuard } from '../auth/auth.guard';
 import type { SessionUser } from '../auth/auth.service';
 import { uuidSchema } from '../documents/documents.dto';
@@ -88,7 +89,8 @@ export class RecipientsController {
     } catch (err) {
       // Внутрь ошибки библиотеки может попасть путь или структура файла —
       // наружу отдаём только понятную формулировку.
-      this.logger.warn(`Не удалось разобрать файл «${filename}»: ${String(err)}`);
+      // Имя файла в журнал не пишем: списки называют «Список Ивановых 9А.xlsx».
+      this.logger.warn(`Не удалось разобрать файл ${maskFileName(filename)}: ${redact(String(err))}`);
       throw new BadRequestException(
         'Не удалось прочитать файл. Проверьте, что это таблица Excel или CSV и в ней есть строка с названиями колонок',
       );

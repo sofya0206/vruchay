@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { ReferralService } from './referral.service';
+import { testConfig } from '../config/env.test-utils';
 
 /*
  * Приглашение друга. Проверяем ровно то, что раздаёт бесплатные документы:
@@ -32,7 +33,7 @@ function serviceWith(params: { referredBy?: string | null; invited?: Org[] }): R
         invited.map((o) => ({ orgId: o.id, _count: { _all: o.issued } })),
     },
   };
-  return new ReferralService(prisma as never);
+  return new ReferralService(prisma as never, testConfig() as never);
 }
 
 const org = (id: string, issued: number): Org => ({ id, name: `Организация ${id}`, issued });

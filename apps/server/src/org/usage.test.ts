@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { OrgService } from './org.service';
+import { testConfig } from '../config/env.test-utils';
 
 /*
  * Остаток бесплатной пробы.
@@ -21,7 +22,7 @@ function serviceWith({ plan, used, bonus = 0 }: {
     user: { findUnique: async () => ({ name: 'Мария', email: 'm@example.test' }) },
   };
   const referral = { bonusDocuments: async () => bonus };
-  return new OrgService(prisma as never, referral as never);
+  return new OrgService(prisma as never, referral as never, testConfig() as never);
 }
 
 describe('остаток пробы', () => {

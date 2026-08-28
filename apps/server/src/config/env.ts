@@ -8,6 +8,9 @@ export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
 
+  /** Метка образа, которую отдаёт /health: по ней видно, что выкатилось. */
+  APP_VERSION: z.string().default('dev'),
+
   /** Публичный домен сервиса: попадает в ссылки верификации и в письма */
   PUBLIC_URL: z.string().url().default('http://localhost:5173'),
 
@@ -61,6 +64,17 @@ export const envSchema = z.object({
   SMTP_PASSWORD: z.string().default(''),
   SMTP_SPF_INCLUDE: z.string().default('vruchay.ru'),
   DASHAMAIL_API_KEY: z.string().default(''),
+
+  /**
+   * Сколько писем организация без своего домена может отправить с нашего —
+   * за сутки и за один запуск рассылки. Репутация общего домена одна на всех,
+   * поэтому объём с него ограничен; со своего домена ограничения нет.
+   *
+   * Читались мимо этой схемы и потому не работали вовсе: опечатка в имени
+   * давала NaN, а сравнения с NaN всегда ложны — предел молча пропускал всё.
+   */
+  SHARED_DOMAIN_DAILY_LIMIT: z.coerce.number().int().positive().default(500),
+  SHARED_DOMAIN_BATCH_LIMIT: z.coerce.number().int().positive().default(300),
 
   /**
    * Отправитель служебных писем самого сервиса: подтверждение адреса при
@@ -199,8 +213,47 @@ export const envSchema = z.object({
 
 export type Env = z.infer<typeof envSchema>;
 
+/**
+ * Публичный адрес сервиса без косой черты на конце.
+ *
+ * К нему всюду приклеивается путь (`/verify/…`, `/api/v1/u/…`), и лишняя
+ * черта даёт в письме ссылку с двойным слэшем. Раньше это подрезание было
+ * переписано в семи местах, каждое — со своим значением по умолчанию.
+ */
+export function baseUrl(url: string): string {
+  return url.replace(/\/+$/, '');
+}
+
+/**
+ * Настройки, для которых пустое значение — осознанный выбор, а не «не задано».
+ *
+ * Такая ровно одна: пустой TRUST_PROXY выключает доверие обратному прокси.
+ * Подставить туда значение по умолчанию значило бы включить доверие обратно —
+ * тихо отменить решение, ради которого строку и очистили.
+ */
+const BLANK_IS_A_VALUE = new Set(['TRUST_PROXY']);
+
+/**
+ * Пустая строка значит «не задано».
+ *
+ * В .env переменную выключают, стирая значение после знака равенства, а не
+ * удаляя строку целиком — в образцах проекта так и написано: `ORG_ACTIVE_JOBS=`
+ * с пояснением «пусто — 3». Для Zod же присутствующий ключ с пустой строкой —
+ * это заданное значение: значение по умолчанию не подставится, `z.coerce.number()`
+ * превратит пустоту в ноль, и сервер откажется стартовать из-за настройки,
+ * которую человек как раз и выключил.
+ */
+function withoutBlanks(raw: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (value === '' && !BLANK_IS_A_VALUE.has(key)) continue;
+    out[key] = value;
+  }
+  return out;
+}
+
 export function validateEnv(raw: Record<string, unknown>): Env {
-  const parsed = envSchema.safeParse(raw);
+  const parsed = envSchema.safeParse(withoutBlanks(raw));
   if (!parsed.success) {
     const details = parsed.error.issues
       .map((i) => `  ${i.path.join('.')}: ${i.message}`)

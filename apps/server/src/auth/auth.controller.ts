@@ -1,9 +1,11 @@
 import { Body, Controller, Get, Post, Req, UseGuards, UsePipes } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { Throttle } from '../common/throttle.decorator';
 import { ThrottleGuard } from '../common/throttle.guard';
+import type { Env } from '../config/env';
 import { AuthService } from './auth.service';
 import { RegistrationService } from './registration.service';
 import { PasswordResetService } from './password-reset.service';
@@ -51,6 +53,7 @@ export class AuthController {
     private readonly auth: AuthService,
     private readonly registration: RegistrationService,
     private readonly passwordReset: PasswordResetService,
+    private readonly config: ConfigService<Env, true>,
   ) {}
 
   // Подбор пароля: не более 10 попыток с одного адреса за 5 минут.
@@ -150,7 +153,7 @@ export class AuthController {
     // Свои мы или клиент — нужно кабинету, чтобы не показывать разделы,
     // за которыми клиента ждёт отказ. Права всё равно проверяет сервер;
     // это про то, чтобы не звать человека туда, куда ему нельзя.
-    const platformOrgId = process.env.PLATFORM_ORG_ID ?? '';
+    const platformOrgId = this.config.get('PLATFORM_ORG_ID', { infer: true });
     return { email, name, role, isPlatform: Boolean(platformOrgId) && orgId === platformOrgId };
   }
 }

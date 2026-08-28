@@ -34,7 +34,16 @@ export function parseMailFrom(raw: string | undefined): { email: string; name: s
   return { email, name: name || 'Вручай' };
 }
 
-/** Отправитель на нашем домене или null, если он не настроен. */
-export function platformSender(): { email: string; name: string } | null {
-  return parseMailFrom(process.env.PLATFORM_MAIL_FROM ?? process.env.SERVICE_MAIL_FROM);
+/**
+ * Отправитель на нашем домене или null, если он не настроен.
+ *
+ * Обе строки передаются снаружи, из проверенной схемы настроек: файл
+ * с разбором адреса не должен знать, откуда взялось значение, — иначе
+ * его нельзя ни проверить тестом, ни переиспользовать.
+ */
+export function platformSender(
+  platformMailFrom: string | undefined,
+  serviceMailFrom: string,
+): { email: string; name: string } | null {
+  return parseMailFrom(platformMailFrom || serviceMailFrom);
 }

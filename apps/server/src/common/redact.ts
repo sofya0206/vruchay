@@ -21,6 +21,21 @@ export function maskEmail(value: string): string {
   return `${local.slice(0, 1)}***@${domain}`;
 }
 
+/**
+ * Имя загруженного файла для журнала.
+ *
+ * Списки участников называют по-человечески: «Список Ивановых 9А.xlsx»,
+ * «Победители Петров и Сидоров.csv». Это персональные данные, и в журнал
+ * они попадать не должны — а разбирать сбой разбора файла по одному только
+ * расширению всё же можно: оно и объясняет большую часть таких сбоев.
+ */
+export function maskFileName(name: string): string {
+  const dot = name.lastIndexOf('.');
+  // Точка первым символом — это не расширение, а скрытый файл целиком.
+  const ext = dot > 0 ? name.slice(dot).toLowerCase() : '';
+  return `***${ext}`;
+}
+
 export function redact(text: string): string {
   return text.replace(EMAIL_RE, maskEmail).replace(PHONE_RE, '+7***');
 }
