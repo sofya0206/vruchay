@@ -42,7 +42,8 @@ export type HeaderChoice = 'auto' | 'headers' | 'none';
 export interface ParsedSheet {
   sheetName: string;
   headerRowIndex: number;
-  columns: { source: string; suggested: string }[];
+  /** `guessed` — имя подобрано по значениям колонки, а не по её заголовку. */
+  columns: { source: string; suggested: string; guessed?: boolean }[];
   rows: string[][];
   skippedEmptyRows: number;
   /** Как разобрана первая строка: как названия колонок или как данные. */

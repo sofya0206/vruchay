@@ -33,6 +33,16 @@ export function RecipientsTable({
   const send = useSend(documentId);
   const [parsed, setParsed] = useState<ParsedSheet | null>(null);
   const [parsedFrom, setParsedFrom] = useState<'file' | 'paste'>('file');
+  /*
+   * Имена переменных, введённые руками в окне импорта.
+   *
+   * Переживают закрытие окна: файл переливают обычно потому, что в нём
+   * что-то поправили, и заставлять человека второй раз переименовывать
+   * те же колонки — значит наказывать его за исправление опечатки.
+   * Ключ — заголовок колонки файла, поэтому переименование срабатывает
+   * и на другом файле с такой же шапкой.
+   */
+  const [manualNames, setManualNames] = useState<Record<string, string>>({});
   const [newColumn, setNewColumn] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState(false);
@@ -112,6 +122,10 @@ export function RecipientsTable({
       onError: (err) => setError((err as Error).message),
     });
   }, [job?.id, job?.status, job?.done, send]);
+
+  // Имена помним в пределах одного материала: у другого материала и таблица
+  // другая, а одинаковая шапка там может значить другое.
+  useEffect(() => setManualNames({}), [documentId]);
 
   if (table.isPending) return <p className="p-6 text-[var(--text-muted)]">Загрузка таблицы…</p>;
   if (!table.data) return <p className="p-6 text-[var(--text-muted)]">Таблица недоступна</p>;
@@ -451,6 +465,8 @@ export function RecipientsTable({
             const file = parseSource.current;
             if (file) void parseInto(file, parsedFrom, headers);
           }}
+          remembered={manualNames}
+          onRemember={(key, name) => setManualNames((prev) => ({ ...prev, [key]: name }))}
           onCancel={() => setParsed(null)}
           onConfirm={(cols, importRows, mode) => {
             m.importRows.mutate(

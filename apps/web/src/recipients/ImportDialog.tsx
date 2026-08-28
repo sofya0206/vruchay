@@ -3,6 +3,14 @@ import { AlertTriangle, Wand2, X } from 'lucide-react';
 import type { ImportSuggestion, ParsedSheet } from '../api/recipients';
 import { Button } from '../ui/Button';
 import { Input, Label } from '../ui/Field';
+import {
+  applyMerge,
+  canMergeFullName,
+  columnKey,
+  countBound,
+  initialNames,
+  NAME_RE,
+} from './column-mapping';
 
 /** Строки с принятыми правками. Непринятые предложения строк не касаются. */
 export function applySuggestions(
@@ -33,6 +41,9 @@ interface Props {
   reparsing?: boolean;
   /** Перечитать файл, поняв первую строку иначе. */
   onHeaderMode?: (mode: 'headers' | 'none') => void;
+  /** Имена, введённые руками при прошлой загрузке: ключ — заголовок колонки файла. */
+  remembered: Record<string, string>;
+  onRemember: (key: string, name: string) => void;
   onCancel: () => void;
   onConfirm: (columns: string[], rows: string[][], mode: 'append' | 'replace') => void;
 }
@@ -71,10 +82,15 @@ export function ImportDialog({
   source = 'file',
   reparsing = false,
   onHeaderMode,
+  remembered,
+  onRemember,
   onCancel,
   onConfirm,
 }: Props) {
-  const [names, setNames] = useState(sheet.columns.map((c) => c.suggested));
+  // Введённое руками сильнее догадки сервиса: если человек уже один раз
+  // переименовал колонку «Участник» в свою переменную, повторная загрузка
+  // того же файла не должна возвращать её к «name».
+  const [names, setNames] = useState(() => initialNames(sheet.columns, remembered));
   const [mode, setMode] = useState<'append' | 'replace'>('append');
   // Предложения выключены по умолчанию: правку текста человек включает сам.
   const [accepted, setAccepted] = useState<number[]>([]);
@@ -114,10 +130,15 @@ export function ImportDialog({
       {reparsing && <span className="text-[var(--text-muted)]">перечитываем…</span>}
     </div>
   );
+  const [mergeFullName, setMergeFullName] = useState(false);
 
   const duplicates = names.filter((n, i) => n && names.indexOf(n) !== i);
-  const invalid = names.filter((n) => n && !/^[a-zA-Z][a-zA-Z0-9_]*$/.test(n));
+  const invalid = names.filter((n) => n && !NAME_RE.test(n));
   const canConfirm = !duplicates.length && !invalid.length && names.every(Boolean);
+
+  const canMerge = canMergeFullName(names);
+  const result = applyMerge(names, rows, mergeFullName);
+  const bound = countBound(result.columns);
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
@@ -189,7 +210,18 @@ export function ImportDialog({
           )}
 
           <div>
-            <Label>Колонки файла и имена переменных</Label>
+            <div className="flex items-baseline justify-between gap-3">
+              <Label>Колонки файла и имена переменных</Label>
+              <span
+                className={`text-sm ${
+                  bound === result.columns.length
+                    ? 'text-[var(--text-muted)]'
+                    : 'text-[var(--danger)]'
+                }`}
+              >
+                Привязано {bound} из {result.columns.length}
+              </span>
+            </div>
             <div className="space-y-2">
               {sheet.columns.map((col, i) => (
                 <div key={i} className="flex items-center gap-3">
@@ -202,8 +234,23 @@ export function ImportDialog({
                     onChange={(e) =>
                       setNames((prev) => prev.map((n, j) => (j === i ? e.target.value : n)))
                     }
+                    // Запоминаем на уходе из поля, а не на каждой букве: иначе
+                    // в память попадали бы недописанные имена и пустая строка,
+                    // оставшаяся после очистки поля.
+                    onBlur={(e) => {
+                      const value = e.target.value.trim();
+                      if (value) onRemember(columnKey(sheet.columns, i), value);
+                    }}
                     className="w-1/2 font-mono text-sm"
                   />
+                  {col.guessed && names[i] === col.suggested && (
+                    <span
+                      title="Заголовок ничего не подсказал — имя подобрано по значениям в колонке. Проверьте его."
+                      className="shrink-0 rounded bg-[var(--award-soft)] px-1.5 py-0.5 text-xs text-[var(--award)]"
+                    >
+                      по данным
+                    </span>
+                  )}
                   {existingColumns.includes(names[i]) && (
                     <span className="shrink-0 text-xs text-[var(--text-muted)]">уже есть</span>
                   )}
@@ -220,6 +267,28 @@ export function ImportDialog({
                 Латинские буквы, цифры и подчёркивание; первым символом — буква
               </p>
             )}
+            {names.some((n) => !n) && (
+              <p className="mt-2 text-sm text-[var(--danger)]">
+                Заполните имена всех колонок — пустых сервис не примет
+              </p>
+            )}
+            {canMerge && (
+              <label className="mt-3 flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={mergeFullName}
+                  onChange={(e) => setMergeFullName(e.target.checked)}
+                  className="mt-0.5 accent-[var(--accent)]"
+                />
+                <span>
+                  Склеить фамилию, имя и отчество в одну переменную{' '}
+                  <code className="font-mono">name</code>
+                  <span className="block text-[var(--text-muted)]">
+                    В макете обычно одна строка с ФИО, а в файле три колонки
+                  </span>
+                </span>
+              </label>
+            )}
           </div>
 
           <div>
@@ -228,7 +297,7 @@ export function ImportDialog({
               <table className="w-full text-sm">
                 <thead className="bg-[var(--surface-sunken)]">
                   <tr>
-                    {names.map((n, i) => (
+                    {result.columns.map((n, i) => (
                       <th key={i} className="px-3 py-2 text-left font-mono text-xs font-medium">
                         {n}
                       </th>
@@ -236,7 +305,7 @@ export function ImportDialog({
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.slice(0, 5).map((row, i) => (
+                  {result.rows.slice(0, 5).map((row, i) => (
                     <tr key={i} className="border-t border-[var(--line)]">
                       {row.map((cell, j) => (
                         <td key={j} className="max-w-48 truncate px-3 py-1.5">
@@ -266,7 +335,7 @@ export function ImportDialog({
             <Button
               variant="primary"
               disabled={!canConfirm || importing}
-              onClick={() => onConfirm(names, rows, mode)}
+              onClick={() => onConfirm(result.columns, result.rows, mode)}
             >
               {importing ? 'Импортируем…' : `Импортировать ${sheet.rows.length}`}
             </Button>
