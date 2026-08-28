@@ -8,6 +8,7 @@ import { EditorPage } from './pages/EditorPage';
 import { RenderPage } from './pages/RenderPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { InvoicesPage } from './pages/InvoicesPage';
+import { RegistryPage } from './registry/RegistryPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { PrivacyPage } from './pages/PrivacyPage';
 import { VerifyDocumentPage } from './pages/VerifyDocumentPage';
@@ -64,6 +65,7 @@ export function App() {
       <Route path="/documents/:id" element={<EditorPage />} />
       <Route path="/settings" element={<SettingsPage />} />
       <Route path="/invoices" element={<InvoicesPage />} />
+      <Route path="/registry" element={<RegistryPage />} />
       <Route path="/login" element={<Navigate to="/" replace />} />
       {/* Вошедшему на этих страницах делать нечего: адрес уже подтверждён,
           организация есть. Отправляем в кабинет, а не показываем формы. */}

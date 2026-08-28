@@ -16,6 +16,7 @@ import { ValidationModule } from './validation/validation.module';
 import { MailModule } from './mail/mail.module';
 import { TildaModule } from './tilda/tilda.module';
 import { VerifyModule } from './verify/verify.module';
+import { RegistryModule } from './registry/registry.module';
 import { LeadsModule } from './leads/leads.module';
 import { PaymentsModule } from './payments/payments.module';
 import { InvoicesModule } from './invoices/invoices.module';
@@ -45,6 +46,7 @@ import { PlatformModule } from './platform/platform.module';
     MailModule,
     TildaModule,
     VerifyModule,
+    RegistryModule,
     LeadsModule,
     PaymentsModule,
     InvoicesModule,

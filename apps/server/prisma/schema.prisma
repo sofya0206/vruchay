@@ -207,16 +207,50 @@ model File {
    */
   rowId String? @map("row_id") @db.Uuid
 
+  /**
+   * Перевыпуск: задание, которое должно заменить этот файл.
+   *
+   * Ставится в момент, когда человек нажал «Перевыпустить», — то есть до
+   * того, как новый документ существует. Пока файла-замены нет, старый
+   * остаётся действительным: выпуск может упасть или быть отменён, и
+   * гасить настоящий сертификат под обещание нового нельзя.
+   *
+   * Замену находим по паре (job_id, row_id) — тому же ключу идемпотентности,
+   * которым пользуется очередь. Найденную запоминаем в replacedById, чтобы
+   * связь пережила удаление строки из таблицы получателей.
+   */
+  replacedByJobId String? @map("replaced_by_job_id") @db.Uuid
+  replacedById    String? @map("replaced_by_id") @db.Uuid
+
+  /**
+   * Сколько раз документ проверяли по QR-коду и когда в последний раз.
+   *
+   * Обезличенный счётчик: ни адреса, ни устройства, ни отпечатка браузера
+   * проверяющего мы не храним. Организации нужен ответ «сертификат проверили
+   * 47 раз», а не досье на того, кто проверял, — и по 152-ФЗ второе
+   * перевело бы нас из обработчика по поручению в самостоятельного оператора.
+   */
+  verifyCount  Int       @default(0) @map("verify_count")
+  verifyLastAt DateTime? @map("verify_last_at")
+
+  /** Сколько раз файл скачивали из кабинета — тоже только счётчиком. */
+  downloadCount Int @default(0) @map("download_count")
+
   org             Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
   document        Document?      @relation(fields: [documentId], references: [id], onDelete: SetNull)
   job             GenerationJob? @relation("JobFiles", fields: [jobId], references: [id], onDelete: SetNull)
   row             RecipientRow?  @relation("RowGenerated", fields: [rowId], references: [id], onDelete: SetNull)
+  replacedBy      File?          @relation("FileReplacement", fields: [replacedById], references: [id], onDelete: SetNull)
+  replaces        File[]         @relation("FileReplacement")
   sheetBackground Sheet[]        @relation("SheetBackground")
   rows            RecipientRow[] @relation("RowFile")
   emails          Email[]        @relation("EmailFile")
 
   @@unique([jobId, rowId])
   @@index([orgId, kind])
+  /// Реестр листает выданное по организации в обратном хронологическом
+  /// порядке — без этого индекса каждая страница читала бы все файлы.
+  @@index([orgId, kind, createdAt])
   @@map("files")
 }
 
