@@ -198,7 +198,7 @@ describe('parseSpreadsheet, книга Excel', () => {
         const ws = wb.addWorksheet('Лист1');
         ws.addRow(['ФИО', 'Почта', 'Дата выдачи']);
         const row = ws.addRow(['Иванов', 'i@mail.ru', null]);
-        row.getCell(3).value = { formula: 'TODAY()', result: new Date(2026, 7, 24) } as never;
+        row.getCell(3).value = { formula: 'TODAY()', result: new Date(Date.UTC(2026, 7, 24)) } as never;
       }),
       'protokol.xlsx',
     );
