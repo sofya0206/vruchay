@@ -9,7 +9,9 @@ import { buildS3Key } from '../storage/s3-key';
 import { createRenderToken } from '../render/render-token';
 import type { Env } from '../config/env';
 import { PdfRenderer } from './pdf-renderer';
+import { GenerationService, STUCK_AFTER_MS } from './generation.service';
 import { DEFAULT_NAME_TEMPLATE, buildFileName } from './file-name';
+import { jobStopMessage, renderProblem, shouldStop, type RenderProblem } from './render-failure';
 
 export const GENERATION_QUEUE = 'generation';
 
@@ -26,6 +28,22 @@ export const GENERATION_QUEUE = 'generation';
  * занимал воркер целиком на часы.
  */
 export const CHUNK_SIZE = 50;
+
+/** Имя разовой задачи-сторожа в той же очереди. */
+const SWEEP_JOB = 'sweep-stuck';
+
+/**
+ * Как часто искать зависшие задания.
+ *
+ * Раз в пять минут: сторож стоит один запрос к базе, а человек с вечным
+ * прогрессом на экране ждать полчаса не должен. Вместе с порогом
+ * зависания это даёт худший случай в двадцать минут — неприятно,
+ * но не «навсегда», как было.
+ */
+const SWEEP_EVERY = '0 */5 * * * *';
+
+/** Сколько зависших разбираем за один заход: сторож не должен занимать воркер надолго. */
+const SWEEP_BATCH = 20;
 
 export interface GenerationChunk {
   jobId: string;
@@ -55,6 +73,7 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
     private readonly storage: StorageService,
     private readonly config: ConfigService<Env, true>,
     private readonly renderer: PdfRenderer,
+    private readonly generation: GenerationService,
   ) {}
 
   onModuleInit(): void {
@@ -70,7 +89,15 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
 
     this.worker = new Worker<GenerationChunk>(
       GENERATION_QUEUE,
-      (job) => this.process(job.data),
+      // Сторож зависших живёт в той же очереди: заводить ради одного
+      // запроса раз в пять минут второе подключение к Redis незачем.
+      async (job) => {
+        if (job.name === SWEEP_JOB) {
+          await this.sweepStuck();
+          return;
+        }
+        await this.process(job.data);
+      },
       {
         connection: this.connection,
         /*
@@ -103,6 +130,8 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
         maxStalledCount: 3,
       },
     );
+    void this.scheduleSweep();
+
     this.worker.on('failed', (job, err) => {
       this.logger.error(`Часть ${job?.id} задания ${job?.data.jobId} упала: ${err.message}`);
       // Попытки ещё остались — очередь вернётся к этой части сама.
@@ -110,6 +139,100 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
       if (job && job.attemptsMade < attempts) return;
       void this.giveUp(job?.data.jobId, err);
     });
+  }
+
+  /**
+   * Ставит сторожа на расписание.
+   *
+   * Не в отдельном таймере процесса, а в очереди: воркеров может быть
+   * несколько, и расписание в Redis гарантирует, что заход будет один.
+   * Неудача здесь выпуск не ломает — сторож нужен, но не ценой старта.
+   */
+  private async scheduleSweep(): Promise<void> {
+    try {
+      await this.queue?.upsertJobScheduler(
+        SWEEP_JOB,
+        { pattern: SWEEP_EVERY },
+        { name: SWEEP_JOB, opts: { removeOnComplete: 20, removeOnFail: 20 } },
+      );
+    } catch (err) {
+      this.logger.error(
+        `Не удалось поставить сторожа зависших заданий: ` +
+          `${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  /**
+   * Подбирает задания, за которыми никто не пришёл.
+   *
+   * Такое задание — не выдумка: запись коммитится в базу, и только потом
+   * пакет кладётся в очередь. Между этими шагами Redis может моргнуть,
+   * а процесс — перезапуститься при выкате. Постановка теперь закрывает
+   * задание сама, но это спасает лишь от той беды, о которой мы узнали;
+   * убитый посреди постановки процесс закрыть ничего не успеет.
+   *
+   * Отсюда второй рубеж: раз в несколько минут смотрим, нет ли заданий,
+   * которые стоят «в очереди» дольше разумного и не сделали ни одной
+   * строки. Прежде чем что-то делать, спрашиваем саму очередь: если части
+   * в ней лежат, задание просто ждёт своей поры, и трогать его нельзя.
+   *
+   * Возвращает число поднятых — им пользуется проверка.
+   */
+  async sweepStuck(now: Date = new Date()): Promise<number> {
+    let revived = 0;
+    try {
+      const candidates = await this.prisma.generationJob.findMany({
+        where: {
+          status: 'queued',
+          startedAt: null,
+          done: 0,
+          failed: 0,
+          createdAt: { lt: new Date(now.getTime() - STUCK_AFTER_MS) },
+        },
+        take: SWEEP_BATCH,
+      });
+
+      for (const job of candidates) {
+        if (await this.hasChunksInQueue(job.id, job.attempt, job.chunks)) continue;
+
+        this.logger.warn(
+          `Задание ${job.id} висит в очереди с ${job.createdAt.toISOString()} ` +
+            `и ни одной части в очереди за ним нет — поднимаем заново`,
+        );
+        try {
+          // Тем же путём, что и кнопка «Продолжить»: второй дороги
+          // к продолжению выпуска быть не должно — разойдутся.
+          const { job: revivedJob, rowIds } = await this.generation.resume(job.orgId, job.id);
+          if (rowIds.length > 0) await this.enqueue(revivedJob, rowIds);
+          revived++;
+        } catch (err) {
+          this.logger.error(
+            `Задание ${job.id} поднять не удалось: ` +
+              `${err instanceof Error ? err.message : String(err)}`,
+          );
+          // Помечаем упавшим: висеть «в очереди» вечно оно не должно
+          // в любом случае — так человек хотя бы увидит, что случилось,
+          // а бронь квоты вернётся организации.
+          await this.generation.failToQueue(job.id);
+        }
+      }
+    } catch (err) {
+      this.logger.error(
+        `Сторож зависших заданий не отработал: ` +
+          `${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+    return revived;
+  }
+
+  /** Лежит ли в очереди хоть одна часть этой попытки: если да — задание просто ждёт. */
+  private async hasChunksInQueue(jobId: string, attempt: number, chunks: number): Promise<boolean> {
+    for (let index = 0; index < chunks; index++) {
+      const found = await this.queue?.getJob(chunkId(jobId, attempt, index)).catch(() => undefined);
+      if (found) return true;
+    }
+    return false;
   }
 
   async onModuleDestroy(): Promise<void> {
@@ -217,6 +340,48 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /**
+   * Останавливает выпуск, когда беда общая, а не в одной строке.
+   *
+   * Считаем неудачи подряд, но терпение разное: причине, которая сама
+   * говорит об общей беде (умершее хранилище, упавший браузер,
+   * кончившееся место), хватает двух строк, незнакомой — пяти.
+   * Одну неудачу не считаем поломкой ни в каком случае: и хранилище,
+   * и браузер умеют моргнуть на одной строке, а такую строку сервис
+   * повторит сам.
+   *
+   * Оставшиеся части сами увидят, что выпуск закрыт, и не начнут работу.
+   * Бронь квоты освобождается тем же движением: закрытое задание
+   * перестаёт быть активным и в расчёте остатка не участвует.
+   */
+  private async stopJob(jobId: string, problem: RenderProblem, streak: number): Promise<void> {
+    this.logger.error(
+      `Задание ${jobId} остановлено после ${streak} неудач подряд: ` +
+        `${problem.reason} — ${problem.details}`,
+    );
+    try {
+      const [done, failed] = await Promise.all([
+        this.prisma.file.count({ where: { jobId, kind: 'generated', s3Key: { not: '' } } }),
+        this.prisma.generationRowFailure.count({ where: { jobId } }),
+      ]);
+      await this.prisma.generationJob.updateMany({
+        where: { id: jobId, status: { in: ['queued', 'running'] } },
+        data: {
+          status: 'failed',
+          done,
+          failed,
+          finishedAt: new Date(),
+          error: jobStopMessage(problem.reason),
+        },
+      });
+    } catch (err) {
+      this.logger.error(
+        `Не удалось остановить задание ${jobId}: ` +
+          `${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
   private async process(chunk: GenerationChunk): Promise<void> {
     const { jobId } = chunk;
     const job = await this.prisma.generationJob.findUnique({
@@ -224,7 +389,11 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
       include: { document: true },
     });
     if (!job) return;
-    if (job.status === 'canceled' || job.status === 'done') {
+    if (job.status === 'canceled' || job.status === 'done' || job.status === 'failed') {
+      // 'failed' здесь наравне с остальными: выпуск останавливают, когда
+      // беда общая — умершее хранилище, упавший браузер. Продолжать
+      // остальными частями значит перемолоть впустую весь список
+      // и выдать человеку три сотни одинаковых строк в отчёте.
       this.logger.log(`Часть ${chunk.index} задания ${jobId}: выпуск уже закрыт, пропускаем`);
       return;
     }
@@ -294,6 +463,14 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
     let canceled = false;
     /** Строки, судьбу которых не удалось записать: их придётся повторить. */
     let unrecorded = 0;
+    /**
+     * Сколько строк подряд не удалось выпустить.
+     *
+     * Отличает «одна плохая строка» от «сломалось всё»: первое — обычное
+     * дело и попадает в отчёт поимённо, второе — повод остановиться
+     * и сказать человеку, что случилось, а не печатать в пустоту.
+     */
+    let streak = 0;
 
     for (const rowId of chunk.rowIds) {
       if (doneRows.has(rowId)) continue;
@@ -387,6 +564,8 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
             .deleteMany({ where: { jobId, rowId } })
             .catch(() => undefined);
         }
+
+        streak = 0;
       } catch (err) {
         if (isDuplicateRow(err)) {
           /*
@@ -405,10 +584,21 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
         // Одна плохая строка не должна ронять всё награждение:
         // записываем причину и продолжаем, отчёт покажем в интерфейсе.
         if (uploaded) await this.storage.remove(s3Key).catch(() => undefined);
-        const message = err instanceof Error ? err.message : String(err);
-        this.logger.warn(`Строка ${rowId}: ${message}`);
-        const recorded = await this.recordFailure(jobId, rowId, 'Документ не удалось создать');
+
+        // Причина словами — в отчёт, полный текст — в журнал сервера.
+        // Раньше в отчёт уходило «Документ не удалось создать» на любую
+        // беду, и понять по нему было нельзя даже того, чинить ли макет
+        // или ждать хранилище.
+        const problem = renderProblem(err);
+        this.logger.warn(`Строка ${rowId}: ${problem.reason} — ${problem.details}`);
+        const recorded = await this.recordFailure(jobId, rowId, problem.reason);
         if (!recorded) unrecorded++;
+
+        streak++;
+        if (shouldStop(problem, streak)) {
+          await this.stopJob(jobId, problem, streak);
+          return;
+        }
       }
 
       /*

@@ -71,6 +71,14 @@ export interface GenerationJob {
   done: number;
   failed: number;
   error: string | null;
+  /**
+   * Задание стоит «в очереди», но за ним никто не пришёл.
+   *
+   * Считает сервер: в кабинете нет ни времени создания задания, ни правила,
+   * по которому срок ожидания считается неразумным. Приходит только
+   * с состоянием задания — у только что созданного его нет и быть не может.
+   */
+  stuck?: boolean;
 }
 
 export interface CanceledJob extends GenerationJob {

@@ -152,10 +152,15 @@ export function RecipientsTable({
 
   const { columns, rows, checkedCount } = table.data;
   const allChecked = rows.length > 0 && rows.every((r) => r.checked);
-  const running = job?.status === 'queued' || job?.status === 'running';
+  // Задание стоит «в очереди», но за ним никто не пришёл: пакет не доехал
+  // до очереди, и сам собой он не тронется. Сервис поднимет такое задание
+  // сторожем в течение нескольких минут, но человеку у экрана незачем
+  // ждать вслепую — он видит, что случилось, и может нажать «Продолжить».
+  const stuck = job?.status === 'queued' && job.stuck === true;
+  const running = !stuck && (job?.status === 'queued' || job?.status === 'running');
   // Доделывать есть что, пока сделано меньше обещанного.
   const canResume =
-    !!job && (job.status === 'failed' || job.status === 'canceled') && job.done < job.total;
+    !!job && (job.status === 'failed' || job.status === 'canceled' || stuck) && job.done < job.total;
 
   /**
    * Разбор для диалога. Один путь и для файла, и для вставки: правила
@@ -274,12 +279,14 @@ export function RecipientsTable({
           </span>
 
           {job && (
-            <StatusChip tone={running ? 'progress' : job.failed ? 'neutral' : 'done'}>
+            <StatusChip tone={running ? 'progress' : job.failed || stuck ? 'neutral' : 'done'}>
               {running ? (
                 <>
                   <LoaderCircle size={13} className="animate-spin" />
                   {job.done} из {job.total}
                 </>
+              ) : stuck ? (
+                <>Выпуск не начался</>
               ) : job.status === 'canceled' ? (
                 <>Остановлено на {job.done}</>
               ) : (
@@ -403,6 +410,16 @@ export function RecipientsTable({
               </button>
             </>
           )}
+        </div>
+      )}
+
+      {/* Зависшее задание. Без этой строчки человек видел вечный прогресс
+          и не знал ни что случилось, ни что делать: «Продолжить» такое
+          задание не принимало, а помогало только «Отменить». */}
+      {stuck && (
+        <div className="border-b border-[var(--line)] bg-[var(--surface-sunken)] px-4 py-3 text-sm">
+          Выпуск так и не начался: очередь заданий не приняла пакет. Ничего не списано —
+          нажмите «Продолжить», и документы создадутся с того же места.
         </div>
       )}
 

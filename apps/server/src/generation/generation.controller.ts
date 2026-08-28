@@ -8,6 +8,7 @@ import {
   Post,
   Query,
   Res,
+  ServiceUnavailableException,
   UseGuards,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -24,7 +25,7 @@ import { contentDisposition } from '../storage/s3-key';
 import { AuditActor } from '../audit/actor.decorator';
 import { AuditService, type Actor } from '../audit/audit.service';
 import type { Env } from '../config/env';
-import { GenerationService } from './generation.service';
+import { GenerationService, isStuck } from './generation.service';
 import { GenerationProcessor } from './generation.processor';
 import { buildFileName, nameTemplateSchema, uniqueName } from './file-name';
 import { mergePdfs } from './merge-pdf';
@@ -70,7 +71,7 @@ export class GenerationController {
     @Body(new ZodValidationPipe(startSchema)) dto: StartDto,
   ) {
     const { job, rowIds } = await this.generation.start(user.orgId, id, dto.format);
-    const chunks = await this.processor.enqueue(job, rowIds);
+    const chunks = await this.enqueueOrFail(job, rowIds);
 
     await this.audit.record({
       actor,
@@ -99,7 +100,7 @@ export class GenerationController {
     @Param('jobId', uuidParam) jobId: string,
   ) {
     const { job, rowIds } = await this.generation.resume(user.orgId, jobId);
-    if (rowIds.length > 0) await this.processor.enqueue(job, rowIds);
+    if (rowIds.length > 0) await this.enqueueOrFail(job, rowIds);
 
     await this.audit.record({
       actor,
@@ -143,14 +144,52 @@ export class GenerationController {
     return { ...job, refunded };
   }
 
+  /**
+   * Ставит пакет в очередь и следит, чтобы неудача не осталась незамеченной.
+   *
+   * Запись о задании уже в базе — она коммитится раньше постановки. Если
+   * очередь не приняла пакет, а мы просто вернём ошибку, задание навсегда
+   * останется «в очереди»: вечный прогресс на экране, занятая бронь квоты,
+   * заблокированный материал. Поэтому сначала закрываем задание,
+   * и только потом отвечаем.
+   */
+  private async enqueueOrFail(
+    job: { id: string; total: number; attempt: number },
+    rowIds: string[],
+  ): Promise<number> {
+    try {
+      return await this.processor.enqueue(job, rowIds);
+    } catch (err) {
+      this.logger.error(
+        `Не удалось поставить задание ${job.id} в очередь: ` +
+          `${err instanceof Error ? err.message : String(err)}`,
+      );
+      await this.generation.failToQueue(job.id);
+      throw new ServiceUnavailableException(
+        'Очередь заданий сейчас недоступна, выпуск не начат. ' +
+          'Ничего не списано — попробуйте ещё раз через минуту.',
+      );
+    }
+  }
+
   @Get('documents/:id/jobs')
   listJobs(@CurrentUser() user: SessionUser, @Param('id', uuidParam) id: string) {
     return this.generation.listJobs(user.orgId, id);
   }
 
+  /**
+   * Состояние задания для экрана выпуска.
+   *
+   * К записи добавлен признак «зависло»: задание может честно стоять
+   * в очереди, а может стоять в ней навсегда, и по одному лишь статусу
+   * `queued` человек эти два случая не различит. Считаем на сервере —
+   * в кабинете нет ни времени создания, ни правила, по которому срок
+   * ожидания считается неразумным.
+   */
   @Get('jobs/:jobId')
-  getJob(@CurrentUser() user: SessionUser, @Param('jobId', uuidParam) jobId: string) {
-    return this.generation.getJob(user.orgId, jobId);
+  async getJob(@CurrentUser() user: SessionUser, @Param('jobId', uuidParam) jobId: string) {
+    const job = await this.generation.getJob(user.orgId, jobId);
+    return { ...job, stuck: isStuck(job) };
   }
 
   /**
