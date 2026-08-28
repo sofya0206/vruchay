@@ -4,6 +4,9 @@ import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { ConfirmEmailPage } from './pages/ConfirmEmailPage';
 import { DocumentsPage } from './pages/DocumentsPage';
+import { AppShell } from './shell/AppShell';
+import { SectionStub } from './shell/SectionStub';
+import { OverviewPage } from './overview/OverviewPage';
 import { EditorPage } from './pages/EditorPage';
 import { RenderPage } from './pages/RenderPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -60,7 +63,30 @@ export function App() {
 
   return (
     <Routes>
-      <Route path="/" element={<DocumentsPage />} />
+      {/* Разделы кабинета живут внутри общей оболочки: шапка и навигация
+          рисуются один раз и при переходах не перерисовываются. Редактор
+          материала, настройки и счета — снаружи: у редактора весь экран
+          занят листом, у остальных своя шапка со ссылкой назад. */}
+      <Route element={<AppShell />}>
+        <Route path="/" element={<OverviewPage />} />
+        <Route path="/documents" element={<DocumentsPage />} />
+
+        {/* ─────────── МАРШРУТЫ РАЗДЕЛОВ БЛОКА 1 ───────────
+            Ветка, которая делает свой раздел, заменяет ЗДЕСЬ одну строку
+            заглушки на свой экран и правит одну строку в shell/sections.ts.
+            Больше в этом файле менять нечего.
+
+              1.3 «Рассылка»  → /mailing
+              1.6 «Реестр»    → /registry
+
+            Интеграции и Оплата пока никем не заняты — оставлены как есть. */}
+        <Route path="/mailing" element={<SectionStub path="/mailing" />} />
+        <Route path="/registry" element={<SectionStub path="/registry" />} />
+        <Route path="/integrations" element={<SectionStub path="/integrations" />} />
+        <Route path="/billing" element={<SectionStub path="/billing" />} />
+        {/* ───────── КОНЕЦ МАРШРУТОВ РАЗДЕЛОВ БЛОКА 1 ───────── */}
+      </Route>
+
       <Route path="/documents/:id" element={<EditorPage />} />
       <Route path="/settings" element={<SettingsPage />} />
       <Route path="/invoices" element={<InvoicesPage />} />

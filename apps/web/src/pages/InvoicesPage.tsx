@@ -59,7 +59,7 @@ export function InvoicesPage() {
       <header className="border-b border-[var(--line)] bg-[var(--surface)]">
         <div className="mx-auto flex max-w-5xl items-center gap-3 px-6 py-3">
           <Link
-            to="/"
+            to="/documents"
             className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)] hover:text-[var(--text)]"
           >
             <ArrowLeft size={16} />К материалам
