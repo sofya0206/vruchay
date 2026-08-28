@@ -67,7 +67,7 @@ export class SmtpProvider implements MailProvider {
         content: a.content,
         contentType: a.contentType,
       })),
-      headers: message.reference ? { 'X-Vruchay-Ref': message.reference } : undefined,
+      headers: headersFor(message),
     });
     return { providerMessageId: String(info.messageId) };
   }
@@ -109,4 +109,23 @@ export class SmtpProvider implements MailProvider {
     // SMTP не сообщает о доставке: события приходят только от провайдеров с API.
     return [];
   }
+}
+
+/**
+ * Свои заголовки письма.
+ *
+ * `List-Unsubscribe` ставим без `List-Unsubscribe-Post`: одношаговая отписка
+ * по RFC 8058 требует, чтобы адрес принимал POST, а наша страница отписки
+ * работает в два шага по ссылке — почтовые сканеры открывают ссылки из писем
+ * сами, и одношаговый отказ отписывал бы участника без его ведома.
+ */
+export function headersFor(
+  message: Pick<OutgoingMessage, 'reference' | 'listUnsubscribeUrl'>,
+): Record<string, string> | undefined {
+  const headers: Record<string, string> = {};
+  if (message.reference) headers['X-Vruchay-Ref'] = message.reference;
+  if (message.listUnsubscribeUrl) {
+    headers['List-Unsubscribe'] = `<${message.listUnsubscribeUrl}>`;
+  }
+  return Object.keys(headers).length > 0 ? headers : undefined;
 }

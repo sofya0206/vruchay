@@ -11,12 +11,13 @@ import {
   renderSubject,
   sanitizeEmailHtml,
 } from './mail-template';
-import type { MailProvider, NormalizedEvent } from './mail-provider.interface';
+import type { MailAttachment, MailProvider, NormalizedEvent } from './mail-provider.interface';
 import { advanceStatus, type EmailStatus } from './email-status';
 import { sharedDomainRefusal } from './shared-domain-limit';
 import { platformSender, type ResolvedSender } from './platform-sender';
 import { withOpenPixel } from './open-tracking';
 import { renderLetterBody, unsubscribeUrl } from '../mailing/letter-kind';
+import { deliveryProblem } from '../mailing/bounce-reason';
 import { redact } from '../common/redact';
 
 /**
@@ -346,8 +347,19 @@ export class MailService {
     return email.id;
   }
 
-  /** Отправка одного письма. Вызывается воркером. */
-  async sendOne(emailId: string): Promise<void> {
+  /**
+   * Отправка одного письма. Вызывается воркером.
+   *
+   * `lastAttempt` — повторять письмо очереди больше нечем. Воркер считает
+   * это по своим попыткам и передаёт сюда: сервис о настройках очереди
+   * не знает, а без признака он не может отличить «сейчас не получилось,
+   * повторим» от «не получилось окончательно».
+   *
+   * По умолчанию попытка считается последней: прямой вызов мимо очереди
+   * повторять некому, и письмо обязано получить окончательное состояние,
+   * а не остаться навсегда «в очереди».
+   */
+  async sendOne(emailId: string, lastAttempt = true): Promise<void> {
     const email = await this.prisma.email.findUnique({
       where: { id: emailId },
       include: { template: { include: { sender: true } }, file: true },
@@ -412,6 +424,10 @@ export class MailService {
         html: this.trackOpens(this.letterBody(email, data), email.id),
         attachments,
         reference: email.id,
+        // Отписка ещё и заголовком: почтовые службы показывают по нему
+        // свою кнопку «Отписаться», а письма без него считают менее
+        // добросовестными и чаще уводят в спам. Ссылка та же, что в подвале.
+        listUnsubscribeUrl: this.unsubscribeLink(email),
       });
 
       await this.prisma.$transaction([
@@ -435,6 +451,27 @@ export class MailService {
       // маскируем и перед записью в журнал, и перед сохранением в базу:
       // причина отказа остаётся понятной, персональные данные не размножаются.
       const message = redact(err instanceof Error ? err.message : String(err));
+
+      // Отличаем «сейчас не вышло» от «не выйдет никогда» тем же разбором
+      // причин, что показывает их человеку в журнале: второй список правил
+      // разошёлся бы с первым на первой же правке.
+      const problem = deliveryProblem('failed', message);
+      const retryable = problem?.retryable ?? true;
+
+      if (retryable && !lastAttempt) {
+        // Ошибку не гасим, а выпускаем наружу: повтор запускает очередь,
+        // и минута недоступности шлюза больше не хоронит всю рассылку.
+        // Состояние остаётся «в очереди» — письмо ещё не проиграно.
+        this.logger.warn(`Письмо ${emailId}: ${message}. Попробуем ещё раз`);
+        await this.prisma.email.update({
+          where: { id: emailId },
+          data: { error: message.slice(0, 500) },
+        });
+        // Наружу отдаём уже обезличенный текст: очередь сохраняет причину
+        // отказа у себя, и адрес получателя не должен уезжать ещё и туда.
+        throw new Error(message, { cause: err });
+      }
+
       this.logger.warn(`Письмо ${emailId} не отправлено: ${message}`);
       await this.prisma.email.update({
         where: { id: emailId },
@@ -444,7 +481,23 @@ export class MailService {
           statusUpdatedAt: new Date(),
         },
       });
+
+      // Безнадёжный адрес повторять нечего: письмо помечено, работа
+      // задания на этом закончена — падать ему незачем.
+      if (retryable) throw new Error(message, { cause: err });
     }
+  }
+
+  /**
+   * Ссылка отписки для заголовка письма. Пусто — заголовку взяться неоткуда.
+   *
+   * Только у рекламных писем: у письма о выдаче документа отписки нет
+   * и быть не может — это переписка по существу, а не рассылка.
+   */
+  private unsubscribeLink(email: { kind: EmailKind; id: string }): string | undefined {
+    const publicUrl = process.env.PUBLIC_URL;
+    if (email.kind !== 'marketing' || !publicUrl) return undefined;
+    return unsubscribeUrl(publicUrl, email.id);
   }
 
   /**
@@ -722,8 +775,18 @@ export class MailService {
    * «отправлено» в журнале означала бы письмо участнику, которого не было.
    * Адрес сюда приходит из сессии — отправить «проверочное» письмо на чужой
    * адрес нельзя, иначе это обычная рассылка без согласия, названная иначе.
+   *
+   * `fileId` — тот же документ, что уйдёт участнику. Кнопка существует ровно
+   * ради ответа на вопрос «что получит участник», и письмо без вложения на
+   * него не отвечает.
    */
-  async sendPreview(orgId: string, to: string, subject: string, html: string): Promise<void> {
+  async sendPreview(
+    orgId: string,
+    to: string,
+    subject: string,
+    html: string,
+    fileId?: string | null,
+  ): Promise<void> {
     const sender = await this.resolveSender(orgId);
     if (!sender) {
       throw new BadRequestException('Отправка писем не настроена — обратитесь в поддержку');
@@ -734,7 +797,36 @@ export class MailService {
       to,
       subject,
       html,
+      attachments: await this.attachmentFor(orgId, fileId),
     });
+  }
+
+  /**
+   * Вложение по идентификатору файла — с проверкой, что файл наш.
+   *
+   * Файл ищется вместе с организацией из сессии, а не по одному
+   * идентификатору: иначе подставленный чужой идентификатор прислал бы
+   * чужой документ на свой адрес.
+   */
+  private async attachmentFor(
+    orgId: string,
+    fileId?: string | null,
+  ): Promise<MailAttachment[] | undefined> {
+    if (!fileId) return undefined;
+
+    const file = await this.prisma.file.findFirst({
+      where: { id: fileId, orgId, deletedAt: null },
+      select: { originalName: true, s3Key: true, mime: true },
+    });
+    if (!file) return undefined;
+
+    return [
+      {
+        filename: file.originalName || 'Документ.pdf',
+        content: await this.storage.getStream(file.s3Key),
+        contentType: file.mime,
+      },
+    ];
   }
 
   /**
