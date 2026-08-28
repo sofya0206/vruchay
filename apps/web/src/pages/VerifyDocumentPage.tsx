@@ -1,14 +1,18 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
-import { BadgeCheck, ShieldX } from 'lucide-react';
+import { BadgeCheck, RefreshCw, ShieldX } from 'lucide-react';
 import { api } from '../api/client';
 import { Meta } from '../seo/Meta';
 
 interface VerifyResult {
-  valid: true;
+  valid: boolean;
+  /** Документ заменён перевыпущенным — это не то же самое, что отозван. */
+  replaced: boolean;
   title: string;
   issuedAt: string;
   fields: Record<string, string>;
+  /** Куда смотреть вместо этого. Пусто, если замена сама недействительна. */
+  replacedBy?: { publicId: string; issuedAt: string } | null;
 }
 
 /**
@@ -57,8 +61,41 @@ export function VerifyDocumentPage() {
 
           {check.data && (
             <div className="rounded-2xl bg-[var(--surface)] p-8 ring-1 ring-[var(--line)]">
-              <BadgeCheck size={40} className="mx-auto text-[var(--accent)]" strokeWidth={1.5} />
-              <h1 className="mt-4 font-serif text-2xl">Документ подлинный</h1>
+              {check.data.replaced ? (
+                <>
+                  <RefreshCw size={40} className="mx-auto text-[var(--award)]" strokeWidth={1.5} />
+                  <h1 className="mt-4 font-serif text-2xl">Этот документ заменён</h1>
+                  {/*
+                    Замена — не отзыв, и говорить о ней надо иначе. Отозванный
+                    документ признан недействительным, и предъявителю остаётся
+                    идти в организацию. Заменённый же означает исправленную
+                    ошибку — в фамилии, в разряде, в дате: действующий документ
+                    существует, и человеку нужно всего лишь показать, где он.
+                  */}
+                  <p className="mt-2 text-[var(--text-muted)]">
+                    Организация выпустила вместо него новый — обычно так исправляют опечатку
+                    в имени или в звании. Действителен новый документ.
+                  </p>
+                  {check.data.replacedBy ? (
+                    <Link
+                      to={`/verify/${check.data.replacedBy.publicId}`}
+                      className="mt-4 inline-block rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--accent-contrast)] hover:bg-[var(--accent-hover)]"
+                    >
+                      Проверить действующий документ
+                    </Link>
+                  ) : (
+                    <p className="mt-3 text-sm text-[var(--text-muted)]">
+                      Проверить новый документ здесь пока нельзя — обратитесь в выдавшую
+                      организацию.
+                    </p>
+                  )}
+                </>
+              ) : (
+                <>
+                  <BadgeCheck size={40} className="mx-auto text-[var(--accent)]" strokeWidth={1.5} />
+                  <h1 className="mt-4 font-serif text-2xl">Документ подлинный</h1>
+                </>
+              )}
               <p className="mt-1 text-[var(--text-muted)]">{check.data.title}</p>
 
               <dl className="mt-6 space-y-2 border-t border-[var(--line)] pt-6 text-left text-sm">

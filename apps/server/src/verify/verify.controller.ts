@@ -1,8 +1,9 @@
-import { Controller, Get, NotFoundException, Param } from '@nestjs/common';
+import { Controller, Get, Logger, NotFoundException, Param } from '@nestjs/common';
 import { z } from 'zod';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { PrismaService } from '../prisma/prisma.service';
 import { RateLimitService } from '../common/rate-limit.service';
+import { ReplacementService } from '../registry/replacement.service';
 
 const uuidParam = new ZodValidationPipe(z.string().uuid());
 
@@ -21,9 +22,12 @@ const uuidParam = new ZodValidationPipe(z.string().uuid());
  */
 @Controller('v1/verify')
 export class VerifyController {
+  private readonly logger = new Logger(VerifyController.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly rateLimit: RateLimitService,
+    private readonly replacement: ReplacementService,
   ) {}
 
   @Get(':publicId')
@@ -36,11 +40,17 @@ export class VerifyController {
     const file = await this.prisma.file.findUnique({
       where: { publicId },
       select: {
+        id: true,
+        orgId: true,
         createdAt: true,
         verifyRevoked: true,
+        rowId: true,
+        replacedById: true,
+        replacedByJobId: true,
         document: {
           select: { title: true, verifyEnabled: true, verifyFields: true },
         },
+        row: { select: { data: true } },
         rows: {
           take: 1,
           select: { data: true },
@@ -55,18 +65,90 @@ export class VerifyController {
       throw new NotFoundException('Документ не найден');
     }
 
-    const data = (file.rows[0]?.data ?? {}) as Record<string, string>;
+    /*
+     * Заменённый документ отвечает иначе, чем отозванный, и это
+     * осознанное исключение из правила выше.
+     *
+     * Перевыпуск — это исправленная опечатка в фамилии, а не проступок:
+     * человеку с бумагой в руках надо не отказать, а показать, где взять
+     * действующую. Скрывать замену значило бы отправлять его выяснять
+     * отношения с организацией по поводу документа, который у неё
+     * в порядке.
+     *
+     * Лишнего это не раскрывает: ответ получает только тот, кто уже держит
+     * старый идентификатор, то есть кому этот документ и выдавали.
+     */
+    const replacedById = await this.replacement.settleOne(file);
+    const replacement = replacedById ? await this.replacementFor(replacedById, file.orgId) : null;
+
+    await this.countCheck(file.id);
+
+    const data = (file.rows[0]?.data ?? file.row?.data ?? {}) as Record<string, string>;
     const allowed = (file.document.verifyFields as string[]) ?? [];
+    // Только те поля, которые организация сама отметила показываемыми.
+    // Пустой список — значит показываем лишь факт подлинности.
+    const fields = Object.fromEntries(allowed.filter((k) => data[k]).map((k) => [k, data[k]]));
+
+    if (replacedById) {
+      return {
+        valid: false as const,
+        replaced: true as const,
+        title: file.document.title,
+        issuedAt: file.createdAt,
+        fields,
+        // Замену могли, в свою очередь, отозвать — тогда ссылки не даём:
+        // вести человека на страницу, которая ответит «не найдено», хуже,
+        // чем честно отправить его в выдавшую организацию.
+        replacedBy: replacement,
+      };
+    }
 
     return {
-      valid: true,
+      valid: true as const,
+      replaced: false as const,
       title: file.document.title,
       issuedAt: file.createdAt,
-      // Только те поля, которые организация сама отметила показываемыми.
-      // Пустой список — значит показываем лишь факт подлинности.
-      fields: Object.fromEntries(
-        allowed.filter((k) => data[k]).map((k) => [k, data[k]]),
-      ),
+      fields,
     };
+  }
+
+  /** Действующая замена — если она сама ещё действительна. */
+  private async replacementFor(fileId: string, orgId: string) {
+    const next = await this.prisma.file.findFirst({
+      where: { id: fileId, orgId, deletedAt: null, verifyRevoked: false },
+      select: {
+        publicId: true,
+        createdAt: true,
+        document: { select: { verifyEnabled: true } },
+      },
+    });
+    if (!next?.document?.verifyEnabled) return null;
+    return { publicId: next.publicId, issuedAt: next.createdAt };
+  }
+
+  /**
+   * Обезличенный счётчик проверок.
+   *
+   * Растёт число на документе — и всё: ни адреса, ни устройства, ни
+   * времени каждой отдельной проверки. Организации нужен ответ «сертификат
+   * проверили 47 раз», и он же — её главный довод, что выданный документ
+   * чего-то стоит. Собирать при этом сведения о проверяющих нельзя:
+   * мы обработчик по поручению, а слежка в собственных интересах перевела бы
+   * нас в операторы персональных данных со всей полнотой ответственности.
+   *
+   * Неудача счётчика не ломает проверку: подлинность документа не зависит
+   * от того, удалось ли нам её сосчитать.
+   */
+  private async countCheck(fileId: string): Promise<void> {
+    try {
+      await this.prisma.file.update({
+        where: { id: fileId },
+        data: { verifyCount: { increment: 1 }, verifyLastAt: new Date() },
+      });
+    } catch (err) {
+      this.logger.warn(
+        `Не удалось учесть проверку документа: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 }

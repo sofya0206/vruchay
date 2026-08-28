@@ -11,6 +11,7 @@ import { EditorPage } from './pages/EditorPage';
 import { RenderPage } from './pages/RenderPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { InvoicesPage } from './pages/InvoicesPage';
+import { RegistryPage } from './registry/RegistryPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { PrivacyPage } from './pages/PrivacyPage';
 import { VerifyDocumentPage } from './pages/VerifyDocumentPage';
@@ -81,7 +82,7 @@ export function App() {
 
             Интеграции и Оплата пока никем не заняты — оставлены как есть. */}
         <Route path="/mailing" element={<SectionStub path="/mailing" />} />
-        <Route path="/registry" element={<SectionStub path="/registry" />} />
+        <Route path="/registry" element={<RegistryPage />} />
         <Route path="/integrations" element={<SectionStub path="/integrations" />} />
         <Route path="/billing" element={<SectionStub path="/billing" />} />
         {/* ───────── КОНЕЦ МАРШРУТОВ РАЗДЕЛОВ БЛОКА 1 ───────── */}
