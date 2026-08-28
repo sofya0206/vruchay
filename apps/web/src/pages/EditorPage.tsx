@@ -5,6 +5,7 @@ import {
   Check,
   ChevronLeft,
   Dot,
+  GitBranch,
   LoaderCircle,
   Mail,
   Redo2,
@@ -15,6 +16,7 @@ import {
   ZoomIn,
 } from 'lucide-react';
 import { RecipientsTable } from '../recipients/RecipientsTable';
+import { RulesTab } from '../awards/RulesTab';
 import { EmailTemplateEditor } from '../mail/EmailTemplateEditor';
 import { InsertMenu } from '../editor/InsertMenu';
 import { RegistryTable } from '../documents/RegistryTable';
@@ -58,7 +60,7 @@ type Gesture =
 export function EditorPage() {
   const { id = '' } = useParams();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [view, setView] = useState<'editor' | 'table' | 'mail' | 'registry'>('editor');
+  const [view, setView] = useState<'editor' | 'table' | 'rules' | 'mail' | 'registry'>('editor');
   const [zoom, setZoom] = useState(1);
   const [saved, setSaved] = useState<'saved' | 'saving' | 'dirty'>('saved');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -345,6 +347,13 @@ export function EditorPage() {
           <ViewTab active={view === 'table'} onClick={() => setView('table')} icon={<Table2 size={14} />}>
             Получатели
           </ViewTab>
+          <ViewTab
+            active={view === 'rules'}
+            onClick={() => setView('rules')}
+            icon={<GitBranch size={14} />}
+          >
+            Правила
+          </ViewTab>
           <ViewTab active={view === 'mail'} onClick={() => setView('mail')} icon={<Mail size={14} />}>
             Письмо
           </ViewTab>
@@ -455,6 +464,8 @@ export function EditorPage() {
           onGoToMail={() => setView('mail')}
           onGoToRegistry={() => setView('registry')}
         />
+      ) : view === 'rules' ? (
+        <RulesTab documentId={id} ruleSetId={page.ruleSetId ?? null} />
       ) : view === 'registry' ? (
         <RegistryTable documentId={id} />
       ) : view === 'mail' ? (

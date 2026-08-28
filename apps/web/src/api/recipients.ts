@@ -52,6 +52,16 @@ export interface ParsedSheet {
   firstRowLooksLikeData: boolean;
   suggestions: ImportSuggestion[];
   warnings: string[];
+  /**
+   * Заполнено, когда файл прочитан как протокол соревнований: нашлась графа
+   * места или разбиение на группы. По groupColumn конструктор правил
+   * предлагает колонку группы, не спрашивая её заново.
+   */
+  protocol?: {
+    groupColumn: string;
+    groups: { title: string; rowCount: number }[];
+    headerRowCount: number;
+  };
 }
 
 export interface GenerationJob {

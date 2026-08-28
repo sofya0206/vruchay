@@ -45,6 +45,11 @@ export interface DocumentSummary {
 }
 
 export interface DocumentDetail extends DocumentSummary {
+  /**
+   * Набор правил награждения, привязанный к соревнованию. null — раскладка
+   * не настроена: документы выпускаются по одному макету на всех.
+   */
+  ruleSetId: string | null;
   verifyEnabled: boolean;
   verifyFields: string[];
   /** Мероприятие: одно на весь материал, подставляется переменными %event и др. */

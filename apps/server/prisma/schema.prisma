@@ -52,6 +52,7 @@ model Organization {
   reviews     Review[]
   auditEvents AuditEvent[]
   apiTokens   ApiToken[]
+  awardRuleSets AwardRuleSet[]
 
   @@map("organizations")
 }
@@ -122,6 +123,15 @@ model Document {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
   deletedAt      DateTime? @map("deleted_at")
+
+  /**
+   * Набор правил награждения, по которому раскладывается протокол.
+   * Многие документы на один набор: федерация настраивает награждение
+   * один раз на сезон. Удаление набора документы не трогает — они
+   * остаются, просто без раскладки.
+   */
+  ruleSetId String?       @map("rule_set_id") @db.Uuid
+  ruleSet   AwardRuleSet? @relation("DocumentRuleSet", fields: [ruleSetId], references: [id], onDelete: SetNull)
 
   org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   sheets  Sheet[]
@@ -772,4 +782,121 @@ model ApiToken {
 
   @@index([orgId])
   @@map("api_tokens")
+}
+
+// ─── Правила награждения (Фаза 9) ──────────────────────────────────────────
+
+/**
+ * Набор правил награждения: «первое место — диплом победителя, снятым
+ * ничего, остальным грамота участника».
+ *
+ * Принадлежит организации, а не документу. Федерация настраивает
+ * награждение один раз на сезон, а соревнований за сезон десятки:
+ * если бы правила жили у документа, «переиспользовать на следующем
+ * соревновании» означало бы собрать их заново.
+ */
+model AwardRuleSet {
+  id    String @id @default(uuid()) @db.Uuid
+  orgId String @map("org_id") @db.Uuid
+  name  String
+
+  /**
+   * Колонка таблицы получателей, по которой строки делятся на группы.
+   * Пусто — весь протокол одна группа.
+   *
+   * Группа задаёт область дедупликации получателя, подпись строки в отчёте
+   * и — только для условий с признаком `withinGroup` — круг строк, среди
+   * которых пересчитывается место. Сама по себе она место не пересчитывает:
+   * в обычном протоколе места уже расставлены по группам, и пересчёт там
+   * не нужен, а местами навредил бы (см. комментарий к withinGroup
+   * в @gramota/shared).
+   */
+  groupColumn  String @default("") @map("group_column")
+  /** Колонка со статусом (DSQ/DNS/«снят»). Пусто — статусов в протоколе нет. */
+  statusColumn String @default("") @map("status_column")
+
+  /**
+   * Версия формата правил. Условия и выходы — такой же общий контракт,
+   * как макет листа: их читает конструктор в браузере, движок на сервере
+   * и превью раскладки. Меняется формат — меняется версия, иначе набор,
+   * собранный в прошлом сезоне, однажды применится не так, как задумывали.
+   */
+  schemaVersion Int @default(1) @map("schema_version")
+
+  /** Предлагать по умолчанию для нового соревнования. */
+  isDefault Boolean @default(false) @map("is_default")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  rules     AwardRule[]
+  documents Document[]   @relation("DocumentRuleSet")
+
+  @@index([orgId, deletedAt])
+  @@map("award_rule_sets")
+}
+
+/** issue — выдать перечисленные документы; skip — не выдавать ничего. */
+enum AwardRuleAction {
+  issue
+  skip
+}
+
+/** Как соединять условия правила. */
+enum AwardConditionMatch {
+  all
+  any
+}
+
+/**
+ * Одно правило набора.
+ *
+ * Выигрывает первое совпавшее правило, поэтому порядок задаётся явно
+ * через position, а не временем создания: «2–3 место» обязано проверяться
+ * раньше, чем «все остальные», иначе призёр получит грамоту участника.
+ */
+model AwardRule {
+  id        String @id @default(uuid()) @db.Uuid
+  ruleSetId String @map("rule_set_id") @db.Uuid
+  position  Int
+
+  enabled Boolean @default(true)
+  /** То, что человек видит в превью: «Победители», «Призёры». */
+  label   String  @default("")
+
+  /**
+   * Плоский список условий вида {field, op, value}. Валидируется Zod-схемой
+   * awardCondition из @gramota/shared.
+   *
+   * Отдельной таблицы условий нет по той же причине, что у Sheet.layout:
+   * SQL-запросов по условиям не бывает, а конструктор сохраняет набор целиком
+   * одним PATCH. Пустой список — правило «иначе».
+   */
+  conditions Json                @default("[]")
+  match      AwardConditionMatch @default(all)
+
+  action AwardRuleAction @default(issue)
+
+  /**
+   * Что выдаём: список выходов {templateDocumentId, subjectColumn,
+   * dedupeScope, label}, схема awardOutput из @gramota/shared.
+   *
+   * Список, а не один шаблон: за первое место участнику полагается диплом,
+   * а его тренеру — благодарность, и это одно решение судейской коллегии.
+   * Разнести их по двум правилам нельзя: выигрывает первое совпавшее.
+   *
+   * Внешнего ключа на documents здесь нет — принадлежность шаблона
+   * организации проверяет сервис при сохранении. Ключ этого всё равно
+   * не гарантирует: он ручается за существование строки, а не за её
+   * владельца. Недоступный шаблон движок отдаёт замечанием «шаблон удалён»,
+   * что человеку понятнее внезапно опустевшего поля.
+   */
+  outputs Json @default("[]")
+
+  ruleSet AwardRuleSet @relation(fields: [ruleSetId], references: [id], onDelete: Cascade)
+
+  @@unique([ruleSetId, position])
+  @@map("award_rules")
 }

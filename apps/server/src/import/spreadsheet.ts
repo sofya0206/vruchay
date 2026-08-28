@@ -183,17 +183,24 @@ function decodeAddress(address: string): { row: number; col: number } | null {
   return { row: Number(match[2]) - 1, col: col - 1 };
 }
 
-function cellText(cell: ExcelJS.Cell): string {
-  return valueText(cell.value);
+export function cellText(cell: ExcelJS.Cell): string {
+  return valueText(cell.value, cell.numFmt ?? '');
 }
 
 /**
  * Значение ячейки текстом. Результат формулы разбирается тем же кодом:
  * внутри может оказаться дата, размеченный текст или ошибка вычисления.
  */
-function valueText(value: unknown): string {
+function valueText(value: unknown, numFmt: string): string {
   if (value === null || value === undefined) return '';
-  if (value instanceof Date) return formatDate(value);
+  if (value instanceof Date) {
+    return isTimeFormat(numFmt) ? formatDuration(durationSeconds(value), numFmt) : formatDate(value);
+  }
+  if (typeof value === 'number') {
+    // Длительность в Excel — это доля суток. Без учёта формата «1:02,45»
+    // превратилось бы в «0,000723» или в дату 30 декабря 1899 года.
+    return isTimeFormat(numFmt) ? formatDuration(value * 86400, numFmt) : formatNumber(value);
+  }
   if (typeof value === 'object') {
     const object = value as Record<string, unknown>;
     // Ошибка вычисления (#Н/Д, #ДЕЛ/0!): значения нет. Раньше такая ячейка
@@ -201,14 +208,14 @@ function valueText(value: unknown): string {
     if ('error' in object) return '';
     // Формула: берём сохранённый результат. Если его нет — ячейка пустая,
     // и это отдельно попадает в предупреждения.
-    if ('result' in object) return valueText(object.result);
+    if ('result' in object) return valueText(object.result, numFmt);
     if ('richText' in object) {
       return (object.richText as { text: string }[])
         .map((part) => part.text)
         .join('')
         .trim();
     }
-    if ('text' in object) return valueText(object.text);
+    if ('text' in object) return valueText(object.text, numFmt);
     return '';
   }
   return String(value).trim();
@@ -222,7 +229,65 @@ function isErrorValue(value: unknown): boolean {
 }
 
 function formatDate(date: Date): string {
-  return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  // Дата из книги приходит в UTC — в местном поясе она уехала бы на сутки.
+  return new Intl.DateTimeFormat('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(date);
+}
+
+/**
+ * Формат ячейки описывает длительность, а не дату: есть секунды или часы
+ * и нет года. Отличить одно от другого по самому значению нельзя — в файле
+ * и там и там лежит одно и то же число.
+ */
+function isTimeFormat(numFmt: string): boolean {
+  if (!numFmt) return false;
+  const fmt = numFmt.toLowerCase();
+  if (fmt.includes('y')) return false;
+  if (!/[hs]/.test(fmt)) return false;
+  // «dd.mm.yyyy hh:mm» — это всё-таки дата; день рядом с временем её выдаёт.
+  return !fmt.includes('d');
+}
+
+/** Сколько секунд прошло от начала суток книги: у длительности это и есть значение. */
+function durationSeconds(date: Date): number {
+  const dayStart = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+  return (date.getTime() - dayStart) / 1000;
+}
+
+/**
+ * Время дистанции так, как его пишут в протоколе: «1:02,45», «58,30»,
+ * «1:02:03,50». Число знаков после запятой берём из формата ячейки: сколько
+ * нулей в «mm:ss.00», столько и печатаем, иначе теряется сотая — а по сотой
+ * в плавании расходятся первое и второе место.
+ */
+function formatDuration(totalSeconds: number, numFmt: string): string {
+  const decimals = /\.(0+)/.exec(numFmt)?.[1].length ?? 2;
+  const factor = 10 ** decimals;
+  const rounded = Math.round(totalSeconds * factor) / factor;
+
+  const hours = Math.floor(rounded / 3600);
+  const minutes = Math.floor((rounded % 3600) / 60);
+  const seconds = rounded % 60;
+  const width = decimals > 0 ? decimals + 3 : 2;
+  const secondsText = seconds.toFixed(decimals).padStart(width, '0').replace('.', ',');
+
+  if (hours > 0) return `${hours}:${String(minutes).padStart(2, '0')}:${secondsText}`;
+  if (minutes > 0) return `${minutes}:${secondsText}`;
+  // Меньше минуты — ведущий ноль не пишут: «58,30», а не «058,30».
+  return secondsText.replace(/^0(?=\d)/, '');
+}
+
+/**
+ * Число с запятой: значения из протокола попадают на грамоту как есть,
+ * а «798.25» на русском наградном документе выглядит опечаткой. Разряды
+ * не разделяем — иначе год рождения превратился бы в «2 008».
+ */
+function formatNumber(value: number): string {
+  return String(value).replace('.', ',');
 }
 
 /** Ячейка похожа на данные, а не на заголовок колонки. */

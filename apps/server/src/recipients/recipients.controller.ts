@@ -13,7 +13,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { FastifyRequest } from 'fastify';
-import { parseSpreadsheet } from '../import/spreadsheet';
+import { parseRecipientFile } from '../import/recipient-file';
 import { refineColumns } from '../import/column-names';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { CurrentUser } from '../common/current-user.decorator';
@@ -83,7 +83,7 @@ export class RecipientsController {
       // Уточнение по данным идёт здесь, а не в разборе файла: разбор
       // отвечает за то, что в файле написано, а это — догадка о том,
       // что написанное значит.
-      const sheet = await parseSpreadsheet(buffer, filename, query.headers);
+      const sheet = await parseRecipientFile(buffer, filename, query.headers);
       return { ...sheet, columns: refineColumns(sheet.columns, sheet.rows) };
     } catch (err) {
       // Внутрь ошибки библиотеки может попасть путь или структура файла —
