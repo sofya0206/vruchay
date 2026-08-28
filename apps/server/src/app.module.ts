@@ -14,6 +14,7 @@ import { RenderModule } from './render/render.module';
 import { GenerationModule } from './generation/generation.module';
 import { ValidationModule } from './validation/validation.module';
 import { MailModule } from './mail/mail.module';
+import { MailingModule } from './mailing/mailing.module';
 import { TildaModule } from './tilda/tilda.module';
 import { VerifyModule } from './verify/verify.module';
 import { LeadsModule } from './leads/leads.module';
@@ -43,6 +44,7 @@ import { PlatformModule } from './platform/platform.module';
     GenerationModule,
     ValidationModule,
     MailModule,
+    MailingModule,
     TildaModule,
     VerifyModule,
     LeadsModule,

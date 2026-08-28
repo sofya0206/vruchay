@@ -7,6 +7,7 @@ import { DocumentsPage } from './pages/DocumentsPage';
 import { EditorPage } from './pages/EditorPage';
 import { RenderPage } from './pages/RenderPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { MailingPage } from './mailing/MailingPage';
 import { InvoicesPage } from './pages/InvoicesPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { PrivacyPage } from './pages/PrivacyPage';
@@ -63,6 +64,7 @@ export function App() {
       <Route path="/" element={<DocumentsPage />} />
       <Route path="/documents/:id" element={<EditorPage />} />
       <Route path="/settings" element={<SettingsPage />} />
+      <Route path="/mailing" element={<MailingPage />} />
       <Route path="/invoices" element={<InvoicesPage />} />
       <Route path="/login" element={<Navigate to="/" replace />} />
       {/* Вошедшему на этих страницах делать нечего: адрес уже подтверждён,
