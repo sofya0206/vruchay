@@ -8,7 +8,9 @@
  * с одинаковым значением во всех строках.
  */
 
-import { declineFullName } from './declension';
+import { declineFullName, shortName } from './declension';
+import { fullNameOf } from './paired-forms';
+import { placeWord } from './place-word';
 
 /** Служебная переменная: как называется, что подставляет, как объяснить. */
 export interface SystemVariable {
@@ -35,10 +37,35 @@ export const SYSTEM_VARIABLES: SystemVariable[] = [
   { name: 'event_place', title: 'Место проведения', hint: 'г. Челябинск' },
   { name: 'hours', title: 'Объём часов', hint: 'для сертификатов об обучении' },
 
+  /*
+   * Производные от колонки «name». Считаются сервисом, но перекрываются
+   * одноимённой колонкой: организатор, вписавший падеж руками, сделал
+   * это именно потому, что наша догадка его не устроила.
+   *
+   * TODO (отдельной задачей): транслитерация ФИО по ГОСТ Р 52535.1 / ICAO
+   * для сертификатов на латинице и числительные прописью («сто двадцать
+   * часов»). В этой ветке намеренно не делаем — обе требуют своих таблиц
+   * и своего набора проверок.
+   */
   {
     name: 'name_dat',
     title: 'ФИО в дательном падеже',
     hint: 'Награждается Иванову Петру',
+  },
+  {
+    name: 'name_gen',
+    title: 'ФИО в родительном падеже',
+    hint: 'Работа Иванова Петра',
+  },
+  {
+    name: 'name_short',
+    title: 'ФИО сокращённо',
+    hint: 'Иванов П. И.',
+  },
+  {
+    name: 'place_word',
+    title: 'Место словом',
+    hint: 'первое, второе — из колонки «Место»',
   },
 ];
 
@@ -116,12 +143,38 @@ export function mergeVariables(
 ): Record<string, string> {
   const merged = { ...systemVariables(ctx), ...rowData };
 
-  // Склонение считаем после слияния: имя приходит колонкой получателя,
-  // и до слияния его ещё нет. Своя колонка «name_dat» опять же сильнее
-  // нашей догадки — организатор мог вписать падеж руками именно потому,
-  // что автоматическое склонение его не устроило.
+  /*
+   * Место словом. Считается из колонки «место», а своя колонка «place_word»
+   * — если организация её завела — сильнее: значит, там написали руками
+   * что-то своё, вроде «Гран-при».
+   */
+  if (merged.place_word === undefined && merged.place) {
+    merged.place_word = placeWord(merged.place);
+  }
+
+  /*
+   * Склонение считаем после слияния: имя приходит колонкой получателя,
+   * и до слияния его ещё нет. Своя колонка «name_dat» опять же сильнее
+   * нашей догадки — организатор мог вписать падеж руками именно потому,
+   * что автоматическое склонение его не устроило.
+   *
+   * ФИО собираем через `fullNameOf`: импорт умеет раскладывать шапку
+   * на «Фамилия», «Имя», «Отчество», и тогда колонки «name» просто нет.
+   * Без этого пол по отчеству определялся бы, а само имя на грамоте
+   * оставалось пустым — расхождение заметнее любой из двух ошибок.
+   */
+  const fullName = fullNameOf(merged);
+
   if (merged.name_dat === undefined) {
-    merged.name_dat = declineFullName(merged.name ?? '', 'dative');
+    merged.name_dat = declineFullName(fullName, 'dative');
+  }
+
+  if (merged.name_gen === undefined) {
+    merged.name_gen = declineFullName(fullName, 'genitive');
+  }
+
+  if (merged.name_short === undefined) {
+    merged.name_short = shortName(fullName);
   }
 
   return merged;

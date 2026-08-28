@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { declineFullName } from './declension';
+import {
+  DECLENSION_DOUBT_LEVEL,
+  DECLENSION_DOUBT_TEXT,
+  declineFullName,
+  declineFullNameChecked,
+  shortName,
+} from './declension';
 
 /*
  * Склонение ФИО. Проверяем не столько удачные случаи, сколько границу:
@@ -145,5 +151,235 @@ describe('мелочи ввода', () => {
 
   it('буква «ё» не ломает разбор', () => {
     expect(dat('Фёдоров Пётр')).toBe('Фёдорову Петру');
+  });
+});
+
+describe('признак «не уверен в склонении»', () => {
+  /*
+   * Значение и уверенность разделены намеренно: генерация берёт значение
+   * и не останавливается, а проверка списка перед выпуском (9.3) берёт
+   * признак и показывает такие строки человеку. Молчаливый пропуск здесь
+   * — это триста грамот с ошибкой, замеченной только на вручении.
+   */
+  const check = (s: string) => declineFullNameChecked(s, 'dative');
+
+  it('обычное русское ФИО проходит без сомнений', () => {
+    const r = check('Иванов Пётр Ильич');
+    expect(r.value).toBe('Иванову Петру Ильичу');
+    expect(r.confidence).toBe('high');
+    expect(r.doubts).toEqual([]);
+  });
+
+  it('значение отдаётся даже там, где мы не уверены', () => {
+    // Проверка не должна выбирать между «показать сомнение» и «выпустить»:
+    // ей нужно и то и другое одновременно.
+    const r = check('John Smith');
+    expect(r.value).toBe('John Smith');
+    expect(r.confidence).toBe('low');
+  });
+
+  it('иностранное имя латиницей помечается', () => {
+    expect(check('John Smith').doubts).toContain('not-cyrillic');
+  });
+
+  it('больше трёх слов помечается', () => {
+    expect(check('Мамедов Мамед Мамед оглы').doubts).toContain('too-many-words');
+  });
+
+  it('несклоняемая фамилия помечается, хотя значение верное', () => {
+    const r = check('Коваленко Олег');
+    expect(r.value).toBe('Коваленко Олегу');
+    expect(r.confidence).toBe('medium');
+    expect(r.doubts).toContain('indeclinable-surname');
+  });
+
+  it('фамилии на -их и -ых помечаются', () => {
+    expect(check('Белых Иван').doubts).toContain('indeclinable-surname');
+    expect(check('Черных Ольга').doubts).toContain('indeclinable-surname');
+  });
+
+  it('фамилия женщины на согласную помечается', () => {
+    // «Ким Ольге» верно, но чаще всего за этим стоит ошибка в поле пола,
+    // и человеку стоит взглянуть.
+    const r = check('Ким Ольга');
+    expect(r.value).toBe('Ким Ольге');
+    expect(r.doubts).toContain('indeclinable-surname');
+  });
+
+  it('нерусская по форме фамилия помечается отдельным кодом', () => {
+    expect(check('Петросян Армен').doubts).toContain('foreign-surname');
+    expect(check('Гурамишвили Давид').doubts).toContain('foreign-surname');
+  });
+
+  it('неопределённый пол помечается', () => {
+    // «Саша Женя»: ни фамилия, ни имя не отвечают на вопрос о поле.
+    const r = check('Женя Саша');
+    expect(r.doubts).toContain('unknown-gender');
+  });
+
+  it('склоняемая мужская фамилия сомнений не вызывает', () => {
+    expect(check('Кузнецов Илья Никитич').confidence).toBe('high');
+    expect(check('Петрова Мария Ивановна').confidence).toBe('high');
+  });
+
+  it('пустая строка — забота проверки заполненности, а не склонения', () => {
+    const r = check('');
+    expect(r.value).toBe('');
+    expect(r.confidence).toBe('high');
+  });
+
+  it('коды сомнений переводятся на человеческий', () => {
+    // Отчёту проверки нужно что-то показать в строке таблицы.
+    for (const doubt of check('Коваленко Олег').doubts) {
+      expect(DECLENSION_DOUBT_TEXT[doubt]).toBeTruthy();
+    }
+  });
+});
+
+describe('родительный падеж на сложных фамилиях', () => {
+  it('двойная фамилия склоняется по обеим частям', () => {
+    expect(gen('Иванов-Петров Пётр')).toBe('Иванова-Петрова Петра');
+  });
+
+  it('несклоняемая остаётся, а имя склоняется', () => {
+    expect(gen('Коваленко Олег')).toBe('Коваленко Олега');
+    expect(gen('Белых Иван')).toBe('Белых Ивана');
+  });
+
+  it('женское ФИО целиком', () => {
+    expect(gen('Петрова Мария Ивановна')).toBe('Петровой Марии Ивановны');
+  });
+});
+
+describe('короткая форма ФИО', () => {
+  /*
+   * Пробелы здесь неразрывные. Обычный пробел разрешает перенос между
+   * инициалами, и «Иванов И.» остаётся в строке, а вторая «И.» уезжает
+   * на следующую — подпись под грамотой разваливается пополам.
+   */
+  const NBSP = ' ';
+
+  it('фамилия и два инициала', () => {
+    expect(shortName('Иванов Пётр Ильич')).toBe(`Иванов${NBSP}П.${NBSP}И.`);
+  });
+
+  it('между инициалами именно неразрывный пробел', () => {
+    const short = shortName('Иванов Пётр Ильич');
+    expect(short).not.toContain(' ');
+    expect(short.split(NBSP)).toHaveLength(3);
+  });
+
+  it('без отчества — один инициал', () => {
+    expect(shortName('Иванов Пётр')).toBe(`Иванов${NBSP}П.`);
+  });
+
+  it('фамилию ставит первой, даже если написали «Имя Фамилия»', () => {
+    // В этом и смысл сокращения: в списке ищут по фамилии.
+    expect(shortName('Мария Петрова')).toBe(`Петрова${NBSP}М.`);
+  });
+
+  it('одну фамилию оставляет как есть', () => {
+    expect(shortName('Иванов')).toBe('Иванов');
+  });
+
+  it('одно имя не сокращает — «П.» короче, но бесполезнее', () => {
+    expect(shortName('Пётр')).toBe('Пётр');
+  });
+
+  it('уже сокращённое пересобирает ради неразрывных пробелов', () => {
+    expect(shortName('Иванов П.И.')).toBe(`Иванов${NBSP}П.${NBSP}И.`);
+    expect(shortName('Иванов П. И.')).toBe(`Иванов${NBSP}П.${NBSP}И.`);
+  });
+
+  it('двойную фамилию сохраняет целиком', () => {
+    expect(shortName('Иванов-Петров Пётр Ильич')).toBe(`Иванов-Петров${NBSP}П.${NBSP}И.`);
+  });
+
+  it('фамилии на -их/-ых и несклоняемые сокращаются как все', () => {
+    expect(shortName('Белых Иван Петрович')).toBe(`Белых${NBSP}И.${NBSP}П.`);
+    expect(shortName('Коваленко Олег')).toBe(`Коваленко${NBSP}О.`);
+  });
+
+  it('иностранное имя латиницей не трогает', () => {
+    expect(shortName('John Smith')).toBe('John Smith');
+  });
+
+  it('больше трёх слов не разбирает', () => {
+    const long = 'Мамедов Мамед Мамед оглы';
+    expect(shortName(long)).toBe(long);
+  });
+
+  it('пустую строку возвращает как была', () => {
+    expect(shortName('')).toBe('');
+    expect(shortName('   ')).toBe('   ');
+  });
+
+  it('буква «ё» в инициале сохраняется', () => {
+    expect(shortName('Фёдоров Пётр Ильич')).toBe(`Фёдоров${NBSP}П.${NBSP}И.`);
+    expect(shortName('Иванов Ёсиф')).toBe(`Иванов${NBSP}Ё.`);
+  });
+});
+
+describe('уровни уверенности — чтобы отчёт проверки читался', () => {
+  /*
+   * Списки из Черноземья, Кубани, Беларуси и Украины наполовину состоят
+   * из фамилий на -ко и -ук. Если каждую помечать наравне с неразобранной
+   * строкой, отчёт 9.3 станет красной простынёй, в которой настоящую
+   * поломку никто не найдёт.
+   */
+  const check = (s: string) => declineFullNameChecked(s, 'dative');
+
+  it('обычная русская фамилия — «high»', () => {
+    expect(check('Иванов Пётр Ильич').confidence).toBe('high');
+    expect(check('Петрова Мария Ивановна').confidence).toBe('high');
+  });
+
+  it('несклоняемые и нерусские по форме — «medium», а не «low»', () => {
+    // Значение верное, подтвердить может только тот, кто знает человека.
+    for (const name of [
+      'Коваленко Олег',
+      'Петренко Олег',
+      'Гончарук Дарья',
+      'Белых Иван',
+      'Ким Ольга',
+      'Петросян Армен',
+    ]) {
+      expect(check(name).confidence, name).toBe('medium');
+    }
+  });
+
+  it('целый украинско-белорусский список не попадает в «low»', () => {
+    // Именно этот случай и делал отчёт нечитаемым.
+    const list = [
+      'Коваленко Олег Петрович',
+      'Шевченко Марина Ивановна',
+      'Бондаренко Игорь Сергеевич',
+      'Гончарук Дарья Олеговна',
+      'Ткачук Павел Николаевич',
+    ];
+    const low = list.filter((n) => check(n).confidence === 'low');
+    expect(low).toEqual([]);
+  });
+
+  it('не склонили или могли испортить — «low»', () => {
+    expect(check('John Smith').confidence).toBe('low');
+    expect(check('Мамедов Мамед Мамед оглы').confidence).toBe('low');
+    expect(check('Женя Саша').confidence).toBe('low');
+  });
+
+  it('худшее сомнение и определяет уровень', () => {
+    // «Женя Коваленко»: и пол неизвестен (low), и фамилия несклоняемая
+    // (medium). Строка обязана попасть в основной список.
+    const r = check('Коваленко Женя');
+    expect(r.doubts).toContain('unknown-gender');
+    expect(r.doubts).toContain('indeclinable-surname');
+    expect(r.confidence).toBe('low');
+  });
+
+  it('у каждого кода есть уровень и человеческое пояснение', () => {
+    for (const code of Object.keys(DECLENSION_DOUBT_TEXT) as (keyof typeof DECLENSION_DOUBT_TEXT)[]) {
+      expect(DECLENSION_DOUBT_LEVEL[code]).toMatch(/^(low|medium)$/);
+      expect(DECLENSION_DOUBT_TEXT[code]).toBeTruthy();
+    }
   });
 });

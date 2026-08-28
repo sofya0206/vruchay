@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
-import { substituteVariables, type SheetElement, type SheetLayout } from '@gramota/shared';
+import {
+  substituteForRow,
+  substituteVariables,
+  type SheetElement,
+  type SheetLayout,
+} from '@gramota/shared';
 
 /**
  * Единый рендер листа: используется редактором, превью и страницей, которую
@@ -151,7 +156,7 @@ function ElementView({
 
   if (element.type === 'text') {
     const { props } = element;
-    const text = showRawVariables ? props.text : substituteVariables(props.text, data ?? {});
+    const text = showRawVariables ? props.text : substituteForRow(props.text, data ?? {});
     return (
       <div
         {...common}
@@ -219,7 +224,8 @@ function ElementView({
     const value = template
       ? showRawVariables
         ? template
-        : substituteVariables(template, data ?? {})
+        : // QR кодирует адрес, а не фразу: парные формы здесь неуместны.
+          substituteVariables(template, data ?? {})
       : (verifyUrl ?? `${origin()}/verify/00000000-0000-0000-0000-000000000000`);
 
     return (
