@@ -120,6 +120,31 @@ model Document {
   eventDate   String @default("") @map("event_date")
   eventPlace  String @default("") @map("event_place")
   eventHours  String @default("") @map("event_hours")
+
+  /**
+   * Раздел библиотеки: спортивные соревнования, обучение, благодарности.
+   * Не перечисление, а строка: набор разделов живёт в `@gramota/shared`
+   * и правится вместе с заготовками, а миграция ради нового раздела —
+   * цена, которой этот выбор не стоит. Значение проверяет Zod на входе.
+   * null — материал заведён до появления разделов или без выбора.
+   */
+  category String? @map("category")
+
+  /**
+   * Материал, с которого сняли копию под новое мероприятие.
+   *
+   * Ссылка на себя, а не отдельная модель шаблона: полное разделение
+   * «бланк отдельно, мероприятие отдельно» задело бы ядро выпуска,
+   * и делается отдельной задачей. Пока это видимая связь «сделан
+   * на основе того», по которой человек находит исходный бланк.
+   *
+   * SetNull, а не Cascade: исходник могли удалить насовсем, и копии
+   * от этого пропадать не должны — они самостоятельные материалы.
+   */
+  sourceDocumentId String?    @map("source_document_id") @db.Uuid
+  sourceDocument   Document?  @relation("DocumentCopies", fields: [sourceDocumentId], references: [id], onDelete: SetNull)
+  copies           Document[] @relation("DocumentCopies")
+
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
   deletedAt      DateTime? @map("deleted_at")
@@ -142,6 +167,8 @@ model Document {
   templates EmailTemplate[]
 
   @@index([orgId, deletedAt])
+  // Библиотека фильтруется по разделу внутри организации — это её главный запрос.
+  @@index([orgId, category])
   @@map("documents")
 }
 
@@ -207,16 +234,50 @@ model File {
    */
   rowId String? @map("row_id") @db.Uuid
 
+  /**
+   * Перевыпуск: задание, которое должно заменить этот файл.
+   *
+   * Ставится в момент, когда человек нажал «Перевыпустить», — то есть до
+   * того, как новый документ существует. Пока файла-замены нет, старый
+   * остаётся действительным: выпуск может упасть или быть отменён, и
+   * гасить настоящий сертификат под обещание нового нельзя.
+   *
+   * Замену находим по паре (job_id, row_id) — тому же ключу идемпотентности,
+   * которым пользуется очередь. Найденную запоминаем в replacedById, чтобы
+   * связь пережила удаление строки из таблицы получателей.
+   */
+  replacedByJobId String? @map("replaced_by_job_id") @db.Uuid
+  replacedById    String? @map("replaced_by_id") @db.Uuid
+
+  /**
+   * Сколько раз документ проверяли по QR-коду и когда в последний раз.
+   *
+   * Обезличенный счётчик: ни адреса, ни устройства, ни отпечатка браузера
+   * проверяющего мы не храним. Организации нужен ответ «сертификат проверили
+   * 47 раз», а не досье на того, кто проверял, — и по 152-ФЗ второе
+   * перевело бы нас из обработчика по поручению в самостоятельного оператора.
+   */
+  verifyCount  Int       @default(0) @map("verify_count")
+  verifyLastAt DateTime? @map("verify_last_at")
+
+  /** Сколько раз файл скачивали из кабинета — тоже только счётчиком. */
+  downloadCount Int @default(0) @map("download_count")
+
   org             Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
   document        Document?      @relation(fields: [documentId], references: [id], onDelete: SetNull)
   job             GenerationJob? @relation("JobFiles", fields: [jobId], references: [id], onDelete: SetNull)
   row             RecipientRow?  @relation("RowGenerated", fields: [rowId], references: [id], onDelete: SetNull)
+  replacedBy      File?          @relation("FileReplacement", fields: [replacedById], references: [id], onDelete: SetNull)
+  replaces        File[]         @relation("FileReplacement")
   sheetBackground Sheet[]        @relation("SheetBackground")
   rows            RecipientRow[] @relation("RowFile")
   emails          Email[]        @relation("EmailFile")
 
   @@unique([jobId, rowId])
   @@index([orgId, kind])
+  /// Реестр листает выданное по организации в обратном хронологическом
+  /// порядке — без этого индекса каждая страница читала бы все файлы.
+  @@index([orgId, kind, createdAt])
   @@map("files")
 }
 
@@ -393,11 +454,43 @@ model Sender {
   @@map("senders")
 }
 
+/**
+ * Поток отправки. Разделение не про удобство, а про деньги.
+ *
+ * Выдача документа, ссылка на него и уведомление об истечении срока —
+ * переписка по существу отношений, согласия по ст. 18 ФЗ «О рекламе»
+ * она не требует. Реклама требует согласия, отписки и журнала согласий.
+ *
+ * Ловушка в том, что рекламный кусок внутри транзакционного письма делает
+ * рекламным всё письмо целиком, а штраф по ст. 14.3 КоАП для юрлица — от
+ * 300 тысяч до миллиона рублей за каждый факт. Поэтому поток — это поле
+ * в базе и развилка в коде, а не строчка в инструкции для оператора:
+ * оператор ошибается один раз, а платит организация за каждое письмо.
+ */
+enum EmailKind {
+  transactional
+  marketing
+}
+
 model EmailTemplate {
   id         String  @id @default(uuid()) @db.Uuid
   orgId      String  @map("org_id") @db.Uuid
   documentId String? @map("document_id") @db.Uuid
   senderId   String? @map("sender_id") @db.Uuid
+
+  /**
+   * Шаблонов у документа столько, сколько потоков: транзакционный и
+   * рекламный не пересекаются нигде, включая текст. Транзакционная
+   * отправка ищет шаблон с фильтром по этому полю и рекламный
+   * не найдёт даже случайно.
+   */
+  kind EmailKind @default(transactional)
+  /**
+   * Рекламодатель: ст. 18 требует, чтобы получатель видел, чья это реклама.
+   * Заполнен только у рекламных шаблонов — транзакционному письму
+   * рекламодателя не полагается по определению.
+   */
+  advertiserName String? @map("advertiser_name")
 
   subject  String
   bodyHtml String  @map("body_html")
@@ -431,6 +524,15 @@ model Email {
   rowId      String? @map("row_id") @db.Uuid
   templateId String? @map("template_id") @db.Uuid
   fileId     String? @map("file_id") @db.Uuid
+
+  /**
+   * Поток копией с шаблона на момент постановки в очередь.
+   *
+   * Именно копией: шаблон можно потом переделать из рекламного
+   * в транзакционный, а по журналу за прошлый год отвечать перед
+   * проверкой придётся тем, чем письмо было в день отправки.
+   */
+  kind EmailKind @default(transactional)
 
   toEmail  String @map("to_email")
   subject  String

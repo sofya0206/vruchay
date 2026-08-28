@@ -1,5 +1,6 @@
 export * from './schema/layout';
 export * from './schema/page-sizes';
+export * from './schema/starter-presets';
 export * from './retention';
 export * from './variables';
 export * from './declension';

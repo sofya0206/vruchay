@@ -1,35 +1,50 @@
 import { FormEvent, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Award, FileText, LogOut, Plus, Receipt, Search, Settings, Trash2 } from 'lucide-react';
+import { FileText, Plus, Search, Trash2 } from 'lucide-react';
 import { UsageBar } from '../documents/UsageBar';
-import { TRASH_DAYS } from '@gramota/shared';
+import {
+  DOCUMENT_CATEGORIES,
+  TRASH_DAYS,
+  type DocumentCategory,
+  type StarterPreset,
+} from '@gramota/shared';
 import { api } from '../api/client';
 import type { DocumentDetail, DocumentList, DocumentSummary } from '../api/types';
-import { useLogout, useMe } from '../auth/useAuth';
 import { Button } from '../ui/Button';
-import { Input } from '../ui/Field';
-import { InstallHint } from '../ui/InstallHint';
+import { Input, Select } from '../ui/Field';
 import { DocumentCard } from '../documents/DocumentCard';
 import { PageSizePicker, type PageSizeValue } from '../documents/PageSizePicker';
+import { PresetGallery } from '../documents/PresetGallery';
+import { LibraryFilters, type LibrarySort } from '../documents/LibraryFilters';
 
+/**
+ * Библиотека материалов.
+ *
+ * До неё здесь был плоский список: человек входил в сервис, видел пустоту
+ * и не знал, с чего начать. Теперь первое, что он видит, — готовые заготовки,
+ * из которых материал делается в одно нажатие, а свои материалы разложены
+ * по разделам и ищутся поиском.
+ */
 export function DocumentsPage() {
   const qc = useQueryClient();
-  const me = useMe();
-  const logout = useLogout();
   const [search, setSearch] = useState('');
+  const [category, setCategory] = useState<DocumentCategory | null>(null);
+  const [sort, setSort] = useState<LibrarySort>('updated');
   const [title, setTitle] = useState('');
+  const [newCategory, setNewCategory] = useState<DocumentCategory | ''>('');
   // A4 альбомная — то, на чём печатают грамоты чаще всего.
   const [size, setSize] = useState<PageSizeValue>({ widthMm: 297, heightMm: 210 });
+  const [scratch, setScratch] = useState(false);
 
   const [trash, setTrash] = useState(false);
 
   const documents = useQuery({
-    queryKey: ['documents', search, trash],
+    queryKey: ['documents', search, trash, category, sort],
     queryFn: () =>
       api.get<DocumentList>(
-        `/documents?limit=50&trashed=${trash}` +
-          (search ? `&search=${encodeURIComponent(search)}` : ''),
+        `/documents?limit=50&trashed=${trash}&sort=${sort}` +
+          (search ? `&search=${encodeURIComponent(search)}` : '') +
+          (category ? `&category=${category}` : ''),
       ),
   });
 
@@ -42,14 +57,17 @@ export function DocumentsPage() {
   });
 
   const create = useMutation({
-    mutationFn: (t: string) =>
+    mutationFn: (v: { title: string; category?: DocumentCategory; presetId?: string }) =>
       api.post<DocumentDetail>('/documents', {
-        title: t,
+        title: v.title,
         pageWidthMm: size.widthMm,
         pageHeightMm: size.heightMm,
+        ...(v.category ? { category: v.category } : {}),
+        ...(v.presetId ? { presetId: v.presetId } : {}),
       }),
     onSuccess: () => {
       setTitle('');
+      setScratch(false);
       void qc.invalidateQueries({ queryKey: ['documents'] });
     },
   });
@@ -93,121 +111,142 @@ export function DocumentsPage() {
 
   function onCreate(e: FormEvent) {
     e.preventDefault();
-    if (title.trim()) create.mutate(title.trim());
+    if (title.trim()) {
+      create.mutate({ title: title.trim(), category: newCategory || undefined });
+    }
   }
 
-  return (
-    <div className="min-h-full">
-      <header className="border-b border-[var(--line)] bg-[var(--surface)]">
-        <div className="mx-auto flex max-w-5xl items-center gap-3 px-6 py-3">
-          <span className="grid h-8 w-8 place-items-center rounded-lg bg-[var(--accent)] text-[var(--accent-contrast)]">
-            <Award size={17} strokeWidth={1.75} />
-          </span>
-          <span className="font-serif text-lg">Вручай</span>
-          <div className="ml-auto flex items-center gap-3">
-            <span className="hidden text-sm text-[var(--text-muted)] sm:inline">
-              {me.data?.email}
-            </span>
-            {/* Счета и заявки — наша собственная бухгалтерия. Клиенту эта
-                ссылка вела в раздел, где его встречал отказ, поэтому
-                показываем её только своим. */}
-            {me.data?.isPlatform && (
-              <Link
-                to="/invoices"
-                title="Счета и заявки"
-                aria-label="Счета и заявки"
-                className="inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
-              >
-                <Receipt size={15} />
-                <span className="hidden sm:inline">Счета</span>
-              </Link>
-            )}
-            {/* aria-label обязателен: на узком экране подпись скрыта,
-                и без него остаётся ссылка вообще без названия — и для
-                чтения с экрана, и для всплывающей подсказки. */}
-            <Link
-              to="/settings"
-              title="Настройки"
-              aria-label="Настройки"
-              className="inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
-            >
-              <Settings size={15} />
-              <span className="hidden sm:inline">Настройки</span>
-            </Link>
-            <Button
-              size="sm"
-              variant="ghost"
-              icon={<LogOut size={15} />}
-              onClick={() => logout.mutate()}
-            >
-              Выйти
-            </Button>
-          </div>
-        </div>
-      </header>
+  function onPickPreset(preset: StarterPreset) {
+    create.mutate({ title: preset.documentTitle, presetId: preset.id });
+  }
 
-      <main className="mx-auto max-w-5xl px-6 py-8">
-        {/* Остаток пробы — до всего остального: человек должен знать,
+  const items = documents.data?.items ?? [];
+  const nothingFound = documents.data?.items.length === 0;
+  // Заготовки — вход по умолчанию. Форма с пустым названием открывается
+  // только по явной просьбе: в ней нечего показать, кроме поля ввода.
+  const showGallery = !trash && !scratch;
+
+  return (
+    <main className="mx-auto max-w-5xl px-6 py-8">
+      {/* Остаток пробы — до всего остального: человек должен знать,
             сколько у него есть, ещё до того как начнёт награждение,
             а не упереться в предел на сорок седьмом документе. */}
-        {!trash && <UsageBar />}
+      {!trash && <UsageBar />}
 
-        <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold">{trash ? 'Корзина' : 'Материалы'}</h1>
-            <p className="mt-1 text-sm text-[var(--text-muted)]">
-              {trash ? (
-                <>Удалённое хранится {TRASH_DAYS} дней, потом стирается насовсем</>
-              ) : (
-                <>Грамоты, дипломы, сертификаты, благодарности — что угодно на бланке</>
-              )}
-              {documents.data ? ` · ${documents.data.total}` : ''}
-            </p>
-          </div>
-          <div className="relative">
-            <Search
-              size={16}
-              className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-[var(--text-muted)]"
-            />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Поиск по названию"
-              className="w-56 pl-9"
-            />
-          </div>
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">{trash ? 'Корзина' : 'Материалы'}</h1>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
+            {trash ? (
+              <>Удалённое хранится {TRASH_DAYS} дней, потом стирается насовсем</>
+            ) : (
+              <>Грамоты, дипломы, сертификаты, благодарности — что угодно на бланке</>
+            )}
+            {documents.data ? ` · ${documents.data.total}` : ''}
+          </p>
         </div>
+        <div className="relative">
+          <Search
+            size={16}
+            className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-[var(--text-muted)]"
+          />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Поиск по названию"
+            className="w-56 pl-9"
+          />
+        </div>
+      </div>
 
-        {/* Переключатель, а не отдельная страница: корзина — тот же список,
+      {/* Переключатель, а не отдельная страница: корзина — тот же список,
             и человеку не надо гадать, где искать выброшенное. Показываем
             только когда в ней что-то есть, чтобы не занимать место зря. */}
-        {(trash || (trashCount.data ?? 0) > 0) && (
-          <div className="mb-4 flex gap-1 rounded-lg bg-[var(--surface-sunken)] p-0.5">
-            <ListTab active={!trash} onClick={() => setTrash(false)}>
-              Материалы
-            </ListTab>
-            <ListTab active={trash} onClick={() => setTrash(true)}>
-              <Trash2 size={14} /> Корзина
-              {(trashCount.data ?? 0) > 0 && (
-                <span className="tabular text-[var(--text-muted)]">{trashCount.data}</span>
-              )}
-            </ListTab>
-          </div>
-        )}
+      {(trash || (trashCount.data ?? 0) > 0) && (
+        <div className="mb-4 flex gap-1 rounded-lg bg-[var(--surface-sunken)] p-0.5">
+          <ListTab active={!trash} onClick={() => setTrash(false)}>
+            Материалы
+          </ListTab>
+          <ListTab active={trash} onClick={() => setTrash(true)}>
+            <Trash2 size={14} /> Корзина
+            {(trashCount.data ?? 0) > 0 && (
+              <span className="tabular text-[var(--text-muted)]">{trashCount.data}</span>
+            )}
+          </ListTab>
+        </div>
+      )}
 
-        {/* Размер выбирается до создания, а не после: поменять его у документа,
-            на котором уже расставлен текст, значит сдвинуть весь макет. */}
+      {!trash && (
+        <LibraryFilters category={category} onCategory={setCategory} sort={sort} onSort={setSort} />
+      )}
+
+      {showGallery && (
+        <section className="mb-8">
+          <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="font-medium">Начните с заготовки</h2>
+            <p className="text-sm text-[var(--text-muted)]">
+              Текст уже расставлен по листу — останется поправить слова
+            </p>
+          </div>
+          <PresetGallery
+            category={category}
+            size={size}
+            busyId={
+              create.isPending && create.variables?.presetId ? create.variables.presetId : null
+            }
+            onPick={onPickPreset}
+          />
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <PageSizePicker value={size} onChange={setSize} />
+            <button
+              type="button"
+              onClick={() => setScratch(true)}
+              className="text-sm text-[var(--text-muted)] underline underline-offset-4 hover:text-[var(--text)]"
+            >
+              Или с чистого листа
+            </button>
+          </div>
+        </section>
+      )}
+
+      {/* Размер выбирается до создания, а не после: поменять его у документа,
+          на котором уже расставлен текст, значит сдвинуть весь макет. */}
+      {!trash && scratch && (
         <form
           onSubmit={onCreate}
-          hidden={trash}
           className="mb-6 space-y-3 rounded-2xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]"
         >
-          <div className="flex gap-2">
+          <div className="flex items-baseline justify-between gap-2">
+            <h2 className="font-medium">Материал с чистого листа</h2>
+            <button
+              type="button"
+              onClick={() => setScratch(false)}
+              className="text-sm text-[var(--text-muted)] underline underline-offset-4 hover:text-[var(--text)]"
+            >
+              Вернуться к заготовкам
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2">
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Название нового документа, например «Сертификат участника семинара»"
+              className="min-w-64 flex-1"
+              autoFocus
             />
+            <Select
+              value={newCategory}
+              onChange={(e) => setNewCategory(e.target.value as DocumentCategory | '')}
+              aria-label="Раздел нового материала"
+              className="w-56"
+            >
+              <option value="">Без раздела</option>
+              {DOCUMENT_CATEGORIES.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.title}
+                </option>
+              ))}
+            </Select>
             <Button
               type="submit"
               variant="primary"
@@ -219,75 +258,72 @@ export function DocumentsPage() {
           </div>
           <PageSizePicker value={size} onChange={setSize} />
         </form>
+      )}
 
-        {documents.isPending && <p className="text-[var(--text-muted)]">Загрузка…</p>}
+      {documents.isPending && <p className="text-[var(--text-muted)]">Загрузка…</p>}
 
-        {documents.data?.items.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-[var(--line-strong)] px-6 py-16 text-center">
-            {trash ? (
-              <>
-                <Trash2
-                  size={28}
-                  className="mx-auto mb-3 text-[var(--text-muted)]"
-                  strokeWidth={1.5}
-                />
-                <p className="font-medium">Корзина пуста</p>
+      {nothingFound && (
+        <div className="rounded-2xl border border-dashed border-[var(--line-strong)] px-6 py-12 text-center">
+          {trash ? (
+            <>
+              <Trash2
+                size={28}
+                className="mx-auto mb-3 text-[var(--text-muted)]"
+                strokeWidth={1.5}
+              />
+              <p className="font-medium">Корзина пуста</p>
+              <p className="mt-1 text-sm text-[var(--text-muted)]">
+                Удалённые материалы лежат здесь {TRASH_DAYS} дней — успеете передумать
+              </p>
+            </>
+          ) : (
+            <>
+              <FileText
+                size={28}
+                className="mx-auto mb-3 text-[var(--text-muted)]"
+                strokeWidth={1.5}
+              />
+              <p className="font-medium">
+                {search || category ? 'Ничего не нашлось' : 'Здесь пока пусто'}
+              </p>
+              {search || category ? (
                 <p className="mt-1 text-sm text-[var(--text-muted)]">
-                  Удалённые материалы лежат здесь {TRASH_DAYS} дней — успеете передумать
+                  Попробуйте изменить запрос или выбрать другой раздел
                 </p>
-              </>
-            ) : (
-              <>
-                <FileText
-                  size={28}
-                  className="mx-auto mb-3 text-[var(--text-muted)]"
-                  strokeWidth={1.5}
-                />
-                <p className="font-medium">
-                  {search ? 'Ничего не нашлось' : 'Здесь пока пусто'}
-                </p>
-                {search ? (
-                  <p className="mt-1 text-sm text-[var(--text-muted)]">
-                    Попробуйте изменить запрос
+              ) : (
+                /* Не пересказываем инструкцию, а показываем на заготовки,
+                   которые стоят прямо над этой рамкой: новичок на пустом
+                   экране ищет, куда нажать, а не что почитать. */
+                <div className="mt-1 text-sm text-[var(--text-muted)]">
+                  <p>
+                    Начните сверху: выберите заготовку — текст уже расставлен по листу, останется
+                    поправить слова.
                   </p>
-                ) : (
-                  /* Не повторяем инструкцию, а показываем на поле, которое
-                     стоит прямо над этой рамкой: новичок на пустом экране
-                     ищет, куда нажать, а не что почитать. */
-                  <div className="mt-1 text-sm text-[var(--text-muted)]">
-                    <p>
-                      Начните сверху: впишите название — например «Грамота за первое
-                      место» — и нажмите «Создать».
-                    </p>
-                    <p className="mt-2">
-                      Дальше загрузите свой бланк и расставьте по нему поля: фамилию,
-                      место, дату. Ничего страшного не произойдёт — пока вы не создали
-                      файлы, ничего не расходуется.
-                    </p>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        )}
+                  <p className="mt-2">
+                    Дальше загрузите свой бланк и подгоните поля: фамилию, место, дату. Ничего
+                    страшного не произойдёт — пока вы не выпустили файлы, ничего не расходуется.
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {documents.data?.items.map((doc) => (
-            <DocumentCard
-              key={doc.id}
-              doc={doc}
-              onRename={onRename}
-              onDuplicate={(d) => duplicate.mutate(d.id)}
-              onDelete={(d) => remove.mutate(d.id)}
-              onRestore={(d) => restore.mutate(d.id)}
-              onPurge={(d) => purge.mutate(d.id)}
-            />
-          ))}
-        </ul>
-      </main>
-
-      <InstallHint />
-    </div>
+      <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {items.map((doc) => (
+          <DocumentCard
+            key={doc.id}
+            doc={doc}
+            onRename={onRename}
+            onDuplicate={(d) => duplicate.mutate(d.id)}
+            onDelete={(d) => remove.mutate(d.id)}
+            onRestore={(d) => restore.mutate(d.id)}
+            onPurge={(d) => purge.mutate(d.id)}
+          />
+        ))}
+      </ul>
+    </main>
   );
 }
 

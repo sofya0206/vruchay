@@ -14,8 +14,10 @@ import { RenderModule } from './render/render.module';
 import { GenerationModule } from './generation/generation.module';
 import { ValidationModule } from './validation/validation.module';
 import { MailModule } from './mail/mail.module';
+import { MailingModule } from './mailing/mailing.module';
 import { TildaModule } from './tilda/tilda.module';
 import { VerifyModule } from './verify/verify.module';
+import { RegistryModule } from './registry/registry.module';
 import { LeadsModule } from './leads/leads.module';
 import { PaymentsModule } from './payments/payments.module';
 import { InvoicesModule } from './invoices/invoices.module';
@@ -24,6 +26,7 @@ import { AuditModule } from './audit/audit.module';
 import { ReferralModule } from './referral/referral.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { OrgModule } from './org/org.module';
+import { OverviewModule } from './overview/overview.module';
 import { TokensModule } from './tokens/tokens.module';
 import { BackupModule } from './backup/backup.module';
 import { PlatformModule } from './platform/platform.module';
@@ -43,8 +46,10 @@ import { PlatformModule } from './platform/platform.module';
     GenerationModule,
     ValidationModule,
     MailModule,
+    MailingModule,
     TildaModule,
     VerifyModule,
+    RegistryModule,
     LeadsModule,
     PaymentsModule,
     InvoicesModule,
@@ -53,6 +58,7 @@ import { PlatformModule } from './platform/platform.module';
     ReferralModule,
     ReviewsModule,
     OrgModule,
+    OverviewModule,
     TokensModule,
     BackupModule,
     PlatformModule,

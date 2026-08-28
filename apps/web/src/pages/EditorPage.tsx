@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   Check,
@@ -59,12 +59,23 @@ type Gesture =
   | (GestureBase & { kind: 'move' })
   | (GestureBase & { kind: 'resize'; handle: ResizeHandle });
 
+type View = 'editor' | 'table' | 'rules' | 'check' | 'mail' | 'registry';
+const VIEWS: View[] = ['editor', 'table', 'rules', 'check', 'mail', 'registry'];
+
 export function EditorPage() {
   const { id = '' } = useParams();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [view, setView] = useState<'editor' | 'table' | 'rules' | 'check' | 'mail' | 'registry'>(
-    'editor',
-  );
+  /*
+   * Нужную вкладку можно назвать в адресе: `?view=table`.
+   *
+   * Ради быстрых действий с рабочего стола: «выпустить документы по списку»
+   * обязано приводить прямо к списку, а не в макет, откуда до списка ещё
+   * одно нажатие. Дальше вкладка живёт своей жизнью — переключение внутри
+   * редактора адрес не трогает.
+   */
+  const [params] = useSearchParams();
+  const asked = params.get('view');
+  const [view, setView] = useState<View>(VIEWS.includes(asked as View) ? (asked as View) : 'editor');
   const [zoom, setZoom] = useState(1);
   const [saved, setSaved] = useState<'saved' | 'saving' | 'dirty'>('saved');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -330,7 +341,7 @@ export function EditorPage() {
     <div className="flex h-full flex-col">
       <header className="flex flex-wrap items-center gap-3 border-b border-[var(--line)] bg-[var(--surface)] px-4 py-2.5">
         <Link
-          to="/"
+          to="/documents"
           className="flex items-center gap-1.5 text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--text)]"
         >
           <ChevronLeft size={16} />
