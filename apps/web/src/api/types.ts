@@ -1,4 +1,4 @@
-import type { SheetLayout } from '@gramota/shared';
+import type { DocumentCategory, SheetLayout } from '@gramota/shared';
 
 export interface Me {
   email: string;
@@ -32,6 +32,14 @@ export interface DocumentSummary {
   updatedAt: string;
   /** Заполнено только у документов в корзине — по нему считается срок. */
   deletedAt?: string | null;
+  /** Раздел библиотеки. null — материал заведён без раздела. */
+  category?: DocumentCategory | null;
+  /**
+   * Материал, с которого снята копия под новое мероприятие. null и когда
+   * копии ни с чего не снимали, и когда исходник лежит в корзине:
+   * открыть его всё равно нельзя, а мёртвая ссылка хуже её отсутствия.
+   */
+  source?: { id: string; title: string } | null;
   /** Сколько листов в документе. Показываем, только если их больше одного. */
   sheetCount?: number;
   /**

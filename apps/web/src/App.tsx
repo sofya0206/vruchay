@@ -61,6 +61,7 @@ export function App() {
   return (
     <Routes>
       <Route path="/" element={<DocumentsPage />} />
+      <Route path="/documents" element={<DocumentsPage />} />
       <Route path="/documents/:id" element={<EditorPage />} />
       <Route path="/settings" element={<SettingsPage />} />
       <Route path="/invoices" element={<InvoicesPage />} />

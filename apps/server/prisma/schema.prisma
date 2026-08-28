@@ -120,6 +120,31 @@ model Document {
   eventDate   String @default("") @map("event_date")
   eventPlace  String @default("") @map("event_place")
   eventHours  String @default("") @map("event_hours")
+
+  /**
+   * Раздел библиотеки: спортивные соревнования, обучение, благодарности.
+   * Не перечисление, а строка: набор разделов живёт в `@gramota/shared`
+   * и правится вместе с заготовками, а миграция ради нового раздела —
+   * цена, которой этот выбор не стоит. Значение проверяет Zod на входе.
+   * null — материал заведён до появления разделов или без выбора.
+   */
+  category String? @map("category")
+
+  /**
+   * Материал, с которого сняли копию под новое мероприятие.
+   *
+   * Ссылка на себя, а не отдельная модель шаблона: полное разделение
+   * «бланк отдельно, мероприятие отдельно» задело бы ядро выпуска,
+   * и делается отдельной задачей. Пока это видимая связь «сделан
+   * на основе того», по которой человек находит исходный бланк.
+   *
+   * SetNull, а не Cascade: исходник могли удалить насовсем, и копии
+   * от этого пропадать не должны — они самостоятельные материалы.
+   */
+  sourceDocumentId String?    @map("source_document_id") @db.Uuid
+  sourceDocument   Document?  @relation("DocumentCopies", fields: [sourceDocumentId], references: [id], onDelete: SetNull)
+  copies           Document[] @relation("DocumentCopies")
+
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
   deletedAt      DateTime? @map("deleted_at")
@@ -142,6 +167,8 @@ model Document {
   templates EmailTemplate[]
 
   @@index([orgId, deletedAt])
+  // Библиотека фильтруется по разделу внутри организации — это её главный запрос.
+  @@index([orgId, category])
   @@map("documents")
 }
 

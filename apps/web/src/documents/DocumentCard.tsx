@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Copy, FileText, MoreVertical, Pencil, RotateCcw, Trash2 } from 'lucide-react';
-import { daysLeftInTrash, TRASH_DAYS } from '@gramota/shared';
+import { CalendarPlus, CornerUpLeft, FileText, MoreVertical, Pencil, RotateCcw, Trash2 } from 'lucide-react';
+import { daysLeftInTrash, DOCUMENT_CATEGORIES, TRASH_DAYS } from '@gramota/shared';
 import type { DocumentSummary } from '../api/types';
 import { SheetRenderer } from '../render/SheetRenderer';
+import { SheetThumbnail } from './SheetThumbnail';
 
 /**
  * Карточка документа в списке.
@@ -60,7 +61,7 @@ export function DocumentCard({
               <FileText size={26} className="text-[var(--line-strong)]" strokeWidth={1.5} />
             </div>
           ) : (
-            <Thumbnail doc={doc} />
+            <Preview doc={doc} />
           )}
           {(doc.sheetCount ?? 1) > 1 && (
             <span className="absolute right-2 top-2 rounded-md bg-[var(--surface)]/90 px-1.5 py-0.5 text-xs text-[var(--text-muted)]">
@@ -71,11 +72,26 @@ export function DocumentCard({
         <div className="p-4 pr-12">
           <h2 className="truncate font-sans text-base font-medium">{doc.title}</h2>
           <p className="tabular mt-1 text-sm text-[var(--text-muted)]">
+            {categoryTitle(doc) ? `${categoryTitle(doc)} · ` : ''}
             {Math.round(doc.pageWidthMm)}×{Math.round(doc.pageHeightMm)} мм ·{' '}
             {new Date(doc.updatedAt).toLocaleDateString('ru-RU')}
           </p>
         </div>
       </Link>
+
+      {/* Связь с исходным бланком — вне ссылки на сам материал: это отдельный
+          переход, и вложенные ссылки браузер всё равно не разрешает. */}
+      {doc.source && (
+        <div className="px-4 pb-4 pr-12 -mt-1">
+          <Link
+            to={`/documents/${doc.source.id}`}
+            className="inline-flex max-w-full items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--text)]"
+          >
+            <CornerUpLeft size={13} className="shrink-0" />
+            <span className="truncate">на основе «{doc.source.title}»</span>
+          </Link>
+        </div>
+      )}
 
       <ActionsMenu
         title={doc.title}
@@ -118,7 +134,7 @@ function TrashedCard({
             <FileText size={26} className="text-[var(--line-strong)]" strokeWidth={1.5} />
           </div>
         ) : (
-          <Thumbnail doc={doc} />
+          <Preview doc={doc} />
         )}
       </div>
 
@@ -170,71 +186,26 @@ function dayWord(n: number): string {
   return 'дней';
 }
 
-/**
- * Лист в натуральную величину, ужатый до ширины карточки.
- *
- * Масштабируем через transform, а не пересчётом размеров: макет задан
- * в миллиметрах, и любой пересчёт «на глаз» разошёлся бы с тем, что
- * человек видит в редакторе и получает в PDF.
- */
-function Thumbnail({ doc }: { doc: DocumentSummary }) {
-  const box = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(0);
-
-  useEffect(() => {
-    const el = box.current;
-    if (!el) return;
-
-    // Размер листа в пикселях при текущем масштабе экрана: меряем реальным
-    // элементом, потому что соотношение миллиметра к пикселю зависит
-    // от устройства, а не от нашего представления о нём.
-    const probe = document.createElement('div');
-    probe.style.cssText = `position:absolute;visibility:hidden;width:${doc.pageWidthMm}mm;height:${doc.pageHeightMm}mm`;
-    el.appendChild(probe);
-    const rect = probe.getBoundingClientRect();
-    probe.remove();
-
-    const update = () => {
-      const { width, height } = el.getBoundingClientRect();
-      if (width <= 0 || rect.width <= 0) return;
-      // Вписываем целиком, по меньшей из сторон: иначе альбомный лист
-      // вылезал бы за рамку по горизонтали, а книжный — по вертикали,
-      // и в обоих случаях обрезался бы край макета.
-      setScale(Math.min(width / rect.width, height / rect.height));
-    };
-    update();
-
-    const observer = new ResizeObserver(update);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [doc.pageWidthMm, doc.pageHeightMm]);
-
+/** Первый лист материала, ужатый до рамки карточки. */
+function Preview({ doc }: { doc: DocumentSummary }) {
   return (
-    // Отступ на внешнем слое, измеряем внутренний: иначе поля вошли бы
-    // в измеренный прямоугольник, и лист вылез бы ровно на их величину.
-    <div className="h-full w-full p-3">
-      <div ref={box} className="grid h-full w-full place-items-center">
-      {scale > 0 && (
-        <div
-          className="overflow-hidden bg-white shadow-sm"
-          style={{ width: `${doc.pageWidthMm * scale}mm`, height: `${doc.pageHeightMm * scale}mm` }}
-        >
-          <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}>
-            <SheetRenderer
-              layout={doc.preview?.layout ?? []}
-              pageWidthMm={doc.pageWidthMm}
-              pageHeightMm={doc.pageHeightMm}
-              backgroundUrl={doc.preview?.backgroundUrl}
-              // Показываем «%name», а не пустоту: в списке нет получателя,
-              // и подставлять нечего — пустые места читались бы как ошибка макета.
-              showRawVariables
-            />
-          </div>
-        </div>
-      )}
-      </div>
-    </div>
+    <SheetThumbnail widthMm={doc.pageWidthMm} heightMm={doc.pageHeightMm}>
+      <SheetRenderer
+        layout={doc.preview?.layout ?? []}
+        pageWidthMm={doc.pageWidthMm}
+        pageHeightMm={doc.pageHeightMm}
+        backgroundUrl={doc.preview?.backgroundUrl}
+        // Показываем «%name», а не пустоту: в списке нет получателя,
+        // и подставлять нечего — пустые места читались бы как ошибка макета.
+        showRawVariables
+      />
+    </SheetThumbnail>
   );
+}
+
+/** Название раздела для подписи под миниатюрой. */
+function categoryTitle(doc: DocumentSummary): string | null {
+  return DOCUMENT_CATEGORIES.find((c) => c.id === doc.category)?.title ?? null;
 }
 
 /** Меню действий — то же, что человек привык видеть в проводнике и на диске. */
@@ -289,8 +260,11 @@ function ActionsMenu({
           <button type="button" role="menuitem" className={item} onClick={() => { setOpen(false); onRename(); }}>
             <Pencil size={14} /> Переименовать
           </button>
+          {/* Название действия говорит, что именно получится: макет тот же,
+              а список получателей и сведения о мероприятии — чистые.
+              «Сделать копию» обещало бы копию целиком. */}
           <button type="button" role="menuitem" className={item} onClick={() => { setOpen(false); onDuplicate(); }}>
-            <Copy size={14} /> Сделать копию
+            <CalendarPlus size={14} /> Копия под новое мероприятие
           </button>
           <button
             type="button"
