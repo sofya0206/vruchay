@@ -1,13 +1,31 @@
 import { z } from 'zod';
-import { sheetLayout } from '@gramota/shared';
+import { DOCUMENT_CATEGORY_IDS, sheetLayout, STARTER_PRESETS } from '@gramota/shared';
 
 /** Лист не меньше визитки и не больше A2 — защита от абсурдных значений в рендере. */
 const pageSizeMm = z.number().min(50).max(600);
+
+/*
+ * Раздел и заготовка приходят от клиента строками, но допустимые значения
+ * задаёт общий пакет: список один для интерфейса, сервера и проверки.
+ * Список нельзя строить из строк на лету — тогда любая опечатка клиента
+ * молча становилась бы новым разделом, по которому ничего не найти.
+ */
+const documentCategory = z.enum(DOCUMENT_CATEGORY_IDS as [string, ...string[]]);
+const starterPresetId = z.enum(
+  STARTER_PRESETS.map((p) => p.id) as [string, ...string[]],
+);
 
 export const createDocumentSchema = z.object({
   title: z.string().trim().min(1, 'Введите название').max(200),
   pageWidthMm: pageSizeMm.default(297),
   pageHeightMm: pageSizeMm.default(210),
+  category: documentCategory.optional(),
+  /**
+   * Заготовка: с ней материал создаётся сразу с расставленным текстом.
+   * Макет строит сервер, а не клиент, — по тем же правилам, что проверяет
+   * схема. Иначе клиент мог бы прислать что угодно под видом заготовки.
+   */
+  presetId: starterPresetId.optional(),
 });
 export type CreateDocumentDto = z.infer<typeof createDocumentSchema>;
 
@@ -33,6 +51,9 @@ export const updateDocumentSchema = z
     eventDate: z.string().trim().max(100),
     eventPlace: z.string().trim().max(200),
     eventHours: z.string().trim().max(50),
+
+    /** null — убрать материал из разделов, а не «не менять». */
+    category: documentCategory.nullable(),
   })
   .partial()
   .refine((v) => Object.keys(v).length > 0, 'Нечего обновлять');
@@ -43,10 +64,20 @@ export const updateSheetSchema = z.object({
 });
 export type UpdateSheetDto = z.infer<typeof updateSheetSchema>;
 
+/**
+ * Порядок в библиотеке.
+ *
+ * По умолчанию — по времени правки: человек возвращается к тому, над чем
+ * работал вчера, а не к тому, что завёл год назад.
+ */
+export const DOCUMENT_SORTS = ['updated', 'created', 'title'] as const;
+
 export const listDocumentsSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
   offset: z.coerce.number().int().min(0).default(0),
   search: z.string().trim().max(200).optional(),
+  category: documentCategory.optional(),
+  sort: z.enum(DOCUMENT_SORTS).default('updated'),
   /** Корзина — тот же список, только из удалённого. */
   trashed: z
     .enum(['true', 'false'])

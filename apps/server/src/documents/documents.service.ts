@@ -1,12 +1,27 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { CURRENT_LAYOUT_SCHEMA_VERSION, SheetLayout } from '@gramota/shared';
+import {
+  buildStarterLayout,
+  CURRENT_LAYOUT_SCHEMA_VERSION,
+  findStarterPreset,
+  SheetLayout,
+} from '@gramota/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { buildS3Key } from '../storage/s3-key';
 import { AllowedImage } from '../common/image-type';
 import { DEFAULT_COLUMNS } from '../recipients/recipients.service';
 import { CreateDocumentDto, ListDocumentsDto, UpdateDocumentDto } from './documents.dto';
+
+/**
+ * Порядок выдачи библиотеки. Названия сортируем без учёта регистра —
+ * иначе «алые паруса» уезжает в конец за все заглавные.
+ */
+const ORDER_BY: Record<ListDocumentsDto['sort'], Prisma.DocumentOrderByWithRelationInput> = {
+  updated: { updatedAt: 'desc' },
+  created: { createdAt: 'desc' },
+  title: { title: 'asc' },
+};
 
 /**
  * Все выборки фильтруются по orgId, который приходит из сессии.
@@ -27,12 +42,13 @@ export class DocumentsService {
       ...(query.search
         ? { title: { contains: query.search, mode: Prisma.QueryMode.insensitive } }
         : {}),
+      ...(query.category ? { category: query.category } : {}),
     };
 
     const [items, total] = await Promise.all([
       this.prisma.document.findMany({
         where,
-        orderBy: { updatedAt: 'desc' },
+        orderBy: ORDER_BY[query.sort],
         take: query.limit,
         skip: query.offset,
         select: {
@@ -42,6 +58,10 @@ export class DocumentsService {
           pageHeightMm: true,
           updatedAt: true,
           createdAt: true,
+          category: true,
+          // Исходный бланк — чтобы в карточке было видно, с чего снята копия.
+          // Название берём связью, а не вторым запросом на каждую карточку.
+          sourceDocument: { select: { id: true, title: true, deletedAt: true } },
           // Нужно корзине: по нему считается, сколько дней осталось
           // до окончательного удаления.
           deletedAt: true,
@@ -63,11 +83,17 @@ export class DocumentsService {
     // Иначе каждая карточка тянула бы свой запрос, и список из двадцати
     // документов давал бы двадцать лишних обращений к серверу.
     const withPreview = await Promise.all(
-      items.map(async ({ sheets, _count, ...doc }) => {
+      items.map(async ({ sheets, _count, sourceDocument, ...doc }) => {
         const sheet = sheets[0];
         return {
           ...doc,
           sheetCount: _count.sheets,
+          // Исходник в корзине показывать ссылкой нельзя: открыть его
+          // всё равно не выйдет, а связь остаётся верной — отдаём без него.
+          source:
+            sourceDocument && !sourceDocument.deletedAt
+              ? { id: sourceDocument.id, title: sourceDocument.title }
+              : null,
           preview: {
             layout: sheet?.layout ?? [],
             // Ошибка подписи ссылки не должна ронять весь список:
@@ -84,19 +110,36 @@ export class DocumentsService {
   }
 
   async create(orgId: string, dto: CreateDocumentDto) {
+    /*
+     * Заготовку раскладывает сервер, а не клиент: макет попадает в базу
+     * и оттуда в PDF, и принимать его готовым с клиента значило бы верить
+     * чужому json на слово. Здесь же лежит и список колонок, без которых
+     * заготовка печатает пустоту.
+     */
+    const preset = dto.presetId ? findStarterPreset(dto.presetId) : null;
+    const layout: SheetLayout = preset
+      ? buildStarterLayout(preset, {
+          pageWidthMm: dto.pageWidthMm,
+          pageHeightMm: dto.pageHeightMm,
+        })
+      : [];
+
     // Документ без листа бесполезен, а таблица без колонок «имя» и «почта»
     // не даст ни сгенерировать файл, ни отправить его — создаём всё сразу.
+    const columns = preset ? preset.columns : [...DEFAULT_COLUMNS];
+
     return this.prisma.document.create({
       data: {
         orgId,
         title: dto.title,
         pageWidthMm: dto.pageWidthMm,
         pageHeightMm: dto.pageHeightMm,
+        category: dto.category ?? preset?.category ?? null,
         sheets: {
-          create: { position: 0, layout: [], schemaVersion: CURRENT_LAYOUT_SCHEMA_VERSION },
+          create: { position: 0, layout, schemaVersion: CURRENT_LAYOUT_SCHEMA_VERSION },
         },
         columns: {
-          create: DEFAULT_COLUMNS.map((name, position) => ({ name, position })),
+          create: columns.map((name, position) => ({ name, position })),
         },
       },
       include: {
@@ -107,11 +150,18 @@ export class DocumentsService {
   }
 
   /**
-   * Копия документа: макет и колонки те же, получатели — нет.
+   * Копия под новое мероприятие: макет и колонки те же, получатели
+   * и сведения о мероприятии — нет.
    *
    * Самое частое действие после первой удачной грамоты: «такую же, но для
-   * другого мероприятия». Получателей не копируем намеренно — это чужие
-   * персональные данные, и тащить их в новый документ никто не просил.
+   * другого соревнования». Бланк федерации один на сезон, а соревнований
+   * за сезон десятки, и сегодня на каждое приходится делать копию целиком.
+   *
+   * Получателей не копируем намеренно — это чужие персональные данные,
+   * и тащить их в новый материал никто не просил. Название, даты и место
+   * мероприятия не копируем по той же причине, по которой копию и делают:
+   * мероприятие другое, и старое название на новых грамотах — ровно та
+   * ошибка, которую замечают уже после печати трёхсот листов.
    *
    * Фон переиспользуем по ссылке на тот же файл, а не копией в хранилище:
    * файл принадлежит той же организации, а лишняя копия — лишние деньги
@@ -130,11 +180,15 @@ export class DocumentsService {
     return this.prisma.document.create({
       data: {
         orgId,
-        title: `${source.title} — копия`,
+        title: `${source.title} — новое мероприятие`,
         pageWidthMm: source.pageWidthMm,
         pageHeightMm: source.pageHeightMm,
         verifyEnabled: source.verifyEnabled,
         verifyFields: (source.verifyFields ?? []) as Prisma.InputJsonValue,
+        category: source.category,
+        // Связь на исходник, а не на его собственный исходник: цепочка копий
+        // копий никому не нужна, человеку важен бланк, который он открывал.
+        sourceDocumentId: source.id,
         sheets: {
           create: source.sheets.map((s) => ({
             position: s.position,
@@ -157,10 +211,21 @@ export class DocumentsService {
   async getOrFail(orgId: string, documentId: string) {
     const doc = await this.prisma.document.findFirst({
       where: { id: documentId, orgId, deletedAt: null },
-      include: { sheets: { orderBy: { position: 'asc' } } },
+      include: {
+        sheets: { orderBy: { position: 'asc' } },
+        sourceDocument: { select: { id: true, title: true, deletedAt: true } },
+      },
     });
     if (!doc) throw new NotFoundException('Документ не найден');
-    return doc;
+
+    const { sourceDocument, ...rest } = doc;
+    return {
+      ...rest,
+      source:
+        sourceDocument && !sourceDocument.deletedAt
+          ? { id: sourceDocument.id, title: sourceDocument.title }
+          : null,
+    };
   }
 
   async update(orgId: string, documentId: string, dto: UpdateDocumentDto) {
