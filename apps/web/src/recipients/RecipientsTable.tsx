@@ -1,7 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
-import { Download, Eye, FileUp, LoaderCircle, Plus, Sparkles, Trash2, X } from 'lucide-react';
+import {
+  Ban,
+  Download,
+  Eye,
+  FileUp,
+  LoaderCircle,
+  Play,
+  Plus,
+  Sparkles,
+  Trash2,
+  X,
+} from 'lucide-react';
 import {
   useGeneration,
+  useJobFailures,
   useRecipientMutations,
   useRecipients,
   useSend,
@@ -15,6 +27,7 @@ import { Input, StatusChip } from '../ui/Field';
 import { ImportDialog } from './ImportDialog';
 import { planPaste } from './clipboard';
 import { GenerateDialog, type GenerateMode } from './GenerateDialog';
+import { DownloadDialog } from './DownloadDialog';
 import { InviteNudge } from '../referral/InviteNudge';
 
 export function RecipientsTable({
@@ -29,7 +42,7 @@ export function RecipientsTable({
   const table = useRecipients(documentId);
   const m = useRecipientMutations(documentId);
   const [jobId, setJobId] = useState<string | null>(null);
-  const { job, start } = useGeneration(documentId, jobId);
+  const { job, start, cancel, resume } = useGeneration(documentId, jobId);
   const send = useSend(documentId);
   const [parsed, setParsed] = useState<ParsedSheet | null>(null);
   const [parsedFrom, setParsedFrom] = useState<'file' | 'paste'>('file');
@@ -48,6 +61,10 @@ export function RecipientsTable({
   const [preview, setPreview] = useState(false);
   const [asking, setAsking] = useState(false);
   const [sent, setSent] = useState<SendResult | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  // Отчёт об ошибках спрашиваем только когда есть о чём: лишний запрос
+  // на каждый удачный выпуск не нужен никому.
+  const failures = useJobFailures(jobId, (job?.failed ?? 0) > 0);
 
   /*
    * Рассылка запускается сама, когда выпуск закончился.
@@ -133,6 +150,9 @@ export function RecipientsTable({
   const { columns, rows, checkedCount } = table.data;
   const allChecked = rows.length > 0 && rows.every((r) => r.checked);
   const running = job?.status === 'queued' || job?.status === 'running';
+  // Доделывать есть что, пока сделано меньше обещанного.
+  const canResume =
+    !!job && (job.status === 'failed' || job.status === 'canceled') && job.done < job.total;
 
   /**
    * Разбор для диалога. Один путь и для файла, и для вставки: правила
@@ -167,6 +187,37 @@ export function RecipientsTable({
 
       const created = await start.mutateAsync();
       setJobId(created.id);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  async function onCancel() {
+    if (!job) return;
+    setError(null);
+    // Рассылку отменённого пакета не запускаем: половина участников
+    // получила бы письма, а половина — нет, и разобраться, кто именно,
+    // было бы не по чему.
+    wantSend.current = false;
+    try {
+      await cancel.mutateAsync(job.id);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  /**
+   * Доделать прерванный выпуск.
+   *
+   * Не то же самое, что «Создать документы»: там новое задание и новая
+   * оплата, а здесь доделывается то же самое, и за уже созданное второй раз
+   * не списывается.
+   */
+  async function onResume() {
+    if (!job) return;
+    setError(null);
+    try {
+      await resume.mutateAsync(job.id);
     } catch (err) {
       setError((err as Error).message);
     }
@@ -226,6 +277,8 @@ export function RecipientsTable({
                   <LoaderCircle size={13} className="animate-spin" />
                   {job.done} из {job.total}
                 </>
+              ) : job.status === 'canceled' ? (
+                <>Остановлено на {job.done}</>
               ) : (
                 <>
                   Готово {job.done}
@@ -235,14 +288,39 @@ export function RecipientsTable({
             </StatusChip>
           )}
 
-          {job?.status === 'done' && job.done > 0 && (
-            <a
-              href={`/api/jobs/${job.id}/archive`}
-              className="inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm ring-1 ring-[var(--line-strong)] transition-colors hover:bg-[var(--surface-sunken)]"
+          {/* Отменить можно, пока идёт. Пакет на тысячу строк печатается
+              больше часа, и увидеть опечатку в макете на второй минуте —
+              обычное дело: до сих пор оставалось только ждать. */}
+          {running && (
+            <Button
+              size="sm"
+              variant="danger"
+              icon={<Ban size={15} />}
+              disabled={cancel.isPending}
+              onClick={() => void onCancel()}
             >
-              <Download size={15} />
-              Скачать архивом
-            </a>
+              {cancel.isPending ? 'Останавливаем…' : 'Отменить'}
+            </Button>
+          )}
+
+          {/* Прерванный выпуск доделывается, а не начинается заново:
+              иначе за уже созданные документы пришлось бы платить второй раз. */}
+          {canResume && (
+            <Button
+              size="sm"
+              variant="primary"
+              icon={<Play size={15} />}
+              disabled={resume.isPending}
+              onClick={() => void onResume()}
+            >
+              {resume.isPending ? 'Продолжаем…' : 'Продолжить'}
+            </Button>
+          )}
+
+          {job && job.done > 0 && job.status !== 'queued' && job.status !== 'running' && (
+            <Button size="sm" icon={<Download size={15} />} onClick={() => setDownloading(true)}>
+              Скачать
+            </Button>
           )}
 
           {/* Посмотреть до выпуска: опечатка в макете, найденная после
@@ -302,14 +380,44 @@ export function RecipientsTable({
                 Документы созданы: <span className="tabular font-medium">{job.done}</span>. Они
                 пока никому не отправлены.
               </span>
-              <a
-                href={`/api/jobs/${job.id}/archive`}
+              <button
+                onClick={() => setDownloading(true)}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface)] px-2.5 py-1.5 ring-1 ring-[var(--line-strong)] hover:bg-[var(--surface-sunken)]"
               >
                 <Download size={14} />
                 Скачать себе
-              </a>
+              </button>
             </>
+          )}
+        </div>
+      )}
+
+      {/* Итог отмены. Главное здесь — что сделанное осталось и что
+          за ненапечатанное никто не заплатил: без этой строчки отмена
+          выглядит потерей всего пакета, и её боятся нажимать. */}
+      {job?.status === 'canceled' && (
+        <div className="flex flex-wrap items-center gap-3 border-b border-[var(--line)] bg-[var(--surface-sunken)] px-4 py-3 text-sm">
+          <span>
+            Выпуск остановлен. Успели создать:{' '}
+            <span className="tabular font-medium">{job.done}</span> из{' '}
+            <span className="tabular">{job.total}</span> — они сохранены.
+            {job.total - job.done - job.failed > 0 && (
+              <>
+                {' '}
+                За оставшиеся{' '}
+                <span className="tabular font-medium">{job.total - job.done - job.failed}</span>{' '}
+                документов ничего не списано — выпуск можно продолжить с того же места.
+              </>
+            )}
+          </span>
+          {job.done > 0 && (
+            <button
+              onClick={() => setDownloading(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface)] px-2.5 py-1.5 ring-1 ring-[var(--line-strong)] hover:bg-[var(--surface-sunken)]"
+            >
+              <Download size={14} />
+              Скачать созданные
+            </button>
           )}
         </div>
       )}
@@ -317,6 +425,25 @@ export function RecipientsTable({
       {/* Просим рассказать о сервисе ровно здесь — сразу под сообщением
           об удачном выпуске, пока человек видит результат. */}
       {job?.status === 'done' && job.failed === 0 && <InviteNudge documentsMade={job.done} />}
+
+      {/* Кого не осилил сам выпуск — поимённо и по той же причине:
+          «ошибок 12» заставляет сверять список руками, а по числу не понять
+          даже, пропали это строки из таблицы или не отрисовались документы. */}
+      {(job?.failed ?? 0) > 0 && (failures.data?.length ?? 0) > 0 && (
+        <details className="border-b border-[var(--line)] px-4 py-2 text-sm">
+          <summary className="cursor-pointer text-[var(--text-muted)]">
+            Кому документ не создался: {job!.failed}
+          </summary>
+          <ul className="mt-2 space-y-1">
+            {failures.data!.map((f) => (
+              <li key={f.rowId}>
+                <span className="font-medium">{f.name}</span>
+                <span className="text-[var(--text-muted)]"> — {f.reason}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
 
       {/* Кого рассылка обошла — поимённо. Число «пропущено 12» заставляет
           сверять список руками, а причина у каждого своя. */}
@@ -482,6 +609,15 @@ export function RecipientsTable({
           documentId={documentId}
           rows={rows.filter((r) => r.checked)}
           onClose={() => setPreview(false)}
+        />
+      )}
+
+      {downloading && job && (
+        <DownloadDialog
+          jobId={job.id}
+          count={job.done}
+          columns={columns.map((c) => c.name)}
+          onClose={() => setDownloading(false)}
         />
       )}
 

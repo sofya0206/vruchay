@@ -194,14 +194,28 @@ model File {
   deletedAt     DateTime? @map("deleted_at")
 
   jobId String? @map("job_id") @db.Uuid
+  /**
+   * Строка получателя, ради которой файл выпущен.
+   *
+   * Вместе с jobId образует ключ идемпотентности: пара (job_id, row_id)
+   * уникальна, поэтому повторная обработка строки не создаст второй файл
+   * даже если воркер запустится дважды. Это не удобство, а деньги: квота
+   * считается по числу файлов, и дубликат списал бы документ повторно.
+   *
+   * При удалении строки обнуляется, а файл остаётся: выпущенный документ
+   * мог уже уйти участнику и быть проверен по QR-коду.
+   */
+  rowId String? @map("row_id") @db.Uuid
 
   org             Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
   document        Document?      @relation(fields: [documentId], references: [id], onDelete: SetNull)
   job             GenerationJob? @relation("JobFiles", fields: [jobId], references: [id], onDelete: SetNull)
+  row             RecipientRow?  @relation("RowGenerated", fields: [rowId], references: [id], onDelete: SetNull)
   sheetBackground Sheet[]        @relation("SheetBackground")
   rows            RecipientRow[] @relation("RowFile")
   emails          Email[]        @relation("EmailFile")
 
+  @@unique([jobId, rowId])
   @@index([orgId, kind])
   @@map("files")
 }
@@ -237,6 +251,8 @@ model RecipientRow {
 
   document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
   lastFile File?    @relation("RowFile", fields: [lastFileId], references: [id], onDelete: SetNull)
+  /** Все файлы, когда-либо выпущенные по этой строке, — по одному на задание. */
+  generated File[]  @relation("RowGenerated")
 
   @@unique([documentId, position])
   @@index([documentId, checked])
@@ -262,6 +278,24 @@ model GenerationJob {
   failed     Int       @default(0)
   error      String?
 
+  /**
+   * На сколько частей пакет разрезан в очереди.
+   *
+   * Пакет — это не одна задача, а несколько по полсотни строк: иначе
+   * запущенный выпуск на десять тысяч держал бы воркер часами, и пакет
+   * на пять грамот, поставленный следом, ждал бы его целиком.
+   * Число нужно, чтобы снять с очереди все части разом при отмене.
+   */
+  chunks     Int       @default(0)
+  /**
+   * Номер попытки. Растёт, когда упавший выпуск продолжают.
+   *
+   * Входит в идентификаторы частей в очереди: BullMQ молча отказывается
+   * добавлять задачу с уже существующим идентификатором, а часть прошлой
+   * попытки может ещё лежать в Redis.
+   */
+  attempt    Int       @default(1)
+
   createdAt  DateTime  @default(now()) @map("created_at")
   startedAt  DateTime? @map("started_at")
   finishedAt DateTime? @map("finished_at")
@@ -269,9 +303,39 @@ model GenerationJob {
   org      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   document Document     @relation(fields: [documentId], references: [id], onDelete: Cascade)
   files    File[]       @relation("JobFiles")
+  rowFailures GenerationRowFailure[]
 
   @@index([orgId, status])
   @@map("generation_jobs")
+}
+
+/**
+ * Строка, которую выпустить не удалось.
+ *
+ * Хранится фактом, а не счётчиком, — по той же причине, по какой квота
+ * считается по файлам. Счётчик нельзя сложить из нескольких частей пакета,
+ * идущих вразнобой: часть, вернувшаяся из очереди после перезапуска
+ * воркера, прибавила бы свои ошибки второй раз.
+ *
+ * А главное — из этих записей и файлов складывается ответ на вопрос
+ * «пакет доработал?». Строка либо стала файлом, либо попала сюда; пока
+ * сумма меньше обещанного, какая-то часть ещё в пути, и объявлять выпуск
+ * законченным нельзя — иначе участникам уйдёт половина писем.
+ *
+ * Ссылки на recipient_rows нет намеренно: одна из причин попасть сюда —
+ * что строку удалили, пока шёл выпуск.
+ */
+model GenerationRowFailure {
+  jobId     String   @map("job_id") @db.Uuid
+  rowId     String   @map("row_id") @db.Uuid
+  /** Причина по-русски: её видит владелец в отчёте о выпуске. */
+  message   String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  job GenerationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@id([jobId, rowId])
+  @@map("generation_row_failures")
 }
 
 // ─── Почта (Фаза 3) ────────────────────────────────────────────────────────
