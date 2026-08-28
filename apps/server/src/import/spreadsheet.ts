@@ -2,6 +2,7 @@ import ExcelJS from 'exceljs';
 import Papa from 'papaparse';
 import iconv from 'iconv-lite';
 import { suggestColumnName } from './column-names';
+import { cleanCell, sanitizeRows, type ImportSuggestion } from './sanitize';
 
 /**
  * Разбор файлов со списками участников.
@@ -25,13 +26,36 @@ export interface ParsedSheet {
   rows: string[][];
   /** Сколько строк отброшено как полностью пустые. */
   skippedEmptyRows: number;
+  /** Как разобрана первая строка: как названия колонок или как данные. */
+  headerMode: 'headers' | 'none';
+  /**
+   * Первая строка похожа на данные, а не на заголовки. Диалог импорта
+   * показывает предупреждение: вставляют чаще всего диапазон без шапки.
+   */
+  firstRowLooksLikeData: boolean;
+  /** Что предлагается исправить; применяет пользователь, а не импорт. */
+  suggestions: ImportSuggestion[];
   /** Предупреждения для пользователя. */
   warnings: string[];
 }
 
-const MAX_ROWS = 5000;
+/**
+ * Как понимать первую строку.
+ *
+ * `auto` — решает разбор; `headers` и `none` выставляет пользователь
+ * переключателем в диалоге, когда разбор ошибся.
+ */
+export type HeaderMode = 'auto' | 'headers' | 'none';
+
+/**
+ * Потолок строк за один импорт. Разбор десяти тысяч строк из книги Excel
+ * занимает около секунды, поэтому упирается не парсер, а то, что дальше:
+ * подтверждение импорта и выпуск документов.
+ */
+export const MAX_ROWS = 10000;
 const MAX_COLUMNS = 30;
 const HEADER_SEARCH_DEPTH = 15;
+const MAX_SHEETS = 20;
 
 export function isCsv(filename: string): boolean {
   return /\.(csv|txt|tsv)$/i.test(filename);
@@ -58,26 +82,75 @@ export function parseCsv(buffer: Buffer): string[][] {
   return result.data.map((row) => row.map((cell) => String(cell ?? '').trim()));
 }
 
-export async function parseWorkbook(buffer: Buffer): Promise<{ name: string; grid: string[][] }> {
+/**
+ * Из книги берём один лист — тот, на котором действительно список.
+ * Первым листом часто идёт обложка, инструкция или итоговая справка;
+ * если брать его вслепую, импорт падает с «не удалось определить шапку»,
+ * хотя нужная таблица лежит на соседнем листе.
+ */
+export async function parseWorkbook(
+  buffer: Buffer,
+): Promise<{ name: string; grid: string[][]; notes: string[] }> {
   const workbook = new ExcelJS.Workbook();
   // ExcelJS типизирован под собственный Buffer из своих зависимостей;
   // на рантайме это обычный Node.js Buffer.
   await workbook.xlsx.load(buffer as unknown as ArrayBuffer);
 
-  const sheet = workbook.worksheets.find((ws) => ws.state !== 'hidden') ?? workbook.worksheets[0];
-  if (!sheet) throw new Error('В файле нет ни одного листа');
+  const visible = workbook.worksheets.filter((ws) => ws.state !== 'hidden');
+  const sheets = (visible.length ? visible : workbook.worksheets).slice(0, MAX_SHEETS);
+  if (!sheets.length) throw new Error('В файле нет ни одного листа');
 
+  const read = sheets.map((sheet) => readSheet(sheet));
+  const withTable = read.filter((s) => looksLikeTable(s.grid));
+  const chosen = withTable[0] ?? read[0];
+
+  const notes: string[] = [];
+  if (chosen !== read[0]) {
+    notes.push(`Список найден на листе «${chosen.name}», предыдущие листы книги пропущены`);
+  }
+  const others = withTable.filter((s) => s !== chosen).map((s) => `«${s.name}»`);
+  if (others.length) {
+    notes.push(
+      `В книге есть ещё листы со списками: ${others.join(', ')}. ` +
+        `Загружен только «${chosen.name}» — остальные загрузите отдельно`,
+    );
+  }
+  if (chosen.errorCells > 0) {
+    notes.push(
+      `Ячеек с ошибками формул (#Н/Д, #ДЕЛ/0! и подобные): ${chosen.errorCells} — они прочитаны как пустые`,
+    );
+  }
+  return { name: chosen.name, grid: chosen.grid, notes };
+}
+
+function readSheet(sheet: ExcelJS.Worksheet): {
+  name: string;
+  grid: string[][];
+  errorCells: number;
+} {
   const grid: string[][] = [];
+  let errorCells = 0;
+  const width = Math.min(sheet.columnCount || 0, MAX_COLUMNS);
   sheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
     const values: string[] = [];
-    for (let col = 1; col <= Math.min(sheet.columnCount || 0, MAX_COLUMNS); col++) {
-      values.push(cellText(row.getCell(col)));
+    for (let col = 1; col <= width; col++) {
+      const cell = row.getCell(col);
+      if (isErrorValue(cell.value)) errorCells++;
+      values.push(cellText(cell));
     }
     grid[rowNumber - 1] = values;
   });
 
   fillMergedCells(sheet, grid);
-  return { name: sheet.name, grid: grid.map((r) => r ?? []) };
+  return { name: sheet.name, grid: grid.map((r) => r ?? []), errorCells };
+}
+
+/** Лист похож на список: нашлась строка-шапка и под ней есть хоть что-то. */
+function looksLikeTable(grid: string[][]): boolean {
+  const header = detectHeaderRow(grid);
+  const labels = (grid[header] ?? []).filter((c) => c.trim() !== '' && !looksLikeData(c)).length;
+  if (labels < 2) return false;
+  return grid.slice(header + 1).some((row) => row.some((c) => c.trim() !== ''));
 }
 
 /**
@@ -111,18 +184,41 @@ function decodeAddress(address: string): { row: number; col: number } | null {
 }
 
 function cellText(cell: ExcelJS.Cell): string {
-  const value = cell.value;
+  return valueText(cell.value);
+}
+
+/**
+ * Значение ячейки текстом. Результат формулы разбирается тем же кодом:
+ * внутри может оказаться дата, размеченный текст или ошибка вычисления.
+ */
+function valueText(value: unknown): string {
   if (value === null || value === undefined) return '';
   if (value instanceof Date) return formatDate(value);
   if (typeof value === 'object') {
+    const object = value as Record<string, unknown>;
+    // Ошибка вычисления (#Н/Д, #ДЕЛ/0!): значения нет. Раньше такая ячейка
+    // приводилась к строке и в диплом уезжало «[object Object]».
+    if ('error' in object) return '';
     // Формула: берём сохранённый результат. Если его нет — ячейка пустая,
     // и это отдельно попадает в предупреждения.
-    if ('result' in value) return value.result === undefined ? '' : String(value.result).trim();
-    if ('richText' in value) return value.richText.map((part) => part.text).join('').trim();
-    if ('text' in value) return String(value.text).trim();
+    if ('result' in object) return valueText(object.result);
+    if ('richText' in object) {
+      return (object.richText as { text: string }[])
+        .map((part) => part.text)
+        .join('')
+        .trim();
+    }
+    if ('text' in object) return valueText(object.text);
     return '';
   }
   return String(value).trim();
+}
+
+function isErrorValue(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false;
+  const object = value as Record<string, unknown>;
+  if ('error' in object) return true;
+  return 'result' in object && isErrorValue(object.result);
 }
 
 function formatDate(date: Date): string {
@@ -166,14 +262,167 @@ export function detectHeaderRow(grid: string[][]): number {
   return best.score === -Infinity ? 0 : best.index;
 }
 
-export function buildSheet(name: string, grid: string[][]): ParsedSheet {
+/** Перенос строки внутри заголовка — обычное дело; в имени колонки он лишний. */
+function normalizeHeader(value: string): string {
+  return cleanCell(value);
+}
+
+function lastNonEmptyRow(grid: string[][], from: number): number {
+  let last = from - 1;
+  for (let i = from; i < grid.length; i++) {
+    if ((grid[i] ?? []).some((cell) => cell.trim() !== '')) last = i;
+  }
+  return last;
+}
+
+/**
+ * Двухэтажная шапка: «Контакты» объединено над «почта» и «телефон».
+ * Вторую строку берём в заголовок, только если она дополняет первую —
+ * иначе в шапку уедет первый участник. Признаки: слева стоит та же
+ * объединённая подпись (или пусто), ниже нет ничего похожего на данные,
+ * а сверху есть повторы от объединения или пропуски.
+ */
+function readHeader(grid: string[][], index: number): { header: string[]; rowsUsed: number } {
+  const first = (grid[index] ?? []).map((cell) => cell.trim());
+  const second = (grid[index + 1] ?? []).map((cell) => cell.trim());
+  const filled = second.filter((cell) => cell !== '');
+
+  const leftColumnFree = (second[0] ?? '') === '' || (second[0] ?? '') === (first[0] ?? '');
+  const topHasGapsOrMerges = first.some(
+    (cell, i) => (cell === '' && second[i]) || (cell !== '' && cell === first[i - 1]),
+  );
+  const complements =
+    filled.length >= 2 &&
+    filled.every((cell) => !looksLikeData(cell)) &&
+    leftColumnFree &&
+    topHasGapsOrMerges;
+
+  if (!complements) return { header: first, rowsUsed: 1 };
+
+  const width = Math.max(first.length, second.length);
+  const header = Array.from({ length: width }, (_, i) => {
+    const top = first[i] ?? '';
+    const bottom = second[i] ?? '';
+    if (!bottom || top === bottom) return top;
+    return top ? `${top} ${bottom}` : bottom;
+  });
+  return { header, rowsUsed: 2 };
+}
+
+/**
+ * Строка похожа на данные, а не на шапку.
+ *
+ * Вставляют из Excel чаще всего выделенный диапазон без строки заголовков.
+ * Без этой проверки первый участник молча уезжает в названия колонок
+ * и теряется — в списке на награждение недосчитаться человека дороже всего.
+ */
+function looksLikeDataRow(row: string[]): boolean {
+  let labels = 0;
+  let data = 0;
+  for (const cell of row) {
+    if (cell.trim() === '') continue;
+    if (looksLikeData(cell)) data++;
+    else labels++;
+  }
+  if (labels + data === 0) return false;
+  return labels < 2 || data >= labels;
+}
+
+/** Собирает строки данных, отбрасывая пустые и лишние сверх потолка. */
+function collectRows(
+  grid: string[][],
+  firstDataRow: number,
+  lastDataRow: number,
+  pick: (row: string[]) => string[],
+): { raw: string[][]; skippedEmptyRows: number } {
+  let skippedEmptyRows = 0;
+  const raw: string[][] = [];
+  for (let i = firstDataRow; i <= lastDataRow && raw.length < MAX_ROWS; i++) {
+    const values = pick(grid[i] ?? []);
+    if (values.every((v) => v === '')) {
+      skippedEmptyRows++;
+      continue;
+    }
+    raw.push(values);
+  }
+  return { raw, skippedEmptyRows };
+}
+
+/** Номер последней колонки, где вообще что-то есть. */
+function lastFilledColumn(grid: string[][]): number {
+  let last = -1;
+  for (const row of grid) {
+    for (let i = row.length - 1; i > last; i--) {
+      if ((row[i] ?? '').trim() !== '') {
+        last = i;
+        break;
+      }
+    }
+  }
+  return last;
+}
+
+/**
+ * Разбор без шапки: колонки называются по порядку, все строки — данные.
+ * Так разбирается вставленный диапазон, в котором заголовки не выделяли.
+ */
+function buildWithoutHeader(name: string, grid: string[][]): ParsedSheet {
+  const width = Math.min(lastFilledColumn(grid) + 1, MAX_COLUMNS);
+  if (width < 1) throw new Error('Не удалось определить шапку таблицы');
+
+  const columns = Array.from({ length: width }, (_, i) => ({
+    source: `Колонка ${i + 1}`,
+    suggested: `column_${i + 1}`,
+  }));
+
+  const lastDataRow = lastNonEmptyRow(grid, 0);
+  const { raw, skippedEmptyRows } = collectRows(grid, 0, lastDataRow, (row) =>
+    Array.from({ length: width }, (_, i) => (row[i] ?? '').trim()),
+  );
+
+  const sanitized = sanitizeRows(
+    raw,
+    columns.map((c) => c.source),
+  );
+
+  const warnings = [
+    'Первая строка взята как данные, а колонки названы по порядку. ' +
+      'Если в первой строке всё-таки заголовки, переключите это в диалоге',
+  ];
+  if (skippedEmptyRows > 0) warnings.push(`Пропущено пустых строк: ${skippedEmptyRows}`);
+  if (lastDataRow + 1 > MAX_ROWS) {
+    warnings.push(`Взяты первые ${MAX_ROWS} строк — остальные не поместились`);
+  }
+  warnings.push(...sanitized.warnings);
+
+  return {
+    sheetName: name,
+    headerRowIndex: 0,
+    columns,
+    rows: sanitized.rows,
+    skippedEmptyRows,
+    headerMode: 'none',
+    firstRowLooksLikeData: true,
+    suggestions: sanitized.suggestions,
+    warnings,
+  };
+}
+
+export function buildSheet(name: string, grid: string[][], mode: HeaderMode = 'auto'): ParsedSheet {
+  if (mode === 'none') return buildWithoutHeader(name, grid);
+
   const warnings: string[] = [];
   const headerRowIndex = detectHeaderRow(grid);
-  const headerRow = grid[headerRowIndex] ?? [];
+  const firstRowLooksLikeData = looksLikeDataRow(grid[headerRowIndex] ?? []);
+  const { header: headerRow, rowsUsed } = readHeader(grid, headerRowIndex);
+  const firstDataRow = headerRowIndex + rowsUsed;
+  // Хвост пустых строк тянется до последней когда-либо тронутой ячейки —
+  // в файле из Excel это сотни строк, и считать их «пропущенными» незачем.
+  const lastDataRow = lastNonEmptyRow(grid, firstDataRow);
 
   // Пустые колонки справа и посередине отбрасываем вместе с их данными.
   const keptColumns = headerRow
-    .map((value, index) => ({ value: value.trim(), index }))
+    .map((value, index) => ({ value: normalizeHeader(value), index }))
     .filter((c) => c.value !== '')
     .slice(0, MAX_COLUMNS);
 
@@ -186,29 +435,50 @@ export function buildSheet(name: string, grid: string[][]): ParsedSheet {
     return { source: c.value, suggested };
   });
 
-  let skippedEmptyRows = 0;
-  const rows: string[][] = [];
-  for (let i = headerRowIndex + 1; i < grid.length && rows.length < MAX_ROWS; i++) {
-    const source = grid[i] ?? [];
-    const values = keptColumns.map((c) => (source[c.index] ?? '').trim());
-    if (values.every((v) => v === '')) {
-      skippedEmptyRows++;
-      continue;
-    }
-    rows.push(values);
+  const { raw, skippedEmptyRows } = collectRows(grid, firstDataRow, lastDataRow, (source) =>
+    keptColumns.map((c) => (source[c.index] ?? '').trim()),
+  );
+
+  /*
+   * Строк данных не осталось, а шапка похожа на данные — значит, шапки и не
+   * было: вставили один диапазон без заголовков. Разбирать это как шапку
+   * бессмысленно, там нечего импортировать. Переключаем сами, но говорим
+   * об этом предупреждением, и переключатель в диалоге остаётся за
+   * пользователем.
+   */
+  if (mode === 'auto' && !raw.length && firstRowLooksLikeData) {
+    return buildWithoutHeader(name, grid);
   }
+
+  // Чистка идёт после вырезания колонок: предложения нумеруются так же,
+  // как колонки в диалоге импорта, иначе пользователь не поймёт, о какой речь.
+  const sanitized = sanitizeRows(
+    raw,
+    columns.map((c) => c.source),
+  );
+  const rows = sanitized.rows;
 
   if (headerRowIndex > 0) {
     warnings.push(
       `Шапка найдена в строке ${headerRowIndex + 1}; строки выше пропущены как заголовок файла`,
     );
   }
+  if (rowsUsed === 2) {
+    warnings.push('Шапка занимает две строки — заголовки склеены через пробел');
+  }
+  if (firstRowLooksLikeData) {
+    warnings.push(
+      'Первая строка похожа на данные, а не на заголовки. Если заголовков нет, ' +
+        'переключите «в первой строке» на «данные» — иначе первый участник уедет в названия колонок',
+    );
+  }
   if (skippedEmptyRows > 0) {
     warnings.push(`Пропущено пустых строк: ${skippedEmptyRows}`);
   }
-  if (grid.length - headerRowIndex - 1 > MAX_ROWS) {
+  if (lastDataRow - firstDataRow + 1 > MAX_ROWS) {
     warnings.push(`Взяты первые ${MAX_ROWS} строк — остальные не поместились`);
   }
+  warnings.push(...sanitized.warnings);
   const emptyCells = rows.flat().filter((v) => v === '').length;
   if (rows.length && emptyCells / (rows.length * columns.length) > 0.3) {
     warnings.push(
@@ -216,11 +486,28 @@ export function buildSheet(name: string, grid: string[][]): ParsedSheet {
     );
   }
 
-  return { sheetName: name, headerRowIndex, columns, rows, skippedEmptyRows, warnings };
+  return {
+    sheetName: name,
+    headerRowIndex,
+    columns,
+    rows,
+    skippedEmptyRows,
+    headerMode: 'headers',
+    firstRowLooksLikeData,
+    suggestions: sanitized.suggestions,
+    warnings,
+  };
 }
 
-export async function parseSpreadsheet(buffer: Buffer, filename: string): Promise<ParsedSheet> {
-  if (isCsv(filename)) return buildSheet('', parseCsv(buffer));
-  const { name, grid } = await parseWorkbook(buffer);
-  return buildSheet(name, grid);
+export async function parseSpreadsheet(
+  buffer: Buffer,
+  filename: string,
+  mode: HeaderMode = 'auto',
+): Promise<ParsedSheet> {
+  if (isCsv(filename)) return buildSheet('', parseCsv(buffer), mode);
+  const { name, grid, notes } = await parseWorkbook(buffer);
+  const sheet = buildSheet(name, grid, mode);
+  // Замечания про саму книгу идут первыми: они объясняют, откуда взяты строки.
+  sheet.warnings.unshift(...notes);
+  return sheet;
 }

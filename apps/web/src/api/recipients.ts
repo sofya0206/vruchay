@@ -21,12 +21,35 @@ export interface RecipientTable {
   checkedCount: number;
 }
 
+/**
+ * Что разбор предлагает исправить в значениях. Готовые значения колонки
+ * приходят вместе с предложением: правила написания фамилий живут
+ * на сервере в одном месте, а применяет их человек галочкой в диалоге.
+ */
+export interface ImportSuggestion {
+  kind: 'uppercase' | 'email-homoglyph';
+  column: number;
+  columnTitle: string;
+  count: number;
+  before: string;
+  after: string;
+  values: string[];
+}
+
+/** Как читать первую строку файла: решает разбор либо человек в диалоге. */
+export type HeaderChoice = 'auto' | 'headers' | 'none';
+
 export interface ParsedSheet {
   sheetName: string;
   headerRowIndex: number;
   columns: { source: string; suggested: string }[];
   rows: string[][];
   skippedEmptyRows: number;
+  /** Как разобрана первая строка: как названия колонок или как данные. */
+  headerMode: 'headers' | 'none';
+  /** Первая строка похожа на данные — диалог предлагает переключиться. */
+  firstRowLooksLikeData: boolean;
+  suggestions: ImportSuggestion[];
   warnings: string[];
 }
 
@@ -78,7 +101,14 @@ export function useRecipientMutations(documentId: string) {
       onSuccess: refresh,
     }),
     parseFile: useMutation({
-      mutationFn: (file: File) => api.upload<ParsedSheet>(`${base}/parse`, file),
+      // headers — явный выбор человека в диалоге; по умолчанию решает разбор.
+      mutationFn: (v: { file: File; headers?: HeaderChoice }) =>
+        api.upload<ParsedSheet>(
+          v.headers && v.headers !== 'auto'
+            ? `${base}/parse?headers=${v.headers}`
+            : `${base}/parse`,
+          v.file,
+        ),
     }),
     importRows: useMutation({
       mutationFn: (v: { columns: string[]; rows: string[][]; mode: 'append' | 'replace' }) =>

@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -27,6 +28,8 @@ import {
   importSchema,
   ImportDto,
   MAX_TABLE_BYTES,
+  parseQuerySchema,
+  ParseQueryDto,
   renameColumnSchema,
   RenameColumnDto,
   setCheckedSchema,
@@ -53,6 +56,7 @@ export class RecipientsController {
   async parse(
     @CurrentUser() user: SessionUser,
     @Param('id', uuidParam) id: string,
+    @Query(new ZodValidationPipe(parseQuerySchema)) query: ParseQueryDto,
     @Req() req: FastifyRequest,
   ) {
     await this.recipients.getTable(user.orgId, id);
@@ -75,7 +79,7 @@ export class RecipientsController {
     }
 
     try {
-      return await parseSpreadsheet(buffer, filename);
+      return await parseSpreadsheet(buffer, filename, query.headers);
     } catch (err) {
       // Внутрь ошибки библиотеки может попасть путь или структура файла —
       // наружу отдаём только понятную формулировку.

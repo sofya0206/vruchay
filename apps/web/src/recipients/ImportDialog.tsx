@@ -1,15 +1,62 @@
-import { useState } from 'react';
-import { AlertTriangle, X } from 'lucide-react';
-import type { ParsedSheet } from '../api/recipients';
+import { useMemo, useState } from 'react';
+import { AlertTriangle, Wand2, X } from 'lucide-react';
+import type { ImportSuggestion, ParsedSheet } from '../api/recipients';
 import { Button } from '../ui/Button';
 import { Input, Label } from '../ui/Field';
+
+/** Строки с принятыми правками. Непринятые предложения строк не касаются. */
+export function applySuggestions(
+  rows: string[][],
+  suggestions: ImportSuggestion[],
+  accepted: number[],
+): string[][] {
+  if (!accepted.length) return rows;
+  const fixed = rows.map((row) => [...row]);
+  for (const index of accepted) {
+    const suggestion = suggestions[index];
+    if (!suggestion) continue;
+    fixed.forEach((row, i) => {
+      const value = suggestion.values[i];
+      if (value !== undefined) row[suggestion.column] = value;
+    });
+  }
+  return fixed;
+}
 
 interface Props {
   sheet: ParsedSheet;
   existingColumns: string[];
   importing: boolean;
+  /** Откуда взяты строки — файл или вставка из буфера. */
+  source?: 'file' | 'paste';
+  /** Идёт повторный разбор после переключения первой строки. */
+  reparsing?: boolean;
+  /** Перечитать файл, поняв первую строку иначе. */
+  onHeaderMode?: (mode: 'headers' | 'none') => void;
   onCancel: () => void;
   onConfirm: (columns: string[], rows: string[][], mode: 'append' | 'replace') => void;
+}
+
+const SUGGESTION_TITLE: Record<ImportSuggestion['kind'], (s: ImportSuggestion) => string> = {
+  uppercase: (s) => `Привести «${s.columnTitle}» из ЗАГЛАВНЫХ к обычному виду`,
+  'email-homoglyph': (s) => `Исправить русские буквы в латинских адресах «${s.columnTitle}»`,
+};
+
+/**
+ * Какие именно буквы русские.
+ *
+ * Без этого предложение выглядит издевательством: «ivanov@mail.ru →
+ * ivanov@mail.ru», потому что русская «о» от латинской на вид неотличима —
+ * в том и беда. Замена идёт буква в букву, поэтому строки сравнимы напрямую.
+ */
+export function replacedLetters(before: string, after: string): string {
+  const letters = new Set<string>();
+  if (before.length === after.length) {
+    for (let i = 0; i < before.length; i++) {
+      if (before[i] !== after[i]) letters.add(before[i]);
+    }
+  }
+  return [...letters].join(', ');
 }
 
 /**
@@ -21,11 +68,52 @@ export function ImportDialog({
   sheet,
   existingColumns,
   importing,
+  source = 'file',
+  reparsing = false,
+  onHeaderMode,
   onCancel,
   onConfirm,
 }: Props) {
   const [names, setNames] = useState(sheet.columns.map((c) => c.suggested));
   const [mode, setMode] = useState<'append' | 'replace'>('append');
+  // Предложения выключены по умолчанию: правку текста человек включает сам.
+  const [accepted, setAccepted] = useState<number[]>([]);
+  const suggestions = sheet.suggestions ?? [];
+
+  const rows = useMemo(
+    () => applySuggestions(sheet.rows, suggestions, accepted),
+    [sheet.rows, suggestions, accepted],
+  );
+
+  /*
+   * Переключатель первой строки.
+   *
+   * Из Excel копируют чаще всего выделенные данные, без строки заголовков,
+   * и тогда первый участник уезжает в названия колонок. Разбор такое
+   * замечает и говорит об этом, но последнее слово — за человеком:
+   * он видит предпросмотр и понимает, где чьё, лучше любой эвристики.
+   */
+  const headerChoice = (
+    <div className="flex flex-wrap items-center gap-2 text-sm">
+      <span className="text-[var(--text-muted)]">В первой строке:</span>
+      {(['headers', 'none'] as const).map((value) => (
+        <button
+          key={value}
+          type="button"
+          disabled={reparsing || !onHeaderMode || sheet.headerMode === value}
+          onClick={() => onHeaderMode?.(value)}
+          className={
+            sheet.headerMode === value
+              ? 'rounded-lg bg-[var(--accent-soft)] px-2.5 py-1 font-medium text-[var(--accent)]'
+              : 'rounded-lg px-2.5 py-1 ring-1 ring-[var(--line-strong)] hover:bg-[var(--surface-sunken)] disabled:opacity-50'
+          }
+        >
+          {value === 'headers' ? 'заголовки' : 'данные'}
+        </button>
+      ))}
+      {reparsing && <span className="text-[var(--text-muted)]">перечитываем…</span>}
+    </div>
+  );
 
   const duplicates = names.filter((n, i) => n && names.indexOf(n) !== i);
   const invalid = names.filter((n) => n && !/^[a-zA-Z][a-zA-Z0-9_]*$/.test(n));
@@ -38,6 +126,7 @@ export function ImportDialog({
           <h2 className="text-lg font-semibold">Проверьте, что распознано</h2>
           <span className="text-sm text-[var(--text-muted)]">
             {sheet.sheetName && `лист «${sheet.sheetName}» · `}
+            {source === 'paste' && 'из буфера обмена · '}
             строк: {sheet.rows.length}
           </span>
           <button
@@ -50,6 +139,8 @@ export function ImportDialog({
         </header>
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+          {headerChoice}
+
           {sheet.warnings.length > 0 && (
             <ul className="space-y-1 rounded-lg bg-[var(--award-soft)] px-3 py-2.5 text-sm text-[var(--award)]">
               {sheet.warnings.map((w) => (
@@ -59,6 +150,42 @@ export function ImportDialog({
                 </li>
               ))}
             </ul>
+          )}
+
+          {/* Правку самих значений не делаем молча: «ИВАНОВ» превращать
+              в «Иванов» решает тот, кто отвечает за список. */}
+          {suggestions.length > 0 && (
+            <div className="space-y-2 rounded-lg bg-[var(--surface-sunken)] px-3 py-2.5">
+              {suggestions.map((suggestion, i) => (
+                <label
+                  key={`${suggestion.kind}-${suggestion.column}`}
+                  className="flex gap-2 text-sm"
+                >
+                  <input
+                    type="checkbox"
+                    checked={accepted.includes(i)}
+                    onChange={(e) =>
+                      setAccepted((prev) =>
+                        e.target.checked ? [...prev, i] : prev.filter((j) => j !== i),
+                      )
+                    }
+                    className="mt-0.5 accent-[var(--accent)]"
+                  />
+                  <span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <Wand2 size={14} className="shrink-0 text-[var(--text-muted)]" />
+                      {SUGGESTION_TITLE[suggestion.kind](suggestion)}
+                    </span>
+                    <span className="block text-[var(--text-muted)]">
+                      ячеек: {suggestion.count} · {suggestion.before} → {suggestion.after}
+                      {suggestion.kind === 'email-homoglyph' &&
+                        replacedLetters(suggestion.before, suggestion.after) &&
+                        ` · русские буквы: ${replacedLetters(suggestion.before, suggestion.after)}`}
+                    </span>
+                  </span>
+                </label>
+              ))}
+            </div>
           )}
 
           <div>
@@ -109,7 +236,7 @@ export function ImportDialog({
                   </tr>
                 </thead>
                 <tbody>
-                  {sheet.rows.slice(0, 5).map((row, i) => (
+                  {rows.slice(0, 5).map((row, i) => (
                     <tr key={i} className="border-t border-[var(--line)]">
                       {row.map((cell, j) => (
                         <td key={j} className="max-w-48 truncate px-3 py-1.5">
@@ -139,7 +266,7 @@ export function ImportDialog({
             <Button
               variant="primary"
               disabled={!canConfirm || importing}
-              onClick={() => onConfirm(names, sheet.rows, mode)}
+              onClick={() => onConfirm(names, rows, mode)}
             >
               {importing ? 'Импортируем…' : `Импортировать ${sheet.rows.length}`}
             </Button>

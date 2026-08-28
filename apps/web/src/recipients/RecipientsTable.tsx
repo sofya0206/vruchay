@@ -5,6 +5,7 @@ import {
   useRecipientMutations,
   useRecipients,
   useSend,
+  type HeaderChoice,
   type ParsedSheet,
   type SendResult,
 } from '../api/recipients';
@@ -12,6 +13,7 @@ import { PreviewDialog } from './PreviewDialog';
 import { Button } from '../ui/Button';
 import { Input, StatusChip } from '../ui/Field';
 import { ImportDialog } from './ImportDialog';
+import { planPaste } from './clipboard';
 import { GenerateDialog, type GenerateMode } from './GenerateDialog';
 import { InviteNudge } from '../referral/InviteNudge';
 
@@ -30,6 +32,7 @@ export function RecipientsTable({
   const { job, start } = useGeneration(documentId, jobId);
   const send = useSend(documentId);
   const [parsed, setParsed] = useState<ParsedSheet | null>(null);
+  const [parsedFrom, setParsedFrom] = useState<'file' | 'paste'>('file');
   const [newColumn, setNewColumn] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState(false);
@@ -56,10 +59,48 @@ export function RecipientsTable({
    * Ошибку глотаем — о ней уже сообщит сама запись, а выпуск из-за неё
    * останавливать не за что.
    */
+  /**
+   * Файл, из которого разобран открытый диалог. Нужен, чтобы перечитать
+   * его же, когда человек переключает понимание первой строки: вставку
+   * из буфера второй раз не попросишь.
+   */
+  const parseSource = useRef<File | null>(null);
+
   const pendingSaves = useRef<Promise<unknown>>(Promise.resolve());
   const trackSave = (promise: Promise<unknown>) => {
     pendingSaves.current = Promise.all([pendingSaves.current, promise.catch(() => {})]);
   };
+
+  /*
+   * Вставка таблицы из Excel.
+   *
+   * Слушаем документ, а не таблицу: фокус во время Ctrl+V может быть
+   * в ячейке, в поле новой колонки или нигде — событие вставки в этих
+   * случаях приходит в разные места, а вести себя должно одинаково.
+   *
+   * Текст уходит в тот же разбор, что и файл: заголовки, кодировка,
+   * пустые строки и чистка значений тогда работают одними правилами,
+   * а не двумя похожими.
+   */
+  useEffect(() => {
+    function onPaste(event: ClipboardEvent) {
+      // Пока открыт диалог, вставка принадлежит ему.
+      if (parsed || preview || asking) return;
+
+      const plan = planPaste(event);
+      if (plan.kind === 'ignore') return;
+
+      event.preventDefault();
+      if (plan.kind === 'too-big') {
+        setError('Слишком большая вставка — сохраните список файлом и загрузите его');
+        return;
+      }
+      void parseInto(plan.file, 'paste');
+    }
+
+    document.addEventListener('paste', onPaste);
+    return () => document.removeEventListener('paste', onPaste);
+  }, [parsed, preview, asking, parseInto]);
 
   useEffect(() => {
     if (!job || job.status !== 'done' || job.done === 0) return;
@@ -79,10 +120,17 @@ export function RecipientsTable({
   const allChecked = rows.length > 0 && rows.every((r) => r.checked);
   const running = job?.status === 'queued' || job?.status === 'running';
 
-  async function onPickFile(file: File) {
+  /**
+   * Разбор для диалога. Один путь и для файла, и для вставки: правила
+   * разбора у них общие, различается только то, откуда взялись байты.
+   */
+  async function parseInto(file: File, from: 'file' | 'paste', headers: HeaderChoice = 'auto') {
     setError(null);
+    parseSource.current = file;
     try {
-      setParsed(await m.parseFile.mutateAsync(file));
+      const sheet = await m.parseFile.mutateAsync({ file, headers });
+      setParsedFrom(from);
+      setParsed(sheet);
     } catch (err) {
       setError((err as Error).message);
     }
@@ -122,7 +170,7 @@ export function RecipientsTable({
             className="hidden"
             onChange={(e) => {
               const file = e.target.files?.[0];
-              if (file) void onPickFile(file);
+              if (file) void parseInto(file, 'file');
               e.target.value = '';
             }}
           />
@@ -294,7 +342,8 @@ export function RecipientsTable({
               <p className="font-medium">Список получателей пуст</p>
               <p className="mt-1 max-w-md text-sm text-[var(--text-muted)]">
                 Загрузите файл Excel или CSV — подойдёт обычный протокол соревнования,
-                шапку и лишние строки сервис распознает сам.
+                шапку и лишние строки сервис распознает сам. Или скопируйте таблицу
+                в Excel и вставьте сюда через Ctrl+V.
               </p>
             </div>
           </div>
@@ -390,9 +439,18 @@ export function RecipientsTable({
 
       {parsed && (
         <ImportDialog
+          // Перечитанный лист — это другой разбор: имена колонок и принятые
+          // предложения от прежнего к нему не относятся, диалог начинается заново.
+          key={parsed.headerMode}
           sheet={parsed}
           existingColumns={columns.map((c) => c.name)}
           importing={m.importRows.isPending}
+          source={parsedFrom}
+          reparsing={m.parseFile.isPending}
+          onHeaderMode={(headers) => {
+            const file = parseSource.current;
+            if (file) void parseInto(file, parsedFrom, headers);
+          }}
           onCancel={() => setParsed(null)}
           onConfirm={(cols, importRows, mode) => {
             m.importRows.mutate(

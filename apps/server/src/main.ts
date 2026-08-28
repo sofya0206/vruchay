@@ -7,11 +7,15 @@ import fastifySecureSession from '@fastify/secure-session';
 import fastifyMultipart from '@fastify/multipart';
 import helmet from '@fastify/helmet';
 import { MAX_IMAGE_BYTES } from './common/image-type';
+import { MAX_IMPORT_BODY_BYTES } from './recipients/recipients.dto';
 import { AppModule } from './app.module';
 import { validateEnv } from './config/env';
 import { registerPublicCors } from './tilda/public-cors';
 
 const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60;
+
+/** Единственный маршрут, которому нужно тело больше мегабайта. */
+const IMPORT_ROUTE = '/api/documents/:id/recipients/import';
 
 async function bootstrap() {
   const env = validateEnv(process.env);
@@ -51,6 +55,25 @@ async function bootstrap() {
      * частные диапазоны здесь и есть «свои».
      */
     trustProxy: env.TRUST_PROXY,
+  });
+
+  /**
+   * Большое тело запроса разрешено ровно одному маршруту.
+   *
+   * Подтверждение импорта уезжает на сервер целиком, одним JSON: десять
+   * тысяч строк на шести колонках — это 1,4 МБ, а мегабайта по умолчанию
+   * Fastify не пропускает и отвечает 413. Поднимать предел всем маршрутам
+   * нельзя: под тем же сервером живут публичные адреса Тильды, виджетов
+   * и верификации, и там предел в мегабайт — не помеха, а защита от того,
+   * чтобы кто угодно занимал память сервиса шестнадцатью мегабайтами
+   * на запрос. Поэтому предел ставится точечно, хуком на регистрации
+   * маршрута: Fastify читает bodyLimit из настроек самого маршрута.
+   */
+  adapter.getInstance().addHook('onRoute', (route) => {
+    const methods = Array.isArray(route.method) ? route.method : [route.method];
+    if (methods.includes('POST') && route.url === IMPORT_ROUTE) {
+      route.bodyLimit = MAX_IMPORT_BODY_BYTES;
+    }
   });
 
   const app = await NestFactory.create<NestFastifyApplication>(AppModule, adapter, {

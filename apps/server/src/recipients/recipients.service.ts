@@ -30,7 +30,7 @@ export class RecipientsService {
       this.prisma.recipientRow.findMany({
         where: { documentId },
         orderBy: { position: 'asc' },
-        take: 5000,
+        take: 10000,
       }),
       this.prisma.recipientRow.count({ where: { documentId, checked: true } }),
     ]);
@@ -141,35 +141,49 @@ export class RecipientsService {
   async import(orgId: string, documentId: string, dto: ImportDto) {
     await this.assertDocument(orgId, documentId);
 
-    return this.prisma.$transaction(async (tx) => {
-      if (dto.mode === 'replace') {
-        await tx.recipientRow.deleteMany({ where: { documentId } });
-      }
+    return this.prisma.$transaction(
+      async (tx) => {
+        if (dto.mode === 'replace') {
+          await tx.recipientRow.deleteMany({ where: { documentId } });
+        }
 
-      const existing = await tx.recipientColumn.findMany({ where: { documentId } });
-      const known = new Map(existing.map((c) => [c.name, c]));
-      let nextPosition = existing.length;
+        const existing = await tx.recipientColumn.findMany({ where: { documentId } });
+        const known = new Map(existing.map((c) => [c.name, c]));
+        let nextPosition = existing.length;
 
-      for (const name of dto.columns) {
-        if (known.has(name)) continue;
-        const created = await tx.recipientColumn.create({
-          data: { documentId, name, position: nextPosition++ },
-        });
-        known.set(name, created);
-      }
+        for (const name of dto.columns) {
+          if (known.has(name)) continue;
+          const created = await tx.recipientColumn.create({
+            data: { documentId, name, position: nextPosition++ },
+          });
+          known.set(name, created);
+        }
 
-      const startPosition = await tx.recipientRow.count({ where: { documentId } });
-      const rows = dto.rows.map((values, i) => ({
-        documentId,
-        position: startPosition + i,
-        data: Object.fromEntries(
-          dto.columns.map((name, colIndex) => [name, values[colIndex] ?? '']),
-        ),
-      }));
+        const startPosition = await tx.recipientRow.count({ where: { documentId } });
+        const rows = dto.rows.map((values, i) => ({
+          documentId,
+          position: startPosition + i,
+          data: Object.fromEntries(
+            dto.columns.map((name, colIndex) => [name, values[colIndex] ?? '']),
+          ),
+        }));
 
-      if (rows.length) await tx.recipientRow.createMany({ data: rows });
-      return { imported: rows.length, columns: [...known.keys()] };
-    });
+        if (rows.length) await tx.recipientRow.createMany({ data: rows });
+        return { imported: rows.length, columns: [...known.keys()] };
+      },
+      /*
+       * Своё время вместо пяти секунд по умолчанию.
+       *
+       * Полный импорт — это удаление прежних строк и вставка десяти тысяч
+       * новых с JSON в каждой; на машине разработчика замена укладывается
+       * примерно в секунду, но пять секунд по умолчанию — это запас всего
+       * впятеро, а под нагрузкой и на медленном диске его не остаётся.
+       * Обрыв здесь стоит дорого: P2028 откатывает транзакцию целиком,
+       * и человек, ждавший загрузки списка, получает пятисотую ошибку
+       * и пустую таблицу.
+       */
+      { timeout: 60_000, maxWait: 15_000 },
+    );
   }
 }
 
