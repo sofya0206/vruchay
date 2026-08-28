@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import type { EmailKind } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { SmtpProvider } from './smtp.provider';
@@ -15,6 +16,7 @@ import { advanceStatus, type EmailStatus } from './email-status';
 import { sharedDomainRefusal } from './shared-domain-limit';
 import { platformSender, type ResolvedSender } from './platform-sender';
 import { withOpenPixel } from './open-tracking';
+import { renderLetterBody, unsubscribeUrl } from '../mailing/letter-kind';
 import { redact } from '../common/redact';
 
 /**
@@ -165,18 +167,58 @@ export class MailService {
     // что именно сохранилось, и не обнаружит пропажу разметки в момент рассылки.
     const clean = { ...data, bodyHtml: sanitizeEmailHtml(data.bodyHtml) };
 
-    const existing = await this.prisma.emailTemplate.findFirst({ where: { orgId, documentId } });
+    const existing = await this.prisma.emailTemplate.findFirst({
+      where: { orgId, documentId, kind: 'transactional' },
+    });
     if (existing) {
       return this.prisma.emailTemplate.update({ where: { id: existing.id }, data: clean });
     }
-    return this.prisma.emailTemplate.create({ data: { orgId, documentId, ...clean } });
+    return this.prisma.emailTemplate.create({
+      data: { orgId, documentId, kind: 'transactional', ...clean },
+    });
   }
 
+  /**
+   * Письмо о выдаче документа.
+   *
+   * Фильтр по потоку обязателен, а не для порядка: у документа может быть
+   * заведено и рекламное письмо, и без фильтра выдача документа однажды
+   * ушла бы рекламным текстом — то есть рекламой без согласия, со штрафом
+   * по ст. 14.3 КоАП за каждое письмо. Все, кто отправляет транзакционные
+   * письма — выдача по заявке с формы, рассылка, — ходят через этот метод.
+   */
   async getTemplate(orgId: string, documentId: string) {
     return this.prisma.emailTemplate.findFirst({
-      where: { orgId, documentId },
+      where: { orgId, documentId, kind: 'transactional' },
       include: { sender: true },
     });
+  }
+
+  /**
+   * Почему организация не может отправлять письма прямо сейчас. null — может.
+   *
+   * Проверяется перед каждой рассылкой, а не только при создании
+   * отправителя: домен мог быть подтверждён раньше, а потом записи
+   * из DNS убрали, и письма ушли бы в спам от имени организации.
+   */
+  async sendingRefusal(orgId: string, senderId: string | null): Promise<string | null> {
+    if (senderId) {
+      const sender = await this.prisma.sender.findFirst({
+        where: { id: senderId, orgId },
+        select: { domain: { select: { status: true, domain: true } } },
+      });
+      if (!sender) return 'Отправитель не найден';
+      if (sender.domain.status !== 'verified') {
+        return `Домен ${sender.domain.domain} не подтверждён — отправка невозможна`;
+      }
+      return null;
+    }
+
+    // Своего отправителя нет — письма уйдут с нашего домена. Отказываем,
+    // только если и его нет: тогда слать действительно нечем.
+    return (await this.resolveSender(orgId))
+      ? null
+      : 'Отправка писем не настроена — обратитесь в поддержку';
   }
 
   // ─── Постановка писем в очередь ──────────────────────────────────────────
@@ -190,23 +232,8 @@ export class MailService {
     const template = await this.getTemplate(orgId, documentId);
     if (!template) throw new BadRequestException('Сначала настройте шаблон письма');
 
-    if (template.sender) {
-      // Домен мог быть подтверждён раньше, а потом записи из DNS убрали.
-      // Проверяем перед каждой рассылкой, а не только при создании отправителя.
-      const domain = await this.prisma.mailDomain.findFirst({
-        where: { id: template.sender.domainId, orgId },
-        select: { status: true, domain: true },
-      });
-      if (domain?.status !== 'verified') {
-        throw new BadRequestException(
-          `Домен ${domain?.domain ?? ''} не подтверждён — отправка невозможна`,
-        );
-      }
-    } else if (!(await this.resolveSender(orgId))) {
-      // Отправителя в шаблоне нет — письма уйдут с нашего домена. Отказываем
-      // только если и его нет: тогда слать действительно нечем.
-      throw new BadRequestException('Отправка писем не настроена — обратитесь в поддержку');
-    }
+    const refusal = await this.sendingRefusal(orgId, template.senderId);
+    if (refusal) throw new BadRequestException(refusal);
 
     const rows = await this.prisma.recipientRow.findMany({
       where: { documentId, checked: true, document: { orgId, deletedAt: null } },
@@ -238,8 +265,8 @@ export class MailService {
     // недобросовестный заказчик портит доставляемость остальным.
     // Со своего домена ограничения нет — там репутация его собственная.
     if (!template.sender) {
-      const refusal = await this.checkSharedDomainVolume(orgId, toQueue.length);
-      if (refusal) throw new BadRequestException(refusal);
+      const volume = await this.volumeRefusal(orgId, toQueue.length);
+      if (volume) throw new BadRequestException(volume);
     }
 
     const created = await this.prisma.$transaction(
@@ -253,6 +280,7 @@ export class MailService {
             fileId: template.attachGeneratedFile
               ? rows.find((r) => r.id === item.rowId)?.lastFileId
               : null,
+            kind: 'transactional',
             toEmail: item.email,
             subject: renderSubject(template.subject, item.data),
             provider: this.providerFor('smtp').name,
@@ -309,6 +337,7 @@ export class MailService {
         documentId,
         templateId: template?.id,
         fileId,
+        kind: 'transactional',
         toEmail: toEmail.trim().toLowerCase(),
         subject: template ? renderSubject(template.subject, data) : DEFAULT_SUBJECT,
         provider: this.providerFor('smtp').name,
@@ -343,6 +372,22 @@ export class MailService {
       return;
     }
 
+    // Реклама без указания рекламодателя незаконна сама по себе, поэтому
+    // такое письмо не уходит вовсе. Проверка стоит и при сохранении шаблона,
+    // и здесь: рекламодателя могли стереть уже после постановки в очередь.
+    if (email.kind === 'marketing' && !email.template?.advertiserName?.trim()) {
+      this.logger.error(`Письмо ${emailId}: рекламное письмо без рекламодателя не отправлено`);
+      await this.prisma.email.update({
+        where: { id: emailId },
+        data: {
+          status: 'failed',
+          error: 'Рекламное письмо без рекламодателя не отправляется',
+          statusUpdatedAt: new Date(),
+        },
+      });
+      return;
+    }
+
     const row = email.rowId
       ? await this.prisma.recipientRow.findUnique({ where: { id: email.rowId } })
       : null;
@@ -364,10 +409,7 @@ export class MailService {
         replyTo: sender.replyTo,
         to: email.toEmail,
         subject: email.subject,
-        html: this.trackOpens(
-          email.template ? renderHtmlTemplate(email.template.bodyHtml, data) : DEFAULT_BODY_HTML,
-          email.id,
-        ),
+        html: this.trackOpens(this.letterBody(email, data), email.id),
         attachments,
         reference: email.id,
       });
@@ -403,6 +445,32 @@ export class MailService {
         },
       });
     }
+  }
+
+  /**
+   * Тело письма по его потоку.
+   *
+   * Рекламный низ — пометка «Реклама», рекламодатель и отписка — добавляет
+   * renderLetterBody, и добавляет только рекламной ветке. Транзакционному
+   * письму его взять неоткуда: у соответствующего типа попросту нет полей
+   * рекламодателя и ссылки отписки (см. mailing/letter-kind.ts).
+   */
+  private letterBody(
+    email: { kind: EmailKind; id: string; template: { bodyHtml: string; advertiserName: string | null } | null },
+    data: Record<string, string>,
+  ): string {
+    const bodyHtml = email.template
+      ? renderHtmlTemplate(email.template.bodyHtml, data)
+      : DEFAULT_BODY_HTML;
+
+    if (email.kind !== 'marketing') return renderLetterBody({ kind: 'transactional', bodyHtml });
+
+    return renderLetterBody({
+      kind: 'marketing',
+      bodyHtml,
+      advertiserName: email.template?.advertiserName ?? '',
+      unsubscribeUrl: unsubscribeUrl(process.env.PUBLIC_URL ?? '', email.id),
+    });
   }
 
   /**
@@ -497,7 +565,7 @@ export class MailService {
    *
    * Письма со своего домена в счёт не идут: у них своя репутация.
    */
-  private async checkSharedDomainVolume(orgId: string, adding: number): Promise<string | null> {
+  async volumeRefusal(orgId: string, adding: number): Promise<string | null> {
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
     const sentToday = await this.prisma.email.count({
@@ -644,6 +712,28 @@ export class MailService {
         `<p style="font-size:28px;letter-spacing:.2em;font-weight:600">${escapeHtml(code)}</p>` +
         `<p style="font-size:13px;color:#5f6b64">Код действует 10 минут. ` +
         `Если вы не запрашивали документ, просто проигнорируйте это письмо.</p>`,
+    });
+  }
+
+  /**
+   * Письмо самому себе — посмотреть, что получится.
+   *
+   * Мимо очереди и мимо журнала доставки: это не выдача документа, и строка
+   * «отправлено» в журнале означала бы письмо участнику, которого не было.
+   * Адрес сюда приходит из сессии — отправить «проверочное» письмо на чужой
+   * адрес нельзя, иначе это обычная рассылка без согласия, названная иначе.
+   */
+  async sendPreview(orgId: string, to: string, subject: string, html: string): Promise<void> {
+    const sender = await this.resolveSender(orgId);
+    if (!sender) {
+      throw new BadRequestException('Отправка писем не настроена — обратитесь в поддержку');
+    }
+    await this.providerFor('smtp').send({
+      from: { email: sender.email, name: sender.displayName },
+      replyTo: sender.replyTo,
+      to,
+      subject,
+      html,
     });
   }
 

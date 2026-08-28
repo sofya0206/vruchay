@@ -1,0 +1,97 @@
+import { Controller, Get, Header, Param, Req } from '@nestjs/common';
+import type { FastifyRequest } from 'fastify';
+import { z } from 'zod';
+import { ZodValidationPipe } from '../common/zod-validation.pipe';
+import { RateLimitService } from '../common/rate-limit.service';
+import { escapeHtml } from '../mail/mail-template';
+import { MailingService } from './mailing.service';
+
+const emailIdParam = new ZodValidationPipe(z.string().uuid());
+
+/**
+ * Отказ от рекламной рассылки по ссылке из письма.
+ *
+ * Открыт без входа: ссылку жмёт участник, у которого нет и не будет
+ * учётной записи. Без работающего отказа рекламная рассылка незаконна
+ * независимо от того, было согласие или нет.
+ *
+ * Отписка в два шага, и это не лишний клик. Ссылки из писем открывают
+ * не только люди: почтовые сканеры и антивирусы обходят их сами, до того
+ * как письмо увидит человек. Отписка по первому же обращению означала бы,
+ * что участника отписал робот, а участник об этом даже не узнал.
+ *
+ * Про несуществующее письмо отвечаем ровно то же, что про существующее:
+ * иначе перебор ссылок сообщал бы, кому и что мы отправляли.
+ */
+@Controller('v1/u')
+export class UnsubscribeController {
+  constructor(
+    private readonly mailing: MailingService,
+    private readonly rateLimit: RateLimitService,
+  ) {}
+
+  @Get(':emailId')
+  @Header('Content-Type', 'text/html; charset=utf-8')
+  @Header('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'")
+  @Header('Cache-Control', 'no-store')
+  ask(@Param('emailId', emailIdParam) emailId: string) {
+    return page(
+      'Отказ от рассылки',
+      '<p>Нажмите кнопку, чтобы больше не получать рекламные письма от этой организации.</p>' +
+        '<p class="muted">Письма о выданных вам документах при этом продолжат приходить: ' +
+        'это не реклама, а сообщения по существу.</p>' +
+        `<p><a class="button" href="/api/v1/u/${escapeHtml(emailId)}/confirm">Отписаться</a></p>`,
+    );
+  }
+
+  @Get(':emailId/confirm')
+  @Header('Content-Type', 'text/html; charset=utf-8')
+  @Header('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'")
+  @Header('Cache-Control', 'no-store')
+  async confirm(@Param('emailId', emailIdParam) emailId: string, @Req() req: FastifyRequest) {
+    // Перебор ограничиваем: идентификатор случайный и его не подобрать,
+    // но без ограничения страница стала бы способом выяснять, какие
+    // письма существуют, по времени ответа.
+    await this.rateLimit.hit(`unsubscribe:${req.ip}`, 60_000, 20);
+
+    await this.mailing.unsubscribe(emailId, {
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    return page(
+      'Вы отписаны',
+      '<p>Готово. Рекламные письма от этой организации больше не придут.</p>' +
+        '<p class="muted">Письма о выданных вам документах продолжат приходить.</p>',
+    );
+  }
+}
+
+/**
+ * Страница отписки.
+ *
+ * Совсем простая и без сценариев: её открывает человек из почты, часто
+ * с телефона и часто в стороннем браузере почтового клиента. Оформление
+ * задано одним набором правил прямо здесь — тянуть сюда сборку кабинета
+ * ради двух абзацев не за чем.
+ */
+function page(title: string, body: string): string {
+  return (
+    '<!doctype html><html lang="ru"><head><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width, initial-scale=1">' +
+    '<meta name="robots" content="noindex">' +
+    `<title>${escapeHtml(title)} — Вручай</title>` +
+    '<style>' +
+    'body{margin:0;padding:48px 20px;background:#f6f5f1;color:#1a1a1a;' +
+    "font:16px/1.6 system-ui,-apple-system,'Segoe UI',sans-serif}" +
+    'main{max-width:32rem;margin:0 auto;background:#fff;border-radius:16px;padding:32px}' +
+    'h1{font-size:22px;margin:0 0 16px}' +
+    'p{margin:0 0 12px}' +
+    '.muted{color:#5f6b64;font-size:14px}' +
+    '.button{display:inline-block;margin-top:12px;padding:10px 18px;border-radius:10px;' +
+    'background:#1f5d3f;color:#fff;text-decoration:none}' +
+    '</style></head><body><main>' +
+    `<h1>${escapeHtml(title)}</h1>${body}` +
+    '</main></body></html>'
+  );
+}
