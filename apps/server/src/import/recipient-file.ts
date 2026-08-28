@@ -42,6 +42,13 @@ function toSheet(parsed: ParsedProtocol): ParsedRecipientFile {
     rows: parsed.rows,
     skippedEmptyRows: parsed.skippedEmptyRows,
     warnings: parsed.warnings,
+    // Шапка протокола найдена самим разбором протокола — переспрашивать
+    // пользователя переключателем «данные без шапки» здесь не о чем.
+    headerMode: 'headers',
+    firstRowLooksLikeData: false,
+    // Правки текста (регистр, похожие на латиницу буквы) протокол не предлагает:
+    // это разбор списка участников курса, а не соревнований.
+    suggestions: [],
     protocol: {
       groupColumn: parsed.groupColumn,
       groups: parsed.groups,
