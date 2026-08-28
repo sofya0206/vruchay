@@ -398,7 +398,13 @@ export class GenerationService {
   private withOrgLock<T>(orgId: string, work: (tx: TxClient) => Promise<T>): Promise<T> {
     const key = lockKey(orgId);
     return this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(${key}::bigint)`;
+      /*
+       * Именно $executeRaw, а не $queryRaw: pg_advisory_xact_lock возвращает
+       * void, и Prisma 6.19 не умеет разбирать такой столбец — запрос падает
+       * с P2010 «Failed to deserialize column of type 'void'». $executeRaw
+       * столбцы не разбирает вовсе, а замок берётся точно так же.
+       */
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${key}::bigint)`;
       return work(tx as unknown as TxClient);
     });
   }

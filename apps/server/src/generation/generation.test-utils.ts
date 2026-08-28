@@ -510,7 +510,7 @@ export class World {
         },
       },
       organization: { findUnique: async () => ({ id: 'org-1', plan: this.plan }) },
-      $queryRaw: async () => [{ lock: true }],
+      $executeRaw: async () => 1,
       $transaction: async (work: (tx: unknown) => Promise<unknown>) => work(this.prisma),
     };
   }
