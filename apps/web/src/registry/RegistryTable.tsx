@@ -56,11 +56,23 @@ export function RegistryTable({ rows, selected, onToggle, onToggleAll, onOpen }:
           {rows.map((row) => {
             const retention = retentionLabel(row.retention);
             return (
+              /*
+               * Строка целиком открывает карточку.
+               *
+               * Раньше открывала только стрелка в последнем столбце, и найти
+               * её удавалось не всем: человек тыкал в фамилию, ничего не
+               * происходило, и выданный документ оставалось только скачать
+               * пачкой со всеми остальными. Поддержка делает это каждый день.
+               *
+               * Отметка и ссылка на замену — свои действия: их нажатие
+               * до строки не доходит.
+               */
               <tr
                 key={row.fileId}
-                className="border-b border-[var(--line)] last:border-0 hover:bg-[var(--surface-sunken)]"
+                onClick={() => onOpen(row.fileId)}
+                className="cursor-pointer border-b border-[var(--line)] last:border-0 hover:bg-[var(--surface-sunken)]"
               >
-                <td className="px-3 py-3 align-top">
+                <td className="px-3 py-3 align-top" onClick={(e) => e.stopPropagation()}>
                   <input
                     type="checkbox"
                     checked={selected.has(row.fileId)}
@@ -114,6 +126,7 @@ export function RegistryTable({ rows, selected, onToggle, onToggleAll, onOpen }:
                       href={`/verify/${row.replacedBy.publicId}`}
                       target="_blank"
                       rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
                       className="mt-1 block text-xs text-[var(--accent)] hover:underline"
                     >
                       Заменён документом от {formatDate(row.replacedBy.issuedAt)}
@@ -126,7 +139,10 @@ export function RegistryTable({ rows, selected, onToggle, onToggleAll, onOpen }:
                 <td className="px-3 py-3 align-top">
                   <button
                     type="button"
-                    onClick={() => onOpen(row.fileId)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpen(row.fileId);
+                    }}
                     aria-label={`Открыть карточку: ${row.name || row.publicId}`}
                     className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-[var(--surface)] hover:text-[var(--text)]"
                   >
