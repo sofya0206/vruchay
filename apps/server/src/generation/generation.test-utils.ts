@@ -74,6 +74,9 @@ function matchValue(actual: unknown, expected: unknown): boolean {
     const cond = expected as Record<string, unknown>;
     if ('in' in cond) return (cond.in as unknown[]).includes(actual);
     if ('not' in cond) return actual !== cond.not;
+    // Сравнение по времени: им сторож ищет задания, висящие дольше срока.
+    if ('lt' in cond) return Number(actual) < Number(cond.lt);
+    if ('gt' in cond) return Number(actual) > Number(cond.gt);
     return true;
   }
   return actual === expected;
@@ -99,6 +102,14 @@ export interface WorldOptions {
   plan?: 'free' | 'paid';
   /** Номера отрисовок (сквозные), которые не удались. */
   renderFails?: number[];
+  /**
+   * Текст, с которым падает отрисовка.
+   *
+   * По умолчанию — незнакомая причина: такую разбор причин общей бедой
+   * не считает, и выпуск идёт дальше. Чтобы проверить остановку, сюда
+   * передают то, что пишет упавший браузер или умершее хранилище.
+   */
+  renderError?: string;
   /** Номера отправок в хранилище (сквозные), которые не удались. */
   putFails?: number[];
   /** Номера попыток записать файл в базу (сквозные), которые не удались. */
@@ -200,7 +211,7 @@ export class World {
         this.calls.render++;
         this.options.beforeRender?.(this.calls.render, this);
         if (this.options.renderFails?.includes(this.calls.render)) {
-          throw new Error('страница не отрисовалась');
+          throw new Error(this.options.renderError ?? 'страница не отрисовалась');
         }
         return Buffer.from(`pdf-${this.calls.render}`);
       },
@@ -229,19 +240,20 @@ export class World {
       },
     };
 
-    this.processor = new GenerationProcessor(
-      this.prisma as never,
-      storage as never,
-      config as never,
-      renderer as never,
-    );
-    (this.processor as unknown as { queue: FakeQueue }).queue = this.queue;
-
     this.service = new GenerationService(
       this.prisma as never,
       { bonusDocuments: async () => 0 } as never,
       config as never,
     );
+
+    this.processor = new GenerationProcessor(
+      this.prisma as never,
+      storage as never,
+      config as never,
+      renderer as never,
+      this.service,
+    );
+    (this.processor as unknown as { queue: FakeQueue }).queue = this.queue;
 
     if (options.rows !== undefined) this.addDocument('doc-1', options.rows);
   }

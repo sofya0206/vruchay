@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { substituteForRow, type SheetLayout } from '@gramota/shared';
 import { SheetRenderer } from '../render/SheetRenderer';
+import { SHEET_SELECTOR, overlayProblem, probePoints } from '../render/overlay-guard';
 
 interface RenderData {
   pageWidthMm: number;
@@ -69,6 +70,21 @@ export function usedFonts(state: Pick<RenderData, 'sheets' | 'data'>): UsedFont[
 }
 
 /**
+ * Точки листа, в которых проверяется, что сверху только он.
+ *
+ * Берём первый лист: окно браузера воркера ровно с него размером,
+ * остальные листы за его краем, и спрашивать про них не о чем.
+ */
+function sheetPoints(): [number, number][] {
+  const sheet = document.querySelector(SHEET_SELECTOR);
+  if (!sheet) return [];
+  return probePoints(sheet.getBoundingClientRect(), {
+    width: window.innerWidth,
+    height: window.innerHeight,
+  });
+}
+
+/**
  * Страница, которую браузер воркера печатает в PDF.
  *
  * Здесь нет ни шапки, ни масштабирования: лист выводится в натуральную величину
@@ -120,6 +136,17 @@ export function RenderPage() {
         window.__RENDER_ERROR__ = `Не загрузились шрифты: ${list.join(', ')}`;
         return;
       }
+
+      // Та же мера, что и со шрифтами, и по той же причине: печатать
+      // бракованный документ хуже, чем не печатать. Заставка приложения
+      // однажды уже уехала в грамоты непрозрачным слоем поверх фамилии,
+      // и заметили это не мы, а награждённые.
+      const overlay = overlayProblem(document, sheetPoints());
+      if (overlay) {
+        window.__RENDER_ERROR__ = `Лист закрыт посторонним слоем: ${overlay}`;
+        return;
+      }
+
       window.__RENDER_READY__ = true;
     });
   }, [state]);
@@ -129,7 +156,12 @@ export function RenderPage() {
   return (
     <>
       {state.sheets.map((sheet, i) => (
-        <div key={i} style={{ breakAfter: i < state.sheets.length - 1 ? 'page' : 'auto' }}>
+        // data-sheet — признак листа для проверки «сверху только лист».
+        <div
+          key={i}
+          data-sheet
+          style={{ breakAfter: i < state.sheets.length - 1 ? 'page' : 'auto' }}
+        >
           <SheetRenderer
             layout={sheet.layout}
             pageWidthMm={state.pageWidthMm}

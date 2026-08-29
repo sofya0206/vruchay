@@ -8,6 +8,45 @@ import type { Env } from '../config/env';
 /** Задания, которые ещё займут воркер, — они же держат часть квоты. */
 const ACTIVE_STATUSES = ['queued', 'running'] as const;
 
+/**
+ * Через сколько задание, не начавшее ни одной строки, считается зависшим.
+ *
+ * Пятнадцать минут — заведомо больше, чем задание может честно простоять
+ * в очереди: воркер берёт части по полсотни строк, и даже за чужой тысячей
+ * маленький пакет стоит минуты. И заведомо меньше, чем человек согласен
+ * смотреть на вечный прогресс.
+ *
+ * Зависание — не выдумка: запись о задании коммитится в базу, и только
+ * потом задание кладётся в очередь. Моргнувший Redis или перезапуск
+ * процесса между этими шагами оставляли задание в «в очереди» навсегда:
+ * вечный прогресс на экране, занятая бронь квоты, заблокированный материал
+ * и кнопка «Продолжить», которая такое задание не принимала.
+ */
+export const STUCK_AFTER_MS = 15 * 60_000;
+
+/** Задание в том объёме, которого хватает, чтобы понять: оно зависло. */
+export interface StuckCheckable {
+  status: string;
+  done: number;
+  failed: number;
+  createdAt: Date;
+  startedAt: Date | null;
+}
+
+/**
+ * Задание зависло: стоит «в очереди», но за ним никто не пришёл.
+ *
+ * Все четыре условия обязательны. Без `startedAt` и счётчиков под это
+ * описание попало бы задание, которое просто идёт медленно, — и мы бы
+ * поставили его части в очередь второй раз.
+ */
+export function isStuck(job: StuckCheckable, now: Date = new Date()): boolean {
+  if (job.status !== 'queued') return false;
+  if (job.startedAt !== null) return false;
+  if (job.done > 0 || job.failed > 0) return false;
+  return now.getTime() - job.createdAt.getTime() >= STUCK_AFTER_MS;
+}
+
 /** Задание и строки, которые по нему предстоит выпустить. */
 export interface StartedJob {
   job: {
@@ -107,7 +146,7 @@ export class GenerationService {
    */
   async resume(orgId: string, jobId: string): Promise<StartedJob> {
     const existing = await this.getJob(orgId, jobId);
-    if (existing.status !== 'failed' && existing.status !== 'canceled') {
+    if (!resumable(existing)) {
       throw new BadRequestException(
         existing.status === 'done'
           ? 'Этот выпуск уже завершён — продолжать нечего'
@@ -118,7 +157,7 @@ export class GenerationService {
     return this.withOrgLock(orgId, async (tx) => {
       const job = await tx.generationJob.findFirst({ where: { id: jobId, orgId } });
       if (!job) throw new NotFoundException('Задание не найдено');
-      if (job.status !== 'failed' && job.status !== 'canceled') {
+      if (!resumable(job)) {
         throw new BadRequestException('Этот выпуск уже продолжили');
       }
 
@@ -319,6 +358,33 @@ export class GenerationService {
     }
   }
 
+  /**
+   * Задание не удалось поставить в очередь — закрываем его сразу.
+   *
+   * Иначе оно остаётся «в очереди» навсегда: запись в базе есть, а в Redis
+   * за ней ничего не стоит. Человек видит вечный прогресс, материал
+   * заблокирован сообщением «выпуск уже идёт», бронь квоты занята,
+   * и догадаться, что спасает только «Отменить», неоткуда.
+   *
+   * Закрытое задание, наоборот, честно показывает беду и принимается
+   * кнопкой «Продолжить». Бронь освобождается сама: задание перестаёт
+   * быть активным.
+   */
+  async failToQueue(jobId: string): Promise<void> {
+    await this.prisma.generationJob
+      .updateMany({
+        where: { id: jobId, status: 'queued' },
+        data: {
+          status: 'failed',
+          finishedAt: new Date(),
+          error:
+            'Выпуск не удалось поставить в очередь — очередь заданий не отвечает. ' +
+            'Ничего не списано; когда очередь вернётся, нажмите «Продолжить».',
+        },
+      })
+      .catch(() => undefined);
+  }
+
   async getJob(orgId: string, jobId: string) {
     const job = await this.prisma.generationJob.findFirst({ where: { id: jobId, orgId } });
     if (!job) throw new NotFoundException('Задание не найдено');
@@ -408,6 +474,17 @@ export class GenerationService {
       return work(tx as unknown as TxClient);
     });
   }
+}
+
+/**
+ * Можно ли продолжить этот выпуск.
+ *
+ * Упавший и отменённый — очевидно. Зависший добавлен потому, что без него
+ * человеку с вечным прогрессом на экране «Продолжить» отвечало «этот выпуск
+ * и так идёт», а идти было нечему.
+ */
+function resumable(job: StuckCheckable): boolean {
+  return job.status === 'failed' || job.status === 'canceled' || isStuck(job);
 }
 
 /** Часть клиента Prisma, которой хватает и транзакции, и обычному вызову. */
