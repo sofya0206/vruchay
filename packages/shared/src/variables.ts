@@ -11,6 +11,7 @@
 import { declineFullName, shortName } from './declension';
 import { fullNameOf } from './paired-forms';
 import { placeWord } from './place-word';
+import { transliterateGost, transliterateIcao } from './translit';
 
 /** Служебная переменная: как называется, что подставляет, как объяснить. */
 export interface SystemVariable {
@@ -42,10 +43,11 @@ export const SYSTEM_VARIABLES: SystemVariable[] = [
    * одноимённой колонкой: организатор, вписавший падеж руками, сделал
    * это именно потому, что наша догадка его не устроила.
    *
-   * TODO (отдельной задачей): транслитерация ФИО по ГОСТ Р 52535.1 / ICAO
-   * для сертификатов на латинице и числительные прописью («сто двадцать
-   * часов»). В этой ветке намеренно не делаем — обе требуют своих таблиц
-   * и своего набора проверок.
+   * TODO (отдельной задачей): числительные прописью («сто двадцать часов»)
+   * для документов, где это понадобится, — общий модуль для этого есть
+   * (`number-in-words.ts`), но ни одна служебная переменная его пока
+   * не использует: подходящего числового поля с явной потребностью
+   * в словесной записи в текущих заготовках не нашлось.
    */
   {
     name: 'name_dat',
@@ -61,6 +63,16 @@ export const SYSTEM_VARIABLES: SystemVariable[] = [
     name: 'name_short',
     title: 'ФИО сокращённо',
     hint: 'Иванов П. И.',
+  },
+  {
+    name: 'name_gost',
+    title: 'ФИО латиницей (ГОСТ 7.79-2000)',
+    hint: 'Ivanov Petr — для двуязычных бланков',
+  },
+  {
+    name: 'name_icao',
+    title: 'ФИО латиницей (как в загранпаспорте)',
+    hint: 'Ivanov Petr — по стандарту ICAO Doc 9303',
   },
   {
     name: 'place_word',
@@ -175,6 +187,20 @@ export function mergeVariables(
 
   if (merged.name_short === undefined) {
     merged.name_short = shortName(fullName);
+  }
+
+  /*
+   * Транслитерация — та же логика перекрытия, что и у склонения: своя
+   * колонка «name_gost»/«name_icao» сильнее автоматической, потому что
+   * завести её руками имеет смысл только ради написания, которое
+   * стандартная таблица не даёт (например, готовый вариант из паспорта).
+   */
+  if (merged.name_gost === undefined) {
+    merged.name_gost = transliterateGost(fullName);
+  }
+
+  if (merged.name_icao === undefined) {
+    merged.name_icao = transliterateIcao(fullName);
   }
 
   return merged;

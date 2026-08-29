@@ -79,6 +79,12 @@ describe('переменные, которые сервис считает са�
     expect(v.name_short).not.toContain(' ');
   });
 
+  it('ФИО латиницей — ГОСТ и загранпаспорт', () => {
+    const v = merged({ name: 'Щукин Илья Кузьмич' });
+    expect(v.name_gost).toBe("Shhukin Il'ya Kuz'mich");
+    expect(v.name_icao).toBe('Shchukin Ilia Kuzmich');
+  });
+
   it('место словом берётся из колонки «place»', () => {
     // Так эту колонку называет подбор имён при импорте: «Место» → place.
     expect(merged({ place: '1' }).place_word).toBe('первое');
@@ -99,12 +105,16 @@ describe('переменные, которые сервис считает са�
       name_dat: 'Петровичу Иванову',
       name_gen: 'товарища Иванова',
       name_short: 'И. Иванов',
+      name_gost: 'Ivanov Petr (из паспорта)',
+      name_icao: 'IVANOV PETR',
       place: '1',
       place_word: 'Гран-при',
     });
     expect(v.name_dat).toBe('Петровичу Иванову');
     expect(v.name_gen).toBe('товарища Иванова');
     expect(v.name_short).toBe('И. Иванов');
+    expect(v.name_gost).toBe('Ivanov Petr (из паспорта)');
+    expect(v.name_icao).toBe('IVANOV PETR');
     expect(v.place_word).toBe('Гран-при');
   });
 
@@ -113,12 +123,14 @@ describe('переменные, которые сервис считает са�
     expect(v.name_dat).toBe('');
     expect(v.name_gen).toBe('');
     expect(v.name_short).toBe('');
+    expect(v.name_gost).toBe('');
+    expect(v.name_icao).toBe('');
   });
 
   it('все вычисляемые переменные объявлены в списке для редактора', () => {
     // Иначе подсказка в редакторе скажет «переменная неизвестна»
     // о том, что сервис на самом деле подставляет.
-    for (const name of ['name_dat', 'name_gen', 'name_short', 'place_word']) {
+    for (const name of ['name_dat', 'name_gen', 'name_short', 'name_gost', 'name_icao', 'place_word']) {
       expect(SYSTEM_VARIABLE_NAMES).toContain(name);
     }
   });
