@@ -118,9 +118,60 @@ describe('переменные, которые сервис считает са�
   it('все вычисляемые переменные объявлены в списке для редактора', () => {
     // Иначе подсказка в редакторе скажет «переменная неизвестна»
     // о том, что сервис на самом деле подставляет.
-    for (const name of ['name_dat', 'name_gen', 'name_short', 'place_word']) {
+    for (const name of [
+      'name_dat',
+      'name_gen',
+      'name_short',
+      'name_lat_gost',
+      'name_lat_icao',
+      'place_word',
+      'hours_word',
+    ]) {
       expect(SYSTEM_VARIABLE_NAMES).toContain(name);
     }
+  });
+
+  it('ФИО латиницей по обоим стандартам', () => {
+    const v = merged({ name: 'Щукин Юрий' });
+    expect(v.name_lat_gost).toBe('Shhukin Yurij');
+    expect(v.name_lat_icao).toBe('Shchukin Iurii');
+  });
+
+  it('своя колонка латиницы сильнее нашей таблицы', () => {
+    // У человека уже есть загранпаспорт с написанием прошлых лет,
+    // и на дипломе должно стоять то, что в паспорте.
+    const v = merged({ name: 'Щукин Юрий', name_lat_icao: 'SHCHOUKINE Youri' });
+    expect(v.name_lat_icao).toBe('SHCHOUKINE Youri');
+    expect(v.name_lat_gost).toBe('Shhukin Yurij');
+  });
+
+  it('без колонки «name» латиница пустая, а не «undefined»', () => {
+    const v = merged({});
+    expect(v.name_lat_gost).toBe('');
+    expect(v.name_lat_icao).toBe('');
+  });
+
+  it('объём часов прописью считается из «часов»', () => {
+    const v = mergeVariables({}, { issuedAt: AUG_4, event: { hours: '120' } });
+    expect(v.hours_word).toBe('сто двадцать часов');
+  });
+
+  it('часы, записанные не числом, остаются как есть', () => {
+    // «16 академических часов», «72 ч.» — разобрать надёжно нельзя,
+    // а испортить легко.
+    const free = mergeVariables({}, { issuedAt: AUG_4, event: { hours: '16 академических' } });
+    expect(free.hours_word).toBe('16 академических');
+
+    const empty = mergeVariables({}, { issuedAt: AUG_4 });
+    expect(empty.hours_word).toBeUndefined();
+  });
+
+  it('своя колонка «hours_word» сильнее расчёта', () => {
+    const v = mergeVariables({ hours_word: 'сто двадцать академических часов' }, {
+      issuedAt: AUG_4,
+      event: { hours: '120' },
+    });
+    expect(v.hours_word).toBe('сто двадцать академических часов');
   });
 });
 

@@ -9,8 +9,10 @@
  */
 
 import { declineFullName, shortName } from './declension';
+import { numberInWordsWith } from './number-in-words';
 import { fullNameOf } from './paired-forms';
 import { placeWord } from './place-word';
+import { transliterateGost, transliterateIcao } from './translit';
 
 /** Служебная переменная: как называется, что подставляет, как объяснить. */
 export interface SystemVariable {
@@ -41,11 +43,6 @@ export const SYSTEM_VARIABLES: SystemVariable[] = [
    * Производные от колонки «name». Считаются сервисом, но перекрываются
    * одноимённой колонкой: организатор, вписавший падеж руками, сделал
    * это именно потому, что наша догадка его не устроила.
-   *
-   * TODO (отдельной задачей): транслитерация ФИО по ГОСТ Р 52535.1 / ICAO
-   * для сертификатов на латинице и числительные прописью («сто двадцать
-   * часов»). В этой ветке намеренно не делаем — обе требуют своих таблиц
-   * и своего набора проверок.
    */
   {
     name: 'name_dat',
@@ -62,10 +59,32 @@ export const SYSTEM_VARIABLES: SystemVariable[] = [
     title: 'ФИО сокращённо',
     hint: 'Иванов П. И.',
   },
+  /*
+   * Латиница. Два стандарта, а не один: ГОСТ 7.79-2000 (система Б) —
+   * делопроизводственный, ICAO Doc 9303 — тот, по которому имя написано
+   * в загранпаспорте. Зарубежная сторона сверяет диплом именно с ним,
+   * поэтому выбор стандарта виден прямо в имени переменной: подставить
+   * не то — значит выдать документ, который не сойдётся с паспортом.
+   */
+  {
+    name: 'name_lat_gost',
+    title: 'ФИО латиницей (ГОСТ 7.79-2000)',
+    hint: 'Shhukin Yurij',
+  },
+  {
+    name: 'name_lat_icao',
+    title: 'ФИО латиницей (ICAO, как в загранпаспорте)',
+    hint: 'Shchukin Iurii',
+  },
   {
     name: 'place_word',
     title: 'Место словом',
     hint: 'первое, второе — из колонки «Место»',
+  },
+  {
+    name: 'hours_word',
+    title: 'Объём часов прописью',
+    hint: 'сто двадцать часов — из «Объёма часов»',
   },
 ];
 
@@ -153,6 +172,20 @@ export function mergeVariables(
   }
 
   /*
+   * Объём часов прописью: «в объёме сто двадцать часов». На сертификатах
+   * об обучении число принято дублировать словом — так его нельзя
+   * подправить ручкой после выдачи.
+   *
+   * Считаем только с чистого числа. Организаторы пишут в это поле и
+   * «16 академических часов», и «72 ч.»: разобрать такое надёжно нельзя,
+   * а испортить — легко, поэтому всё, кроме числа, отдаём как есть.
+   * Правило то же, что у `placeWord`.
+   */
+  if (merged.hours_word === undefined && merged.hours) {
+    merged.hours_word = hoursWord(merged.hours);
+  }
+
+  /*
    * Склонение считаем после слияния: имя приходит колонкой получателя,
    * и до слияния его ещё нет. Своя колонка «name_dat» опять же сильнее
    * нашей догадки — организатор мог вписать падеж руками именно потому,
@@ -177,5 +210,26 @@ export function mergeVariables(
     merged.name_short = shortName(fullName);
   }
 
+  /*
+   * Латиница — та же логика: считаем сами, но своя колонка сильнее.
+   * Здесь она перекрывает особенно часто: у человека может быть уже
+   * выданный загранпаспорт с написанием, отличным от нынешней таблицы
+   * ICAO (её меняли), и на дипломе должно стоять то, что в паспорте.
+   */
+  if (merged.name_lat_gost === undefined) {
+    merged.name_lat_gost = transliterateGost(fullName);
+  }
+
+  if (merged.name_lat_icao === undefined) {
+    merged.name_lat_icao = transliterateIcao(fullName);
+  }
+
   return merged;
+}
+
+/** «120» → «сто двадцать часов». Всё, что не голое число, — как есть. */
+function hoursWord(hours: string): string {
+  const source = hours.trim();
+  if (!/^\d{1,6}$/.test(source)) return source;
+  return numberInWordsWith(Number(source), 'час', 'часа', 'часов');
 }

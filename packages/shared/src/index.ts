@@ -5,6 +5,8 @@ export * from './retention';
 export * from './variables';
 export * from './declension';
 export * from './place-word';
+export * from './translit';
+export * from './number-in-words';
 export * from './paired-forms';
 export * from './awards';
 export * from './validation/problems';
