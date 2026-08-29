@@ -473,11 +473,18 @@ describe('крупная группа дубликатов', () => {
     row(i, { name: `Участник ${i} Иванович`, email: 'coordinator@example.org' }),
   );
 
+  /*
+   * Своё время прогона: каждая проверка здесь разбирает пять тысяч строк,
+   * и пяти секунд по умолчанию не хватало, когда рядом шли остальные файлы.
+   * Потолок самого замера от этого не меняется — он ниже и живёт в тесте.
+   */
+  const RUN_MS = 60_000;
+
   // Прогрев, чтобы в замер не попало одноразовое раскрытие метрик шрифтов:
   // на боевом сервере оно случается один раз, а не на каждую проверку.
   beforeAll(() => {
     validateBatch(input(rows.slice(0, 50)));
-  });
+  }, RUN_MS);
 
   it('не встаёт колом на общем адресе во всех строках', () => {
     const started = performance.now();
@@ -490,7 +497,7 @@ describe('крупная группа дубликатов', () => {
     console.log(`группа из ${SIZE} одинаковых адресов: ${elapsed.toFixed(0)} мс`);
     expect(elapsed).toBeLessThan(6000);
     expect(report.rows).toHaveLength(SIZE);
-  });
+  }, RUN_MS);
 
   it('в причине показывает пять номеров и счёт остальных', () => {
     const report = validateBatch(input({ rows }));
@@ -500,14 +507,14 @@ describe('крупная группа дубликатов', () => {
     expect(detail).toContain('и ещё');
     expect(detail).toContain(String(SIZE - 1 - 5));
     expect(detail.length).toBeLessThan(120);
-  });
+  }, RUN_MS);
 
   it('строку не считает дубликатом самой себя', () => {
     const report = validateBatch(input({ rows }));
     const first = report.rows[0].problems.find((p) => p.code === 'duplicate_email')!.detail;
     // Первая строка — номер 1; в списке остальных её быть не должно.
     expect(first).not.toMatch(/(^|\D)1(\D|$)/);
-  });
+  }, RUN_MS);
 });
 
 describe('несколько бед в одной строке', () => {
