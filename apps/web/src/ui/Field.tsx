@@ -1,4 +1,5 @@
 import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
+import { cn } from './cn';
 
 const control =
   'w-full rounded-lg bg-[var(--surface)] px-3 py-2 text-[var(--text)] ' +
@@ -15,15 +16,15 @@ export function Label({ children, hint }: { children: ReactNode; hint?: ReactNod
 }
 
 export function Input({ className = '', ...rest }: InputHTMLAttributes<HTMLInputElement>) {
-  return <input className={`${control} ${className}`} {...rest} />;
+  return <input className={cn(control, className)} {...rest} />;
 }
 
 export function Textarea({ className = '', ...rest }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea className={`${control} ${className}`} {...rest} />;
+  return <textarea className={cn(control, className)} {...rest} />;
 }
 
 export function Select({ className = '', ...rest }: SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select className={`${control} ${className}`} {...rest} />;
+  return <select className={cn(control, className)} {...rest} />;
 }
 
 /** Состояние выводим формой и цветом сразу — чтобы читалось не только по тексту. */
