@@ -108,6 +108,10 @@ describe('приём заявки', () => {
 
     const data = create.mock.calls[0][0].data;
     expect(data.volume).toBe('До 20 000 документов в год');
+    // Колонки, а не только текст: по ним заявки ищут и сортируют.
+    expect(data.eventKinds).toEqual(['competitions', 'education']);
+    expect(data.callTime).toBe('morning');
+    expect(data.consentTextVersion).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(data.comment).toContain('Соревнования и турниры');
     expect(data.comment).toContain('Обучение, курсы, семинары');
     expect(data.comment).toContain('Утром, с 9 до 12 по Москве');
