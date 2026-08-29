@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Gift } from 'lucide-react';
 import { useUsage } from '../api/org';
+import { DiscussTermsLink } from '../billing/DiscussTermsLink';
 
 /**
  * Остаток бесплатной пробы.
@@ -53,7 +54,8 @@ export function UsageBar() {
       <p className="mt-2 text-sm text-[var(--text-muted)]">
         {data.left === 0 ? (
           <>
-            Проба закончилась. Чтобы выпускать дальше, выберите тариф — или{' '}
+            Проба закончилась. Чтобы выпускать дальше, напишите нам —{' '}
+            <DiscussTermsLink>обсудим условия под ваш объём</DiscussTermsLink>. Или{' '}
             <Link to="/settings" className="underline underline-offset-2">
               пригласите коллегу
             </Link>
@@ -61,7 +63,8 @@ export function UsageBar() {
           </>
         ) : low ? (
           <>
-            Осталось немного. Если впереди большое награждение — выберите тариф заранее или{' '}
+            Осталось немного. Если впереди большое награждение —{' '}
+            <DiscussTermsLink>обсудите условия заранее</DiscussTermsLink> или{' '}
             <Link to="/settings" className="underline underline-offset-2">
               пригласите коллегу
             </Link>

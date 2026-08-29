@@ -9,3 +9,4 @@ export * from './paired-forms';
 export * from './awards';
 export * from './validation/problems';
 export * from './validation/awarding-rules';
+export * from './lead-request';

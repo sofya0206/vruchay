@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
-import { Link } from 'react-router-dom';
 import { CalendarDays, FileCheck2, Gift, Mail } from 'lucide-react';
 import type { Overview } from '../api/overview';
+import { DiscussTermsLink } from '../billing/DiscussTermsLink';
 import { plural } from './format';
 
 /**
@@ -47,9 +47,7 @@ export function Metrics({ data }: { data: Overview }) {
               {low && (
                 <>
                   {' · '}
-                  <Link to="/billing" className="underline underline-offset-2">
-                    выбрать тариф
-                  </Link>
+                  <DiscussTermsLink />
                 </>
               )}
             </>
