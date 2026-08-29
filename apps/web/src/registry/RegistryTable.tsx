@@ -58,9 +58,13 @@ export function RegistryTable({ rows, selected, onToggle, onToggleAll, onOpen }:
             return (
               <tr
                 key={row.fileId}
-                className="border-b border-[var(--line)] last:border-0 hover:bg-[var(--surface-sunken)]"
+                onClick={() => onOpen(row.fileId)}
+                // Строка целиком открывает карточку документа — это ежедневная
+                // операция поддержки, и находить для неё маленькую стрелку
+                // в последнем столбце не должно быть обязательным условием.
+                className="cursor-pointer border-b border-[var(--line)] last:border-0 hover:bg-[var(--surface-sunken)]"
               >
-                <td className="px-3 py-3 align-top">
+                <td className="px-3 py-3 align-top" onClick={(e) => e.stopPropagation()}>
                   <input
                     type="checkbox"
                     checked={selected.has(row.fileId)}
@@ -114,6 +118,7 @@ export function RegistryTable({ rows, selected, onToggle, onToggleAll, onOpen }:
                       href={`/verify/${row.replacedBy.publicId}`}
                       target="_blank"
                       rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
                       className="mt-1 block text-xs text-[var(--accent)] hover:underline"
                     >
                       Заменён документом от {formatDate(row.replacedBy.issuedAt)}
@@ -123,7 +128,7 @@ export function RegistryTable({ rows, selected, onToggle, onToggleAll, onOpen }:
 
                 <td className="px-3 py-3 text-right align-top tabular-nums">{row.verifyCount}</td>
 
-                <td className="px-3 py-3 align-top">
+                <td className="px-3 py-3 align-top" onClick={(e) => e.stopPropagation()}>
                   <button
                     type="button"
                     onClick={() => onOpen(row.fileId)}
