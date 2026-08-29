@@ -27,6 +27,11 @@ interface PlanRequest {
 /** Состояния, при которых письмо считается уже ушедшим на этот адрес. */
 const LIVE_STATUSES: EmailStatus[] = ['queued', 'sent', 'delivered', 'opened'];
 
+/** Ключ «адрес в этом потоке»: адреса из разных потоков — разные адресаты. */
+function streamKey(kind: EmailKind, email: string): string {
+  return `${kind}:${normalizeEmail(email)}`;
+}
+
 /**
  * Массовая рассылка документов отдельным разделом.
  *
@@ -225,6 +230,11 @@ export class MailingService {
    *
    * Адрес берём из сессии, а не из запроса: «тестовая отправка» на чужой
    * адрес — это рассылка без согласия, только названная иначе.
+   *
+   * Документ прикладываем тот же, что уйдёт участнику по первой строке —
+   * по ней же собрано и превью. Кнопка отвечает на вопрос «что получит
+   * участник», и письмо без вложения на него не отвечает: в тексте
+   * шаблона обычно написано «во вложении», а вложения нет.
    */
   async testSend(orgId: string, toEmail: string, documentId: string, kind: LetterKind) {
     const doc = await this.assertDocument(orgId, documentId);
@@ -236,9 +246,10 @@ export class MailingService {
     const sample = await this.prisma.recipientRow.findFirst({
       where: { documentId },
       orderBy: { position: 'asc' },
-      select: { data: true },
+      select: { data: true, lastFileId: true },
     });
     const data = (sample?.data as Record<string, string>) ?? {};
+    const fileId = template.attachGeneratedFile ? (sample?.lastFileId ?? null) : null;
 
     const body = renderHtmlTemplate(template.bodyHtml, data);
     const html = renderLetterBody(
@@ -254,14 +265,27 @@ export class MailingService {
         : { kind: 'transactional', bodyHtml: body },
     );
 
+    // Письмо обещает вложение, а выпущенного документа нет — говорим об этом
+    // прямо в письме. Промолчать значит показать проверяющему письмо без
+    // вложения и оставить его гадать, потеряется ли оно и у участника.
+    const missingFile = template.attachGeneratedFile && !fileId;
+    const notice = missingFile
+      ? '<p style="font-size:13px;color:#8a5a00;background:#fff6e5;border-radius:8px;' +
+        'padding:10px 12px;margin:0 0 16px">' +
+        'Проверочное письмо: документ по первой строке ещё не выпущен, поэтому вложения ' +
+        'в этом письме нет. Участнику письмо уйдёт с документом.' +
+        '</p>'
+      : '';
+
     await this.mail.sendPreview(
       orgId,
       toEmail,
       `[Проверка] ${renderSubject(template.subject, data)}`,
-      html,
+      notice + html,
+      fileId,
     );
 
-    return { to: toEmail, title: doc.title };
+    return { to: toEmail, title: doc.title, attached: Boolean(fileId) };
   }
 
   /**
@@ -285,19 +309,22 @@ export class MailingService {
     });
 
     // Последняя попытка по каждому адресу: если после провала письмо
-    // уже переотправляли и оно ушло, повторять снова не надо.
+    // уже переотправляли и оно ушло, повторять снова не надо. Считаем
+    // внутри потока — по тем же причинам, что и в sentAddresses: ушедшая
+    // выдача документа не заменяет собой недоставленное рекламное письмо.
     const live = new Set(
       (
         await this.prisma.email.findMany({
           where: { orgId, documentId, status: { in: LIVE_STATUSES } },
-          select: { toEmail: true },
+          select: { toEmail: true, kind: true },
         })
-      ).map((e) => e.toEmail),
+      ).map((e) => streamKey(e.kind, e.toEmail)),
     );
 
     const attempts = new Map<string, (typeof failed)[number]>();
     for (const email of failed) {
-      if (!live.has(email.toEmail)) attempts.set(email.toEmail, email);
+      const key = streamKey(email.kind, email.toEmail);
+      if (!live.has(key)) attempts.set(key, email);
     }
 
     const hopeless: { name: string; email: string; reason: string }[] = [];
@@ -501,15 +528,33 @@ export class MailingService {
       rows,
       manualEmails: request.emails ? parseEmailList(request.emails) : [],
       requireFile: template.attachGeneratedFile,
-      alreadySent: await this.sentAddresses(orgId, documentId),
+      alreadySent: await this.sentAddresses(orgId, documentId, template.kind),
       consented: template.kind === 'marketing' ? await this.consentedAddresses(orgId) : null,
     });
   }
 
-  /** Адреса, которым по этому материалу письмо уже ушло или вот-вот уйдёт. */
-  private async sentAddresses(orgId: string, documentId: string): Promise<Set<string>> {
+  /**
+   * Адреса, которым по этому материалу письмо этого потока уже ушло
+   * или вот-вот уйдёт.
+   *
+   * Поток обязателен. Защита от дублей существует ради одного случая:
+   * человек нажал «Отправить», не дождался и нажал ещё раз. Считать её
+   * по всем письмам материала значит, что письмо о выдаче документа
+   * закрывает адрес и для рекламы, — а это разные письма, разные согласия
+   * и разные поводы. По материалу, где выдача уже прошла, рекламная
+   * рассылка при таком счёте не уходила никому.
+   *
+   * Обратное подмешивание при этом невозможно и здесь ни при чём:
+   * рекламу в письмо о выдаче не пускают тип письма и выбор шаблона
+   * по потоку (см. letter-kind.ts).
+   */
+  private async sentAddresses(
+    orgId: string,
+    documentId: string,
+    kind: EmailKind,
+  ): Promise<Set<string>> {
     const sent = await this.prisma.email.findMany({
-      where: { orgId, documentId, status: { in: LIVE_STATUSES } },
+      where: { orgId, documentId, kind, status: { in: LIVE_STATUSES } },
       select: { toEmail: true },
     });
     return new Set(sent.map((e) => normalizeEmail(e.toEmail)));
