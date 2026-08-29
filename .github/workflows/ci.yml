@@ -34,9 +34,66 @@ jobs:
       - run: pnpm -r build
       - run: pnpm -r test
 
+  # Слой, который разговаривает с настоящей базой.
+  #
+  # Отдельной работой, а не шагом в `check`: ей нужны Postgres и Redis,
+  # и обычные тесты не должны от них зависеть — иначе на машине без
+  # поднятой базы `pnpm test` перестанет работать, и им перестанут
+  # пользоваться. Работа обязательна для вливания: 28.08.2026 ядро
+  # продукта не работало вовсе при 979 зелёных тестах, и заметил это
+  # человек, а не конвейер.
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: gramota
+          POSTGRES_PASSWORD: gramota
+          POSTGRES_DB: gramota
+        ports:
+          - 5432:5432
+        # Без проверки готовности первый же `migrate deploy` упирается
+        # в ещё не поднявшуюся базу.
+        options: >-
+          --health-cmd "pg_isready -U gramota"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      INTEGRATION_DATABASE_URL: postgresql://gramota:gramota@localhost:5432/gramota
+      INTEGRATION_REDIS_URL: redis://localhost:6379/15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @gramota/server exec prisma generate
+      # Тесты слоя печатают настоящий PDF настоящим Chromium: без него
+      # «выпуск прошёл» ничего не значит — файл может быть пустым.
+      - run: pnpm --filter @gramota/server exec playwright install --with-deps chromium
+      # Общий пакет нужен собранным: макет листа и подстановка переменных
+      # приезжают из него.
+      - run: pnpm --filter @gramota/shared build
+      - run: pnpm test:integration
+
   docker:
     runs-on: ubuntu-latest
-    needs: check
+    needs: [check, integration]
     if: github.ref == 'refs/heads/main'
     permissions:
       contents: read
