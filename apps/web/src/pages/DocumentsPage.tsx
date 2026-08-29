@@ -1,4 +1,5 @@
 import { FormEvent, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FileText, Plus, Search, Trash2 } from 'lucide-react';
 import { UsageBar } from '../documents/UsageBar';
@@ -27,6 +28,7 @@ import { LibraryFilters, type LibrarySort } from '../documents/LibraryFilters';
  */
 export function DocumentsPage() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<DocumentCategory | null>(null);
   const [sort, setSort] = useState<LibrarySort>('updated');
@@ -65,10 +67,19 @@ export function DocumentsPage() {
         ...(v.category ? { category: v.category } : {}),
         ...(v.presetId ? { presetId: v.presetId } : {}),
       }),
-    onSuccess: () => {
+    onSuccess: (doc, variables) => {
       setTitle('');
       setScratch(false);
       void qc.invalidateQueries({ queryKey: ['documents'] });
+      /*
+       * Материал из заготовки открываем сразу.
+       *
+       * Раньше нажатие на заготовку молча добавляло материал в список ниже:
+       * ничего видимого не происходило, и человек нажимал ещё раз — отсюда
+       * три «Грамоты за место» подряд. Заготовку выбирают, чтобы её править,
+       * поэтому переход в редактор и есть ответ на нажатие.
+       */
+      if (variables.presetId) navigate(`/documents/${doc.id}`);
     },
   });
 
