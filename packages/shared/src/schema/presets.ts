@@ -433,7 +433,11 @@ export function buildPreset(kind: PresetKind, style: PresetStyle, ctx: PresetCon
    * «за первое место» без колонки «место» превратится в «за  место».
    */
   if (!ctx.columns.includes('place')) available.delete('place_word');
-  if (!ctx.columns.includes('name')) available.delete('name_dat');
+  if (!ctx.columns.includes('name')) {
+    available.delete('name_dat');
+    available.delete('name_lat_gost');
+    available.delete('name_lat_icao');
+  }
 
   const rows: (Row & { text: string })[] = ROWS[kind]
     .filter((row) => row.role !== 'title' || !titlePrinted)
