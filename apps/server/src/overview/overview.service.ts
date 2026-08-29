@@ -48,10 +48,15 @@ export class OverviewService {
   async summary(orgId: string, now = new Date()) {
     const since = monthStart(now);
 
-    const [usage, issuedMonth, emailsSent, materials, documents, jobs] = await Promise.all([
-      // Остаток пробы берём у той же службы, что решает, пускать ли к выпуску:
+    const [usage, issuedTotal, issuedMonth, emailsSent, materials, documents, jobs] =
+      await Promise.all([
+      // Остаток берём у той же службы, что решает, пускать ли к выпуску:
       // разойдись эти две цифры — человек упёрся бы в предел, видя запас.
       this.org.usage(orgId),
+      // Выпущенное за всё время считаем отдельно: израсходованное по плану —
+      // это документы с начала плана, а «за всё время» на рабочем столе
+      // означает ровно то, что написано.
+      this.prisma.file.count({ where: { orgId, kind: 'generated' } }),
       this.prisma.file.count({
         where: { orgId, kind: 'generated', createdAt: { gte: since } },
       }),
@@ -82,8 +87,8 @@ export class OverviewService {
 
     return {
       usage,
-      /** Выпущено за всё время — те же созданные файлы, по которым считается проба. */
-      issuedTotal: usage.used,
+      /** Выпущено за всё время — те же созданные файлы, по которым считается квота. */
+      issuedTotal,
       issuedMonth,
       emailsSent,
       /** Материалов в работе. Ноль означает, что организация ещё ничего не начинала. */

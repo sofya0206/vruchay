@@ -30,6 +30,7 @@ import { OverviewModule } from './overview/overview.module';
 import { TokensModule } from './tokens/tokens.module';
 import { BackupModule } from './backup/backup.module';
 import { PlatformModule } from './platform/platform.module';
+import { PlansModule } from './plans/plans.module';
 
 @Module({
   imports: [
@@ -62,6 +63,7 @@ import { PlatformModule } from './platform/platform.module';
     TokensModule,
     BackupModule,
     PlatformModule,
+    PlansModule,
   ],
   controllers: [HealthController],
 })

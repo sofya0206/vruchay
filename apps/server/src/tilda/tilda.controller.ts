@@ -8,6 +8,7 @@ import type { SessionUser } from '../auth/auth.service';
 import { uuidSchema } from '../documents/documents.dto';
 import { TildaService } from './tilda.service';
 import { integrationSchema, IntegrationDto } from './tilda.dto';
+import { PlanFeatureGuard, RequiresFeature } from '../plans/plan-feature.guard';
 
 const uuidParam = new ZodValidationPipe(uuidSchema);
 const listRequestsSchema = z.object({
@@ -18,7 +19,7 @@ type ListRequestsDto = z.infer<typeof listRequestsSchema>;
 
 /** Управление интеграциями из кабинета. Публичная часть — в отдельном контроллере. */
 @Controller('integrations/tilda')
-@UseGuards(AuthGuard, RolesGuard)
+@UseGuards(AuthGuard, RolesGuard, PlanFeatureGuard)
 export class TildaController {
   constructor(private readonly tilda: TildaService) {}
 
@@ -42,6 +43,7 @@ export class TildaController {
 
   // Интеграция открывает выдачу документов посторонним людям, поэтому её
   // создание и настройка — право владельца и администратора, а не участника.
+  @RequiresFeature('tilda')
   @Post()
   @Roles('owner', 'admin')
   create(

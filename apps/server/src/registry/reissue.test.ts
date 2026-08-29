@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { RegistryActionsService } from './registry-actions.service';
+import { PlansService } from '../plans/plans.service';
 import { testConfig } from '../config/env.test-utils';
 
 /** Файл в реестре, каким его видит перевыпуск. */
@@ -45,6 +46,8 @@ function serviceWith(world: World): { service: RegistryActionsService; recorded:
         documentId: data.documentId,
       }),
     },
+    // Планов у организации нет: здесь проверяется поведение пробы.
+    plan: { findMany: async () => [] },
     file: {
       count: async () => world.issued ?? 0,
       updateMany: async ({
@@ -82,14 +85,14 @@ function serviceWith(world: World): { service: RegistryActionsService; recorded:
     },
   };
 
+  const plans = new PlansService(prisma as never, referral as never, testConfig() as never);
   const service = new RegistryActionsService(
     prisma as never,
     replacement as never,
-    referral as never,
+    plans,
     generation as never,
     {} as never,
     {} as never,
-    testConfig() as never,
   );
   return { service, recorded };
 }
@@ -205,7 +208,9 @@ describe('перевыпуск из реестра', () => {
     const result = await service.reissue('org', ['file-1']);
 
     expect(result.reissued).toBe(0);
-    expect(result.skipped[0].reason).toContain('бесплатной пробе');
+    expect(result.skipped[0].reason).toContain('проба закончилась');
+    // И тут же объясняет, почему перевыпуск считается: это новые документы.
+    expect(result.skipped[0].reason).toContain('наравне с обычным выпуском');
     delete process.env.FREE_DOCUMENT_LIMIT;
   });
 
