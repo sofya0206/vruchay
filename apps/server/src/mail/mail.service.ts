@@ -503,7 +503,7 @@ export class MailService {
    * и быть не может — это переписка по существу, а не рассылка.
    */
   private unsubscribeLink(email: { kind: EmailKind; id: string }): string | undefined {
-    const publicUrl = process.env.PUBLIC_URL;
+    const publicUrl = this.publicUrl;
     if (email.kind !== 'marketing' || !publicUrl) return undefined;
     return unsubscribeUrl(publicUrl, email.id);
   }

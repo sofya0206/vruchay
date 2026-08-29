@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MailingService } from './mailing.service';
+import { testConfig } from '../config/env.test-utils';
 
 /*
  * Две беды рассылки, которые не видны ни по одному зелёному тесту:
@@ -137,7 +138,12 @@ function world(stub: Stub = {}): World {
   const processor = { enqueue: async () => undefined };
 
   return {
-    service: new MailingService(prisma as never, mail as never, processor as never),
+    service: new MailingService(
+      prisma as never,
+      mail as never,
+      processor as never,
+      testConfig() as never,
+    ),
     previews,
     created,
   };

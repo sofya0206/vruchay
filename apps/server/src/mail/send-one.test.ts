@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { MailService } from './mail.service';
+import { testConfig } from '../config/env.test-utils';
 import { isLastAttempt, MAIL_ATTEMPTS, MAIL_BACKOFF_MS } from './mail.processor';
 import type { OutgoingMessage } from './mail-provider.interface';
 
@@ -96,7 +97,12 @@ function world(stub: Stub = {}): World {
   };
 
   return {
-    service: new MailService(prisma as never, storage as never, smtp as never),
+    service: new MailService(
+      prisma as never,
+      storage as never,
+      smtp as never,
+      testConfig() as never,
+    ),
     email,
     sent,
   };
@@ -185,16 +191,11 @@ describe('счёт попыток очереди', () => {
   });
 });
 
+// Публичный адрес служба берёт из проверенной схемы настроек (ConfigService),
+// а не из process.env: подмена переменной окружения тут ничего бы не изменила.
+// В testConfig PUBLIC_URL — 'https://vruchay.ru'.
 describe('заголовок отписки', () => {
-  const previous = process.env.PUBLIC_URL;
-
-  afterEach(() => {
-    if (previous === undefined) delete process.env.PUBLIC_URL;
-    else process.env.PUBLIC_URL = previous;
-  });
-
   it('у рекламного письма есть List-Unsubscribe с той же ссылкой, что в подвале', async () => {
-    process.env.PUBLIC_URL = 'https://vruchay.ru';
     const { service, sent } = world({ kind: 'marketing' });
 
     await service.sendOne(EMAIL_ID);
@@ -204,7 +205,6 @@ describe('заголовок отписки', () => {
   });
 
   it('у письма о выдаче документа заголовка отписки нет', async () => {
-    process.env.PUBLIC_URL = 'https://vruchay.ru';
     const { service, sent } = world();
 
     await service.sendOne(EMAIL_ID);
