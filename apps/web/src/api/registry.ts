@@ -116,6 +116,37 @@ export const emptyFilters: RegistryFilters = {
   to: '',
 };
 
+/** Состояния, которые отбор вообще знает. */
+const STATES: FileState[] = ['valid', 'revoked', 'replaced'];
+
+/**
+ * Отбор из строки адреса.
+ *
+ * Нужен, чтобы «посмотреть выданное по этому материалу» было ссылкой:
+ * реестр открывается сразу суженным, а не всем подряд, из которого
+ * человек ещё должен выбрать материал в списке из сорока.
+ *
+ * Разбираем по белому списку — только известные поля и только известные
+ * состояния. Чужая ссылка не должна класть в отбор произвольное поле,
+ * которое потом уедет на сервер строкой запроса.
+ */
+export function filtersFromQuery(search: string): RegistryFilters {
+  const params = new URLSearchParams(search);
+  const filters = { ...emptyFilters };
+
+  for (const key of Object.keys(emptyFilters) as (keyof RegistryFilters)[]) {
+    const value = params.get(key);
+    if (!value) continue;
+    if (key === 'state') {
+      if (STATES.includes(value as FileState)) filters.state = value as FileState;
+      continue;
+    }
+    filters[key] = value;
+  }
+
+  return filters;
+}
+
 /**
  * Строка запроса из отбора.
  *

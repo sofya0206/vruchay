@@ -10,6 +10,39 @@ interface Props {
   onReset: () => void;
 }
 
+/** Что показать в списке материалов, включая названный в адресе. */
+export interface DocumentOption {
+  id: string;
+  label: string;
+}
+
+/**
+ * Материалы для отбора.
+ *
+ * Сервер перечисляет только те, по которым что-то выдано, — в списке
+ * незачем сорок пустых заготовок. Но по ссылке «выданное по этому
+ * материалу» можно прийти и с материалом, по которому пока ничего нет:
+ * тогда отбор стоит, а список о материале не знает, и поле показывало бы
+ * «Любой». Человек видел «ничего не найдено» при якобы пустом отборе
+ * и понимал это как «у меня вообще ничего не выдано».
+ *
+ * Поэтому названный в адресе материал добавляем сами. Названия у нас
+ * нет — сервер его не прислал, — и подписываем нейтрально: важно, что
+ * отбор виден и его есть чем снять.
+ */
+export function documentOptions(
+  facets: RegistryFacets | undefined,
+  documentId: string,
+): DocumentOption[] {
+  const known = (facets?.documents ?? []).map((doc) => ({
+    id: doc.id,
+    label: doc.title + (doc.deletedAt ? ' (в корзине)' : ''),
+  }));
+
+  if (!documentId || known.some((doc) => doc.id === documentId)) return known;
+  return [...known, { id: documentId, label: 'Выбранный материал' }];
+}
+
 /**
  * Отбор в реестре.
  *
@@ -45,10 +78,9 @@ export function RegistryFilters({ value, facets, onChange, onReset }: Props) {
           <Label>Материал</Label>
           <Select value={value.documentId} onChange={(e) => set('documentId', e.target.value)}>
             <option value="">Любой</option>
-            {facets?.documents.map((doc) => (
+            {documentOptions(facets, value.documentId).map((doc) => (
               <option key={doc.id} value={doc.id}>
-                {doc.title}
-                {doc.deletedAt ? ' (в корзине)' : ''}
+                {doc.label}
               </option>
             ))}
           </Select>
