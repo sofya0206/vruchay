@@ -548,15 +548,39 @@ export function EditorPage() {
           ref={containerRef}
           className="relative grid flex-1 place-items-center overflow-auto bg-[var(--surface-sunken)] p-6"
         >
-          {/* Подсказка следующего шага. Человек открывает пустой редактор
-              и не знает, с чего начать: сначала бланк, потом текст.
-              Исчезает сама, как только шаг сделан, — постоянная подсказка
-              быстро становится мусором на экране. */}
+          {/*
+            Пустой холст обязан объяснять себя сам.
+
+            Сюда попадают не только из библиотеки: «Загрузить протокол
+            соревнований» с рабочего стола заводит материал и открывает
+            его же — с чистым листом и без единого следа заготовок,
+            потому что галерея заготовок живёт на экране создания
+            материала, то есть уже позади. Человек оставался перед пустым
+            прямоугольником и уходил.
+
+            Ссылка ведёт назад в библиотеку — туда, где заготовку ещё
+            можно выбрать. Настоящая связка «протокол → заготовка» здесь
+            не решается: это вопрос устройства потока, и он относится
+            к блоку 7. Это заплатка, снимающая тупик, а не готовый поток.
+
+            Подсказка исчезает, как только шаг сделан: постоянная
+            подсказка быстро становится мусором на экране.
+          */}
           {!sheet.backgroundFileId && layout.length === 0 && (
-            <div className="pointer-events-none absolute inset-x-0 top-6 z-10 flex justify-center">
-              <p className="rounded-full bg-[var(--surface)] px-4 py-2 text-sm text-[var(--text-muted)] shadow-sm ring-1 ring-[var(--line)]">
-                Начните с бланка: «Вставить» → «Бланк». Потом положите на него текст.
-              </p>
+            <div className="absolute inset-x-0 top-6 z-10 flex justify-center px-6">
+              <div className="max-w-sm rounded-2xl bg-[var(--surface)] px-5 py-4 text-center shadow-sm ring-1 ring-[var(--line)]">
+                <p className="font-medium">Лист пока пустой</p>
+                <p className="mt-1 text-sm text-[var(--text-muted)]">
+                  Выберите заготовку, чтобы оформить документ, — текст на ней уже расставлен
+                  по листу. Или соберите лист сами: «Вставить» → «Бланк», потом текст.
+                </p>
+                <Link
+                  to="/documents"
+                  className="mt-3 inline-block rounded-lg bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-[var(--accent-contrast)] hover:bg-[var(--accent-hover)]"
+                >
+                  Выбрать заготовку
+                </Link>
+              </div>
             </div>
           )}
           {sheet.backgroundFileId && layout.length === 0 && (
