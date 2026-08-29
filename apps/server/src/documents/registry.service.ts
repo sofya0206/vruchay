@@ -29,7 +29,24 @@ export class RegistryService {
       orderBy: { position: 'asc' },
       include: {
         lastFile: {
-          select: { id: true, publicId: true, createdAt: true, sizeBytes: true, verifyRevoked: true },
+          select: {
+            id: true,
+            publicId: true,
+            createdAt: true,
+            sizeBytes: true,
+            verifyRevoked: true,
+            /*
+             * Чем документ заменён при перевыпуске.
+             *
+             * Связью, а не вторым запросом: строк в реестре материала
+             * столько же, сколько получателей, и по запросу на строку
+             * реестр на трёхстах участниках дал бы триста обращений.
+             * Отзыв и замена — разные вещи, и путать их нельзя: отозванный
+             * недействителен, а у заменённого есть действующий двойник,
+             * и человеку нужно всего лишь показать, где он.
+             */
+            replacedBy: { select: { publicId: true, createdAt: true } },
+          },
         },
       },
     });
@@ -63,6 +80,12 @@ export class RegistryService {
           publicId: row.lastFile!.publicId,
           issuedAt: row.lastFile!.createdAt,
           revoked: row.lastFile!.verifyRevoked,
+          replacedBy: row.lastFile!.replacedBy
+            ? {
+                publicId: row.lastFile!.replacedBy.publicId,
+                issuedAt: row.lastFile!.replacedBy.createdAt,
+              }
+            : null,
           mailStatus: email?.status ?? null,
           mailSentAt: email?.sentAt ?? null,
           mailError: email?.error ?? null,

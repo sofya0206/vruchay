@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Download, ShieldCheck, ShieldOff } from 'lucide-react';
+import { Download, RefreshCw, ShieldCheck, ShieldOff } from 'lucide-react';
 import { api } from '../api/client';
 import { StatusChip } from '../ui/Field';
 import { Button } from '../ui/Button';
@@ -14,6 +14,12 @@ interface RegistryItem {
   publicId: string;
   issuedAt: string;
   revoked: boolean;
+  /**
+   * Чем документ заменён при перевыпуске. null — не заменялся.
+   * Замена не то же самое, что отзыв: у заменённого есть действующий
+   * двойник, и его надо показать, а не просто пометить строку.
+   */
+  replacedBy: { publicId: string; issuedAt: string } | null;
   mailStatus: string | null;
   mailSentAt: string | null;
   mailError: string | null;
@@ -217,6 +223,31 @@ function RevokeCell({
   onChange: (revoked: boolean) => void;
 }) {
   const [asking, setAsking] = useState(false);
+
+  /*
+   * Замена сильнее отзыва в показе, но не подменяет его: отозванный
+   * документ признан недействительным, и об этом надо сказать первым
+   * делом. Заменённый — исправленная опечатка, и человеку нужен адрес
+   * действующего документа, а не одна пометка «Заменён» без него.
+   */
+  if (!item.revoked && item.replacedBy) {
+    return (
+      <div className="flex flex-wrap items-center gap-2 whitespace-nowrap">
+        <span className="flex items-center gap-1.5 text-[var(--text-muted)]">
+          <RefreshCw size={14} />
+          заменён
+        </span>
+        <a
+          href={`/verify/${item.replacedBy.publicId}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sm text-[var(--accent)] underline underline-offset-2"
+        >
+          открыть новый
+        </a>
+      </div>
+    );
+  }
 
   if (item.revoked) {
     return (
