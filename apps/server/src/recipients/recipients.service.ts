@@ -62,7 +62,13 @@ export class RecipientsService {
     // Переименование колонки должно переносить значения во всех строках,
     // иначе данные потеряются: они хранятся по имени, а не по идентификатору.
     return this.prisma.$transaction(async (tx) => {
-      const updated = await tx.recipientColumn.update({ where: { id: columnId }, data: { name } });
+      // Переименование — это решение человека поверх заголовка файла:
+      // дальше колонка называется так, как назвали её, а не как она
+      // называлась в файле, и хранить стухший заголовок незачем.
+      const updated = await tx.recipientColumn.update({
+        where: { id: columnId },
+        data: { name, label: null },
+      });
       const rows = await tx.recipientRow.findMany({ where: { documentId } });
       await Promise.all(
         rows.map((row) => {
@@ -151,10 +157,14 @@ export class RecipientsService {
         const known = new Map(existing.map((c) => [c.name, c]));
         let nextPosition = existing.length;
 
-        for (const name of dto.columns) {
+        for (const [i, name] of dto.columns.entries()) {
           if (known.has(name)) continue;
+          // Заголовок файла — только для колонки, которую заводим прямо
+          // сейчас: у уже существующей колонки он либо уже есть с прошлого
+          // импорта, либо её завели вручную, и файла-источника нет вовсе.
+          const label = dto.labels?.[i]?.trim() || null;
           const created = await tx.recipientColumn.create({
-            data: { documentId, name, position: nextPosition++ },
+            data: { documentId, name, position: nextPosition++, label },
           });
           known.set(name, created);
         }

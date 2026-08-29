@@ -45,7 +45,14 @@ interface Props {
   remembered: Record<string, string>;
   onRemember: (key: string, name: string) => void;
   onCancel: () => void;
-  onConfirm: (columns: string[], rows: string[][], mode: 'append' | 'replace') => void;
+  onConfirm: (
+    columns: string[],
+    rows: string[][],
+    mode: 'append' | 'replace',
+    // Заголовки файла для каждой итоговой колонки, в том же порядке —
+    // чтобы таблица получателей показывала «Год рождения», а не «birth_year».
+    labels: string[],
+  ) => void;
 }
 
 const SUGGESTION_TITLE: Record<ImportSuggestion['kind'], (s: ImportSuggestion) => string> = {
@@ -354,7 +361,18 @@ export function ImportDialog({
             <Button
               variant="primary"
               disabled={!canConfirm || importing}
-              onClick={() => onConfirm(result.columns, result.rows, mode)}
+              onClick={() =>
+                onConfirm(
+                  result.columns,
+                  result.rows,
+                  mode,
+                  // Склеенная колонка ФИО собрана из нескольких заголовков файла —
+                  // соединяем их через «/», как делаем это со значениями строк.
+                  result.sources.map((from) =>
+                    from.map((i) => sheet.columns[i]?.source ?? '').filter(Boolean).join(' / '),
+                  ),
+                )
+              }
             >
               {importing ? 'Импортируем…' : `Импортировать ${sheet.rows.length}`}
             </Button>

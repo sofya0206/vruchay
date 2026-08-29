@@ -292,6 +292,14 @@ model RecipientColumn {
   position   Int
   /** Имя переменной без знака процента: name, email, course. */
   name       String
+  /**
+   * Заголовок колонки таким, каким он был в загруженном файле —
+   * «Год рождения», а не «birth_year». null у колонок без файла:
+   * заведённых вручную кнопкой «+» или существовавших до этого поля.
+   * Показывается в шапке таблицы вместо служебного имени; имя переменной
+   * при этом не меняется — оно уже разошлось по макетам и письмам.
+   */
+  label      String? @map("label")
 
   document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 

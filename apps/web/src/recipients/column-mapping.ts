@@ -69,8 +69,10 @@ export function applyMerge(
   names: string[],
   rows: string[][],
   merge: boolean,
-): { columns: string[]; rows: string[][] } {
-  if (!merge || !canMergeFullName(names)) return { columns: names, rows };
+): { columns: string[]; rows: string[][]; sources: number[][] } {
+  if (!merge || !canMergeFullName(names)) {
+    return { columns: names, rows, sources: names.map((_, i) => [i]) };
+  }
 
   const parts = FULL_NAME_PARTS.map((p) => names.indexOf(p)).filter((i) => i >= 0);
   const anchor = Math.min(...parts);
@@ -99,6 +101,7 @@ export function applyMerge(
           .join(' '),
       ),
     ),
+    sources,
   };
 }
 

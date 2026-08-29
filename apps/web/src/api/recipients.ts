@@ -5,6 +5,8 @@ export interface RecipientColumn {
   id: string;
   name: string;
   position: number;
+  /** Заголовок из загруженного файла. null — колонка заведена вручную. */
+  label: string | null;
 }
 
 export interface RecipientRow {
@@ -150,8 +152,12 @@ export function useRecipientMutations(documentId: string) {
         ),
     }),
     importRows: useMutation({
-      mutationFn: (v: { columns: string[]; rows: string[][]; mode: 'append' | 'replace' }) =>
-        api.post<{ imported: number }>(`${base}/import`, v),
+      mutationFn: (v: {
+        columns: string[];
+        rows: string[][];
+        mode: 'append' | 'replace';
+        labels?: string[];
+      }) => api.post<{ imported: number }>(`${base}/import`, v),
       onSuccess: refresh,
     }),
   };

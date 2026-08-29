@@ -543,10 +543,10 @@ export function RecipientsTable({
                     className="group border-b border-[var(--line)] px-3 py-2 text-left text-sm font-medium"
                   >
                     <span className="inline-flex items-center gap-1.5">
-                      {columnTitle(col.name)}
+                      {columnTitle(col)}
                       <button
                         onClick={() => m.deleteColumn.mutate(col.id)}
-                        aria-label={`Удалить колонку ${columnTitle(col.name)}`}
+                        aria-label={`Удалить колонку ${columnTitle(col)}`}
                         className="opacity-0 transition-opacity group-hover:opacity-100 hover:text-[var(--danger)]"
                       >
                         <X size={12} />
@@ -626,9 +626,9 @@ export function RecipientsTable({
           remembered={manualNames}
           onRemember={(key, name) => setManualNames((prev) => ({ ...prev, [key]: name }))}
           onCancel={() => setParsed(null)}
-          onConfirm={(cols, importRows, mode) => {
+          onConfirm={(cols, importRows, mode, labels) => {
             m.importRows.mutate(
-              { columns: cols, rows: importRows, mode },
+              { columns: cols, rows: importRows, mode, labels },
               { onSuccess: () => setParsed(null), onError: (e) => setError((e as Error).message) },
             );
           }}
@@ -672,13 +672,17 @@ export function RecipientsTable({
  * Название колонки по-человечески.
  *
  * Служебные имена придумали мы, и в макет их вписывать удобно, но в шапке
- * таблицы «%name» — не название столбца, а шифр. Своим колонкам организация
- * даёт имена сама, и их показываем как есть.
+ * таблицы «%name» — не название столбца, а шифр. Для двух колонок, которые
+ * заводит сам сервис, шифр переводим сами; для колонок из файла показываем
+ * заголовок, который был в файле (label) — своим колонкам организация даёт
+ * имена сама, и придумывать за неё нечего. Когда заголовка нет (колонку
+ * завели вручную, или файл её не подписывал), остаётся служебное имя —
+ * лучше оно, чем пустая шапка.
  */
-function columnTitle(name: string): string {
+function columnTitle(col: { name: string; label: string | null }): string {
   const known: Record<string, string> = {
     name: 'ФИО',
     email: 'Адрес почты',
   };
-  return known[name] ?? name;
+  return known[col.name] ?? col.label ?? col.name;
 }

@@ -60,6 +60,13 @@ export const importSchema = z.object({
   rows: z.array(z.array(z.string().max(1000)).max(30)).max(10000),
   /** Дописать к существующим строкам или заменить таблицу целиком. */
   mode: z.enum(['append', 'replace']).default('append'),
+  /**
+   * Заголовки, как они звучали в загруженном файле, — по одному на
+   * элемент columns, в том же порядке. Только для новых колонок: у уже
+   * существующей заголовок из прошлого импорта не трогаем. Необязательно —
+   * ручная вставка через API без файла заголовков не знает.
+   */
+  labels: z.array(z.string().trim().max(200)).max(30).optional(),
 });
 export type ImportDto = z.infer<typeof importSchema>;
 
