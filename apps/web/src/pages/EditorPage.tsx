@@ -551,12 +551,29 @@ export function EditorPage() {
           {/* Подсказка следующего шага. Человек открывает пустой редактор
               и не знает, с чего начать: сначала бланк, потом текст.
               Исчезает сама, как только шаг сделан, — постоянная подсказка
-              быстро становится мусором на экране. */}
+              быстро становится мусором на экране.
+
+              Материал мог попасть сюда и из «Загрузить протокол
+              соревнований» на «Главном» — та кнопка создаёт документ сразу,
+              без выбора заготовки (библиотека заготовок живёт только на
+              экране библиотеки материалов), и без этой строки человек
+              упирался бы в пустой холст, не понимая, откуда взять готовый
+              макет. Полноценная связка «протокол → заготовка» — задача
+              блока 7 (UI/UX-система); здесь — только выход из тупика. */}
           {!sheet.backgroundFileId && layout.length === 0 && (
             <div className="pointer-events-none absolute inset-x-0 top-6 z-10 flex justify-center">
-              <p className="rounded-full bg-[var(--surface)] px-4 py-2 text-sm text-[var(--text-muted)] shadow-sm ring-1 ring-[var(--line)]">
-                Начните с бланка: «Вставить» → «Бланк». Потом положите на него текст.
-              </p>
+              <div className="pointer-events-auto flex flex-col items-center gap-2 rounded-2xl bg-[var(--surface)] px-5 py-3 text-center shadow-sm ring-1 ring-[var(--line)]">
+                <p className="text-sm text-[var(--text-muted)]">
+                  Выберите заготовку, чтобы оформить документ — текст уже расставлен по листу.
+                  Или начните с бланка: «Вставить» → «Бланк», потом положите на него текст сами.
+                </p>
+                <Link
+                  to="/documents"
+                  className="text-sm font-medium text-[var(--accent)] hover:underline"
+                >
+                  Выбрать заготовку
+                </Link>
+              </div>
             </div>
           )}
           {sheet.backgroundFileId && layout.length === 0 && (
