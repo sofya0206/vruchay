@@ -239,7 +239,7 @@ export class MailService {
    */
   async queueForDocument(orgId: string, documentId: string) {
     const template = await this.getTemplate(orgId, documentId);
-    if (!template) throw new BadRequestException('Сначала настройте шаблон письма');
+    if (!template) throw new BadRequestException('Сначала сохраните письмо');
 
     const refusal = await this.sendingRefusal(orgId, template.senderId);
     if (refusal) throw new BadRequestException(refusal);
