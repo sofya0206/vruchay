@@ -45,7 +45,13 @@ interface Props {
   remembered: Record<string, string>;
   onRemember: (key: string, name: string) => void;
   onCancel: () => void;
-  onConfirm: (columns: string[], rows: string[][], mode: 'append' | 'replace') => void;
+  onConfirm: (
+    columns: string[],
+    rows: string[][],
+    mode: 'append' | 'replace',
+    /** Заголовки колонок из файла — они и станут шапкой таблицы получателей. */
+    titles: string[],
+  ) => void;
 }
 
 const SUGGESTION_TITLE: Record<ImportSuggestion['kind'], (s: ImportSuggestion) => string> = {
@@ -137,7 +143,12 @@ export function ImportDialog({
   const canConfirm = !duplicates.length && !invalid.length && names.every(Boolean);
 
   const canMerge = canMergeFullName(names);
-  const result = applyMerge(names, rows, mergeFullName);
+  const result = applyMerge(
+    names,
+    rows,
+    mergeFullName,
+    sheet.columns.map((c) => c.source),
+  );
   const bound = countBound(result.columns);
 
   return (
@@ -354,7 +365,7 @@ export function ImportDialog({
             <Button
               variant="primary"
               disabled={!canConfirm || importing}
-              onClick={() => onConfirm(result.columns, result.rows, mode)}
+              onClick={() => onConfirm(result.columns, result.rows, mode, result.titles)}
             >
               {importing ? 'Импортируем…' : `Импортировать ${sheet.rows.length}`}
             </Button>

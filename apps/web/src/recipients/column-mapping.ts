@@ -69,36 +69,48 @@ export function applyMerge(
   names: string[],
   rows: string[][],
   merge: boolean,
-): { columns: string[]; rows: string[][] } {
-  if (!merge || !canMergeFullName(names)) return { columns: names, rows };
+  /**
+   * Заголовки колонок файла — те, что человек видел в своей шапке.
+   *
+   * Едут рядом с именами переменных до самого сохранения: в таблице
+   * получателей шапку рисуют ими, а не служебными `birth_year` и `team`.
+   * У склеенного ФИО заголовка нет: он собран из трёх колонок файла,
+   * и любой из трёх был бы неправдой.
+   */
+  sources: string[] = [],
+): { columns: string[]; rows: string[][]; titles: string[] } {
+  if (!merge || !canMergeFullName(names)) {
+    return { columns: names, rows, titles: names.map((_, i) => sources[i] ?? '') };
+  }
 
   const parts = FULL_NAME_PARTS.map((p) => names.indexOf(p)).filter((i) => i >= 0);
   const anchor = Math.min(...parts);
 
   const columns: string[] = [];
   // Для каждой итоговой колонки — из каких исходных она собрана.
-  const sources: number[][] = [];
+  const builtFrom: number[][] = [];
   names.forEach((name, i) => {
     if (i === anchor) {
       columns.push('name');
-      sources.push(parts);
+      builtFrom.push(parts);
       return;
     }
     if (parts.includes(i)) return;
     columns.push(name);
-    sources.push([i]);
+    builtFrom.push([i]);
   });
 
   return {
     columns,
     rows: rows.map((row) =>
-      sources.map((from) =>
+      builtFrom.map((from) =>
         from
           .map((i) => (row[i] ?? '').trim())
           .filter(Boolean)
           .join(' '),
       ),
     ),
+    titles: builtFrom.map((from) => (from.length === 1 ? (sources[from[0]] ?? '') : '')),
   };
 }
 

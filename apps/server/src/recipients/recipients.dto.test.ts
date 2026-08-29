@@ -50,6 +50,31 @@ describe('importSchema', () => {
   it('имя колонки только латиницей — оно же имя переменной в макете', () => {
     expect(importSchema.safeParse({ columns: ['ФИО'], rows: [['Иванов']] }).success).toBe(false);
   });
+
+  it('заголовков должно быть столько же, сколько колонок', () => {
+    /*
+     * Разъехавшиеся массивы подписали бы колонки чужими заголовками:
+     * «Команда» над годом рождения хуже, чем служебное `birth_year`, —
+     * первое человек примет за правду.
+     */
+    const ok = importSchema.safeParse({
+      columns: ['name', 'team'],
+      titles: ['ФИО', 'Команда'],
+      rows: [['Иванов', 'Луч']],
+    });
+    expect(ok.success).toBe(true);
+
+    const short = importSchema.safeParse({
+      columns: ['name', 'team'],
+      titles: ['ФИО'],
+      rows: [['Иванов', 'Луч']],
+    });
+    expect(short.success).toBe(false);
+  });
+
+  it('без заголовков импорт принимается: вставка из буфера шапки не шлёт', () => {
+    expect(importSchema.safeParse({ columns: ['name'], rows: [['Иванов']] }).success).toBe(true);
+  });
 });
 
 describe('MAX_IMPORT_BODY_BYTES', () => {
