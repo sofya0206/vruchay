@@ -102,6 +102,14 @@ function PresetCard({
               data={PRESET_SAMPLE}
             />
           </SheetThumbnail>
+          {/* Маркер «это заготовка, а не готовый диплом» — самое лёгкое,
+              что можно было сделать, не трогая сами макеты заготовок:
+              одна плашка поверх превью, безо всякой новой системы
+              обозначений. Насколько она заметна и где именно стоит —
+              решать дизайну при блоке 7; это временный, но честный фикс. */}
+          <span className="pointer-events-none absolute top-2 left-2 rounded-md bg-[var(--surface)]/90 px-1.5 py-0.5 text-[11px] font-medium tracking-wide text-[var(--text-muted)] uppercase shadow-sm ring-1 ring-[var(--line)]">
+            Образец
+          </span>
           {busy && (
             <span className="absolute inset-0 grid place-items-center bg-[var(--surface)]/70 text-sm">
               Создаём…
