@@ -44,10 +44,21 @@ describe('остаток документов: состояния и выход 
       { left: 0, warn: 'exhausted' as const, source: 'trial' as const },
       { warn: 'low' as const, left: 100 },
       { warn: 'critical' as const, left: 50 },
-    ]) expect(show(u)).toContain('href="/#obsudit"');
+    ]) expect(show(u)).toContain('href="/obsudit"');
   });
 
   it('пока запас велик — ссылки нет', () => {
-    expect(show({})).not.toContain('/#obsudit');
+    expect(show({})).not.toContain('/obsudit');
+  });
+
+  /*
+   * Отдельная страница, а не якорь главной.
+   *
+   * Прежний адрес `/#obsudit` вёл вошедшего человека на его же «Обзор»:
+   * по `/` у него стоит дашборд, а не рассказ о сервисе. Проверка здесь
+   * закрепляет именно это — что ссылка не вернулась к якорю.
+   */
+  it('адрес формы не якорь на главной', () => {
+    expect(show({ left: 0, warn: 'exhausted' })).not.toContain('/#obsudit');
   });
 });
