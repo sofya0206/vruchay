@@ -124,20 +124,32 @@ export function TriplePreview({
         ))}
       </div>
 
-      {tab === 'document' && (
-        <DocumentPreview doc={doc.data} data={values} position={index + 1} orgName={orgName} />
-      )}
+      {/*
+        Высота у трёх вкладок разная — лист, короткое письмо и карточка
+        проверки, — а окно росло и сжималось под каждую: кнопки внизу
+        прыгали, и человек нажимал не туда. Держим общий нижний предел
+        по самой высокой из трёх; содержимое выше него окно, как и прежде,
+        прокручивает само.
 
-      {tab === 'letter' && (
-        <LetterPreview
-          subject={fillVariables(subject, values)}
-          body={fillVariables(body, values)}
-          kind={kind}
-          advertiserName={advertiserName}
-        />
-      )}
+        Величина взята на глаз и остаётся предметом разговора при работе
+        над UI-китом (блок 7) — здесь важно, что окно перестало прыгать.
+      */}
+      <div className="min-h-[60vh]">
+        {tab === 'document' && (
+          <DocumentPreview doc={doc.data} data={values} position={index + 1} orgName={orgName} />
+        )}
 
-      {tab === 'verify' && <VerifyPreview doc={doc.data} data={values} />}
+        {tab === 'letter' && (
+          <LetterPreview
+            subject={fillVariables(subject, values)}
+            body={fillVariables(body, values)}
+            kind={kind}
+            advertiserName={advertiserName}
+          />
+        )}
+
+        {tab === 'verify' && <VerifyPreview doc={doc.data} data={values} />}
+      </div>
     </Dialog>
   );
 }
