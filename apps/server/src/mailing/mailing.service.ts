@@ -339,26 +339,27 @@ export class MailingService {
       retry.push(email);
     }
 
-    const created = await this.prisma.$transaction(
-      retry.map((email) =>
-        this.prisma.email.create({
-          data: {
-            orgId,
-            documentId: email.documentId,
-            rowId: email.rowId,
-            templateId: email.templateId,
-            fileId: email.fileId,
-            // Поток берём у прошлой попытки: переотправка не меняет того,
-            // чем письмо было.
-            kind: email.kind,
-            toEmail: email.toEmail,
-            subject: email.subject,
-            provider: email.provider,
-          },
-          select: { id: true },
-        }),
-      ),
-    );
+    // Тот же пропуск дублей, что и в createEmails: два нажатия «Повторить»
+    // подряд не должны ни удвоить письмо, ни уронить весь повтор.
+    // Прошлой попытке новая не мешает: она лежит в bounced или failed,
+    // а индекс считает только живые состояния.
+    const created = await this.prisma.email.createManyAndReturn({
+      data: retry.map((email) => ({
+        orgId,
+        documentId: email.documentId,
+        rowId: email.rowId,
+        templateId: email.templateId,
+        fileId: email.fileId,
+        // Поток берём у прошлой попытки: переотправка не меняет того,
+        // чем письмо было.
+        kind: email.kind,
+        toEmail: email.toEmail,
+        subject: email.subject,
+        provider: email.provider,
+      })),
+      skipDuplicates: true,
+      select: { id: true },
+    });
 
     await Promise.all(created.map((e) => this.processor.enqueue(e.id)));
 
@@ -589,24 +590,30 @@ export class MailingService {
     template: { id: string; kind: EmailKind; subject: string },
     plan: Plan,
   ): Promise<string[]> {
-    const created = await this.prisma.$transaction(
-      plan.letters.map((letter) =>
-        this.prisma.email.create({
-          data: {
-            orgId,
-            documentId,
-            rowId: letter.rowId,
-            templateId: template.id,
-            fileId: letter.fileId,
-            kind: template.kind,
-            toEmail: letter.email,
-            subject: renderSubject(template.subject, letter.data),
-            provider: 'smtp',
-          },
-          select: { id: true },
-        }),
-      ),
-    );
+    // Одной вставкой с пропуском дублей, а не транзакцией из отдельных
+    // создании. Уникальный индекс emails_document_to_kind_live закрывает
+    // окно между чтением журнала и записью — то самое, в которое попадает
+    // человек, нажавший «Отправить» дважды. Транзакция из create в этом
+    // окне откатилась бы целиком: из-за одного повторного адреса не ушло
+    // бы ни одного письма, включая те, что были в списке впервые.
+    // skipDuplicates — это ON CONFLICT DO NOTHING: повтор молча выпадает,
+    // остальные уходят, а вернувшийся список и есть честный счёт
+    // поставленного в очередь.
+    const created = await this.prisma.email.createManyAndReturn({
+      data: plan.letters.map((letter) => ({
+        orgId,
+        documentId,
+        rowId: letter.rowId,
+        templateId: template.id,
+        fileId: letter.fileId,
+        kind: template.kind,
+        toEmail: letter.email,
+        subject: renderSubject(template.subject, letter.data),
+        provider: 'smtp',
+      })),
+      skipDuplicates: true,
+      select: { id: true },
+    });
     return created.map((e) => e.id);
   }
 }
