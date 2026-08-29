@@ -59,6 +59,10 @@ export class DocumentsService {
           updatedAt: true,
           createdAt: true,
           category: true,
+          // Мероприятие и число строк — чтобы одинаковые по названию
+          // материалы (несколько «Грамот за место» за сезон) можно было
+          // различить в списках, не открывая каждый по отдельности.
+          eventName: true,
           // Исходный бланк — чтобы в карточке было видно, с чего снята копия.
           // Название берём связью, а не вторым запросом на каждую карточку.
           sourceDocument: { select: { id: true, title: true, deletedAt: true } },
@@ -73,7 +77,7 @@ export class DocumentsService {
             take: 1,
             select: { layout: true, backgroundFileId: true },
           },
-          _count: { select: { sheets: true } },
+          _count: { select: { sheets: true, rows: true } },
         },
       }),
       this.prisma.document.count({ where }),
@@ -88,6 +92,7 @@ export class DocumentsService {
         return {
           ...doc,
           sheetCount: _count.sheets,
+          recipientCount: _count.rows,
           // Исходник в корзине показывать ссылкой нельзя: открыть его
           // всё равно не выйдет, а связь остаётся верной — отдаём без него.
           source:

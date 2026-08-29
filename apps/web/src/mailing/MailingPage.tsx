@@ -128,13 +128,24 @@ export function MailingPage() {
               <ul className="space-y-1">
                 {items.map((doc) => (
                   <li key={doc.id}>
-                    <label className="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-[var(--surface-sunken)]">
+                    <label className="flex items-start gap-3 rounded-xl px-3 py-2 hover:bg-[var(--surface-sunken)]">
                       <input
                         type="checkbox"
                         checked={selected.includes(doc.id)}
                         onChange={() => toggle(doc.id)}
+                        className="mt-1"
                       />
-                      <span>{doc.title}</span>
+                      <span>
+                        <span className="block">{doc.title}</span>
+                        {/* Одинаковые по названию материалы (несколько «Грамот
+                            за место» за сезон) иначе неразличимы в списке —
+                            а рассылка необратима, ошибиться легко. */}
+                        <span className="mt-0.5 block text-sm text-[var(--text-muted)]">
+                          {doc.eventName ? `${doc.eventName} · ` : ''}
+                          создан {new Date(doc.createdAt).toLocaleDateString('ru-RU')} ·
+                          получателей: {doc.recipientCount ?? 0}
+                        </span>
+                      </span>
                     </label>
                   </li>
                 ))}
