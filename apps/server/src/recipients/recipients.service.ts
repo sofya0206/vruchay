@@ -151,10 +151,31 @@ export class RecipientsService {
         const known = new Map(existing.map((c) => [c.name, c]));
         let nextPosition = existing.length;
 
-        for (const name of dto.columns) {
-          if (known.has(name)) continue;
+        for (const [index, name] of dto.columns.entries()) {
+          // Заголовок из файла пустым не пишем: пустая надпись в шапке
+          // хуже имени переменной — по ней колонку не опознать вообще.
+          const title = dto.titles?.[index]?.trim() || null;
+
+          const existingColumn = known.get(name);
+          if (existingColumn) {
+            /*
+             * Колонка уже была, а заголовка у неё нет: она заведена руками
+             * или до появления заголовков. Первый же импорт с шапкой её
+             * подписывает. Готовый заголовок не трогаем — человек мог
+             * перезалить файл с другой шапкой, и менять подпись под ним
+             * значит переименовывать колонку без спроса.
+             */
+            if (title && !existingColumn.title) {
+              known.set(name, await tx.recipientColumn.update({
+                where: { id: existingColumn.id },
+                data: { title },
+              }));
+            }
+            continue;
+          }
+
           const created = await tx.recipientColumn.create({
-            data: { documentId, name, position: nextPosition++ },
+            data: { documentId, name, title, position: nextPosition++ },
           });
           known.set(name, created);
         }

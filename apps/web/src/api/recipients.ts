@@ -5,6 +5,12 @@ export interface RecipientColumn {
   id: string;
   name: string;
   position: number;
+  /**
+   * Заголовок колонки в загруженном файле: «Год рождения», «Команда».
+   * null у колонок, заведённых руками, — там в шапке остаётся имя
+   * переменной, потому что другого названия у них и не было.
+   */
+  title?: string | null;
 }
 
 export interface RecipientRow {
@@ -150,7 +156,13 @@ export function useRecipientMutations(documentId: string) {
         ),
     }),
     importRows: useMutation({
-      mutationFn: (v: { columns: string[]; rows: string[][]; mode: 'append' | 'replace' }) =>
+      mutationFn: (v: {
+        columns: string[];
+        rows: string[][];
+        /** Заголовки колонок файла — шапка таблицы получателей рисуется ими. */
+        titles?: string[];
+        mode: 'append' | 'replace';
+      }) =>
         api.post<{ imported: number }>(`${base}/import`, v),
       onSuccess: refresh,
     }),

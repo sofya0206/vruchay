@@ -42,6 +42,7 @@ const DEFAULTS: Record<LetterKind, { subject: string; body: string }> = {
 export function LetterCard({
   documentId,
   title,
+  subtitle,
   kind,
   audience,
   checking,
@@ -49,6 +50,8 @@ export function LetterCard({
 }: {
   documentId: string;
   title: string;
+  /** Чем этот материал отличается от одноимённых: мероприятие, дата, список. */
+  subtitle?: string;
   kind: LetterKind;
   audience?: Audience;
   checking: boolean;
@@ -129,7 +132,12 @@ export function LetterCard({
   return (
     <section className="rounded-2xl bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]">
       <header className="mb-4 flex flex-wrap items-center gap-3">
-        <h3 className="font-medium">{title}</h3>
+        <h3 className="font-medium">
+          {title}
+          {subtitle && (
+            <span className="block text-sm font-normal text-[var(--text-muted)]">{subtitle}</span>
+          )}
+        </h3>
         {audience && !audience.refusal && (
           <span className="text-sm text-[var(--text-muted)]">
             уйдёт писем: {audience.willSend}

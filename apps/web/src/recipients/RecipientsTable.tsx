@@ -20,6 +20,7 @@ import {
   useSend,
   type HeaderChoice,
   type ParsedSheet,
+  type RecipientColumn,
   type SendResult,
 } from '../api/recipients';
 import { PreviewDialog } from './PreviewDialog';
@@ -543,10 +544,10 @@ export function RecipientsTable({
                     className="group border-b border-[var(--line)] px-3 py-2 text-left text-sm font-medium"
                   >
                     <span className="inline-flex items-center gap-1.5">
-                      {columnTitle(col.name)}
+                      {columnTitle(col)}
                       <button
                         onClick={() => m.deleteColumn.mutate(col.id)}
-                        aria-label={`Удалить колонку ${columnTitle(col.name)}`}
+                        aria-label={`Удалить колонку ${columnTitle(col)}`}
                         className="opacity-0 transition-opacity group-hover:opacity-100 hover:text-[var(--danger)]"
                       >
                         <X size={12} />
@@ -626,9 +627,9 @@ export function RecipientsTable({
           remembered={manualNames}
           onRemember={(key, name) => setManualNames((prev) => ({ ...prev, [key]: name }))}
           onCancel={() => setParsed(null)}
-          onConfirm={(cols, importRows, mode) => {
+          onConfirm={(cols, importRows, mode, titles) => {
             m.importRows.mutate(
-              { columns: cols, rows: importRows, mode },
+              { columns: cols, rows: importRows, titles, mode },
               { onSuccess: () => setParsed(null), onError: (e) => setError((e as Error).message) },
             );
           }}
@@ -675,10 +676,21 @@ export function RecipientsTable({
  * таблицы «%name» — не название столбца, а шифр. Своим колонкам организация
  * даёт имена сама, и их показываем как есть.
  */
-function columnTitle(name: string): string {
+/**
+ * Что писать в шапке колонки.
+ *
+ * Сначала заголовок из загруженного файла: человек составлял таблицу сам
+ * и ищет в шапке свои слова — «Год рождения», «Команда», «№». Служебные
+ * `birth_year` и `team` он видит впервые и опознаёт колонку по значениям.
+ *
+ * Дальше — наши названия для двух колонок, которые заводит сам сервис,
+ * и только потом имя переменной: у колонки, добавленной руками, другого
+ * названия и нет.
+ */
+function columnTitle(column: RecipientColumn): string {
   const known: Record<string, string> = {
     name: 'ФИО',
     email: 'Адрес почты',
   };
-  return known[name] ?? name;
+  return column.title?.trim() || known[column.name] || column.name;
 }

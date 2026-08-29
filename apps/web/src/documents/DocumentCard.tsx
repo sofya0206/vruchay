@@ -238,7 +238,7 @@ function ActionsMenu({
   }, [open]);
 
   const item =
-    'flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-[var(--surface-sunken)]';
+    'flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-[var(--surface-sunken)] [&>svg]:shrink-0';
 
   return (
     <div ref={wrap} className="absolute bottom-3 right-3">
@@ -255,16 +255,23 @@ function ActionsMenu({
       {open && (
         <div
           role="menu"
-          className="absolute bottom-9 right-0 z-10 w-48 overflow-hidden rounded-xl bg-[var(--surface)] py-1 shadow-lg ring-1 ring-[var(--line)]"
+          className="absolute bottom-9 right-0 z-10 w-64 overflow-hidden rounded-xl bg-[var(--surface)] py-1 shadow-lg ring-1 ring-[var(--line)]"
         >
+          {/*
+            Первым пунктом, и глаголом.
+            Ради этого действия меню и открывают чаще всего: бланк у федерации
+            один на сезон, а соревнований за сезон десятки. «Копия под новое
+            мероприятие» стояло вторым и читалось как название чего-то, а не
+            как предложение сделать, — на приёмке его просто не нашли.
+            Название по-прежнему говорит, что именно получится: макет тот же,
+            а список получателей и сведения о мероприятии — чистые.
+            «Сделать копию» обещало бы копию целиком.
+          */}
+          <button type="button" role="menuitem" className={item} onClick={() => { setOpen(false); onDuplicate(); }}>
+            <CalendarPlus size={14} /> Скопировать под новое мероприятие
+          </button>
           <button type="button" role="menuitem" className={item} onClick={() => { setOpen(false); onRename(); }}>
             <Pencil size={14} /> Переименовать
-          </button>
-          {/* Название действия говорит, что именно получится: макет тот же,
-              а список получателей и сведения о мероприятии — чистые.
-              «Сделать копию» обещало бы копию целиком. */}
-          <button type="button" role="menuitem" className={item} onClick={() => { setOpen(false); onDuplicate(); }}>
-            <CalendarPlus size={14} /> Копия под новое мероприятие
           </button>
           <button
             type="button"

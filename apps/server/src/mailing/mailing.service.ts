@@ -123,14 +123,22 @@ export class MailingService {
       include: { sender: true },
     });
 
+    /*
+     * Считаем по сохранённому письму, а не по тому, что набрано в форме:
+     * расчёт обязан идти тем же кодом, что и отправка, иначе он покажет
+     * одно, а уйдёт другое. Но и говорить об этом надо точно — прежнее
+     * «Сначала настройте письмо» звучало над заполненной формой как
+     * поломка: человек видел свой текст на экране и не понимал, чего ещё
+     * от него хотят. Ему не хватало одного нажатия «Сохранить письмо».
+     */
     if (!template) {
       return {
         documentId,
         title: doc.title,
         refusal:
           request.kind === 'marketing'
-            ? 'Рекламное письмо для этого материала не настроено'
-            : 'Сначала настройте письмо',
+            ? 'Рекламное письмо для этого материала не сохранено — нажмите «Сохранить письмо»'
+            : 'Сначала сохраните письмо: считаем по сохранённому тексту, а не по набранному',
         willSend: 0,
         letters: [],
         skipped: [],
@@ -241,7 +249,7 @@ export class MailingService {
     const template = await this.prisma.emailTemplate.findFirst({
       where: { orgId, documentId, kind },
     });
-    if (!template) throw new BadRequestException('Сначала настройте письмо');
+    if (!template) throw new BadRequestException('Сначала сохраните письмо');
 
     const sample = await this.prisma.recipientRow.findFirst({
       where: { documentId },
