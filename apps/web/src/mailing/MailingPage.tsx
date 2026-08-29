@@ -9,6 +9,7 @@ import { Loading } from '../ui/Loading';
 import { LetterCard } from './LetterCard';
 import { MailingLogTable } from './MailingLogTable';
 import { Dialog } from './Dialog';
+import { documentLine } from './document-line';
 import {
   useAudience,
   useSendMailing,
@@ -128,13 +129,22 @@ export function MailingPage() {
               <ul className="space-y-1">
                 {items.map((doc) => (
                   <li key={doc.id}>
-                    <label className="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-[var(--surface-sunken)]">
+                    {/* Не одно название: одноимённых материалов в библиотеке
+                        бывает три подряд, а разослать не тому списку нельзя —
+                        письмо не отзывается. */}
+                    <label className="flex items-start gap-3 rounded-xl px-3 py-2 hover:bg-[var(--surface-sunken)]">
                       <input
                         type="checkbox"
                         checked={selected.includes(doc.id)}
                         onChange={() => toggle(doc.id)}
+                        className="mt-1"
                       />
-                      <span>{doc.title}</span>
+                      <span>
+                        <span className="block">{doc.title}</span>
+                        <span className="mt-0.5 block text-sm text-[var(--text-muted)]">
+                          {documentLine(doc)}
+                        </span>
+                      </span>
                     </label>
                   </li>
                 ))}
@@ -168,6 +178,7 @@ export function MailingPage() {
                     key={`${doc.id}-${kind}`}
                     documentId={doc.id}
                     title={doc.title}
+                    subtitle={documentLine(doc)}
                     kind={kind}
                     audience={audiences[doc.id]}
                     checking={checking === doc.id}
@@ -212,9 +223,19 @@ export function MailingPage() {
           }
         >
           <p className="text-sm">
-            Материалов: {chosen.length}. Поток:{' '}
-            {kind === 'marketing' ? 'реклама' : 'выдача документа'}.
+            Поток: {kind === 'marketing' ? 'реклама' : 'выдача документа'}. Материалов:{' '}
+            {chosen.length}.
           </p>
+          {/* Поимённо, а не числом: последняя возможность заметить, что
+              отмечен не тот из одноимённых материалов. */}
+          <ul className="mt-2 space-y-1 text-sm">
+            {chosen.map((doc) => (
+              <li key={doc.id}>
+                {doc.title}
+                <span className="block text-xs text-[var(--text-muted)]">{documentLine(doc)}</span>
+              </li>
+            ))}
+          </ul>
           {/* Отправленное письмо не отзывается — предупреждаем до нажатия,
               а не после. */}
           <p className="mt-3 text-sm text-[var(--text-muted)]">

@@ -59,6 +59,14 @@ export class DocumentsService {
           updatedAt: true,
           createdAt: true,
           category: true,
+          /*
+           * Мероприятие и число получателей — чтобы одинаково названные
+           * материалы различались в списке. В рассылке три строки «Грамота
+           * за место» без мероприятия и числа строк выбираются наугад,
+           * а отправка писем необратима.
+           */
+          eventName: true,
+          eventDate: true,
           // Исходный бланк — чтобы в карточке было видно, с чего снята копия.
           // Название берём связью, а не вторым запросом на каждую карточку.
           sourceDocument: { select: { id: true, title: true, deletedAt: true } },
@@ -73,7 +81,7 @@ export class DocumentsService {
             take: 1,
             select: { layout: true, backgroundFileId: true },
           },
-          _count: { select: { sheets: true } },
+          _count: { select: { sheets: true, rows: true } },
         },
       }),
       this.prisma.document.count({ where }),
@@ -88,6 +96,7 @@ export class DocumentsService {
         return {
           ...doc,
           sheetCount: _count.sheets,
+          recipientCount: _count.rows,
           // Исходник в корзине показывать ссылкой нельзя: открыть его
           // всё равно не выйдет, а связь остаётся верной — отдаём без него.
           source:
