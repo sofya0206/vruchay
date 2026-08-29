@@ -13,6 +13,7 @@ import { Button } from '../ui/Button';
 import { Reviews } from '../landing/Reviews';
 import { Faq } from '../landing/Faq';
 import { Pricing } from '../landing/Pricing';
+import { DiscussTerms } from '../landing/DiscussTerms';
 import { ForBusiness } from '../landing/ForBusiness';
 import { Certificate } from '../landing/Certificate';
 import { Scope } from '../landing/Scope';
@@ -70,6 +71,7 @@ export function LandingPage() {
       <Reviews />
       <Legal />
       <Pricing />
+      <DiscussTerms />
       <Faq />
       <FinalCta />
       <Footer />
@@ -90,7 +92,7 @@ function Header() {
             Как это работает
           </a>
           <a href="#ceny" className="hidden rounded-lg px-3 py-1.5 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)] sm:inline">
-            Цены
+            Условия
           </a>
           <Link to="/login">
             <Button size="sm" variant="primary">
@@ -138,18 +140,25 @@ function Hero() {
           </p>
 
           {/* Два пути названы сразу: иначе организатор одного турнира решит,
-              что сервис только для организаций с договорами, и уйдёт. */}
+              что сервис только для организаций с договорами, и уйдёт. Цен
+              здесь нет — они обсуждаются, — но бесплатный вход есть, и он
+              не требует ни разговора, ни карты. */}
           <dl className="mt-8 grid gap-4 border-t border-[var(--line)] pt-6 sm:grid-cols-2">
-            <div>
-              <dt className="text-sm font-medium">Организациям</dt>
-              <dd className="mt-1 text-sm text-[var(--text-muted)]">
-                Подписка на год, счёт и договор. Федерации, школы, вузы, клубы.
-              </dd>
-            </div>
             <div>
               <dt className="text-sm font-medium">Одному мероприятию</dt>
               <dd className="mt-1 text-sm text-[var(--text-muted)]">
-                3 ₽ за документ, оплата картой. Без договоров и переговоров.
+                Первые 50 документов бесплатно. Без карты и без разговоров:
+                завели кабинет — и работаете.
+              </dd>
+            </div>
+            <div>
+              <dt className="text-sm font-medium">Организациям</dt>
+              <dd className="mt-1 text-sm text-[var(--text-muted)]">
+                Условия по вашему объёму, счёт и договор.{' '}
+                <a href="#obsudit" className="underline underline-offset-2">
+                  Обсудим за пятнадцать минут
+                </a>
+                .
               </dd>
             </div>
           </dl>

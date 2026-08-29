@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { CalendarDays, FileCheck2, Gift, Mail } from 'lucide-react';
 import type { Overview } from '../api/overview';
+import { DiscussTermsLink } from '../billing/DiscussTermsLink';
 import { plural } from './format';
 
 /**
@@ -45,17 +46,26 @@ export function Metrics({ data }: { data: Overview }) {
           unlimited ? (
             'Без ограничения по документам'
           ) : usage.expired ? (
-            'Срок плана закончился · выданные документы остаются действительными'
+            <>
+              Срок плана закончился · выданные документы остаются действительными ·{' '}
+              <DiscussTermsLink>обсудим продление</DiscussTermsLink>
+            </>
           ) : (
             <>
               из {usage.limit}
               {usage.source !== 'trial' && <> · {usage.planName}</>}
               {usage.bonus > 0 && <> · +{usage.bonus} за приглашённых</>}
               {/*
-                * Без ссылки на страницу тарифов: публичных цен больше нет,
+                * Ссылки на страницу тарифов нет: публичных цен больше нет,
                 * а вести человека на заглушку хуже, чем сказать словами.
+                * Ведём на форму «Обсудить условия» — единственный путь дальше.
                 */}
-              {(low || soon) && <> · напишите нам, добавим документов</>}
+              {(low || soon) && (
+                <>
+                  {' · '}
+                  <DiscussTermsLink>напишите нам, добавим документов</DiscussTermsLink>
+                </>
+              )}
             </>
           )
         }

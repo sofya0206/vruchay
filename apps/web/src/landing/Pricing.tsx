@@ -1,228 +1,87 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { CheckCircle2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Button } from '../ui/Button';
+import { PLANS, planPrice, planGridClass } from './plans';
 
 /**
- * Цены.
+ * Условия.
  *
- * Обычный блок из трёх карточек сюда не годится: у нас не три ступени одного
- * тарифа, а две разные модели для двух разных покупателей. Федерация планирует
- * бюджет на год и покупает по счёту после разговора с юротделом; организатор
- * одного турнира платит картой за штуку и решение принимает сам.
+ * Ценника здесь нет намеренно. У наших покупателей объём и состав работ
+ * слишком разные, чтобы три колонки с цифрами сказали правду: одна и та же
+ * федерация выдаёт пять тысяч документов в спокойный год и вдвое больше
+ * в год чемпионата. Цифра на странице в таком разговоре не помогает,
+ * а мешает — её приходится сначала объяснять, а потом от неё отступать.
  *
- * Отсюда и разные целевые действия: у подписки — «запросить счёт», у оплаты
- * по факту — «начать бесплатно». Кнопка «Начать» на годовом тарифе за 149 000 ₽
- * не соответствует тому, как такие покупки происходят на самом деле.
+ * Зато бесплатная проба названа громко и стоит рядом: это единственное,
+ * что человек может сделать не разговаривая с нами. Пятьдесят документов
+ * без водяных знаков — настоящее награждение, а не демонстрация.
  *
- * По умолчанию открыта подписка: федерации — основной покупатель.
+ * Цена возвращается данными: появится `priceRub` в plans.ts — здесь
+ * появится число, и переписывать страницу не придётся.
  */
-
-const SUBSCRIPTION = [
-  {
-    name: 'Старт',
-    price: '29 000 ₽',
-    volume: 'до 5 000 документов в год',
-    perDoc: '5,80 ₽ за документ',
-    features: [
-      'Редактор макетов и списки',
-      'Импорт из Excel и CSV',
-      'Рассылка с нашего домена',
-      'Один пользователь',
-    ],
-  },
-  {
-    name: 'Про',
-    price: '69 000 ₽',
-    volume: 'до 20 000 документов в год',
-    perDoc: '3,45 ₽ за документ',
-    features: [
-      'Всё из «Старта»',
-      'Отправка с вашего домена',
-      'Форма на сайте и Тильда',
-      'До пяти пользователей',
-      'Доступ по API',
-    ],
-    highlight: true,
-  },
-  {
-    name: 'Максимум',
-    price: '149 000 ₽',
-    volume: 'до 60 000 документов в год',
-    perDoc: '2,48 ₽ за документ',
-    features: [
-      'Всё из «Про»',
-      'Импорт протоколов соревнований',
-      'Правила награждения по местам',
-      'Пользователи без ограничений',
-      'Приоритетная поддержка',
-    ],
-  },
-];
-
-type Mode = 'subscription' | 'payg';
-
 export function Pricing() {
-  const [mode, setMode] = useState<Mode>('subscription');
-
   return (
     <section id="ceny" className="mx-auto max-w-5xl scroll-mt-16 px-6 py-16">
-      <h2 className="font-serif text-3xl">Цены</h2>
+      <h2 className="font-serif text-3xl">Условия</h2>
       <p className="mt-2 max-w-xl text-[var(--text-muted)]">
-        Организациям выгоднее годовая подписка, разовому мероприятию — оплата
-        за выданные документы.
+        Считаем по вашему календарю награждений: сколько документов, в какие
+        месяцы и что должно работать. Разговор занимает минут пятнадцать.
       </p>
 
-      <Switcher mode={mode} onChange={setMode} />
-
-      {mode === 'subscription' ? <Subscription /> : <PayAsYouGo />}
-    </section>
-  );
-}
-
-function Switcher({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => void }) {
-  const options: { value: Mode; label: string }[] = [
-    { value: 'subscription', label: 'Организациям' },
-    { value: 'payg', label: 'Разовому мероприятию' },
-  ];
-
-  return (
-    <div
-      role="tablist"
-      aria-label="Модель оплаты"
-      className="mt-8 inline-flex rounded-xl bg-[var(--surface-sunken)] p-1"
-    >
-      {options.map((o) => (
-        <button
-          key={o.value}
-          role="tab"
-          aria-selected={mode === o.value}
-          onClick={() => onChange(o.value)}
-          // Переход только по цвету: сдвиг подложки под курсором читался бы
-          // как промах мимо кнопки.
-          className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors duration-200 ${
-            mode === o.value
-              ? 'bg-[var(--surface)] text-[var(--text)] shadow-[0_1px_3px_rgba(20,32,26,0.12)]'
-              : 'text-[var(--text-muted)] hover:text-[var(--text)]'
-          }`}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function Subscription() {
-  return (
-    <>
-      <div className="mt-8 grid gap-5 lg:grid-cols-3">
-        {SUBSCRIPTION.map((t) => (
-          <div
-            key={t.name}
-            className={`flex flex-col rounded-xl bg-[var(--surface)] p-6 transition-shadow duration-200 hover:shadow-[0_12px_32px_-16px_rgba(20,32,26,0.3)] ${
-              t.highlight ? 'ring-2 ring-[var(--accent)]' : 'ring-1 ring-[var(--line)]'
-            }`}
-          >
-            <div className="flex items-baseline gap-2">
-              <h3 className="font-serif text-xl">{t.name}</h3>
-              {t.highlight && (
-                <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--accent)]">
-                  чаще всего берут
-                </span>
-              )}
-            </div>
-            <p className="mt-4 text-2xl">
-              {t.price} <span className="text-sm text-[var(--text-muted)]">в год</span>
-            </p>
-            <p className="mt-1 text-sm text-[var(--text-muted)]">
-              {t.volume} · {t.perDoc}
-            </p>
-            <ul className="mt-5 flex-1 space-y-2 text-sm">
-              {t.features.map((f) => (
-                <li key={f} className="flex gap-2">
-                  <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-[var(--accent)]" />
-                  {f}
-                </li>
-              ))}
-            </ul>
-            <a href="#federatsiyam" className="mt-6">
-              <Button variant={t.highlight ? 'primary' : 'secondary'} className="w-full">
-                Запросить счёт
-              </Button>
-            </a>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-5 flex flex-wrap items-center gap-4 rounded-xl bg-[var(--surface-sunken)] p-6">
-        <div className="min-w-64 flex-1">
-          <h3 className="font-medium">Больше 60 000 документов в год</h3>
-          <p className="mt-1.5 text-sm leading-relaxed text-[var(--text-muted)]">
-            Условия индивидуальные: уровень доступности в договоре, выделенное
-            хранилище, обучение сотрудников.
-          </p>
-        </div>
-        <a href="#federatsiyam">
-          <Button variant="secondary">Обсудить</Button>
-        </a>
-      </div>
-
-      <p className="mt-4 text-sm text-[var(--text-muted)]">
-        Превышение лимита — 3 ₽ за документ, без блокировки сервиса. Останавливать
-        выдачу в разгар награждения мы считаем недопустимым.
-      </p>
-    </>
-  );
-}
-
-function PayAsYouGo() {
-  return (
-    <div className="mt-8 grid gap-5 lg:grid-cols-[1.2fr_1fr]">
-      <div className="rounded-xl bg-[var(--surface)] p-6 ring-1 ring-[var(--line)]">
-        <h3 className="font-serif text-xl">Оплата за документ</h3>
-        <p className="mt-4 text-2xl">
-          3 ₽ <span className="text-sm text-[var(--text-muted)]">за выданный документ</span>
-        </p>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Создание файла, письмо участнику и страница проверки подлинности.
-        </p>
-
-        <div className="mt-5 space-y-2 text-sm">
-          {[
-            ['Пакет 1 000 документов', '2 500 ₽', '2,50 ₽ за штуку'],
-            ['Пакет 5 000 документов', '11 000 ₽', '2,20 ₽ за штуку'],
-          ].map(([name, price, per]) => (
+      <div className={`mt-8 grid gap-5 ${planGridClass()}`}>
+        {PLANS.map((plan) => {
+          const price = planPrice(plan);
+          return (
             <div
-              key={name}
-              className="flex flex-wrap items-baseline gap-x-3 rounded-lg bg-[var(--surface-sunken)] px-4 py-3"
+              key={plan.id}
+              className={`flex flex-col rounded-xl bg-[var(--surface)] p-6 transition-shadow duration-200 hover:shadow-[0_12px_32px_-16px_rgba(20,32,26,0.3)] ${
+                plan.highlight ? 'ring-2 ring-[var(--accent)]' : 'ring-1 ring-[var(--line)]'
+              }`}
             >
-              <span className="font-medium">{name}</span>
-              <span>{price}</span>
-              <span className="text-[var(--text-muted)]">{per}</span>
+              <h3 className="font-serif text-xl">{plan.name}</h3>
+              <p className="mt-4 text-2xl">
+                {price.value}
+                {price.period && (
+                  <span className="ml-2 text-sm text-[var(--text-muted)]">{price.period}</span>
+                )}
+              </p>
+              <p className="mt-1 text-sm text-[var(--text-muted)]">{plan.volume}</p>
+
+              <ul className="mt-5 grid flex-1 gap-2 text-sm sm:grid-cols-2">
+                {plan.features.map((f) => (
+                  <li key={f} className="flex gap-2">
+                    <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-[var(--accent)]" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+
+              <a href="#obsudit" className="mt-6">
+                <Button variant="primary" className="w-full">
+                  Обсудить условия
+                </Button>
+              </a>
             </div>
-          ))}
-        </div>
-        <p className="mt-3 text-sm text-[var(--text-muted)]">
-          Пакеты без срока действия: остаток не сгорает. Договор и счёт
-          не нужны — оплата картой, чек приходит на почту.
-        </p>
+          );
+        })}
       </div>
 
-      <div className="flex flex-col justify-between rounded-xl bg-[var(--accent-soft)] p-6">
-        <div>
-          <h3 className="font-serif text-xl text-[var(--accent)]">Первые 50 — бесплатно</h3>
-          <p className="mt-3 text-sm leading-relaxed">
-            Без водяных знаков и без карты. Пятидесяти документов хватает, чтобы
-            провести настоящее награждение и понять, подходит ли сервис.
+      <div className="mt-5 flex flex-wrap items-center gap-x-8 gap-y-4 rounded-xl bg-[var(--accent-soft)] p-6">
+        <div className="min-w-64 flex-1">
+          <h3 className="font-serif text-xl text-[var(--accent)]">
+            Первые 50 документов — бесплатно
+          </h3>
+          <p className="mt-2 text-sm leading-relaxed">
+            Без водяных знаков, без карты и без разговора с нами. Пятидесяти
+            документов хватает, чтобы провести настоящее награждение и понять,
+            подходит ли сервис. Начать можно прямо сейчас, условия обсудим,
+            когда станет понятно, что и в каком объёме вы выдаёте.
           </p>
         </div>
-        <Link to="/register" className="mt-6">
-          <Button variant="primary" className="w-full">
-            Начать бесплатно
-          </Button>
+        <Link to="/register">
+          <Button variant="primary">Начать бесплатно</Button>
         </Link>
       </div>
-    </div>
+    </section>
   );
 }

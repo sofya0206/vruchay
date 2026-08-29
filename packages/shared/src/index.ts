@@ -10,3 +10,4 @@ export * from './awards';
 export * from './validation/problems';
 export * from './validation/awarding-rules';
 export * from './plans';
+export * from './lead-request';
