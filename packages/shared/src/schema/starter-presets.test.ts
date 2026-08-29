@@ -8,6 +8,7 @@ import {
   findStarterPreset,
   isDocumentCategory,
   STARTER_PRESETS,
+  PRESET_SAMPLE,
 } from './starter-presets';
 import { SYSTEM_VARIABLE_NAMES } from '../variables';
 import { resolvePairedForms } from '../paired-forms';
@@ -139,6 +140,48 @@ describe('заготовки', () => {
   it('разделы и заготовки не дублируются по идентификатору', () => {
     expect(new Set(DOCUMENT_CATEGORIES.map((c) => c.id)).size).toBe(DOCUMENT_CATEGORIES.length);
     expect(new Set(STARTER_PRESETS.map((p) => p.id)).size).toBe(STARTER_PRESETS.length);
+  });
+
+  /*
+   * Падеж имени. Заготовки печатали «Награждается Иванов» — именительный
+   * после слова, которое требует дательного. На наградном документе это
+   * не мелочь: его вешают на стену.
+   *
+   * Проверяем по самому листу, а не по описанию заготовки: между ними
+   * стоит `buildStarterLayout`, и ошибиться можно в нём.
+   */
+  it('после «Награждается» и «Объявляется» имя стоит в дательном', () => {
+    for (const preset of STARTER_PRESETS) {
+      const labels = preset.rows.filter((r) => r.role === 'label').map((r) => r.text);
+      if (!labels.some((t) => /^(Награждается|Объявляется)/.test(t))) continue;
+      const names = preset.rows.filter((r) => r.role === 'name').map((r) => r.text);
+      expect(names, preset.id).toEqual(['%name_dat']);
+    }
+  });
+
+  it('после «подтверждает, что» имя остаётся в именительном', () => {
+    // «подтверждает, что Иванову прошла» — тоже ошибка, только обратная.
+    for (const preset of STARTER_PRESETS) {
+      const labels = preset.rows.filter((r) => r.role === 'label').map((r) => r.text);
+      if (!labels.some((t) => /подтверждает, что$/.test(t))) continue;
+      const names = preset.rows.filter((r) => r.role === 'name').map((r) => r.text);
+      expect(names, preset.id).toEqual(['%name']);
+    }
+  });
+
+  /*
+   * Витрина отдаёт образец прямо в отрисовку, минуя `mergeVariables`:
+   * производные переменные она не вычисляет. Переменной без готового
+   * значения хватит, чтобы на плашке заготовки осталась пустота вместо
+   * имени, — а витрину и смотрят ради того, как заготовка выглядит.
+   */
+  it('на всё, что стоит в заготовке, у образца витрины есть значение', () => {
+    for (const preset of STARTER_PRESETS) {
+      const layout = buildStarterLayout(preset, { pageWidthMm: 297, pageHeightMm: 210 });
+      for (const name of extractVariables(layout)) {
+        expect(PRESET_SAMPLE[name], `${preset.id}: %${name}`).toBeTruthy();
+      }
+    }
   });
 
   it('несуществующая заготовка не находится', () => {

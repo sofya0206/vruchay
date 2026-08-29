@@ -130,11 +130,30 @@ interface Row {
   bold?: boolean;
 }
 
+/**
+ * Падеж имени выбирает фраза, в которую оно встроено, а не привычка.
+ *
+ * «Награждается» и «Объявляется» требуют дательного: «Награждается
+ * Иванову». Именительный после них — не стилистическая мелочь, а
+ * грамматическая ошибка, и напечатана она будет на наградном документе,
+ * который человек повесит на стену.
+ *
+ * Там, где имя стоит в придаточном — «подтверждает, что Иванов прошёл», —
+ * верен именительный, и трогать его нельзя: `course`, `attendee`,
+ * `graduate` остаются с `%name`.
+ *
+ * Благодарственное письмо (`letter`) слова перед именем не имеет вовсе.
+ * Взят дательный: письмо адресуется — «Иванову Петру Ильичу», — как
+ * в любой деловой переписке.
+ *
+ * `%name_dat` считается сам из колонки «ФИО» (см. `variables.ts`),
+ * заводить для него колонку не нужно.
+ */
 const ROWS: Record<PresetKind, Row[]> = {
   award: [
     { role: 'title', parts: ['Грамота'] },
     { role: 'label', parts: ['Награждается'] },
-    { role: 'name', parts: ['%name'] },
+    { role: 'name', parts: ['%name_dat'] },
     { role: 'meta', parts: ['%team', '%city'] },
     { role: 'main', parts: ['за %place_word место'] },
     { role: 'main', parts: ['%event'], bold: true },
@@ -142,7 +161,7 @@ const ROWS: Record<PresetKind, Row[]> = {
   participant: [
     { role: 'title', parts: ['Диплом'] },
     { role: 'label', parts: ['Награждается'] },
-    { role: 'name', parts: ['%name'] },
+    { role: 'name', parts: ['%name_dat'] },
     { role: 'meta', parts: ['%team', '%city'] },
     { role: 'main', parts: ['за участие в соревновании'] },
     { role: 'main', parts: ['%event'], bold: true },
@@ -159,7 +178,7 @@ const ROWS: Record<PresetKind, Row[]> = {
   winner: [
     { role: 'title', parts: ['Диплом'] },
     { role: 'label', parts: ['Награждается'] },
-    { role: 'name', parts: ['%name'] },
+    { role: 'name', parts: ['%name_dat'] },
     { role: 'meta', parts: ['%team', '%city'] },
     { role: 'main', parts: ['%(победитель|победительница)'] },
     { role: 'main', parts: ['%event'], bold: true },
@@ -176,14 +195,14 @@ const ROWS: Record<PresetKind, Row[]> = {
   school: [
     { role: 'title', parts: ['Похвальная грамота'] },
     { role: 'label', parts: ['Награждается'] },
-    { role: 'name', parts: ['%name'] },
+    { role: 'name', parts: ['%name_dat'] },
     { role: 'meta', parts: ['%team', '%city'] },
     { role: 'main', parts: ['за отличные успехи в учёбе'] },
   ],
   laureate: [
     { role: 'title', parts: ['Диплом'] },
     { role: 'label', parts: ['Награждается'] },
-    { role: 'name', parts: ['%name'] },
+    { role: 'name', parts: ['%name_dat'] },
     { role: 'meta', parts: ['%team', '%city'] },
     { role: 'main', parts: ['лауреат'] },
     { role: 'main', parts: ['%event'], bold: true },
@@ -199,7 +218,7 @@ const ROWS: Record<PresetKind, Row[]> = {
   ],
   letter: [
     { role: 'title', parts: ['Благодарственное письмо'] },
-    { role: 'name', parts: ['%name'] },
+    { role: 'name', parts: ['%name_dat'] },
     { role: 'meta', parts: ['%team', '%city'] },
     { role: 'main', parts: ['за помощь в организации и проведении'] },
     { role: 'main', parts: ['%event'], bold: true },
@@ -207,7 +226,7 @@ const ROWS: Record<PresetKind, Row[]> = {
   thanks: [
     { role: 'title', parts: ['Благодарность'] },
     { role: 'label', parts: ['Объявляется'] },
-    { role: 'name', parts: ['%name'] },
+    { role: 'name', parts: ['%name_dat'] },
     { role: 'meta', parts: ['%team', '%city'] },
     { role: 'main', parts: ['за помощь в проведении'] },
     { role: 'main', parts: ['%event'], bold: true },
