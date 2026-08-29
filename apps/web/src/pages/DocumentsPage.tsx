@@ -1,4 +1,5 @@
 import { FormEvent, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FileText, Plus, Search, Trash2 } from 'lucide-react';
 import { UsageBar } from '../documents/UsageBar';
@@ -27,6 +28,7 @@ import { LibraryFilters, type LibrarySort } from '../documents/LibraryFilters';
  */
 export function DocumentsPage() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<DocumentCategory | null>(null);
   const [sort, setSort] = useState<LibrarySort>('updated');
@@ -65,10 +67,15 @@ export function DocumentsPage() {
         ...(v.category ? { category: v.category } : {}),
         ...(v.presetId ? { presetId: v.presetId } : {}),
       }),
-    onSuccess: () => {
+    onSuccess: (doc, variables) => {
       setTitle('');
       setScratch(false);
       void qc.invalidateQueries({ queryKey: ['documents'] });
+      // Из заготовки — сразу в редактор: иначе клик по заготовке выглядит
+      // так, будто ничего не произошло, и человек кликает ещё раз.
+      if (variables.presetId) {
+        navigate(`/documents/${doc.id}`);
+      }
     },
   });
 
