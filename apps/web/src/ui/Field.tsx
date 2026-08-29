@@ -31,13 +31,14 @@ export function StatusChip({
   tone,
   children,
 }: {
-  tone: 'neutral' | 'progress' | 'done';
+  tone: 'neutral' | 'progress' | 'done' | 'error';
   children: ReactNode;
 }) {
   const tones = {
     neutral: 'bg-[var(--surface-sunken)] text-[var(--text-muted)]',
     progress: 'bg-[var(--award-soft)] text-[var(--award)]',
     done: 'bg-[var(--accent-soft)] text-[var(--accent)]',
+    error: 'bg-[var(--danger-soft)] text-[var(--danger)]',
   } as const;
   return (
     <span
