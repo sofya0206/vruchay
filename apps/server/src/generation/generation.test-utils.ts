@@ -234,6 +234,7 @@ export class World {
       get: (key: string) => {
         if (key === 'SESSION_SECRET') return 'a'.repeat(32);
         if (key === 'ORG_ACTIVE_JOBS') return Number(process.env.ORG_ACTIVE_JOBS ?? 3);
+        if (key === 'FREE_DOCUMENT_LIMIT') return Number(process.env.FREE_DOCUMENT_LIMIT ?? 50);
         if (key === 'PRINT_MERGE_LIMIT_FILES') return 300;
         if (key === 'PRINT_MERGE_LIMIT_MB') return 150;
         return '';

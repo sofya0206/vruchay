@@ -1,6 +1,7 @@
-import { describe, expect, it, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { BadRequestException } from '@nestjs/common';
 import { GenerationService } from './generation.service';
+import { testConfig } from '../config/env.test-utils';
 
 /*
  * Лимит бесплатной пробы. Проверяем именно арифметику границы: ошибка здесь
@@ -10,6 +11,8 @@ import { GenerationService } from './generation.service';
  * Prisma подменяем минимальной заглушкой: нужны ровно два запроса —
  * организация и число выпущенных файлов.
  */
+
+const LIMIT = 50;
 
 interface Stub {
   plan: 'free' | 'paid';
@@ -24,7 +27,8 @@ function serviceWith({ plan, used, bonus = 0 }: Stub): GenerationService {
     file: { count: async () => used },
   };
   const referral = { bonusDocuments: async () => bonus };
-  const config = { get: () => 3 };
+  // Предел пробы служба берёт из проверенной схемы настроек, а не из окружения.
+  const config = testConfig({ FREE_DOCUMENT_LIMIT: String(LIMIT) });
   return new GenerationService(prisma as never, referral as never, config as never);
 }
 
@@ -36,16 +40,7 @@ function check(svc: GenerationService, adding: number): Promise<void> {
   );
 }
 
-const LIMIT = 50;
-
 describe('лимит бесплатной пробы', () => {
-  beforeEach(() => {
-    process.env.FREE_DOCUMENT_LIMIT = String(LIMIT);
-  });
-  afterEach(() => {
-    delete process.env.FREE_DOCUMENT_LIMIT;
-  });
-
   it('на оплаченном тарифе не ограничивает ничего', async () => {
     await expect(check(serviceWith({ plan: 'paid', used: 100_000 }), 5_000)).resolves.toBeUndefined();
   });

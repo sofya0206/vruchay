@@ -328,7 +328,7 @@ export class GenerationService {
     const org = await tx.organization.findUnique({ where: { id: orgId } });
     if (!org || org.plan !== 'free') return;
 
-    const base = Number(process.env.FREE_DOCUMENT_LIMIT ?? 50);
+    const base = this.config.get('FREE_DOCUMENT_LIMIT', { infer: true });
     // Заработанное приглашениями прибавляется к пробе. Считается по фактам,
     // а не по счётчику, — см. ReferralService. Читает через ту же транзакцию:
     // мы под замком, и заглядывать мимо него незачем.
