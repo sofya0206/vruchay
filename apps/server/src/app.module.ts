@@ -27,6 +27,7 @@ import { ReferralModule } from './referral/referral.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { OrgModule } from './org/org.module';
 import { OverviewModule } from './overview/overview.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 import { TokensModule } from './tokens/tokens.module';
 import { BackupModule } from './backup/backup.module';
 import { PlatformModule } from './platform/platform.module';
@@ -60,6 +61,7 @@ import { PlansModule } from './plans/plans.module';
     ReviewsModule,
     OrgModule,
     OverviewModule,
+    AnalyticsModule,
     TokensModule,
     BackupModule,
     PlatformModule,

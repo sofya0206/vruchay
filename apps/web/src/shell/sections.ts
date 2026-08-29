@@ -1,4 +1,5 @@
 import {
+  ChartNoAxesColumn,
   CreditCard,
   FileText,
   LayoutDashboard,
@@ -53,6 +54,12 @@ export const SECTIONS: Section[] = [
     label: 'Реестр',
     icon: ShieldCheck,
     about: 'Всё выданное: поиск по фамилии, проверка подлинности, отзыв',
+  },
+  {
+    path: '/analytics',
+    label: 'Аналитика',
+    icon: ChartNoAxesColumn,
+    about: 'Проверки по QR, качество выпуска и путь от регистрации до награждения',
   },
   {
     path: '/integrations',

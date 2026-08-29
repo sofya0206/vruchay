@@ -12,6 +12,7 @@ describe('открытый раздел', () => {
     expect(activeSection('/')).toBe('/');
     expect(activeSection('/documents')).toBe('/documents');
     expect(activeSection('/registry')).toBe('/registry');
+    expect(activeSection('/analytics')).toBe('/analytics');
   });
 
   it('редактор материала относится к «Документам»', () => {
@@ -30,12 +31,13 @@ describe('открытый раздел', () => {
 });
 
 describe('состав навигации', () => {
-  it('шесть разделов, настроек среди них нет', () => {
+  it('семь разделов, настроек среди них нет', () => {
     expect(SECTIONS.map((s) => s.label)).toEqual([
       'Обзор',
       'Документы',
       'Рассылка',
       'Реестр',
+      'Аналитика',
       'Интеграции',
       'Оплата',
     ]);
