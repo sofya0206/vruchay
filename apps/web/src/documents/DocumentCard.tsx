@@ -257,14 +257,18 @@ function ActionsMenu({
           role="menu"
           className="absolute bottom-9 right-0 z-10 w-48 overflow-hidden rounded-xl bg-[var(--surface)] py-1 shadow-lg ring-1 ring-[var(--line)]"
         >
-          <button type="button" role="menuitem" className={item} onClick={() => { setOpen(false); onRename(); }}>
-            <Pencil size={14} /> Переименовать
-          </button>
-          {/* Название действия говорит, что именно получится: макет тот же,
+          {/* Первым пунктом, а не вторым: это самое частое действие в меню —
+              человек искал его и не находил среди других строк. Формулировка
+              с глаголом в начале («Скопировать…»), а не отглагольным
+              существительным, — так действие виднее при беглом взгляде.
+              Название говорит, что именно получится: макет тот же,
               а список получателей и сведения о мероприятии — чистые.
               «Сделать копию» обещало бы копию целиком. */}
           <button type="button" role="menuitem" className={item} onClick={() => { setOpen(false); onDuplicate(); }}>
-            <CalendarPlus size={14} /> Копия под новое мероприятие
+            <CalendarPlus size={14} /> Скопировать под новое мероприятие
+          </button>
+          <button type="button" role="menuitem" className={item} onClick={() => { setOpen(false); onRename(); }}>
+            <Pencil size={14} /> Переименовать
           </button>
           <button
             type="button"
