@@ -8,7 +8,7 @@ import { SECTIONS, activeSection } from './sections';
  */
 
 describe('открытый раздел', () => {
-  it('обзор подсвечивается только на самой главной', () => {
+  it('«Главное» подсвечивается только на самой главной', () => {
     expect(activeSection('/')).toBe('/');
     expect(activeSection('/documents')).toBe('/documents');
     expect(activeSection('/registry')).toBe('/registry');
@@ -32,7 +32,7 @@ describe('открытый раздел', () => {
 describe('состав навигации', () => {
   it('шесть разделов, настроек среди них нет', () => {
     expect(SECTIONS.map((s) => s.label)).toEqual([
-      'Обзор',
+      'Главное',
       'Документы',
       'Рассылка',
       'Реестр',
