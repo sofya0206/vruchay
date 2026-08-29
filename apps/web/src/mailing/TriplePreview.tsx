@@ -124,20 +124,26 @@ export function TriplePreview({
         ))}
       </div>
 
-      {tab === 'document' && (
-        <DocumentPreview doc={doc.data} data={values} position={index + 1} orgName={orgName} />
-      )}
+      {/* Высота фиксирована по самой высокой вкладке («Документ» — полный
+          лист), а не auto-height: иначе окно прыгает при каждом переключении
+          вкладки — на короткое письмо и на страницу проверки без вложения
+          диалог схлопывался бы, а потом снова растягивался обратно. */}
+      <div className="min-h-[60vh]">
+        {tab === 'document' && (
+          <DocumentPreview doc={doc.data} data={values} position={index + 1} orgName={orgName} />
+        )}
 
-      {tab === 'letter' && (
-        <LetterPreview
-          subject={fillVariables(subject, values)}
-          body={fillVariables(body, values)}
-          kind={kind}
-          advertiserName={advertiserName}
-        />
-      )}
+        {tab === 'letter' && (
+          <LetterPreview
+            subject={fillVariables(subject, values)}
+            body={fillVariables(body, values)}
+            kind={kind}
+            advertiserName={advertiserName}
+          />
+        )}
 
-      {tab === 'verify' && <VerifyPreview doc={doc.data} data={values} />}
+        {tab === 'verify' && <VerifyPreview doc={doc.data} data={values} />}
+      </div>
     </Dialog>
   );
 }
