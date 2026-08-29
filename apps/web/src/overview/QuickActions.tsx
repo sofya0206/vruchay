@@ -4,6 +4,7 @@ import { FileUp, ListChecks, Plus } from 'lucide-react';
 import type { Overview } from '../api/overview';
 import { protocolTitle } from './format';
 import { useCreateMaterial } from './useCreateMaterial';
+import { workspacePath } from '../mailing/workspace-tabs';
 
 /**
  * Три действия, ради которых сюда заходят.
@@ -22,7 +23,7 @@ export function QuickActions({ data }: { data: Overview }) {
         {/* Продолжить последнее: обычно человек возвращается к тому же
             награждению, что и вчера, — оно и стоит первым. */}
         <Action
-          to={latest ? `/documents/${latest.id}?view=table` : '/documents'}
+          to={latest ? workspacePath(latest.id) : '/documents'}
           icon={<ListChecks size={18} />}
           title="Выпустить документы по списку"
           about={

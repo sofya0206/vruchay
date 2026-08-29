@@ -78,7 +78,7 @@ export function RecentActivity({ data }: { data: Overview }) {
               return (
                 <li key={job.id}>
                   <Link
-                    to={`/documents/${job.documentId}?view=registry`}
+                    to={`/registry?documentId=${job.documentId}`}
                     className="-mx-2 flex items-baseline gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-[var(--surface-sunken)]"
                   >
                     <span className="min-w-0 flex-1">

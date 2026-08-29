@@ -1,27 +1,17 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   Check,
   ChevronLeft,
   Dot,
-  GitBranch,
-  ListChecks,
   LoaderCircle,
-  Mail,
   Redo2,
-  ShieldCheck,
-  Table2,
-  Type,
+  Send,
   Undo2,
   ZoomIn,
 } from 'lucide-react';
-import { RecipientsTable } from '../recipients/RecipientsTable';
-import { RulesTab } from '../awards/RulesTab';
-import { EmailTemplateEditor } from '../mail/EmailTemplateEditor';
 import { InsertMenu } from '../editor/InsertMenu';
-import { RegistryTable } from '../documents/RegistryTable';
-import { ValidationScreen } from '../validation/ValidationScreen';
 import { sheetLayout, type SheetElement, type TextElement } from '@gramota/shared';
 import { Button } from '../ui/Button';
 import { StatusChip } from '../ui/Field';
@@ -31,6 +21,8 @@ import { useRecipients } from '../api/recipients';
 import type { DocumentDetail } from '../api/types';
 import type { EventValues } from '../editor/EventFields';
 import { canvasPreviewData } from '../editor/preview-data';
+import { movedViewTarget } from '../editor/moved-views';
+import { workspacePath } from '../mailing/workspace-tabs';
 import { SheetRenderer } from '../render/SheetRenderer';
 import { PropertiesPanel } from '../editor/PropertiesPanel';
 import { useLayoutHistory } from '../editor/useLayoutHistory';
@@ -63,23 +55,23 @@ type Gesture =
   | (GestureBase & { kind: 'move' })
   | (GestureBase & { kind: 'resize'; handle: ResizeHandle });
 
-type View = 'editor' | 'table' | 'rules' | 'check' | 'mail' | 'registry';
-const VIEWS: View[] = ['editor', 'table', 'rules', 'check', 'mail', 'registry'];
-
+/**
+ * Страница редактирования материала.
+ *
+ * Здесь только лист: холст, блоки, их свойства, вставка переменных
+ * и сохранение. Работа со списком и с письмом отсюда уехала целиком —
+ * она живёт в рабочем месте материала на «Рассылке».
+ *
+ * Причина в том, как устроен день: макет рисуют один раз и заранее,
+ * а рассылают в день награждения и часто не тот же человек. Пока обе
+ * работы жили под одной шапкой, редактор открывался ради списка,
+ * и первое, что видел пришедший разослать, — чужой лист, который можно
+ * случайно сдвинуть. Обратно, к рассылке, отсюда ведёт одна кнопка,
+ * а не встроенная панель.
+ */
 export function EditorPage() {
   const { id = '' } = useParams();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  /*
-   * Нужную вкладку можно назвать в адресе: `?view=table`.
-   *
-   * Ради быстрых действий с рабочего стола: «выпустить документы по списку»
-   * обязано приводить прямо к списку, а не в макет, откуда до списка ещё
-   * одно нажатие. Дальше вкладка живёт своей жизнью — переключение внутри
-   * редактора адрес не трогает.
-   */
-  const [params] = useSearchParams();
-  const asked = params.get('view');
-  const [view, setView] = useState<View>(VIEWS.includes(asked as View) ? (asked as View) : 'editor');
   const [zoom, setZoom] = useState(1);
   const [saved, setSaved] = useState<'saved' | 'saving' | 'dirty'>('saved');
   /*
@@ -94,6 +86,11 @@ export function EditorPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const gesture = useRef<Gesture | null>(null);
   const backgroundInput = useRef<HTMLInputElement>(null);
+
+  // Адреса уехавших вкладок: `?view=table` и соседние. Разбираются
+  // отдельно, в `moved-views.ts`, — там же объяснено зачем.
+  const [params] = useSearchParams();
+  const moved = movedViewTarget(params.get('view'), id);
 
   const doc = useQuery({
     queryKey: ['document', id],
@@ -123,12 +120,16 @@ export function EditorPage() {
   }, [sheet, sheetId, reset]);
 
   /*
-   * Список получателей: из колонок складывается подменю переменных
-   * при вставке текста, а из первой строки — образец для холста.
+   * Колонки списка и одна его строка.
    *
-   * Тот же запрос, что у вкладки «Получатели», а не свой: правки в таблице
-   * сбрасывают именно его, и лист в редакторе не остаётся с данными,
-   * которых в таблице уже нет.
+   * Это не работа со списком, а две вещи, без которых нельзя рисовать
+   * лист: имена колонок складываются в подменю переменных при вставке
+   * текста, а первая строка служит образцом на холсте — чтобы на месте
+   * «%name» стояла живая фамилия, а не токен.
+   *
+   * Правит же список другая страница, и запрос здесь тот же самый:
+   * поправленная там таблица не оставляет холст с данными, которых
+   * уже нет.
    */
   const recipients = useRecipients(id);
   const org = useOrgProfile();
@@ -219,12 +220,7 @@ export function EditorPage() {
     const observer = new ResizeObserver(recompute);
     observer.observe(el);
     return () => observer.disconnect();
-    // view в зависимостях обязателен: на вкладках «Получатели» и «Письмо»
-    // холст размонтируется вместе с наблюдателем за размером. При возврате
-    // появляется новый узел, а эффект без view не перезапускался — масштаб
-    // оставался тем, что посчитан для схлопнутого контейнера, и лист
-    // показывался в 13% вместо «во весь экран».
-  }, [doc.data, view]);
+  }, [doc.data]);
 
   const selected = useMemo(
     () => layout.find((el) => el.id === selectedId) ?? null,
@@ -325,6 +321,10 @@ export function EditorPage() {
     return () => window.removeEventListener('keydown', onKey);
   }, [history, selectedId]);
 
+  // Проверка стоит после всех хуков намеренно: ранний выход выше сломал бы
+  // их порядок между отрисовками.
+  if (moved) return <Navigate to={moved} replace />;
+
   if (doc.isPending) return <div className="p-6 text-slate-500">Загрузка документа…</div>;
   if (!doc.data || !sheet) return <div className="p-6 text-slate-500">Документ не найден</div>;
 
@@ -398,43 +398,6 @@ export function EditorPage() {
 
         <h1 className="font-serif text-lg">{page.title}</h1>
 
-        <div className="flex rounded-lg bg-[var(--surface-sunken)] p-0.5">
-          <ViewTab active={view === 'editor'} onClick={() => setView('editor')} icon={<Type size={14} />}>
-            Макет
-          </ViewTab>
-          <ViewTab active={view === 'table'} onClick={() => setView('table')} icon={<Table2 size={14} />}>
-            Получатели
-          </ViewTab>
-          <ViewTab
-            active={view === 'rules'}
-            onClick={() => setView('rules')}
-            icon={<GitBranch size={14} />}
-          >
-            Правила
-          </ViewTab>
-          {/* Между получателями и письмом: проверка идёт после того, как
-              список собран, и до того, как из него что-то выпустят. */}
-          <ViewTab
-            active={view === 'check'}
-            onClick={() => setView('check')}
-            icon={<ListChecks size={14} />}
-          >
-            Проверка
-          </ViewTab>
-          <ViewTab active={view === 'mail'} onClick={() => setView('mail')} icon={<Mail size={14} />}>
-            Письмо
-          </ViewTab>
-          <ViewTab
-            active={view === 'registry'}
-            onClick={() => setView('registry')}
-            icon={<ShieldCheck size={14} />}
-          >
-            Реестр
-          </ViewTab>
-        </div>
-
-        {view !== 'editor' ? null : (
-          <>
         <InsertMenu
           onInsert={addElement}
           variables={recipients.data?.columns.map((c) => c.name) ?? []}
@@ -520,29 +483,20 @@ export function EditorPage() {
               </>
             )}
           </StatusChip>
+
+          {/* Выход из редактора в работу со списком — одной кнопкой.
+              Раньше на её месте была вкладка, и разница не косметическая:
+              вкладка обещает, что список — часть макета, а он часть
+              награждения. Правки долетают сами, поэтому уводим без
+              вопросов и без «сохранить перед выходом». */}
+          <Link to={workspacePath(id)}>
+            <Button size="sm" variant="primary" icon={<Send size={15} />}>
+              Готово → к рассылке
+            </Button>
+          </Link>
         </div>
-          </>
-        )}
       </header>
 
-      {view === 'table' ? (
-        <RecipientsTable
-          documentId={id}
-          onGoToMail={() => setView('mail')}
-          onGoToRegistry={() => setView('registry')}
-          onGoToCheck={() => setView('check')}
-        />
-      ) : view === 'rules' ? (
-        <RulesTab documentId={id} ruleSetId={page.ruleSetId ?? null} />
-      ) : view === 'check' ? (
-        <ValidationScreen documentId={id} onDone={() => setView('table')} />
-      ) : view === 'registry' ? (
-        <RegistryTable documentId={id} />
-      ) : view === 'mail' ? (
-        <div className="min-h-0 flex-1 overflow-auto">
-          <EmailTemplateEditor documentId={id} />
-        </div>
-      ) : (
       <div className="flex min-h-0 flex-1">
         <div
           ref={containerRef}
@@ -675,7 +629,6 @@ export function EditorPage() {
           }}
         />
       </div>
-      )}
 
       {fit && (
         <FitPageDialog
@@ -689,33 +642,6 @@ export function EditorPage() {
         />
       )}
     </div>
-  );
-}
-
-function ViewTab({
-  active,
-  onClick,
-  icon,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      aria-pressed={active}
-      className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm transition-colors ${
-        active
-          ? 'bg-[var(--surface)] font-medium text-[var(--text)] shadow-sm'
-          : 'text-[var(--text-muted)] hover:text-[var(--text)]'
-      }`}
-    >
-      {icon}
-      {children}
-    </button>
   );
 }
 

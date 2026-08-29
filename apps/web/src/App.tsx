@@ -11,6 +11,7 @@ import { EditorPage } from './pages/EditorPage';
 import { RenderPage } from './pages/RenderPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { MailingPage } from './mailing/MailingPage';
+import { DocumentWorkspacePage } from './mailing/DocumentWorkspacePage';
 import { InvoicesPage } from './pages/InvoicesPage';
 import { RegistryPage } from './registry/RegistryPage';
 import { NotFoundPage } from './pages/NotFoundPage';
@@ -83,6 +84,9 @@ export function App() {
 
             Интеграции и Оплата пока никем не заняты — оставлены как есть. */}
         <Route path="/mailing" element={<MailingPage />} />
+        {/* Рабочее место материала: список, правила, проверка, письмо.
+            Раньше это были вкладки редактора макета. */}
+        <Route path="/mailing/:id" element={<DocumentWorkspacePage />} />
         <Route path="/registry" element={<RegistryPage />} />
         <Route path="/integrations" element={<SectionStub path="/integrations" />} />
         <Route path="/billing" element={<SectionStub path="/billing" />} />

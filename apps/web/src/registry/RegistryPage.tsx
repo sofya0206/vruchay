@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Download, FileSpreadsheet, RefreshCw, Send, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Loading } from '../ui/Loading';
 import {
   emptyFilters,
+  filtersFromQuery,
   filtersToQuery,
   useRegistry,
   useRegistryAction,
@@ -40,7 +42,16 @@ interface ActionResult {
  */
 export function RegistryPage() {
   const [tab, setTab] = useState<'registry' | 'analytics'>('registry');
-  const [filters, setFilters] = useState<Filters>(emptyFilters);
+  /*
+   * Отбор из адреса — только начальный.
+   *
+   * Ссылка «выданное по этому материалу» обязана открывать реестр уже
+   * суженным: иначе человек, пришедший за грамотой Ивановой, встречает
+   * все восемь тысяч выданных документов. Дальше отбор живёт своей
+   * жизнью и адрес не трогает.
+   */
+  const [search] = useSearchParams();
+  const [filters, setFilters] = useState<Filters>(() => filtersFromQuery(search.toString()));
   const [offset, setOffset] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [openFileId, setOpenFileId] = useState<string | null>(null);
