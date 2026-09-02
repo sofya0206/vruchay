@@ -3,16 +3,21 @@ import { useSearchParams } from 'react-router-dom';
 import { Download, FileSpreadsheet, RefreshCw, Send, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Loading } from '../ui/Loading';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   emptyFilters,
+  filterForRevoke,
   filtersFromQuery,
   filtersToQuery,
+  revokableByFilter,
   useRegistry,
   useRegistryAction,
   useRegistryFacets,
   type RegistryFilters as Filters,
+  type RevokeTarget,
   type SkippedItem,
 } from '../api/registry';
+import { RevokeDialog } from './RevokeDialog';
 import { ApiError } from '../api/client';
 import { RegistryFilters } from './RegistryFilters';
 import { RegistryTable } from './RegistryTable';
@@ -56,6 +61,8 @@ export function RegistryPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [openFileId, setOpenFileId] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ text: string; skipped: SkippedItem[] } | null>(null);
+  const [revoking, setRevoking] = useState<RevokeTarget | null>(null);
+  const qc = useQueryClient();
 
   const facets = useRegistryFacets();
   const registry = useRegistry(filters, offset, PAGE_SIZE);
@@ -175,6 +182,18 @@ export function RegistryPage() {
             </p>
 
             <div className="ml-auto flex flex-wrap gap-2">
+              {/* Отзыв по отбору — для «утёк бланк» и «ошибка в целом протоколе»,
+                  когда документов тысячи. Только по суженному отбору. */}
+              {revokableByFilter(filters) && total > 0 && selected.size === 0 && (
+                <Button
+                  size="sm"
+                  variant="danger"
+                  icon={<ShieldAlert size={14} />}
+                  onClick={() => setRevoking({ filter: filterForRevoke(filters) })}
+                >
+                  Отозвать всё найденное
+                </Button>
+              )}
               <a
                 href={`/api/registry/export.csv${query ? `?${query}` : ''}`}
                 target="_blank"
@@ -241,13 +260,7 @@ export function RegistryPage() {
                 variant="danger"
                 icon={<ShieldAlert size={14} />}
                 disabled={pending}
-                onClick={() =>
-                  run(
-                    revoke,
-                    { fileIds: ids, revoked: true },
-                    (r) => `Отозвано документов: ${r.changed ?? 0}`,
-                  )
-                }
+                onClick={() => setRevoking({ fileIds: ids })}
               >
                 Отозвать
               </Button>
@@ -258,7 +271,7 @@ export function RegistryPage() {
                 onClick={() =>
                   run(
                     revoke,
-                    { fileIds: ids, revoked: false },
+                    { fileIds: ids, revoked: false, expectedCount: ids.length },
                     (r) => `Проверка возвращена: ${r.changed ?? 0}`,
                   )
                 }
@@ -313,6 +326,23 @@ export function RegistryPage() {
         </>
       )}
       {openFileId && <DocumentHistory fileId={openFileId} onClose={() => setOpenFileId(null)} />}
+      {revoking && (
+        <RevokeDialog
+          target={revoking}
+          filters={filters}
+          onClose={() => setRevoking(null)}
+          onDone={async (changed) => {
+            setRevoking(null);
+            setSelected(new Set());
+            setNotice({ text: `Отозвано документов: ${changed}`, skipped: [] });
+            await Promise.all([
+              qc.invalidateQueries({ queryKey: ['registry'] }),
+              qc.invalidateQueries({ queryKey: ['registry-analytics'] }),
+              qc.invalidateQueries({ queryKey: ['registry-detail'] }),
+            ]);
+          }}
+        />
+      )}
     </main>
   );
 }

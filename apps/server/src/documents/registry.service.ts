@@ -127,7 +127,10 @@ export class RegistryService {
     });
     if (!file) throw new NotFoundException('Документ не найден');
 
-    await this.prisma.file.update({ where: { id: fileId }, data: { verifyRevoked: revoked } });
+    await this.prisma.file.update({
+      where: { id: fileId },
+      data: revoked ? { verifyRevoked: true, revokedAt: new Date() } : { verifyRevoked: false },
+    });
 
     const data = (file.rows[0]?.data ?? {}) as Record<string, string>;
     return {

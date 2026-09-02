@@ -65,6 +65,22 @@ export function DocumentHistory({ fileId, onClose }: Props) {
               )}
             </div>
 
+            {row.state === 'revoked' && (
+              <div className="rounded-xl bg-[var(--danger-soft)] p-4 text-sm text-[var(--text)]">
+                <p>
+                  Отозван{row.revokedAt ? ` ${formatDate(row.revokedAt)}` : ''}.
+                  {row.revokedReasonPublic
+                    ? ` Причина для проверяющих: ${row.revokedReasonPublic}.`
+                    : ' Причина для проверяющих не указана.'}
+                </p>
+                {row.revokedReasonInternal && (
+                  <p className="mt-1 text-[var(--text-muted)]">
+                    Внутренняя причина: {row.revokedReasonInternal}
+                  </p>
+                )}
+              </div>
+            )}
+
             {row.replacedBy && (
               <p className="rounded-xl bg-[var(--award-soft)] p-4 text-sm text-[var(--text)]">
                 Этот документ заменён на выданный {formatDate(row.replacedBy.issuedAt)}.
@@ -83,6 +99,14 @@ export function DocumentHistory({ fileId, onClose }: Props) {
             <dl className="space-y-2 border-y border-[var(--line)] py-4 text-sm">
               <Fact label="Выдан">{formatDateTime(row.issuedAt)}</Fact>
               {row.expiresAt && <Fact label="Действителен до">{formatDate(row.expiresAt)}</Fact>}
+              {row.printedName && (
+                <Fact label="Напечатано">
+                  {row.printedName}
+                  <span className="block text-xs text-[var(--text-muted)]">
+                    строка в таблице поправлена после выпуска
+                  </span>
+                </Fact>
+              )}
               <Fact label="Адрес почты">{row.email || '—'}</Fact>
               <Fact label="Проверочный код">
                 <span className="font-mono text-xs">{row.code}</span>

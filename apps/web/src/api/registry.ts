@@ -20,6 +20,12 @@ export interface RegistryRow {
   issuedAt: string;
   /** Когда документ перестаёт действовать. null — бессрочный. */
   expiresAt: string | null;
+  /** Имя на бумаге, если строку таблицы после выпуска поправили. */
+  printedName: string | null;
+  revokedAt: string | null;
+  revokedReasonPublic: string | null;
+  /** Только владельцу и управляющему; остальным null. */
+  revokedReasonInternal: string | null;
   state: FileState;
   /** Перевыпуск заказан, но нового документа ещё нет. */
   reissuePending: boolean;
@@ -100,6 +106,34 @@ export interface RegistryDetail {
     queuedAt: string;
   }[];
   history: HistoryEntry[];
+}
+
+/** Кого отзывать: отмеченные документы либо всё найденное по отбору. */
+export type RevokeTarget =
+  | { fileIds: string[]; filter?: undefined }
+  | { fileIds?: undefined; filter: Record<string, string> };
+
+/** Что будет отозвано — до необратимого действия. */
+export interface RevokePreview {
+  count: number;
+  alreadyRevoked: number;
+  sample: { fileId: string; name: string; code: string; documentTitle: string; state: FileState }[];
+}
+
+/**
+ * Можно ли отзывать «всё найденное» по этому отбору.
+ *
+ * Только суженный отбор: материал, мероприятие или период. Пустой отбор —
+ * это всё выданное организацией за всё время, и один клик мимо гасил бы
+ * всю историю. Сервер проверяет то же самое ещё раз.
+ */
+export function revokableByFilter(filters: RegistryFilters): boolean {
+  return Boolean(filters.documentId || filters.event || filters.from || filters.to);
+}
+
+/** Отбор для сервера: только заполненные поля. */
+export function filterForRevoke(filters: RegistryFilters): Record<string, string> {
+  return Object.fromEntries(Object.entries(filters).filter(([, v]) => v));
 }
 
 /** Кого действие не коснулось и почему. */

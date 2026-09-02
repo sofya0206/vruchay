@@ -89,9 +89,66 @@ export const fileIdsSchema = z.object({
 });
 export type FileIdsDto = z.infer<typeof fileIdsSchema>;
 
-export const revokeSchema = fileIdsSchema.extend({
-  revoked: z.boolean({ error: 'Не указано, отзывать проверку или возвращать' }),
-});
+/**
+ * Причины отзыва. Две, и это не дубль: публичную видит человек с бумагой
+ * на странице проверки, внутреннюю — только владелец и управляющий
+ * в реестре. Обе необязательны: «выдан по ошибке» уже сказано самим
+ * отзывом.
+ */
+const revokeReasons = {
+  reasonPublic: z.string().trim().max(300, 'Публичная причина — не длиннее 300 знаков').optional(),
+  reasonInternal: z
+    .string()
+    .trim()
+    .max(1000, 'Внутренняя причина — не длиннее 1000 знаков')
+    .optional(),
+};
+
+/**
+ * Кого отзывать: отмеченные документы либо всё найденное по отбору.
+ *
+ * Отбор — для случая «утёк бланк» или «ошибка в целом протоколе», когда
+ * документов тысячи и отмечать их по одному нельзя. Но отбор обязан
+ * быть сужен хотя бы материалом, мероприятием или периодом: пустой отбор
+ * означал бы «всё выданное организацией за всё время», и один клик мимо
+ * гасил бы всю историю.
+ */
+const revokeTargetSchema = z
+  .object({
+    fileIds: z
+      .array(fileId)
+      .min(1, 'Не отмечено ни одного документа')
+      .max(BULK_MAX_FILES, `За раз можно обработать не больше ${BULK_MAX_FILES} документов`)
+      .optional(),
+    filter: registryFilterSchema.optional(),
+  })
+  .refine((v) => Boolean(v.fileIds) !== Boolean(v.filter), 'Укажите либо документы, либо отбор')
+  .refine(
+    (v) => !v.filter || Boolean(v.filter.documentId || v.filter.event || v.filter.from || v.filter.to),
+    'Отбор для массового отзыва должен быть сужен материалом, мероприятием или периодом',
+  );
+
+export const revokePreviewSchema = revokeTargetSchema;
+export type RevokePreviewDto = z.infer<typeof revokePreviewSchema>;
+
+/**
+ * Отзыв необратим по смыслу (вернуть проверку можно, но человек с бумагой
+ * уже увидел красную страницу), поэтому подтверждается числом: клиент
+ * присылает, сколько документов он показал человеку, а сервер отказывает,
+ * если по отбору сейчас находится другое число. Список успел измениться —
+ * значит, человек подтверждал не то, что будет отозвано.
+ */
+export const revokeSchema = revokeTargetSchema
+  .safeExtend({
+    revoked: z.boolean({ error: 'Не указано, отзывать проверку или возвращать' }),
+    expectedCount: z.coerce
+      .number()
+      .int()
+      .min(1, 'Подтвердите число документов')
+      .max(1_000_000),
+    ...revokeReasons,
+  })
+  .refine((v) => v.revoked || v.fileIds, 'Возврат проверки — только по отмеченным документам');
 export type RevokeDto = z.infer<typeof revokeSchema>;
 
 export const resendSchema = z.object({

@@ -29,6 +29,15 @@ export interface RegistryRow {
   issuedAt: Date;
   /** Когда документ перестаёт действовать. Null — бессрочный. */
   expiresAt: Date | null;
+  /**
+   * Имя, напечатанное на документе, если оно отличается от строки таблицы:
+   * строку могли поправить после выпуска. Null — совпадает или снимка нет.
+   */
+  printedName: string | null;
+  revokedAt: Date | null;
+  revokedReasonPublic: string | null;
+  /** Только владельцу и управляющему; остальным — null. */
+  revokedReasonInternal: string | null;
   state: FileState;
   /** Перевыпуск заказан, но нового документа ещё нет. */
   reissuePending: boolean;
@@ -70,7 +79,7 @@ export class RegistryService {
    * тысяч выданных документов, и выгрузка их в браузер целиком означала бы
    * минуту белого экрана вместо таблицы.
    */
-  async list(orgId: string, query: ListRegistryDto) {
+  async list(orgId: string, query: ListRegistryDto, showInternal = false) {
     const where = registryWhere(orgId, query);
 
     const [files, total] = await Promise.all([
@@ -84,7 +93,7 @@ export class RegistryService {
       this.prisma.file.count({ where }),
     ]);
 
-    const items = await this.decorate(files);
+    const items = await this.decorate(files, showInternal);
     return { items, total, limit: query.limit, offset: query.offset };
   }
 
@@ -125,7 +134,7 @@ export class RegistryService {
     });
     if (!file) throw new NotFoundException('Документ не найден');
 
-    const [row] = await this.decorate([file]);
+    const [row] = await this.decorate([file], showActors);
 
     const emails = await this.prisma.email.findMany({
       where: { orgId, fileId },
@@ -294,7 +303,7 @@ export class RegistryService {
    * по строке: полсотни строк — это полсотни лишних обращений к базе,
    * и на них уходит больше времени, чем на саму выборку.
    */
-  private async decorate(files: FileRecord[]): Promise<RegistryRow[]> {
+  private async decorate(files: FileRecord[], showInternal = false): Promise<RegistryRow[]> {
     if (files.length === 0) return [];
 
     const settled = await this.replacement.settle(files);
@@ -332,6 +341,8 @@ export class RegistryService {
 
     return resolved.map((file) => {
       const data = (file.row?.data ?? {}) as Record<string, string>;
+      const printed = (file.issuedData ?? null) as Record<string, string> | null;
+      const printedName = (printed?.name ?? '').trim();
       const email = lastEmail.get(file.id);
       const replacement = file.replacedById ? byId.get(file.replacedById) : undefined;
 
@@ -348,6 +359,10 @@ export class RegistryService {
         eventDate: file.document?.eventDate ?? '',
         issuedAt: file.createdAt,
         expiresAt: file.expiresAt,
+        printedName: printedName && printedName !== (data.name ?? '').trim() ? printedName : null,
+        revokedAt: file.revokedAt,
+        revokedReasonPublic: file.revokedReasonPublic,
+        revokedReasonInternal: showInternal ? file.revokedReasonInternal : null,
         state: fileState(file),
         reissuePending: file.replacedByJobId !== null && file.replacedById === null,
         replacedBy: replacement
@@ -386,7 +401,11 @@ const fileSelect = {
   documentId: true,
   createdAt: true,
   expiresAt: true,
+  issuedData: true,
   verifyRevoked: true,
+  revokedAt: true,
+  revokedReasonPublic: true,
+  revokedReasonInternal: true,
   replacedById: true,
   replacedByJobId: true,
   rowId: true,

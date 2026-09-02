@@ -9,6 +9,25 @@ import { GenerationProcessor } from '../generation/generation.processor';
 import { MailService } from '../mail/mail.service';
 import { MailProcessor } from '../mail/mail.processor';
 import { ReplacementService } from './replacement.service';
+import { registryWhere } from './registry-filter';
+import { fileState } from './file-state';
+import type { RegistryFilterDto } from './registry.dto';
+
+/** Сколько имён показываем в предпросмотре перед отзывом. */
+const PREVIEW_SAMPLE = 20;
+
+/** Чем отзывать: отмеченные документы либо всё найденное по отбору. */
+export interface RevokeTarget {
+  fileIds?: string[];
+  filter?: RegistryFilterDto;
+}
+
+export interface RevokeOptions {
+  /** Сколько документов человек видел, когда подтверждал. */
+  expectedCount?: number;
+  reasonPublic?: string;
+  reasonInternal?: string;
+}
 
 /** Задания, которые ещё займут воркер, — они же держат часть квоты. */
 const ACTIVE_STATUSES = ['queued', 'running'] as const;
@@ -47,13 +66,32 @@ export class RegistryActionsService {
    *
    * Сами файлы остаются: их могли скачать и распечатать, и делать вид,
    * что их не было, бессмысленно. Меняется ответ страницы проверки.
+   *
+   * Отзыв по отбору («утёк бланк», «ошибка в целом протоколе») идёт
+   * тем же путём: сначала находим, потом меняем только найденное
+   * и только внутри организации. Число найденного сверяем с тем, что
+   * человек видел, когда подтверждал (см. registry.dto.ts).
    */
-  async setRevoked(orgId: string, fileIds: string[], revoked: boolean) {
+  async setRevoked(
+    orgId: string,
+    target: string[] | RevokeTarget,
+    revoked: boolean,
+    options: RevokeOptions = {},
+  ) {
     const files = await this.prisma.file.findMany({
-      where: { id: { in: fileIds }, orgId, kind: 'generated', deletedAt: null },
-      select: { id: true, row: { select: { data: true } } },
+      where: this.revokeWhere(orgId, target),
+      select: { id: true, verifyRevoked: true, row: { select: { data: true } } },
+      orderBy: { createdAt: 'desc' },
     });
     if (files.length === 0) throw new BadRequestException('Ни один из документов не найден');
+
+    if (options.expectedCount !== undefined && options.expectedCount !== files.length) {
+      throw new BadRequestException(
+        `Список изменился: сейчас по этому отбору ${files.length} ` +
+          `${plural(files.length, 'документ', 'документа', 'документов')}, ` +
+          `а подтверждено ${options.expectedCount}. Обновите список и подтвердите снова.`,
+      );
+    }
 
     const ids = files.map((f) => f.id);
     await this.prisma.file.updateMany({
@@ -61,10 +99,81 @@ export class RegistryActionsService {
       // изменение чужих документов не должно зависеть от того, не забыл ли
       // вызывающий отфильтровать список.
       where: { id: { in: ids }, orgId },
-      data: { verifyRevoked: revoked },
+      data: revoked
+        ? {
+            verifyRevoked: true,
+            revokedAt: new Date(),
+            // Причины пишем, только если их назвали: повторный отзыв
+            // без причины не должен стирать прежнюю.
+            ...(options.reasonPublic !== undefined
+              ? { revokedReasonPublic: options.reasonPublic || null }
+              : {}),
+            ...(options.reasonInternal !== undefined
+              ? { revokedReasonInternal: options.reasonInternal || null }
+              : {}),
+          }
+        : // Возврат снимает только отметку: дата и причины остаются
+          // историей документа — по ним потом отвечают на вопрос
+          // «а почему его вообще отзывали».
+          { verifyRevoked: false },
     });
 
     return { changed: ids.length, names: files.map(nameOf).filter(Boolean) };
+  }
+
+  /**
+   * Что будет отозвано — до того, как это станет необратимым.
+   *
+   * Число и первые имена: человек должен увидеть, что отбор поймал
+   * именно тот протокол, а не весь сезон.
+   */
+  async previewRevoke(orgId: string, target: RevokeTarget) {
+    const where = this.revokeWhere(orgId, target);
+    const [count, sample, alreadyRevoked] = await Promise.all([
+      this.prisma.file.count({ where }),
+      this.prisma.file.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: PREVIEW_SAMPLE,
+        select: {
+          id: true,
+          publicId: true,
+          publicCode: true,
+          verifyRevoked: true,
+          replacedById: true,
+          expiresAt: true,
+          row: { select: { data: true } },
+          document: { select: { title: true } },
+        },
+      }),
+      this.prisma.file.count({ where: { ...where, verifyRevoked: true } }),
+    ]);
+
+    return {
+      count,
+      alreadyRevoked,
+      sample: sample.map((f) => ({
+        fileId: f.id,
+        name: nameOf(f),
+        code: f.publicCode ?? f.publicId,
+        documentTitle: f.document?.title ?? 'Материал удалён',
+        state: fileState(f),
+      })),
+    };
+  }
+
+  /**
+   * Условие отзыва — всегда с организацией первым делом.
+   *
+   * Отмеченные документы: по идентификаторам, но только свои и только
+   * выданные. Отбор: тем же условием, что и таблица реестра, — человек
+   * отзывает ровно то, что видит.
+   */
+  private revokeWhere(orgId: string, target: string[] | RevokeTarget): Prisma.FileWhereInput {
+    const ids = Array.isArray(target) ? target : target.fileIds;
+    if (ids) return { id: { in: ids }, orgId, kind: 'generated', deletedAt: null };
+    if (!Array.isArray(target) && target.filter) return registryWhere(orgId, target.filter);
+    throw new BadRequestException('Не указано, какие документы отзывать');
   }
 
   /**
@@ -374,6 +483,16 @@ export class RegistryActionsService {
 function nameOf(file: { row: { data: Prisma.JsonValue } | null }): string {
   const data = (file.row?.data ?? {}) as Record<string, string>;
   return (data.name ?? '').trim();
+}
+
+/** Русское склонение после числа — в сообщении об изменившемся списке. */
+function plural(n: number, one: string, few: string, many: string): string {
+  const mod100 = Math.abs(n) % 100;
+  const mod10 = mod100 % 10;
+  if (mod100 >= 11 && mod100 <= 14) return many;
+  if (mod10 === 1) return one;
+  if (mod10 >= 2 && mod10 <= 4) return few;
+  return many;
 }
 
 /**
