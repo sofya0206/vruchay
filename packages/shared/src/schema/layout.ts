@@ -173,11 +173,32 @@ export const linkElement = elementBase.extend({
   }),
 });
 
+/**
+ * Фигура: линия, прямоугольник, овал. Рисуется векторно, в миллиметрах,
+ * как и всё остальное на листе, — печать получает те же контуры, что холст.
+ */
+export const shapeElement = elementBase.extend({
+  type: z.literal('shape'),
+  props: z.object({
+    kind: z.enum(['rect', 'ellipse', 'line']).default('rect'),
+    /** Заливка; null — без заливки. */
+    fill: hexColor.nullable().default(null),
+    stroke: hexColor.default('#000000'),
+    /** Толщина обводки в мм; 0 — без обводки. */
+    strokeWidth: z.number().min(0).max(20).default(0.5),
+    /** Скругление углов прямоугольника, мм. */
+    radius: z.number().min(0).max(100).default(0),
+    /** Пунктир: длина штриха в мм; 0 — сплошная. */
+    dash: z.number().min(0).max(50).default(0),
+  }),
+});
+
 export const sheetElement = z.discriminatedUnion('type', [
   textElement,
   imageElement,
   qrElement,
   linkElement,
+  shapeElement,
 ]);
 
 export const sheetLayout = z.array(sheetElement).max(MAX_ELEMENTS_PER_SHEET);
@@ -195,6 +216,7 @@ export const CURRENT_LAYOUT_SCHEMA_VERSION = 2;
 export type SheetElement = z.infer<typeof sheetElement>;
 export type TextElement = z.infer<typeof textElement>;
 export type TextProps = TextElement['props'];
+export type ShapeElement = z.infer<typeof shapeElement>;
 export type SheetLayout = z.infer<typeof sheetLayout>;
 export type { RichDoc };
 

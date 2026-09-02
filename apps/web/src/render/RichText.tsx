@@ -26,7 +26,12 @@ import {
  * на холсте только поверх одного блока и только пока его правят.
  */
 
-export type FieldRender = 'value' | 'chip';
+/**
+ * `value` — текстом, как на печати; `chip` — фишкой, как на холсте
+ * в режиме заготовки; `highlight` — текстом с лёгкой подсветкой: режим
+ * «данные строки», где видно и что напечатается, и откуда оно взялось.
+ */
+export type FieldRender = 'value' | 'chip' | 'highlight';
 
 /** Ступень отступа списка в миллиметрах — примерно ширина двух букв. */
 export const INDENT_MM = 6;
@@ -177,6 +182,16 @@ function Inline({
   if (fields === 'value') {
     if (node.text === '') return null;
     return wrapIndex(node.marks, <span style={markStyle(node.marks)}>{node.text}</span>);
+  }
+
+  if (fields === 'highlight') {
+    if (node.text === '') return null;
+    return wrapIndex(
+      node.marks,
+      <span className="merge-value" data-field={node.attrs.source} style={markStyle(node.marks)}>
+        {node.text}
+      </span>,
+    );
   }
 
   return <FieldChip field={node} labels={labels} onClick={onFieldClick} />;

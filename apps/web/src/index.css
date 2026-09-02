@@ -263,3 +263,61 @@ h2 {
 .merge-chip[data-selected='true'] {
   box-shadow: 0 0 0 0.08em var(--focus);
 }
+
+/*
+ * Живой редактор блока (TipTap) — поверх статичного вида.
+ *
+ * Правила подобраны так, чтобы разметка редактора ложилась в тот же
+ * контейнер, что и статичный вид: ширина на весь блок, абзацы без полей,
+ * списки с тем же отступом, что у RichText (INDENT_MM = 6 мм).
+ */
+.rich-editor {
+  width: 100%;
+  outline: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.rich-editor p {
+  margin: 0;
+}
+.rich-editor ul,
+.rich-editor ol {
+  margin: 0;
+  padding-left: 6mm;
+}
+.rich-editor ul {
+  list-style: disc;
+}
+.rich-editor ul[data-marker='dash'] {
+  list-style: '– ';
+}
+.rich-editor ul[data-marker='circle'] {
+  list-style: circle;
+}
+.rich-editor ul[data-marker='square'] {
+  list-style: square;
+}
+.rich-editor ol {
+  list-style: decimal;
+}
+.rich-editor ol[data-numbering='upper-roman'] {
+  list-style: upper-roman;
+}
+.rich-editor ol[data-numbering='lower-alpha'] {
+  list-style: lower-alpha;
+}
+.rich-editor li[data-task='todo']::marker {
+  content: '☐ ';
+}
+.rich-editor li[data-task='done']::marker {
+  content: '☑ ';
+}
+.rich-editor .ProseMirror-selectednode {
+  box-shadow: 0 0 0 0.08em var(--focus);
+}
+
+/* Режим «данные строки»: значение поля подсвечено, но не оформлено фишкой. */
+.merge-value {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  box-shadow: 0 0.06em 0 color-mix(in srgb, var(--accent) 40%, transparent);
+}

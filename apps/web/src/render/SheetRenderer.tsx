@@ -5,6 +5,7 @@ import {
   resolveRichDoc,
   substituteVariables,
   type ResolvedField,
+  type ShapeElement,
   type SheetElement,
   type SheetLayout,
   type TextElement,
@@ -323,10 +324,57 @@ function ElementView({
     );
   }
 
+  if (element.type === 'shape') {
+    return (
+      <div {...common} style={box}>
+        <Shape element={element} />
+      </div>
+    );
+  }
+
   return (
     <a {...common} style={box} href={element.props.url} rel="noreferrer noopener" target="_blank">
       <span className="sr-only">{element.props.url}</span>
     </a>
+  );
+}
+
+/**
+ * Фигура — SVG в миллиметрах.
+ *
+ * `viewBox` совпадает с размером блока в мм, поэтому обводка задаётся
+ * в тех же миллиметрах и печатается той же толщиной, что видна на холсте.
+ * Линия идёт по диагонали блока сверху-слева вниз-вправо: горизонтальная
+ * линия — это блок высотой в толщину, повёрнутая — блок с поворотом.
+ */
+function Shape({ element }: { element: ShapeElement }) {
+  const { w, h } = element;
+  const p = element.props;
+  const half = p.strokeWidth / 2;
+  const common = {
+    fill: p.fill ?? 'none',
+    stroke: p.strokeWidth > 0 ? p.stroke : 'none',
+    strokeWidth: p.strokeWidth,
+    strokeDasharray: p.dash > 0 ? `${p.dash} ${p.dash}` : undefined,
+    vectorEffect: 'non-scaling-stroke' as const,
+  };
+
+  return (
+    <svg
+      viewBox={`0 0 ${w} ${h}`}
+      width="100%"
+      height="100%"
+      preserveAspectRatio="none"
+      style={{ display: 'block', overflow: 'visible' }}
+    >
+      {p.kind === 'rect' && (
+        <rect x={half} y={half} width={Math.max(w - p.strokeWidth, 0)} height={Math.max(h - p.strokeWidth, 0)} rx={p.radius} {...common} />
+      )}
+      {p.kind === 'ellipse' && (
+        <ellipse cx={w / 2} cy={h / 2} rx={Math.max(w / 2 - half, 0)} ry={Math.max(h / 2 - half, 0)} {...common} />
+      )}
+      {p.kind === 'line' && <line x1={0} y1={h / 2} x2={w} y2={h / 2} {...common} fill="none" />}
+    </svg>
   );
 }
 

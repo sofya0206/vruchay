@@ -4,15 +4,30 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   Check,
   ChevronLeft,
+  ChevronRight,
   Dot,
+  Grid3x3,
+  Layers,
   LoaderCircle,
+  Magnet,
   Redo2,
   Send,
+  SlidersHorizontal,
+  Table2,
   Undo2,
   ZoomIn,
 } from 'lucide-react';
-import { InsertMenu } from '../editor/InsertMenu';
-import { sheetLayout, type SheetElement, type TextElement } from '@gramota/shared';
+import type { Editor } from '@tiptap/core';
+import {
+  sheetLayout,
+  type RichDoc,
+  type SheetElement,
+  type SheetLayout,
+  type ShapeElement,
+  type TextElement,
+  type TextProps,
+} from '@gramota/shared';
+import { InsertMenu, type InsertKind } from '../editor/InsertMenu';
 import { Button } from '../ui/Button';
 import { StatusChip } from '../ui/Field';
 import { api } from '../api/client';
@@ -25,9 +40,21 @@ import { movedViewTarget } from '../editor/moved-views';
 import { workspacePath } from '../mailing/workspace-tabs';
 import { SheetRenderer } from '../render/SheetRenderer';
 import { PropertiesPanel } from '../editor/PropertiesPanel';
+import { LayersPanel } from '../editor/LayersPanel';
+import { FIELD_DRAG_TYPE, FieldsPanel } from '../editor/FieldsPanel';
+import { InlineTextEditor } from '../editor/rich/InlineTextEditor';
 import { useLayoutHistory } from '../editor/useLayoutHistory';
 import { FitPageDialog } from '../editor/FitPageDialog';
 import { fitPageToImage, readImageSize, type PageFit } from '../editor/fit-page';
+import {
+  applyMatches,
+  fieldLabels,
+  fieldRegistry,
+  knownFieldKeys,
+  proposeMatches,
+  type FieldInfo,
+} from '../editor/fields';
+import { appendField, docWithField } from '../editor/doc-ops';
 import {
   clamp,
   fitZoom,
@@ -39,26 +66,57 @@ import {
   type Box,
   type ResizeHandle,
 } from '../editor/geometry';
+import {
+  alignBoxes,
+  boundingBox,
+  distributeBoxes,
+  DUPLICATE_OFFSET_MM,
+  expandToGroups,
+  marqueeSelect,
+  moveGroup,
+  moveLayer,
+  nudgeBox,
+  pickTextStyle,
+  rectFromPoints,
+  rotationFromPointer,
+  scaleGroup,
+  selectableIds,
+  snapBox,
+  snapCandidates,
+  snapToGrid,
+  type AlignKind,
+  type Rect,
+  type SnapLine,
+  type TextStylePatch,
+} from '../editor/selection';
 
 const AUTOSAVE_DELAY_MS = 1500;
 const HANDLES: ResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+const CORNERS: ResizeHandle[] = ['nw', 'ne', 'se', 'sw'];
+/** Шаг сетки в мм — и шаг прилипания к ней, когда сетка включена. */
+const GRID_MM = 5;
+/** Сдвиг стрелками: пункт и десять пунктов, как просит бриф, — в миллиметрах. */
+const NUDGE_MM = 25.4 / 72;
 
 interface GestureBase {
-  id: string;
   startX: number;
   startY: number;
-  box: Box;
   /** Было ли реальное перемещение: от этого зависит и история, и сохранение. */
   moved: boolean;
 }
 type Gesture =
-  | (GestureBase & { kind: 'move' })
-  | (GestureBase & { kind: 'resize'; handle: ResizeHandle });
+  | (GestureBase & { kind: 'move'; boxes: Record<string, Box> })
+  | (GestureBase & { kind: 'resize'; id: string; handle: ResizeHandle; box: Box })
+  | (GestureBase & { kind: 'scale'; handle: ResizeHandle; frame: Rect; boxes: Record<string, Box>; sizes: Record<string, number> })
+  | (GestureBase & { kind: 'rotate'; id: string; center: { x: number; y: number } })
+  | (GestureBase & { kind: 'marquee'; additive: boolean; base: ReadonlySet<string> });
+
+type Panel = 'props' | 'layers' | 'fields';
 
 /**
  * Страница редактирования материала.
  *
- * Здесь только лист: холст, блоки, их свойства, вставка переменных
+ * Здесь только лист: холст, блоки, их свойства, поля подстановки
  * и сохранение. Работа со списком и с письмом отсюда уехала целиком —
  * она живёт в рабочем месте материала на «Рассылке».
  *
@@ -68,24 +126,37 @@ type Gesture =
  * и первое, что видел пришедший разослать, — чужой лист, который можно
  * случайно сдвинуть. Обратно, к рассылке, отсюда ведёт одна кнопка,
  * а не встроенная панель.
+ *
+ * Текст правится прямо на листе: двойной клик по блоку открывает
+ * его в живом редакторе на том же месте, без отдельного окна.
  */
 export function EditorPage() {
   const { id = '' } = useParams();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const [saved, setSaved] = useState<'saved' | 'saving' | 'dirty'>('saved');
+  const [viewMode, setViewMode] = useState<'placeholders' | 'data'>('placeholders');
+  const [rowIndex, setRowIndex] = useState(0);
+  const [showGrid, setShowGrid] = useState(false);
+  const [snapping, setSnapping] = useState(true);
+  const [guides, setGuides] = useState<SnapLine[]>([]);
+  const [marquee, setMarquee] = useState<Rect | null>(null);
+  const [panel, setPanel] = useState<Panel>('props');
+  const [styleClipboard, setStyleClipboard] = useState<TextStylePatch | null>(null);
   /*
    * Что набрано в «О мероприятии» прямо сейчас, до сохранения.
    *
    * Нужно ради живого холста: поле сохраняется по уходу с него, и без
    * черновика название появлялось бы на листе только после клика мимо.
-   * Человек при этом смотрит на лист, а не на поле, — и решает, что
-   * подстановка опять не работает.
    */
   const [eventDraft, setEventDraft] = useState<EventValues | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
   const gesture = useRef<Gesture | null>(null);
   const backgroundInput = useRef<HTMLInputElement>(null);
+  const clipboard = useRef<SheetElement[]>([]);
+  const liveEditor = useRef<Editor | null>(null);
 
   // Адреса уехавших вкладок: `?view=table` и соседние. Разбираются
   // отдельно, в `moved-views.ts`, — там же объяснено зачем.
@@ -98,43 +169,45 @@ export function EditorPage() {
   });
 
   const sheet = doc.data?.sheets[0];
-  // Переход к другому материалу: чужой черновик мероприятия на холсте
-  // остался бы от прошлого документа.
   useEffect(() => setEventDraft(null), [id]);
   const history = useLayoutHistory([]);
   const { reset, beginGesture, endGesture } = history;
 
   /*
-   * Макет с сервера кладём в историю только при смене листа.
-   *
-   * Следить за объектом листа целиком нельзя: он пересоздаётся при каждом
-   * ответе сервера, а `reset` обнуляет историю. Достаточно было обновить
-   * данные — скажем, загрузить бланк, — и все прежние шаги отмены пропадали.
+   * Макет с сервера кладём в историю только при смене листа — и через
+   * разбор схемы: в базе ещё долго будут макеты первой версии, с текстом
+   * строкой, а холсту нужно дерево.
    */
   const sheetId = sheet?.id;
   const loaded = useRef<string | null>(null);
   useEffect(() => {
     if (!sheet || loaded.current === sheet.id) return;
     loaded.current = sheet.id;
-    // Через разбор схемы: в базе ещё долго будут макеты первой версии,
-    // с текстом строкой, а холсту нужно дерево.
     reset(sheetLayout.parse(sheet.layout));
   }, [sheet, sheetId, reset]);
 
   /*
-   * Колонки списка и одна его строка.
+   * Колонки списка и его строки.
    *
-   * Это не работа со списком, а две вещи, без которых нельзя рисовать
-   * лист: имена колонок складываются в подменю переменных при вставке
-   * текста, а первая строка служит образцом на холсте — чтобы на месте
-   * «%name» стояла живая фамилия, а не токен.
-   *
-   * Правит же список другая страница, и запрос здесь тот же самый:
-   * поправленная там таблица не оставляет холст с данными, которых
-   * уже нет.
+   * Это не работа со списком, а то, без чего нельзя рисовать лист:
+   * имена колонок становятся полями подстановки, а строки — образцом
+   * на холсте, чтобы на месте поля стояла живая фамилия.
    */
   const recipients = useRecipients(id);
   const org = useOrgProfile();
+
+  const columns = useMemo(
+    () => (recipients.data?.columns ?? []).map((c) => ({ id: c.id, name: c.name })),
+    [recipients.data],
+  );
+  const fields = useMemo<FieldInfo[]>(() => {
+    const registry = fieldRegistry(columns);
+    // Заголовки из загруженного файла — как назвал колонки сам человек.
+    const titles = new Map((recipients.data?.columns ?? []).map((c) => [c.name, c.title]));
+    return registry.map((f) => (f.kind === 'column' && titles.get(f.source) ? { ...f, title: titles.get(f.source)! } : f));
+  }, [columns, recipients.data]);
+  const known = useMemo(() => knownFieldKeys(columns), [columns]);
+  const labels = useMemo(() => fieldLabels(fields), [fields]);
 
   const background = useQuery({
     queryKey: ['file-url', sheet?.backgroundFileId],
@@ -143,17 +216,13 @@ export function EditorPage() {
   });
 
   const save = useMutation({
-    mutationFn: (layout: unknown) =>
-      api.patch(`/documents/${id}/sheets/${sheet!.id}`, { layout }),
+    mutationFn: (layout: unknown) => api.patch(`/documents/${id}/sheets/${sheet!.id}`, { layout }),
     onSuccess: () => setSaved('saved'),
   });
 
   const uploadBackground = useMutation({
     mutationFn: (file: File) =>
-      api.upload<{ fileId: string; url: string }>(
-        `/documents/${id}/sheets/${sheet!.id}/background`,
-        file,
-      ),
+      api.upload<{ fileId: string; url: string }>(`/documents/${id}/sheets/${sheet!.id}/background`, file),
     onSuccess: () => {
       void doc.refetch();
       void background.refetch();
@@ -165,10 +234,7 @@ export function EditorPage() {
 
   const resizePage = useMutation({
     mutationFn: (size: { widthMm: number; heightMm: number }) =>
-      api.patch(`/documents/${id}`, {
-        pageWidthMm: size.widthMm,
-        pageHeightMm: size.heightMm,
-      }),
+      api.patch(`/documents/${id}`, { pageWidthMm: size.widthMm, pageHeightMm: size.heightMm }),
     onSuccess: () => void doc.refetch(),
   });
 
@@ -178,21 +244,11 @@ export function EditorPage() {
     onSuccess: () => void doc.refetch(),
   });
 
-  /**
-   * Размеры картинки читаем в браузере, до отправки: файл уже здесь,
-   * и гонять его на сервер ради двух чисел незачем. Вопрос задаём после
-   * успешной загрузки — предлагать подогнать лист под бланк, который
-   * не загрузился, бессмысленно.
-   */
   async function onPickBackground(file: File) {
     const size = await readImageSize(file).catch(() => null);
     await uploadBackground.mutateAsync(file);
     if (!size || !doc.data) return;
-
-    const result = fitPageToImage(
-      { widthMm: doc.data.pageWidthMm, heightMm: doc.data.pageHeightMm },
-      size,
-    );
+    const result = fitPageToImage({ widthMm: doc.data.pageWidthMm, heightMm: doc.data.pageHeightMm }, size);
     if (result.mismatched) setFit(result);
   }
 
@@ -215,31 +271,41 @@ export function EditorPage() {
     const el = containerRef.current;
     if (!el || !doc.data) return;
     const recompute = () =>
-      setZoom(
-        fitZoom(el.clientWidth, el.clientHeight, doc.data.pageWidthMm, doc.data.pageHeightMm),
-      );
+      setZoom(fitZoom(el.clientWidth - 24, el.clientHeight - 24, doc.data.pageWidthMm, doc.data.pageHeightMm));
     recompute();
     const observer = new ResizeObserver(recompute);
     observer.observe(el);
     return () => observer.disconnect();
   }, [doc.data]);
 
-  const selected = useMemo(
-    () => layout.find((el) => el.id === selectedId) ?? null,
-    [layout, selectedId],
+  // Выделение не переживает исчезновение блока: удалили — сняли.
+  useEffect(() => {
+    const ids = new Set(layout.map((el) => el.id));
+    if ([...selected].some((s) => !ids.has(s))) {
+      setSelected(new Set([...selected].filter((s) => ids.has(s))));
+    }
+    if (editingId && !ids.has(editingId)) setEditingId(null);
+  }, [layout, selected, editingId]);
+
+  const selectedElements = useMemo(
+    () => layout.filter((el) => selected.has(el.id)),
+    [layout, selected],
   );
+
+  const rows = recipients.data?.rows ?? [];
+  const rowCount = rows.length;
+  const safeRow = rowCount ? Math.min(rowIndex, rowCount - 1) : 0;
 
   /*
    * Значения для холста: на листе должно стоять название мероприятия,
    * а не «%event». Что именно подставляется и почему — в `preview-data.ts`.
-   *
    * Черновик мероприятия сильнее сохранённого: он и есть то, что человек
    * набирает прямо сейчас, глядя на лист.
    */
   const previewData = useMemo(
     () =>
       canvasPreviewData({
-        row: recipients.data?.rows[0]?.data,
+        row: rows[safeRow]?.data,
         orgName: org.data?.orgName,
         event: {
           name: eventDraft?.eventName ?? doc.data?.eventName,
@@ -249,27 +315,147 @@ export function EditorPage() {
         },
         issuedAt: new Date(),
       }),
-    [recipients.data, org.data, doc.data, eventDraft],
+    [rows, safeRow, org.data, doc.data, eventDraft],
   );
 
-  const updateBox = useCallback(
-    (id: string, box: Box, commit: boolean) => {
+  const matches = useMemo(() => proposeMatches(layout, columns), [layout, columns]);
+
+  /* ────────────────────────────── правки макета ────────────────────────── */
+
+  const patchElements = useCallback(
+    (ids: ReadonlySet<string>, fn: (el: SheetElement) => SheetElement, commit = true) => {
+      history.setLayout((prev) => prev.map((el) => (ids.has(el.id) ? fn(el) : el)), commit);
+    },
+    [history],
+  );
+
+  const updateBoxes = useCallback(
+    (boxes: Record<string, Box>, commit: boolean) => {
       history.setLayout(
-        (prev) => prev.map((el) => (el.id === id ? { ...el, ...roundBox(box) } : el)),
+        (prev) => prev.map((el) => (boxes[el.id] ? { ...el, ...roundBox(boxes[el.id]) } : el)),
         commit,
       );
     },
     [history],
   );
 
-  // Жест ведём на уровне окна: курсор может выйти за пределы блока и даже листа.
+  const patchTextProps = useCallback(
+    (patch: Partial<TextProps>, commit = true) =>
+      patchElements(
+        selected,
+        (el) => (el.type === 'text' ? { ...el, props: { ...el.props, ...patch } } : el),
+        commit,
+      ),
+    [patchElements, selected],
+  );
+
+  const patchShapeProps = useCallback(
+    (patch: Partial<ShapeElement['props']>, commit = true) =>
+      patchElements(
+        selected,
+        (el) => (el.type === 'shape' ? { ...el, props: { ...el.props, ...patch } } : el),
+        commit,
+      ),
+    [patchElements, selected],
+  );
+
+  const setDoc = useCallback(
+    (elementId: string, richDoc: RichDoc, commit: boolean) =>
+      patchElements(
+        new Set([elementId]),
+        (el) => (el.type === 'text' ? { ...el, props: { ...el.props, doc: richDoc } } : el),
+        commit,
+      ),
+    [patchElements],
+  );
+
+  /** Выделить: обычный клик — только этот, Shift — добавить/убрать. Группа тянется целиком. */
+  const select = useCallback(
+    (elementId: string | null, additive: boolean) => {
+      setSelected((prev) => {
+        if (!elementId) return additive ? prev : new Set();
+        const next = new Set(additive ? prev : []);
+        if (additive && prev.has(elementId)) next.delete(elementId);
+        else next.add(elementId);
+        return expandToGroups(layout, next);
+      });
+    },
+    [layout],
+  );
+
+  const removeSelected = useCallback(() => {
+    if (selected.size === 0) return;
+    history.setLayout((prev) => prev.filter((el) => !selected.has(el.id)));
+    setSelected(new Set());
+  }, [history, selected]);
+
+  /** Копия выбранных — новыми блоками, чуть сдвинутыми, чтобы не легли поверх. */
+  const cloneInto = useCallback(
+    (source: SheetElement[]) => {
+      if (!source.length || !doc.data) return;
+      const page = { w: doc.data.pageWidthMm, h: doc.data.pageHeightMm };
+      const groupMap = new Map<string, string>();
+      const maxZ = Math.max(-1, ...layout.map((el) => el.z));
+      const clones = source.map((el, i) => {
+        const groupId = el.groupId ? (groupMap.get(el.groupId) ?? groupMap.set(el.groupId, crypto.randomUUID()).get(el.groupId)!) : null;
+        const box = nudgeBox(el, DUPLICATE_OFFSET_MM, DUPLICATE_OFFSET_MM, page);
+        return { ...el, ...box, id: crypto.randomUUID(), z: maxZ + 1 + i, groupId } as SheetElement;
+      });
+      history.setLayout((prev) => [...prev, ...clones]);
+      setSelected(new Set(clones.map((c) => c.id)));
+    },
+    [doc.data, history, layout],
+  );
+
+  const insertField = useCallback(
+    (field: FieldInfo) => {
+      if (liveEditor.current) {
+        liveEditor.current
+          .chain()
+          .focus()
+          .insertContent([{ type: 'mergeField', attrs: { source: field.source, fieldId: field.fieldId } }, { type: 'text', text: ' ' }])
+          .run();
+        return;
+      }
+      const one = selectedElements.length === 1 ? selectedElements[0] : null;
+      if (one && one.type === 'text') {
+        setDoc(one.id, appendField(one.props.doc, field.source, field.fieldId), true);
+        return;
+      }
+      addElement({ type: 'text', field });
+    },
+    [selectedElements, setDoc],
+  );
+
+  /* ─────────────────────────────── жесты холста ────────────────────────── */
+
+  const pointToMm = useCallback(
+    (clientX: number, clientY: number) => {
+      const rect = sheetRef.current?.getBoundingClientRect();
+      if (!rect) return { x: 0, y: 0 };
+      return { x: pxToMm(clientX - rect.left, zoom), y: pxToMm(clientY - rect.top, zoom) };
+    },
+    [zoom],
+  );
+
   useEffect(() => {
     if (!doc.data) return;
-    const page = doc.data;
+    const page = { w: doc.data.pageWidthMm, h: doc.data.pageHeightMm };
 
     function onMove(e: PointerEvent) {
       const g = gesture.current;
       if (!g) return;
+
+      if (g.kind === 'marquee') {
+        const from = pointToMm(g.startX, g.startY);
+        const to = pointToMm(e.clientX, e.clientY);
+        const rect = rectFromPoints(from.x, from.y, to.x, to.y);
+        setMarquee(rect);
+        const hit = marqueeSelect(layout, rect);
+        setSelected(expandToGroups(layout, g.additive ? new Set([...g.base, ...hit]) : hit));
+        return;
+      }
+
       const dx = pxToMm(e.clientX - g.startX, zoom);
       const dy = pxToMm(e.clientY - g.startY, zoom);
 
@@ -279,17 +465,65 @@ export function EditorPage() {
         beginGesture();
       }
 
-      const next =
-        g.kind === 'move'
-          ? moveBox(g.box, dx, dy, page.pageWidthMm, page.pageHeightMm)
-          : resizeBox(g.box, g.handle, dx, dy, page.pageWidthMm, page.pageHeightMm);
-      updateBox(g.id, next, false);
+      if (g.kind === 'move') {
+        const ids = Object.keys(g.boxes);
+        const boxes = ids.map((k) => g.boxes[k]);
+        let next = moveGroup(boxes, dx, dy, page);
+        let active: SnapLine[] = [];
+        if (showGrid) {
+          const frame = boundingBox(next)!;
+          const snapped = snapToGrid(frame, GRID_MM);
+          next = next.map((b) => ({ ...b, x: b.x + snapped.x - frame.x, y: b.y + snapped.y - frame.y }));
+        } else if (snapping && !e.altKey) {
+          const frame = boundingBox(next)!;
+          const result = snapBox(frame, snapCandidates(layout, new Set(ids), page));
+          next = next.map((b) => ({ ...b, x: b.x + result.box.x - frame.x, y: b.y + result.box.y - frame.y }));
+          active = result.active;
+        }
+        setGuides(active);
+        updateBoxes(Object.fromEntries(ids.map((k, i) => [k, next[i]])), false);
+        return;
+      }
+
+      if (g.kind === 'resize') {
+        let next = resizeBox(g.box, g.handle, dx, dy, page.w, page.h);
+        if (showGrid) next = snapToGrid(next, GRID_MM);
+        updateBoxes({ [g.id]: next }, false);
+        return;
+      }
+
+      if (g.kind === 'scale') {
+        const ids = Object.keys(g.boxes);
+        const { boxes, scale } = scaleGroup(ids.map((k) => g.boxes[k]), g.frame, g.handle, dx, dy, page);
+        const next = Object.fromEntries(ids.map((k, i) => [k, boxes[i]]));
+        // Кегли — в той же пропорции: композиция уменьшается целиком.
+        history.setLayout(
+          (prev) =>
+            prev.map((el) =>
+              next[el.id]
+                ? el.type === 'text'
+                  ? { ...el, ...roundBox(next[el.id]), props: { ...el.props, fontSize: Math.max(4, Math.round(g.sizes[el.id] * scale * 2) / 2) } }
+                  : { ...el, ...roundBox(next[el.id]) }
+                : el,
+            ),
+          false,
+        );
+        return;
+      }
+
+      if (g.kind === 'rotate') {
+        const rotation = rotationFromPointer(g.center, { x: e.clientX, y: e.clientY }, e.shiftKey ? 15 : null);
+        patchElements(new Set([g.id]), (el) => ({ ...el, rotation }), false);
+      }
     }
 
     function onUp() {
+      const g = gesture.current;
+      if (g?.kind === 'marquee') setMarquee(null);
       // Без этого перетаскивание не попадало бы в автосохранение:
       // промежуточные кадры намеренно не двигают счётчик версии.
-      if (gesture.current?.moved) endGesture();
+      else if (g?.moved) endGesture();
+      setGuides([]);
       gesture.current = null;
     }
 
@@ -299,29 +533,101 @@ export function EditorPage() {
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
     };
-  }, [doc.data, zoom, updateBox, beginGesture, endGesture]);
+  }, [doc.data, zoom, layout, showGrid, snapping, updateBoxes, patchElements, beginGesture, endGesture, pointToMm, history]);
+
+  /* ────────────────────────────── горячие клавиши ──────────────────────── */
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null;
       const typing =
-        e.target instanceof HTMLElement &&
-        ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName);
+        target instanceof HTMLElement &&
+        (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable);
       if (typing) return;
+      if (!doc.data) return;
+      const page = { w: doc.data.pageWidthMm, h: doc.data.pageHeightMm };
+      const mod = e.metaKey || e.ctrlKey;
+      const key = e.key.toLowerCase();
 
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+      if (mod && key === 'z') {
         e.preventDefault();
         if (e.shiftKey) history.redo();
         else history.undo();
+        return;
       }
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
+      if (mod && key === 'y') {
         e.preventDefault();
-        history.setLayout((prev) => prev.filter((el) => el.id !== selectedId));
-        setSelectedId(null);
+        history.redo();
+        return;
+      }
+      if (mod && key === 'a') {
+        e.preventDefault();
+        setSelected(new Set(selectableIds(layout)));
+        return;
+      }
+      if (e.key === 'Escape') {
+        setSelected(new Set());
+        return;
+      }
+      if (selected.size === 0) return;
+
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        removeSelected();
+        return;
+      }
+      if (e.key === 'Enter' && selectedElements.length === 1 && selectedElements[0].type === 'text') {
+        e.preventDefault();
+        setEditingId(selectedElements[0].id);
+        return;
+      }
+      if (mod && key === 'd') {
+        e.preventDefault();
+        cloneInto(selectedElements);
+        return;
+      }
+      if (mod && key === 'c') {
+        clipboard.current = selectedElements.map((el) => structuredClone(el));
+        return;
+      }
+      if (mod && key === 'x') {
+        clipboard.current = selectedElements.map((el) => structuredClone(el));
+        removeSelected();
+        return;
+      }
+      if (mod && key === 'v') {
+        if (clipboard.current.length) cloneInto(clipboard.current);
+        return;
+      }
+      if (mod && key === 'g') {
+        e.preventDefault();
+        const groupId = e.shiftKey ? null : crypto.randomUUID();
+        patchElements(selected, (el) => ({ ...el, groupId }));
+        return;
+      }
+      if (mod && (key === 'b' || key === 'i' || key === 'u')) {
+        e.preventDefault();
+        const prop = key === 'b' ? 'bold' : key === 'i' ? 'italic' : 'underline';
+        const on = selectedElements.some((el) => el.type === 'text' && !el.props[prop]);
+        patchTextProps({ [prop]: on });
+        return;
+      }
+      if (mod && (key === 'l' || key === 'r' || key === 'e')) {
+        e.preventDefault();
+        patchTextProps({ align: key === 'l' ? 'left' : key === 'r' ? 'right' : 'center' });
+        return;
+      }
+      if (e.key.startsWith('Arrow')) {
+        e.preventDefault();
+        const step = (e.shiftKey ? 10 : 1) * NUDGE_MM;
+        const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
+        const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
+        patchElements(selected, (el) => (el.locked ? el : { ...el, ...roundBox(nudgeBox(el, dx, dy, page)) }));
       }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [history, selectedId]);
+  }, [history, selected, selectedElements, layout, doc.data, removeSelected, cloneInto, patchElements, patchTextProps]);
 
   // Проверка стоит после всех хуков намеренно: ранний выход выше сломал бы
   // их порядок между отрисовками.
@@ -331,56 +637,119 @@ export function EditorPage() {
   if (!doc.data || !sheet) return <div className="p-6 text-slate-500">Документ не найден</div>;
 
   const page = doc.data;
+  const pageBox = { w: page.pageWidthMm, h: page.pageHeightMm };
 
   /**
-   * Добавляет элемент в середину листа.
+   * Добавляет блок в середину листа.
    *
    * Свойства прогоняем через схему, а не задаём вручную: умолчания живут
    * в одном месте, и новый блок гарантированно такой же, каким его увидит
    * печать. Иначе редактор и рендер разошлись бы на первом же новом поле.
    */
-  function addElement(
-    type: 'text' | 'qr' | 'link',
-    size: { w: number; h: number },
-    text?: string,
-  ) {
-    const seed: Record<string, unknown> =
-      type === 'text'
-        ? { text: text ?? 'Награждается %name' }
-        : type === 'link'
-          ? { text: 'Проверить подлинность', url: 'https://vruchay.ru' }
-          : {};
+  function addElement(what: InsertKind) {
+    const size =
+      what.type === 'text'
+        ? { w: 120, h: 20 }
+        : what.type === 'qr'
+          ? { w: 30, h: 30 }
+          : what.type === 'link'
+            ? { w: 80, h: 10 }
+            : what.kind === 'line'
+              ? { w: 80, h: 2 }
+              : what.kind === 'rect'
+                ? { w: 60, h: 40 }
+                : { w: 40, h: 40 };
 
-    const el = {
-      id: crypto.randomUUID(),
-      type,
-      x: page.pageWidthMm / 2 - size.w / 2,
-      y: page.pageHeightMm / 2 - size.h / 2,
-      w: size.w,
-      h: size.h,
-      rotation: 0,
-      z: layout.length,
-      props: sheetLayout.parse([
-        { id: 'tmp', type, x: 0, y: 0, w: 1, h: 1, props: seed },
-      ])[0].props,
-    } as SheetElement;
+    const seed: Record<string, unknown> =
+      what.type === 'text'
+        ? what.field
+          ? { doc: docWithField(what.field.source, what.field.fieldId) }
+          : { text: 'Награждается %name' }
+        : what.type === 'link'
+          ? { url: 'https://vruchay.ru' }
+          : what.type === 'shape'
+            ? { kind: what.kind, strokeWidth: what.kind === 'line' ? 0.5 : 0.5, fill: null }
+            : {};
+
+    const maxZ = Math.max(-1, ...layout.map((el) => el.z));
+    const el = sheetLayout.parse([
+      {
+        id: crypto.randomUUID(),
+        type: what.type,
+        x: page.pageWidthMm / 2 - size.w / 2,
+        y: page.pageHeightMm / 2 - size.h / 2,
+        w: size.w,
+        h: size.h,
+        rotation: 0,
+        z: maxZ + 1,
+        props: seed,
+      },
+    ])[0];
 
     history.setLayout((prev) => [...prev, el]);
-    setSelectedId(el.id);
+    setSelected(new Set([el.id]));
+    setPanel('props');
   }
 
-  function patchProps(patch: Partial<TextElement['props']>, commit = true) {
-    if (!selectedId) return;
-    history.setLayout(
-      (prev) =>
-        prev.map((el) =>
-          el.id === selectedId && el.type === 'text'
-            ? { ...el, props: { ...el.props, ...patch } }
-            : el,
-        ) as SheetElement[],
-      commit,
+  function align(kind: AlignKind) {
+    const items = selectedElements.filter((el) => !el.locked);
+    if (!items.length) return;
+    const frame = items.length > 1 ? boundingBox(items)! : { x: 0, y: 0, ...pageBox };
+    const boxes = alignBoxes(items, kind, frame);
+    updateBoxes(Object.fromEntries(items.map((el, i) => [el.id, boxes[i]])), true);
+  }
+
+  function distribute(axis: 'h' | 'v') {
+    const items = selectedElements.filter((el) => !el.locked);
+    const boxes = distributeBoxes(items, axis);
+    updateBoxes(Object.fromEntries(items.map((el, i) => [el.id, boxes[i]])), true);
+  }
+
+  function applyStyleToAll() {
+    const source = selectedElements.find((el): el is TextElement => el.type === 'text');
+    if (!source) return;
+    const { fontFamily, color } = source.props;
+    history.setLayout((prev) =>
+      prev.map((el) => (el.type === 'text' ? { ...el, props: { ...el.props, fontFamily, color } } : el)),
     );
   }
+
+  function startMove(e: React.PointerEvent, el: SheetElement) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (editingId && editingId !== el.id) setEditingId(null);
+    const additive = e.shiftKey;
+    // Что окажется выделенным после этого клика — считаем сразу, чтобы жест
+    // вёл именно эту группу, а не ту, что была до клика.
+    let next: ReadonlySet<string>;
+    if (additive) {
+      const base = new Set(selected);
+      if (base.has(el.id)) base.delete(el.id);
+      else base.add(el.id);
+      next = expandToGroups(layout, base);
+    } else {
+      next = selected.has(el.id) ? selected : expandToGroups(layout, [el.id]);
+    }
+    setSelected(next);
+    if (el.locked) return;
+    const boxes: Record<string, Box> = {};
+    for (const item of layout) {
+      if (next.has(item.id) && !item.locked) boxes[item.id] = { x: item.x, y: item.y, w: item.w, h: item.h };
+    }
+    gesture.current = { kind: 'move', boxes, startX: e.clientX, startY: e.clientY, moved: false };
+  }
+
+  function startMarquee(e: React.PointerEvent) {
+    if (e.button !== 0) return;
+    setEditingId(null);
+    if (!e.shiftKey) setSelected(new Set());
+    gesture.current = { kind: 'marquee', additive: e.shiftKey, base: selected, startX: e.clientX, startY: e.clientY, moved: false };
+  }
+
+  const frame = selectedElements.length > 1 ? boundingBox(selectedElements) : null;
+  const single = selectedElements.length === 1 ? selectedElements[0] : null;
+  const px = (mm: number) => mm * PX_PER_MM * zoom;
+  const dataMode = viewMode === 'data';
 
   return (
     <div className="flex h-full flex-col">
@@ -390,11 +759,7 @@ export function EditorPage() {
           className="flex items-center gap-1.5 text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--text)]"
         >
           <ChevronLeft size={16} />
-          {/* Именно «Материалы», как называется страница, куда ведёт ссылка.
-              Разница со словом «документ» здесь по существу: материал —
-              это заготовка, а документы — то, что из неё выпускается
-              («создать документы», «осталось 50 документов»). Ссылка,
-              обещавшая «Документы», приводила на «Материалы». */}
+          {/* Именно «Материалы», как называется страница, куда ведёт ссылка. */}
           Материалы
         </Link>
 
@@ -402,7 +767,7 @@ export function EditorPage() {
 
         <InsertMenu
           onInsert={addElement}
-          variables={recipients.data?.columns.map((c) => c.name) ?? []}
+          fields={fields}
           onBackground={() => backgroundInput.current?.click()}
           backgroundLoading={uploadBackground.isPending}
           hasBackground={Boolean(sheet.backgroundFileId)}
@@ -429,30 +794,41 @@ export function EditorPage() {
           </span>
         )}
 
+        {/* Два взгляда на лист: заготовка с фишками полей и настоящая строка
+            таблицы. Второй — чтобы увидеть, как ляжет длинная фамилия, не
+            выпуская ничего. */}
+        <div className="flex items-center gap-1 rounded-lg p-0.5 ring-1 ring-[var(--line)]">
+          <Segment active={!dataMode} onClick={() => setViewMode('placeholders')}>
+            Заготовка
+          </Segment>
+          <Segment active={dataMode} onClick={() => setViewMode('data')} disabled={rowCount === 0} title={rowCount === 0 ? 'Список пока пустой' : undefined}>
+            Данные строки
+          </Segment>
+          {dataMode && rowCount > 0 && (
+            <span className="tabular flex items-center gap-0.5 pl-1 text-sm text-[var(--text-muted)]">
+              <button type="button" aria-label="Предыдущая строка" onClick={() => setRowIndex((i) => Math.max(0, i - 1))} className="rounded p-0.5 hover:bg-[var(--surface-sunken)]">
+                <ChevronLeft size={14} />
+              </button>
+              {safeRow + 1} / {rowCount}
+              <button type="button" aria-label="Следующая строка" onClick={() => setRowIndex((i) => Math.min(rowCount - 1, i + 1))} className="rounded p-0.5 hover:bg-[var(--surface-sunken)]">
+                <ChevronRight size={14} />
+              </button>
+            </span>
+          )}
+        </div>
+
         <div className="ml-auto flex items-center gap-2">
-          {/* С подписью, а не одними стрелками: две одинаковые серые иконки
-              не читаются как «отмена», и человек их просто не находит.
-              Заблокированное состояние тоже обязательно — активная кнопка,
-              по которой ничего не происходит, выглядит как сломанная. */}
-          <Button
-            size="sm"
-            variant="ghost"
-            icon={<Undo2 size={15} />}
-            onClick={history.undo}
-            disabled={!history.canUndo}
-            title="Отменить (Ctrl+Z)"
-          >
+          <Button size="sm" variant="ghost" icon={<Undo2 size={15} />} onClick={history.undo} disabled={!history.canUndo} title="Отменить (Ctrl+Z)">
             Отменить
           </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            icon={<Redo2 size={15} />}
-            onClick={history.redo}
-            disabled={!history.canRedo}
-            title="Вернуть (Ctrl+Shift+Z)"
-            aria-label="Вернуть"
-          />
+          <Button size="sm" variant="ghost" icon={<Redo2 size={15} />} onClick={history.redo} disabled={!history.canRedo} title="Вернуть (Ctrl+Shift+Z)" aria-label="Вернуть" />
+
+          <IconButton active={showGrid} onClick={() => setShowGrid((v) => !v)} title="Сетка 5 мм и прилипание к ней">
+            <Grid3x3 size={15} />
+          </IconButton>
+          <IconButton active={snapping} onClick={() => setSnapping((v) => !v)} title="Прилипание к краям и центрам (Alt — временно выключить)">
+            <Magnet size={15} />
+          </IconButton>
 
           <div className="flex items-center gap-2 rounded-lg px-2 py-1 ring-1 ring-[var(--line)]">
             <ZoomIn size={15} className="text-[var(--text-muted)]" />
@@ -465,9 +841,7 @@ export function EditorPage() {
               aria-label="Масштаб"
               className="w-24 accent-[var(--accent)]"
             />
-            <span className="tabular w-10 text-right text-sm text-[var(--text-muted)]">
-              {Math.round(zoom * 100)}%
-            </span>
+            <span className="tabular w-10 text-right text-sm text-[var(--text-muted)]">{Math.round(zoom * 100)}%</span>
           </div>
 
           <StatusChip tone={saved === 'saved' ? 'done' : saved === 'saving' ? 'progress' : 'neutral'}>
@@ -486,11 +860,7 @@ export function EditorPage() {
             )}
           </StatusChip>
 
-          {/* Выход из редактора в работу со списком — одной кнопкой.
-              Раньше на её месте была вкладка, и разница не косметическая:
-              вкладка обещает, что список — часть макета, а он часть
-              награждения. Правки долетают сами, поэтому уводим без
-              вопросов и без «сохранить перед выходом». */}
+          {/* Выход из редактора в работу со списком — одной кнопкой. */}
           <Link to={workspacePath(id)}>
             <Button size="sm" variant="primary" icon={<Send size={15} />}>
               Готово → к рассылке
@@ -504,24 +874,6 @@ export function EditorPage() {
           ref={containerRef}
           className="relative grid flex-1 place-items-center overflow-auto bg-[var(--surface-sunken)] p-6"
         >
-          {/*
-            Пустой холст обязан объяснять себя сам.
-
-            Сюда попадают не только из библиотеки: «Загрузить протокол
-            соревнований» с рабочего стола заводит материал и открывает
-            его же — с чистым листом и без единого следа заготовок,
-            потому что галерея заготовок живёт на экране создания
-            материала, то есть уже позади. Человек оставался перед пустым
-            прямоугольником и уходил.
-
-            Ссылка ведёт назад в библиотеку — туда, где заготовку ещё
-            можно выбрать. Настоящая связка «протокол → заготовка» здесь
-            не решается: это вопрос устройства потока, и он относится
-            к блоку 7. Это заплатка, снимающая тупик, а не готовый поток.
-
-            Подсказка исчезает, как только шаг сделан: постоянная
-            подсказка быстро становится мусором на экране.
-          */}
           {!sheet.backgroundFileId && layout.length === 0 && (
             <div className="absolute inset-x-0 top-6 z-10 flex justify-center px-6">
               <div className="max-w-sm rounded-2xl bg-[var(--surface)] px-5 py-4 text-center shadow-sm ring-1 ring-[var(--line)]">
@@ -546,90 +898,272 @@ export function EditorPage() {
               </p>
             </div>
           )}
-          <div
-            className="relative shadow-lg"
-            style={{
-              width: page.pageWidthMm * PX_PER_MM * zoom,
-              height: page.pageHeightMm * PX_PER_MM * zoom,
-            }}
-          >
-            <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}>
-              <SheetRenderer
-                layout={layout}
-                pageWidthMm={page.pageWidthMm}
-                pageHeightMm={page.pageHeightMm}
-                backgroundUrl={background.data?.url}
-                data={previewData}
-                unfilled="token"
-                selectedIds={selectedId ? new Set([selectedId]) : null}
-                onSelect={(id) => setSelectedId(id)}
-              />
-            </div>
 
-            {/* Слой жестов поверх листа: рамка выделения и ручки размера. */}
-            {layout.map((el) => (
-              <div
-                key={el.id}
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  setSelectedId(el.id);
-                  gesture.current = {
-                    kind: 'move',
-                    id: el.id,
-                    startX: e.clientX,
-                    startY: e.clientY,
-                    box: { x: el.x, y: el.y, w: el.w, h: el.h },
-                    moved: false,
-                  };
-                }}
-                style={{
-                  position: 'absolute',
-                  left: el.x * PX_PER_MM * zoom,
-                  top: el.y * PX_PER_MM * zoom,
-                  width: el.w * PX_PER_MM * zoom,
-                  height: el.h * PX_PER_MM * zoom,
-                  cursor: 'move',
-                }}
-                className={selectedId === el.id ? 'ring-2 ring-[var(--focus)]' : ''}
-              >
-                {selectedId === el.id &&
-                  HANDLES.map((handle) => (
+          <div className="relative" style={{ padding: 18 }}>
+            {/* Линейки в миллиметрах — по краям листа. */}
+            <Ruler axis="x" lengthMm={page.pageWidthMm} zoom={zoom} />
+            <Ruler axis="y" lengthMm={page.pageHeightMm} zoom={zoom} />
+
+            <div
+              ref={sheetRef}
+              className="relative shadow-lg"
+              style={{ width: px(page.pageWidthMm), height: px(page.pageHeightMm) }}
+              onPointerDown={startMarquee}
+            >
+              <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}>
+                <SheetRenderer
+                  layout={layout}
+                  pageWidthMm={page.pageWidthMm}
+                  pageHeightMm={page.pageHeightMm}
+                  backgroundUrl={background.data?.url}
+                  data={previewData}
+                  unfilled={dataMode ? 'blank' : 'token'}
+                  fields={dataMode ? 'highlight' : 'chip'}
+                  knownFields={known}
+                  fieldLabels={labels}
+                  selectedIds={selected}
+                  onSelect={(elementId, additive) => elementId && select(elementId, additive)}
+                  onEdit={(elementId) => setEditingId(elementId)}
+                  editingId={editingId}
+                  renderEditing={(element) => (
+                    <InlineTextEditor
+                      key={element.id}
+                      element={element}
+                      fields={fields}
+                      data={previewData}
+                      known={known}
+                      labels={labels}
+                      onEditor={(editor) => {
+                        liveEditor.current = editor;
+                      }}
+                      onChange={(richDoc) => setDoc(element.id, richDoc, false)}
+                      onDone={(richDoc) => {
+                        liveEditor.current = null;
+                        setDoc(element.id, richDoc, true);
+                        setEditingId(null);
+                      }}
+                    />
+                  )}
+                />
+              </div>
+
+              {showGrid && (
+                <div
+                  className="pointer-events-none absolute inset-0"
+                  style={{
+                    backgroundImage:
+                      'linear-gradient(to right, rgba(0,0,0,0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.08) 1px, transparent 1px)',
+                    backgroundSize: `${px(GRID_MM)}px ${px(GRID_MM)}px`,
+                  }}
+                />
+              )}
+
+              {/* Направляющие, к которым прилип двигаемый блок. */}
+              {guides.map((g, i) => (
+                <div
+                  key={i}
+                  className="pointer-events-none absolute bg-[var(--accent)]"
+                  style={
+                    g.axis === 'x'
+                      ? { left: px(g.at), top: 0, width: 1, height: '100%' }
+                      : { top: px(g.at), left: 0, height: 1, width: '100%' }
+                  }
+                />
+              ))}
+
+              {/* Слой жестов поверх листа: рамки выделения и ручки. */}
+              {layout
+                .filter((el) => !el.hidden)
+                .map((el) => {
+                  const isSelected = selected.has(el.id);
+                  const editing = editingId === el.id;
+                  return (
+                    <div
+                      key={el.id}
+                      onPointerDown={(e) => startMove(e, el)}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        if (el.type === 'text' && !el.locked) setEditingId(el.id);
+                      }}
+                      onDragOver={(e) => {
+                        if (el.type === 'text' && e.dataTransfer.types.includes(FIELD_DRAG_TYPE)) e.preventDefault();
+                      }}
+                      onDrop={(e) => {
+                        if (el.type !== 'text') return;
+                        const raw = e.dataTransfer.getData(FIELD_DRAG_TYPE);
+                        if (!raw) return;
+                        e.preventDefault();
+                        const { source, fieldId } = JSON.parse(raw) as { source: string; fieldId: string | null };
+                        setDoc(el.id, appendField(el.props.doc, source, fieldId), true);
+                        setSelected(new Set([el.id]));
+                      }}
+                      style={{
+                        position: 'absolute',
+                        left: px(el.x),
+                        top: px(el.y),
+                        width: px(el.w),
+                        height: px(el.h),
+                        transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined,
+                        cursor: el.locked ? 'not-allowed' : 'move',
+                        pointerEvents: editing ? 'none' : undefined,
+                      }}
+                      className={isSelected && !frame ? (el.locked ? 'ring-2 ring-[var(--text-muted)]' : 'ring-2 ring-[var(--focus)]') : ''}
+                    >
+                      {single?.id === el.id && !el.locked && !editing && (
+                        <>
+                          {HANDLES.map((handle) => (
+                            <span
+                              key={handle}
+                              onPointerDown={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                gesture.current = {
+                                  kind: 'resize',
+                                  id: el.id,
+                                  handle,
+                                  startX: e.clientX,
+                                  startY: e.clientY,
+                                  box: { x: el.x, y: el.y, w: el.w, h: el.h },
+                                  moved: false,
+                                };
+                              }}
+                              style={handleStyle(handle)}
+                              className="absolute h-2.5 w-2.5 rounded-full border border-[var(--surface)] bg-[var(--focus)]"
+                            />
+                          ))}
+                          {/* Ручка поворота — над верхним краем. Shift — с шагом в 15°. */}
+                          <span
+                            onPointerDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              const rect = (e.currentTarget.parentElement as HTMLElement).getBoundingClientRect();
+                              gesture.current = {
+                                kind: 'rotate',
+                                id: el.id,
+                                center: { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 },
+                                startX: e.clientX,
+                                startY: e.clientY,
+                                moved: false,
+                              };
+                            }}
+                            title="Повернуть (Shift — с шагом 15°)"
+                            style={{ top: -22, left: 'calc(50% - 5px)', cursor: 'grab' }}
+                            className="absolute h-2.5 w-2.5 rounded-full border border-[var(--surface)] bg-[var(--accent)]"
+                          />
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+
+              {/* Общая рамка группы — с угловыми ручками масштаба. */}
+              {frame && (
+                <div
+                  className="pointer-events-none absolute ring-2 ring-[var(--focus)]"
+                  style={{ left: px(frame.x), top: px(frame.y), width: px(frame.w), height: px(frame.h) }}
+                >
+                  {CORNERS.map((handle) => (
                     <span
                       key={handle}
                       onPointerDown={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
+                        const movable = selectedElements.filter((el) => !el.locked);
                         gesture.current = {
-                          kind: 'resize',
-                          id: el.id,
+                          kind: 'scale',
                           handle,
+                          frame,
+                          boxes: Object.fromEntries(movable.map((el) => [el.id, { x: el.x, y: el.y, w: el.w, h: el.h }])),
+                          sizes: Object.fromEntries(movable.map((el) => [el.id, el.type === 'text' ? el.props.fontSize : 0])),
                           startX: e.clientX,
                           startY: e.clientY,
-                          box: { x: el.x, y: el.y, w: el.w, h: el.h },
                           moved: false,
                         };
                       }}
-                      style={handleStyle(handle)}
-                      className="absolute h-2.5 w-2.5 rounded-full border border-[var(--surface)] bg-[var(--focus)]"
+                      style={{ ...handleStyle(handle), pointerEvents: 'auto' }}
+                      className="absolute h-3 w-3 rounded-sm border border-[var(--surface)] bg-[var(--focus)]"
                     />
                   ))}
-              </div>
-            ))}
+                </div>
+              )}
+
+              {marquee && (
+                <div
+                  className="pointer-events-none absolute border border-[var(--focus)] bg-[var(--focus)]/10"
+                  style={{ left: px(marquee.x), top: px(marquee.y), width: px(marquee.w), height: px(marquee.h) }}
+                />
+              )}
+            </div>
           </div>
         </div>
 
-        <PropertiesPanel
-          element={selected}
-          doc={doc.data}
-          onSaveEvent={(values) => saveEvent.mutate(values)}
-          onEventDraft={setEventDraft}
-          onChange={patchProps}
-          onDelete={() => {
-            if (!selectedId) return;
-            history.setLayout((prev) => prev.filter((el) => el.id !== selectedId));
-            setSelectedId(null);
-          }}
-        />
+        <aside className="flex w-80 shrink-0 flex-col border-l border-[var(--line)] bg-[var(--surface)]">
+          <div className="flex border-b border-[var(--line)]">
+            <Tab active={panel === 'props'} onClick={() => setPanel('props')} icon={<SlidersHorizontal size={14} />}>
+              Свойства
+            </Tab>
+            <Tab active={panel === 'fields'} onClick={() => setPanel('fields')} icon={<Table2 size={14} />} badge={matches.length || undefined}>
+              Поля
+            </Tab>
+            <Tab active={panel === 'layers'} onClick={() => setPanel('layers')} icon={<Layers size={14} />}>
+              Слои
+            </Tab>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-4">
+            {panel === 'props' && (
+              <PropertiesPanel
+                elements={selectedElements}
+                page={pageBox}
+                doc={doc.data}
+                onSaveEvent={(values) => saveEvent.mutate(values)}
+                onEventDraft={setEventDraft}
+                onTextProps={patchTextProps}
+                onShapeProps={patchShapeProps}
+                onElement={(patch, commit) => patchElements(selected, (el) => ({ ...el, ...patch }) as SheetElement, commit)}
+                onBox={(elementId, box) => {
+                  const safe = { ...box, w: Math.max(box.w, 5), h: Math.max(box.h, 5) };
+                  updateBoxes({ [elementId]: moveBox(safe, 0, 0, pageBox.w, pageBox.h) }, true);
+                }}
+                onAlign={align}
+                onDistribute={distribute}
+                onGroup={() => {
+                  const groupId = crypto.randomUUID();
+                  patchElements(selected, (el) => ({ ...el, groupId }));
+                }}
+                onUngroup={() => patchElements(selected, (el) => ({ ...el, groupId: null }))}
+                onLayer={(where) => {
+                  let next = layout;
+                  for (const elementId of selected) next = moveLayer(next, elementId, where);
+                  history.setLayout(next);
+                }}
+                onApplyStyleToAll={applyStyleToAll}
+                onCopyStyle={() => {
+                  const source = selectedElements.find((el): el is TextElement => el.type === 'text');
+                  if (source) setStyleClipboard(pickTextStyle(source.props));
+                }}
+                onPasteStyle={() => styleClipboard && patchTextProps(styleClipboard)}
+                hasStyleClipboard={styleClipboard !== null}
+                onDelete={removeSelected}
+              />
+            )}
+            {panel === 'fields' && (
+              <FieldsPanel
+                fields={fields}
+                matches={matches}
+                onInsert={insertField}
+                onAutoMatch={() => history.setLayout(applyMatches(layout, matches))}
+              />
+            )}
+            {panel === 'layers' && (
+              <LayersPanel
+                layout={layout}
+                selected={selected}
+                onSelect={(elementId, additive) => select(elementId, additive)}
+                onChange={(next: SheetLayout) => history.setLayout(next)}
+              />
+            )}
+          </div>
+        </aside>
       </div>
 
       {fit && (
@@ -661,4 +1195,135 @@ function handleStyle(handle: ResizeHandle): React.CSSProperties {
     w: 'ew-resize',
   };
   return { top: vertical, left: horizontal, cursor: cursors[handle] };
+}
+
+/** Линейка в миллиметрах: штрих каждые 5 мм, число каждые 50. */
+function Ruler({ axis, lengthMm, zoom }: { axis: 'x' | 'y'; lengthMm: number; zoom: number }) {
+  const ticks: number[] = [];
+  for (let mm = 0; mm <= lengthMm; mm += 5) ticks.push(mm);
+  const px = (mm: number) => mm * PX_PER_MM * zoom;
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none absolute text-[9px] text-[var(--text-muted)]"
+      style={
+        axis === 'x'
+          ? { left: 18, top: 0, width: px(lengthMm), height: 18 }
+          : { top: 18, left: 0, height: px(lengthMm), width: 18 }
+      }
+    >
+      {ticks.map((mm) => {
+        const major = mm % 50 === 0;
+        const size = major ? 10 : mm % 10 === 0 ? 6 : 3;
+        return (
+          <span
+            key={mm}
+            className="absolute bg-[var(--line-strong)]"
+            style={
+              axis === 'x'
+                ? { left: px(mm), bottom: 0, width: 1, height: size }
+                : { top: px(mm), right: 0, height: 1, width: size }
+            }
+          >
+            {major && mm > 0 && (
+              <span
+                className="absolute"
+                style={axis === 'x' ? { left: 2, bottom: 6 } : { top: -12, right: 12, transform: 'rotate(-90deg)' }}
+              >
+                {mm}
+              </span>
+            )}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+function Segment({
+  active,
+  onClick,
+  disabled,
+  title,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  disabled?: boolean;
+  title?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      aria-pressed={active}
+      className={`rounded-md px-2.5 py-1 text-sm transition-colors disabled:opacity-50 ${
+        active ? 'bg-[var(--accent-soft)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text)]'
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function IconButton({
+  active,
+  onClick,
+  title,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+      aria-pressed={active}
+      className={`grid h-8 w-8 place-items-center rounded-lg ring-1 transition-colors ${
+        active ? 'bg-[var(--accent-soft)] text-[var(--accent)] ring-[var(--accent)]/40' : 'text-[var(--text-muted)] ring-[var(--line)] hover:bg-[var(--surface-sunken)]'
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Tab({
+  active,
+  onClick,
+  icon,
+  badge,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  badge?: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-selected={active}
+      role="tab"
+      className={`flex flex-1 items-center justify-center gap-1.5 border-b-2 px-2 py-2 text-sm ${
+        active ? 'border-[var(--accent)] text-[var(--accent)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text)]'
+      }`}
+    >
+      {icon}
+      {children}
+      {badge ? (
+        <span className="rounded-full bg-[var(--accent)] px-1.5 text-[10px] font-medium text-white">{badge}</span>
+      ) : null}
+    </button>
+  );
 }
