@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
 
-/** Состояние выданного документа: действителен, отозван или заменён. */
-export type FileState = 'valid' | 'revoked' | 'replaced';
+/** Состояние выданного документа: действителен, отозван, заменён или срок истёк. */
+export type FileState = 'valid' | 'revoked' | 'replaced' | 'expired';
 
 export interface RegistryRow {
   fileId: string;
@@ -18,6 +18,8 @@ export interface RegistryRow {
   eventName: string;
   eventDate: string;
   issuedAt: string;
+  /** Когда документ перестаёт действовать. null — бессрочный. */
+  expiresAt: string | null;
   state: FileState;
   /** Перевыпуск заказан, но нового документа ещё нет. */
   reissuePending: boolean;
@@ -58,6 +60,7 @@ export interface RegistryAnalytics {
   issued: number;
   revoked: number;
   replaced: number;
+  expired: number;
   mail: {
     queued: number;
     sent: number;
@@ -127,7 +130,7 @@ export const emptyFilters: RegistryFilters = {
 };
 
 /** Состояния, которые отбор вообще знает. */
-const STATES: FileState[] = ['valid', 'revoked', 'replaced'];
+const STATES: FileState[] = ['valid', 'revoked', 'replaced', 'expired'];
 
 /**
  * Отбор из строки адреса.

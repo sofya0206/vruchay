@@ -9,7 +9,7 @@
  * же разбирается адрес, и вкладка, которую можно назвать в ссылке,
  * не может разойтись с вкладкой, которая нарисована.
  */
-export type WorkspaceTab = 'table' | 'rules' | 'check' | 'mail';
+export type WorkspaceTab = 'table' | 'rules' | 'check' | 'mail' | 'verify';
 
 export interface WorkspaceTabInfo {
   id: WorkspaceTab;
@@ -23,6 +23,10 @@ export const WORKSPACE_TABS: WorkspaceTabInfo[] = [
   // собран, и до того, как из него что-то выпустят.
   { id: 'check', label: 'Проверка' },
   { id: 'mail', label: 'Письмо' },
+  // Подлинность — про уже выданное: срок действия, страница проверки.
+  // Живёт здесь, а не в редакторе макета, по той же причине, что и
+  // остальные вкладки: это настройки выпуска, а не рисунка на листе.
+  { id: 'verify', label: 'Подлинность' },
 ];
 
 /**

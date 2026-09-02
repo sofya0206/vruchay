@@ -56,6 +56,18 @@ describe('условие выборки реестра', () => {
     expect(byCode.OR).toContainEqual({ publicId: code });
   });
 
+  it('«истёк» и «действителен» делят документы по сроку той же границей, что fileState', () => {
+    const now = new Date('2026-06-17T12:00:00.000Z');
+
+    const expired = registryWhere(ORG, { state: 'expired' }, [], now);
+    expect(expired.verifyRevoked).toBe(false);
+    expect(expired.replacedById).toBeNull();
+    expect(expired.expiresAt).toEqual({ lte: now });
+
+    const valid = registryWhere(ORG, { state: 'valid' }, [], now);
+    expect(valid.AND).toEqual([{ OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] }]);
+  });
+
   it('короткий код ищется в любом написании и тоже только целиком', () => {
     // Так его диктуют по телефону: строчными, без дефисов, с O вместо нуля.
     const byShort = registryWhere(ORG, { search: 'k7m2 9qxr 4tvo' });

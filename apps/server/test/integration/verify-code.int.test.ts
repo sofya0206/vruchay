@@ -94,6 +94,39 @@ describe('старый UUID и новый код на одной страниц�
     ).rejects.toMatchObject({ code: 'P2002' });
   });
 
+  it('истёкший документ отвечает страницей «срок истёк», а не отказом, и реестр его отбирает', async () => {
+    const document = await app.prisma.document.findFirstOrThrow();
+    // Позиция после уже заведённых строк: пара (документ, позиция) уникальна.
+    const row = await app.prisma.recipientRow.create({
+      data: {
+        documentId: document.id,
+        position: 10,
+        data: { name: 'Петров Илья', email: 'petrov@example.ru' },
+      },
+    });
+    const expired = await makeIssuedFile(app.prisma, {
+      orgId,
+      documentId: document.id,
+      rowId: row.id,
+    });
+    await app.prisma.file.update({
+      where: { id: expired.id },
+      data: { expiresAt: new Date(Date.now() - 60_000) },
+    });
+
+    const answer = await app.verify.check(expired.publicId);
+    expect(answer.valid).toBe(false);
+    expect(answer.expired).toBe(true);
+    expect(answer.fields).toEqual({ name: 'Петров Илья' });
+
+    const page = await app.registry.list(orgId, { limit: 50, offset: 0, state: 'expired' });
+    expect(page.items.map((i) => i.fileId)).toEqual([expired.id]);
+    expect(page.items[0].state).toBe('expired');
+
+    const valid = await app.registry.list(orgId, { limit: 50, offset: 0, state: 'valid' });
+    expect(valid.items.map((i) => i.fileId)).not.toContain(expired.id);
+  });
+
   it('реестр ищет по короткому коду в любом написании', async () => {
     const page = await app.registry.list(orgId, {
       limit: 50,

@@ -13,6 +13,7 @@ interface Issued {
   publicId: string;
   publicCode: string | null;
   createdAt: Date;
+  expiresAt: Date | null;
   verifyRevoked: boolean;
   rowId: string | null;
   replacedById: string | null;
@@ -29,6 +30,7 @@ function issued(over: Partial<Issued> = {}): Issued {
     publicId: '11111111-1111-4111-8111-111111111111',
     publicCode: null,
     createdAt: new Date('2026-06-17T09:00:00Z'),
+    expiresAt: null,
     verifyRevoked: false,
     rowId: 'row-1',
     replacedById: null,
@@ -124,6 +126,37 @@ describe('страница проверки: старый UUID и новый к�
     const { controller } = controllerWith([issued()]);
     const answer = await controller.check('11111111-1111-4111-8111-111111111111');
     expect(answer.fields).toEqual({ name: 'Иванов Пётр Ильич' });
+  });
+});
+
+describe('страница проверки: срок действия', () => {
+  it('до истечения документ действителен и показывает, до какого числа', async () => {
+    const soon = new Date(Date.now() + 60 * 60 * 1000);
+    const { controller } = controllerWith([issued({ expiresAt: soon })]);
+    const answer = await controller.check('11111111-1111-4111-8111-111111111111');
+    expect(answer.valid).toBe(true);
+    expect(answer.expired).toBe(false);
+    expect(answer.state).toBe('valid');
+    expect(answer.expiresAt).toEqual(soon);
+  });
+
+  it('истёкший — это 200 с жёлтой страницей, а не «не найдено»', async () => {
+    const past = new Date(Date.now() - 1000);
+    const { controller } = controllerWith([issued({ expiresAt: past })]);
+    const answer = await controller.check('11111111-1111-4111-8111-111111111111');
+    expect(answer.valid).toBe(false);
+    expect(answer.expired).toBe(true);
+    expect(answer.state).toBe('expired');
+    // Поля остаются: документ был настоящим, и человеку это надо видеть.
+    expect(answer.fields).toEqual({ name: 'Иванов Пётр Ильич' });
+  });
+
+  it('заменённый документ показывает замену, а не истечение срока', async () => {
+    const past = new Date(Date.now() - 1000);
+    const { controller } = controllerWith([issued({ expiresAt: past, replacedById: 'new' })]);
+    const answer = await controller.check('11111111-1111-4111-8111-111111111111');
+    expect(answer.replaced).toBe(true);
+    expect(answer.expired).toBe(false);
   });
 });
 

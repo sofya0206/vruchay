@@ -27,6 +27,8 @@ export interface RegistryRow {
   eventName: string;
   eventDate: string;
   issuedAt: Date;
+  /** Когда документ перестаёт действовать. Null — бессрочный. */
+  expiresAt: Date | null;
   state: FileState;
   /** Перевыпуск заказан, но нового документа ещё нет. */
   reissuePending: boolean;
@@ -232,6 +234,7 @@ export class RegistryService {
       'Материал',
       'Мероприятие',
       'Выдан',
+      'Действителен до',
       'Проверочный код',
       'Состояние',
       'Письмо',
@@ -249,6 +252,7 @@ export class RegistryService {
           item.documentTitle,
           item.eventName,
           formatDate(item.issuedAt),
+          item.expiresAt ? formatDate(item.expiresAt) : '',
           item.code,
           stateLabel(item.state, item.reissuePending),
           mailLabel(item.mail?.status ?? null),
@@ -343,6 +347,7 @@ export class RegistryService {
         eventName: file.document?.eventName ?? '',
         eventDate: file.document?.eventDate ?? '',
         issuedAt: file.createdAt,
+        expiresAt: file.expiresAt,
         state: fileState(file),
         reissuePending: file.replacedByJobId !== null && file.replacedById === null,
         replacedBy: replacement
@@ -380,6 +385,7 @@ const fileSelect = {
   publicCode: true,
   documentId: true,
   createdAt: true,
+  expiresAt: true,
   verifyRevoked: true,
   replacedById: true,
   replacedByJobId: true,
@@ -422,6 +428,7 @@ function formatDate(date: Date): string {
 export function stateLabel(state: FileState, pending: boolean): string {
   if (state === 'revoked') return 'отозван';
   if (state === 'replaced') return 'заменён';
+  if (state === 'expired') return 'срок истёк';
   return pending ? 'перевыпускается' : 'действителен';
 }
 

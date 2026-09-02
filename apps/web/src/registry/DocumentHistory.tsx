@@ -82,6 +82,7 @@ export function DocumentHistory({ fileId, onClose }: Props) {
 
             <dl className="space-y-2 border-y border-[var(--line)] py-4 text-sm">
               <Fact label="Выдан">{formatDateTime(row.issuedAt)}</Fact>
+              {row.expiresAt && <Fact label="Действителен до">{formatDate(row.expiresAt)}</Fact>}
               <Fact label="Адрес почты">{row.email || '—'}</Fact>
               <Fact label="Проверочный код">
                 <span className="font-mono text-xs">{row.code}</span>

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
-import { BadgeCheck, RefreshCw, ShieldX } from 'lucide-react';
+import { BadgeCheck, CalendarX, RefreshCw, ShieldX } from 'lucide-react';
 import { api } from '../api/client';
 import { Meta } from '../seo/Meta';
 
@@ -8,8 +8,11 @@ interface VerifyResult {
   valid: boolean;
   /** Документ заменён перевыпущенным — это не то же самое, что отозван. */
   replaced: boolean;
+  /** Срок действия вышел: документ был настоящим, но подтверждает прошлое. */
+  expired: boolean;
   title: string;
   issuedAt: string;
+  expiresAt: string | null;
   fields: Record<string, string>;
   /** Код, напечатанный на бумаге, — по нему человек сверяет страницу с листом. */
   code: string;
@@ -92,6 +95,15 @@ export function VerifyDocumentPage() {
                     </p>
                   )}
                 </>
+              ) : check.data.expired ? (
+                <>
+                  <CalendarX size={40} className="mx-auto text-[var(--award)]" strokeWidth={1.5} />
+                  <h1 className="mt-4 font-serif text-2xl">Срок действия истёк</h1>
+                  <p className="mt-2 text-[var(--text-muted)]">
+                    Документ подлинный, но срок его действия закончился. Он подтверждает
+                    то, что было на момент выдачи, а не сегодняшний день.
+                  </p>
+                </>
               ) : (
                 <>
                   <BadgeCheck size={40} className="mx-auto text-[var(--accent)]" strokeWidth={1.5} />
@@ -117,6 +129,20 @@ export function VerifyDocumentPage() {
                     })}
                   </dd>
                 </div>
+                {check.data.expiresAt && (
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-[var(--text-muted)]">
+                      {check.data.expired ? 'Действовал до' : 'Действителен до'}
+                    </dt>
+                    <dd className="tabular text-right font-medium">
+                      {new Date(check.data.expiresAt).toLocaleDateString('ru-RU', {
+                        day: '2-digit',
+                        month: 'long',
+                        year: 'numeric',
+                      })}
+                    </dd>
+                  </div>
+                )}
               </dl>
             </div>
           )}

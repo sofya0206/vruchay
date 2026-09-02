@@ -27,6 +27,7 @@ export const SYSTEM_VARIABLES: SystemVariable[] = [
   { name: 'number', title: 'Номер по списку', hint: '1, 2, 3…' },
   { name: 'code', title: 'Проверочный код', hint: 'для сверки с QR' },
   { name: 'org', title: 'Название организации', hint: 'из настроек кабинета' },
+  { name: 'valid_until', title: 'Действителен до', hint: 'если у материала задан срок' },
 
   /*
    * Мероприятие. Заполняется один раз на весь документ, а не колонкой
@@ -98,6 +99,8 @@ export interface SystemVariableContext {
   number?: number;
   /** Публичный идентификатор экземпляра — он же в QR. */
   publicId?: string | null;
+  /** Когда документ перестаёт действовать. Нет срока — пусто на листе. */
+  expiresAt?: Date | null;
   /** Название организации-издателя. */
   orgName?: string;
   /** Мероприятие: одно на весь документ, заполняется в свойствах материала. */
@@ -128,24 +131,30 @@ export interface EventFields {
  * точка отсчёта для российской отчётности.
  */
 export function systemVariables(ctx: SystemVariableContext): Record<string, string> {
-  const date = new Intl.DateTimeFormat('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    timeZone: 'Europe/Moscow',
-  }).format(ctx.issuedAt);
+  const date = formatDate(ctx.issuedAt);
 
   return {
     date,
     year: date.slice(-4),
     number: ctx.number === undefined ? '' : String(ctx.number),
     code: ctx.publicId ?? '',
+    valid_until: ctx.expiresAt ? formatDate(ctx.expiresAt) : '',
     org: ctx.orgName ?? '',
     event: ctx.event?.name ?? '',
     event_date: ctx.event?.date ?? '',
     event_place: ctx.event?.place ?? '',
     hours: ctx.event?.hours ?? '',
   };
+}
+
+/** Дата по Москве в виде 04.08.2026 — так она печатается на документах. */
+function formatDate(value: Date): string {
+  return new Intl.DateTimeFormat('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    timeZone: 'Europe/Moscow',
+  }).format(value);
 }
 
 /**

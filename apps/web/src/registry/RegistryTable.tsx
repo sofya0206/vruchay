@@ -102,6 +102,11 @@ export function RegistryTable({ rows, selected, onToggle, onToggleAll, onOpen }:
 
                 <td className="px-3 py-3 align-top whitespace-nowrap tabular-nums">
                   {formatDate(row.issuedAt)}
+                  {row.expiresAt && (
+                    <p className="text-[11px] text-[var(--text-muted)]">
+                      до {formatDate(row.expiresAt)}
+                    </p>
+                  )}
                   <p className="font-mono text-[11px] text-[var(--text-muted)]">
                     {row.code.length > 14 ? row.code.slice(0, 8) : row.code}
                   </p>

@@ -22,12 +22,12 @@ describe('состояние выданного документа', () => {
 
   it('отзыв сильнее замены, замена сильнее срока', () => {
     const past = new Date('2020-01-01T00:00:00.000Z');
-    expect(
-      fileState({ verifyRevoked: true, replacedById: 'new', expiresAt: past }, NOW),
-    ).toBe('revoked');
-    expect(
-      fileState({ verifyRevoked: false, replacedById: 'new', expiresAt: past }, NOW),
-    ).toBe('replaced');
+    expect(fileState({ verifyRevoked: true, replacedById: 'new', expiresAt: past }, NOW)).toBe(
+      'revoked',
+    );
+    expect(fileState({ verifyRevoked: false, replacedById: 'new', expiresAt: past }, NOW)).toBe(
+      'replaced',
+    );
     expect(fileState({ verifyRevoked: false, replacedById: null, expiresAt: past }, NOW)).toBe(
       'expired',
     );

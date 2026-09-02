@@ -19,6 +19,7 @@ export function registryWhere(
   orgId: string,
   filter: RegistryFilterDto,
   ids: string[] = [],
+  now: Date = new Date(),
 ): Prisma.FileWhereInput {
   const where: Prisma.FileWhereInput = {
     orgId,
@@ -46,14 +47,23 @@ export function registryWhere(
     where.document = { eventName: filter.event };
   }
 
+  // Те же правила старшинства, что в fileState: отзыв сильнее замены,
+  // замена сильнее срока. Разойдись условия с функцией — отбор «истёк»
+  // показал бы не то, что помечено «истёк» в самой таблице.
   if (filter.state === 'revoked') where.verifyRevoked = true;
   if (filter.state === 'replaced') {
     where.verifyRevoked = false;
     where.replacedById = { not: null };
   }
+  if (filter.state === 'expired') {
+    where.verifyRevoked = false;
+    where.replacedById = null;
+    where.expiresAt = { lte: now };
+  }
   if (filter.state === 'valid') {
     where.verifyRevoked = false;
     where.replacedById = null;
+    where.AND = [{ OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] }];
   }
 
   if (filter.mail) {

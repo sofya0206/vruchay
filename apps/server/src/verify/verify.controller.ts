@@ -9,6 +9,7 @@ import { ReplacementService } from '../registry/replacement.service';
 import { publicCodeSecret, type Env } from '../config/env';
 import { hasValidTail, normalizePublicCode } from './public-code';
 import { verifyPath } from './verify-url';
+import { fileState } from '../registry/file-state';
 
 /**
  * Идентификатор в адресе: UUID старых выпусков или короткий код новых.
@@ -83,6 +84,7 @@ export class VerifyController {
         publicId: true,
         publicCode: true,
         createdAt: true,
+        expiresAt: true,
         verifyRevoked: true,
         rowId: true,
         replacedById: true,
@@ -133,13 +135,22 @@ export class VerifyController {
     // выпусков, UUID у старых. По нему человек сверяет страницу с листом.
     const code = file.publicCode ?? file.publicId;
 
-    if (replacedById) {
+    const state = fileState({
+      verifyRevoked: false,
+      replacedById,
+      expiresAt: file.expiresAt,
+    });
+
+    if (state === 'replaced') {
       return {
         valid: false as const,
         replaced: true as const,
+        expired: false as const,
+        state,
         code,
         title: file.document.title,
         issuedAt: file.createdAt,
+        expiresAt: file.expiresAt,
         fields,
         // Замену могли, в свою очередь, отозвать — тогда ссылки не даём:
         // вести человека на страницу, которая ответит «не найдено», хуже,
@@ -148,12 +159,21 @@ export class VerifyController {
       };
     }
 
+    /*
+     * Истёкший документ — не отозванный. Он был настоящим и остаётся
+     * настоящим, просто подтверждает прошлое: «на июнь 2025 года допуск
+     * был». Поэтому отвечаем полноценной страницей со всеми полями,
+     * а не отказом, и красим её жёлтым, а не красным.
+     */
     return {
-      valid: true as const,
+      valid: state === 'valid',
       replaced: false as const,
+      expired: state === 'expired',
+      state,
       code,
       title: file.document.title,
       issuedAt: file.createdAt,
+      expiresAt: file.expiresAt,
       fields,
     };
   }

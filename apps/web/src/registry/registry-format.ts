@@ -13,6 +13,7 @@ import type { RegistryRow } from '../api/registry';
 export function stateLabel(row: Pick<RegistryRow, 'state' | 'reissuePending'>): string {
   if (row.state === 'revoked') return 'Отозван';
   if (row.state === 'replaced') return 'Заменён';
+  if (row.state === 'expired') return 'Срок истёк';
   // Обещанный перевыпуск — ещё не замена: документ действителен, пока
   // нового нет.
   return row.reissuePending ? 'Перевыпускается' : 'Действителен';
@@ -23,6 +24,8 @@ export type Tone = 'ok' | 'wait' | 'warn' | 'bad' | 'mute';
 export function stateTone(row: Pick<RegistryRow, 'state' | 'reissuePending'>): Tone {
   if (row.state === 'revoked') return 'bad';
   if (row.state === 'replaced') return 'warn';
+  // Истёкший — не беда, а прошлое: жёлтый, как у заменённого, не красный.
+  if (row.state === 'expired') return 'warn';
   return row.reissuePending ? 'wait' : 'ok';
 }
 

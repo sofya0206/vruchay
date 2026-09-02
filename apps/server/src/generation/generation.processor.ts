@@ -9,6 +9,7 @@ import { buildS3Key } from '../storage/s3-key';
 import { createRenderToken } from '../render/render-token';
 import { publicCodeSecret, type Env } from '../config/env';
 import { generatePublicCode } from '../verify/public-code';
+import { expiresAtFor } from '../verify/expiry';
 import { PdfRenderer } from './pdf-renderer';
 import { GenerationService, STUCK_AFTER_MS } from './generation.service';
 import { DEFAULT_NAME_TEMPLATE, buildFileName } from './file-name';
@@ -550,6 +551,9 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
             kind: 'generated',
             publicId,
             publicCode: code,
+            // Срок — факт выпуска, а не ссылка на правило материала:
+            // правило потом поменяют, а бумага уже напечатана.
+            expiresAt: expiresAtFor(new Date(), job.document),
             s3Key,
             sizeBytes: body.length,
             mime,

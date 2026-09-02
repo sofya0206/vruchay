@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { DOCUMENT_CATEGORY_IDS, sheetLayout, STARTER_PRESETS } from '@gramota/shared';
+import { parseIsoDuration } from '../verify/expiry';
 
 /** Лист не меньше визитки и не больше A2 — защита от абсурдных значений в рендере. */
 const pageSizeMm = z.number().min(50).max(600);
@@ -54,6 +55,21 @@ export const updateDocumentSchema = z
 
     /** null — убрать материал из разделов, а не «не менять». */
     category: documentCategory.nullable(),
+
+    /*
+     * Срок действия: длительность от выдачи (`P1Y`) или фиксированная
+     * дата. null — снять срок. Длительность проверяем той же функцией,
+     * что считает срок при выпуске: иначе в базу попала бы запись,
+     * которую воркер потом молча проигнорирует.
+     */
+    expiresIn: z
+      .string()
+      .trim()
+      .max(20)
+      .refine((v) => parseIsoDuration(v) !== null, 'Срок задаётся как P1Y, P6M, P2W или P30D')
+      .transform((v) => v.toUpperCase())
+      .nullable(),
+    expiresAt: z.coerce.date('Не удалось разобрать дату окончания срока').nullable(),
   })
   .partial()
   .refine((v) => Object.keys(v).length > 0, 'Нечего обновлять');

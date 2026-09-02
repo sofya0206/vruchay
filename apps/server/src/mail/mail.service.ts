@@ -319,26 +319,7 @@ export class MailService {
   ): Promise<string> {
     if (!isValidEmail(toEmail)) throw new BadRequestException('Некорректный адрес');
 
-    const template = await this.getTemplate(orgId, documentId);
-    const sender = template?.sender
-      ? { email: template.sender.email, displayName: template.sender.displayName, domainId: template.sender.domainId }
-      : await this.resolveSender(orgId);
-    if (!sender) {
-      throw new BadRequestException('Отправка писем не настроена — обратитесь в поддержку');
-    }
-
-    // Домен мог перестать быть подтверждённым уже после настройки шаблона.
-    // Проверяем только свой домен организации: у отправителя на нашем домене
-    // domainId нет, и проверять там нечего — он подтверждён по построению.
-    if (sender.domainId) {
-      const domain = await this.prisma.mailDomain.findFirst({
-        where: { id: sender.domainId, orgId },
-        select: { status: true },
-      });
-      if (domain?.status !== 'verified') {
-        throw new BadRequestException('Домен отправителя не подтверждён — отправка невозможна');
-      }
-    }
+    const template = await this.checkedTemplate(orgId, documentId);
 
     const email = await this.prisma.email.create({
       data: {
@@ -353,6 +334,78 @@ export class MailService {
       },
     });
     return email.id;
+  }
+
+  /**
+   * Служебное письмо о самом документе — уведомление о скором истечении
+   * срока. Текст пишет сервис, а не организация, поэтому он идёт в письме
+   * готовым, а файл не прикладывается: он у человека уже есть.
+   *
+   * Поток транзакционный: сообщение о сроке собственного документа —
+   * переписка по существу, а не реклама, согласия по ст. 18 ФЗ «О рекламе»
+   * не требует. Отправитель — тот же, что у писем о выдаче по этому
+   * материалу: участник должен узнать организацию, а не сервис.
+   */
+  async queueNotice(
+    orgId: string,
+    notice: {
+      documentId: string;
+      fileId: string;
+      rowId: string | null;
+      toEmail: string;
+      subject: string;
+      bodyHtml: string;
+    },
+  ): Promise<string> {
+    if (!isValidEmail(notice.toEmail)) throw new BadRequestException('Некорректный адрес');
+
+    const template = await this.checkedTemplate(orgId, notice.documentId);
+
+    const email = await this.prisma.email.create({
+      data: {
+        orgId,
+        documentId: notice.documentId,
+        rowId: notice.rowId,
+        templateId: template?.id,
+        fileId: notice.fileId,
+        kind: 'transactional',
+        toEmail: notice.toEmail.trim().toLowerCase(),
+        subject: notice.subject,
+        bodyHtml: notice.bodyHtml,
+        attachFile: false,
+        provider: this.providerFor('smtp').name,
+      },
+    });
+    return email.id;
+  }
+
+  /**
+   * Шаблон материала с проверкой, что от его имени можно слать.
+   *
+   * Домен мог перестать быть подтверждённым уже после настройки шаблона.
+   * Проверяем только свой домен организации: у отправителя на нашем домене
+   * domainId нет, и проверять там нечего — он подтверждён по построению.
+   */
+  private async checkedTemplate(orgId: string, documentId: string) {
+    const template = await this.getTemplate(orgId, documentId);
+    const sender = template?.sender
+      ? { email: template.sender.email, displayName: template.sender.displayName, domainId: template.sender.domainId }
+      : await this.resolveSender(orgId);
+    if (!sender) {
+      throw new BadRequestException('Отправка писем не настроена — обратитесь в поддержку');
+    }
+
+    if (sender.domainId) {
+      const domain = await this.prisma.mailDomain.findFirst({
+        where: { id: sender.domainId, orgId },
+        select: { status: true },
+      });
+      if (domain?.status !== 'verified') {
+        throw new BadRequestException('Домен отправителя не подтверждён — отправка невозможна');
+      }
+    }
+
+    return template;
   }
 
   /**
@@ -414,8 +467,10 @@ export class MailService {
     const data = (row?.data as Record<string, string>) ?? {};
 
     try {
-      const attachments = email.file
-        ? [
+      // Уведомление о сроке уходит без файла: документ у человека уже есть.
+      const attachments =
+        email.file && email.attachFile
+          ? [
             {
               filename: email.file.originalName || 'Документ.pdf',
               content: await this.storage.getStream(email.file.s3Key),
@@ -517,12 +572,19 @@ export class MailService {
    * рекламодателя и ссылки отписки (см. mailing/letter-kind.ts).
    */
   private letterBody(
-    email: { kind: EmailKind; id: string; template: { bodyHtml: string; advertiserName: string | null } | null },
+    email: {
+      kind: EmailKind;
+      id: string;
+      bodyHtml: string | null;
+      template: { bodyHtml: string; advertiserName: string | null } | null;
+    },
     data: Record<string, string>,
   ): string {
-    const bodyHtml = email.template
-      ? renderHtmlTemplate(email.template.bodyHtml, data)
-      : DEFAULT_BODY_HTML;
+    // Готовый текст сервиса (уведомление о сроке) — как есть: он собран
+    // нами с экранированием, переменных в нём нет.
+    const bodyHtml =
+      email.bodyHtml ??
+      (email.template ? renderHtmlTemplate(email.template.bodyHtml, data) : DEFAULT_BODY_HTML);
 
     if (email.kind !== 'marketing') return renderLetterBody({ kind: 'transactional', bodyHtml });
 
