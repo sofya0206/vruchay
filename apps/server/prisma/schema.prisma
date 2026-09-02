@@ -218,6 +218,17 @@ model File {
    * сертификаты нельзя будет проверить задним числом.
    */
   publicId      String   @unique @default(uuid()) @map("public_id") @db.Uuid
+  /**
+   * Короткий публичный код: `K7M2-9QXR-4TVB`, алфавит Крокфорда, хвост
+   * HMAC (см. verify/public-code.ts). Печатается на бумаге, кодируется
+   * в QR, диктуется по телефону — UUID для всего этого слишком длинный.
+   *
+   * Считается в приложении, а не базой: базе неоткуда взять секрет
+   * для хвоста. Null у документов, выпущенных до появления кода: их QR
+   * уже напечатан со ссылкой на publicId, и она продолжает работать.
+   * Задним числом код им не назначается — на их бумаге его всё равно нет.
+   */
+  publicCode    String?  @unique @map("public_code")
   verifyRevoked Boolean  @default(false) @map("verify_revoked")
   createdAt     DateTime @default(now()) @map("created_at")
   deletedAt     DateTime? @map("deleted_at")

@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { baseUrl, type Env } from '../config/env';
 import { verifyRenderToken } from './render-token';
+import { verifyUrl } from '../verify/verify-url';
 
 /**
  * Данные для страницы, которую печатает в PDF браузер воркера.
@@ -63,7 +64,9 @@ export class RenderController {
       data: mergeVariables(row.data as Record<string, string>, {
         issuedAt: new Date(),
         number: row.position + 1,
-        publicId: payload.publicId ?? null,
+        // На бумагу (%code) идёт короткий код, когда он есть: его и будут
+        // диктовать по телефону. UUID остаётся только у старых выпусков.
+        publicId: payload.code ?? payload.publicId ?? null,
         orgName: doc.org?.name,
         event: {
           name: doc.eventName,
@@ -77,7 +80,10 @@ export class RenderController {
       // по внутреннему адресу контейнера, и он попал бы в код на бумаге.
       verifyUrl:
         doc.verifyEnabled && payload.publicId
-          ? `${baseUrl(this.config.get('PUBLIC_URL', { infer: true }))}/verify/${payload.publicId}`
+          ? verifyUrl(baseUrl(this.config.get('PUBLIC_URL', { infer: true })), {
+              publicId: payload.publicId,
+              publicCode: payload.code ?? null,
+            })
           : null,
     };
   }

@@ -34,6 +34,19 @@ export const envSchema = z.object({
    */
   SESSION_SECRET: z.string().min(32, 'SESSION_SECRET должен быть не короче 32 символов'),
 
+  /**
+   * Секрет хвоста публичного кода документа (см. verify/public-code.ts).
+   *
+   * Пусто — ключ выводится из SESSION_SECRET. Задавать отдельно стоит
+   * с первого же дня, и вот почему: хвост печатается на бумаге, и код,
+   * посчитанный одним секретом, с другим уже не сходится. Сменить
+   * SESSION_SECRET, чтобы разом всех разлогинить, — обычное дело;
+   * если от него же зависят напечатанные коды, такая смена сделает
+   * все выданные документы «похожими на опечатку». Отдельный секрет
+   * не меняют никогда.
+   */
+  PUBLIC_CODE_SECRET: z.string().min(16, 'PUBLIC_CODE_SECRET короче 16 символов').optional(),
+
   S3_ENDPOINT: z.string().url(),
   S3_ACCESS_KEY: z.string().min(1),
   S3_SECRET_KEY: z.string().min(1),
@@ -222,6 +235,17 @@ export type Env = z.infer<typeof envSchema>;
  */
 export function baseUrl(url: string): string {
   return url.replace(/\/+$/, '');
+}
+
+/**
+ * Секрет для хвоста публичного кода: свой, если задан, иначе сессионный.
+ *
+ * Одно место выбора на воркер, страницу проверки и реестр: разойдись
+ * они, воркер печатал бы коды, которые страница проверки считает
+ * опечаткой.
+ */
+export function publicCodeSecret(env: Pick<Env, 'PUBLIC_CODE_SECRET' | 'SESSION_SECRET'>): string {
+  return env.PUBLIC_CODE_SECRET ?? env.SESSION_SECRET;
 }
 
 /**

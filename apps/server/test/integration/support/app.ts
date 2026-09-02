@@ -141,7 +141,7 @@ export async function startApp(options: AppOptions = {}): Promise<IntegrationApp
     replacement,
     mail,
     mailing: new MailingService(prisma, mail, mailProcessor, config),
-    verify: new VerifyController(prisma, replacement),
+    verify: new VerifyController(prisma, replacement, config),
     render,
 
     close: async () => {

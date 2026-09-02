@@ -56,6 +56,17 @@ describe('условие выборки реестра', () => {
     expect(byCode.OR).toContainEqual({ publicId: code });
   });
 
+  it('короткий код ищется в любом написании и тоже только целиком', () => {
+    // Так его диктуют по телефону: строчными, без дефисов, с O вместо нуля.
+    const byShort = registryWhere(ORG, { search: 'k7m2 9qxr 4tvo' });
+    expect(byShort.OR).toHaveLength(3);
+    expect(byShort.OR).toContainEqual({ publicCode: 'K7M2-9QXR-4TV0' });
+
+    // Кусок кода — это не код: перебирать чужие коды по частям нельзя.
+    const byPart = registryWhere(ORG, { search: 'K7M2-9QXR' });
+    expect(byPart.OR).toHaveLength(2);
+  });
+
   it('отбор по отмеченным строкам не отменяет условие организации', () => {
     const where = registryWhere(ORG, {}, ['33333333-3333-4333-8333-333333333333']);
     expect(where.orgId).toBe(ORG);

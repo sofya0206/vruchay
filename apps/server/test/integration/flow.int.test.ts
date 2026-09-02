@@ -136,6 +136,16 @@ describe('выпуск от списка получателей до прове�
     expect(counted.verifyCount).toBe(1);
   });
 
+  it('воркер выделяет короткий код, и по нему документ тоже находится', async () => {
+    const file = await app.prisma.file.findFirstOrThrow({ where: { jobId, kind: 'generated' } });
+    // Тот самый вид, что напечатан на бумаге: три группы по четыре знака.
+    expect(file.publicCode).toMatch(/^[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4}$/);
+
+    const answer = await app.verify.check(file.publicCode as string);
+    expect(answer.valid).toBe(true);
+    expect(answer.code).toBe(file.publicCode);
+  });
+
   it('чужой публичный код не находится', async () => {
     await expect(app.verify.check('00000000-0000-4000-8000-00000000ffff')).rejects.toThrow(
       'Документ не найден',

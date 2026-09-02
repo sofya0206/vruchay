@@ -7,7 +7,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { buildS3Key } from '../storage/s3-key';
 import { createRenderToken } from '../render/render-token';
-import type { Env } from '../config/env';
+import { publicCodeSecret, type Env } from '../config/env';
+import { generatePublicCode } from '../verify/public-code';
 import { PdfRenderer } from './pdf-renderer';
 import { GenerationService, STUCK_AFTER_MS } from './generation.service';
 import { DEFAULT_NAME_TEMPLATE, buildFileName } from './file-name';
@@ -458,6 +459,10 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
     const byId = new Map(rows.map((r) => [r.id, r]));
 
     const secret = this.config.get('SESSION_SECRET', { infer: true });
+    const codeSecret = publicCodeSecret({
+      SESSION_SECRET: secret,
+      PUBLIC_CODE_SECRET: this.config.get('PUBLIC_CODE_SECRET', { infer: true }),
+    });
     const format = job.format === 'jpg' ? 'jpg' : 'pdf';
     const ext = format === 'jpg' ? 'jpg' : 'pdf';
     let canceled = false;
@@ -505,6 +510,7 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
        */
       const fileId = randomUUID();
       const publicId = randomUUID();
+      const code = await this.freshPublicCode(codeSecret);
       const s3Key = buildS3Key({
         orgId: job.orgId,
         documentId: job.documentId,
@@ -519,7 +525,7 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
         // Идентификатор выделяем до печати: он попадает в QR на самом листе,
         // а значит должен быть известен раньше, чем лист отрисован.
         const token = createRenderToken(
-          { jobId, rowId, publicId },
+          { jobId, rowId, publicId, code },
           secret,
           Math.floor(Date.now() / 1000),
         );
@@ -543,6 +549,7 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
             rowId,
             kind: 'generated',
             publicId,
+            publicCode: code,
             s3Key,
             sizeBytes: body.length,
             mime,
@@ -636,6 +643,28 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
 
     await this.progress(jobId);
     await this.finish(jobId, job.total);
+  }
+
+  /**
+   * Свободный публичный код.
+   *
+   * Случайная часть кода — сорок бит, и на миллионе документов два
+   * одинаковых уже не редкость. Уникальность держит индекс в базе, но
+   * узнать о совпадении при записи файла было бы поздно: код к тому
+   * моменту напечатан на листе. Поэтому спрашиваем базу до печати.
+   * Просвет между проверкой и записью остаётся, и в нём совпадение
+   * ловит тот же индекс — строка уйдёт в неудачи и будет повторена.
+   */
+  private async freshPublicCode(secret: string): Promise<string> {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const code = generatePublicCode(secret);
+      const taken = await this.prisma.file.findUnique({
+        where: { publicCode: code },
+        select: { id: true },
+      });
+      if (!taken) return code;
+    }
+    throw new Error('Не удалось подобрать свободный публичный код документа');
   }
 
   /**

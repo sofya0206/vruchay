@@ -59,6 +59,8 @@ export function App() {
         {/* Приглашённый ещё не может войти — в том и смысл приглашения. */}
         <Route path="/invite" element={<InvitePage />} />
         <Route path="/verify/:publicId" element={<VerifyDocumentPage />} />
+        {/* Короткий адрес из QR: /c/K7M2-9QXR-4TVB. Та же страница. */}
+        <Route path="/c/:publicId" element={<VerifyDocumentPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     );
@@ -105,6 +107,7 @@ export function App() {
       <Route path="/reset" element={<Navigate to="/" replace />} />
       <Route path="/invite" element={<Navigate to="/" replace />} />
       <Route path="/verify/:publicId" element={<VerifyDocumentPage />} />
+      <Route path="/c/:publicId" element={<VerifyDocumentPage />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );

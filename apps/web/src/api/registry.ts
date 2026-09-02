@@ -7,6 +7,10 @@ export type FileState = 'valid' | 'revoked' | 'replaced';
 export interface RegistryRow {
   fileId: string;
   publicId: string;
+  /** Код, напечатанный на бумаге: короткий у новых выпусков, UUID у старых. */
+  code: string;
+  /** Путь страницы проверки — тот же, что в QR на документе. */
+  verifyPath: string;
   name: string;
   email: string;
   documentId: string | null;
@@ -17,7 +21,13 @@ export interface RegistryRow {
   state: FileState;
   /** Перевыпуск заказан, но нового документа ещё нет. */
   reissuePending: boolean;
-  replacedBy: { fileId: string; publicId: string; issuedAt: string } | null;
+  replacedBy: {
+    fileId: string;
+    publicId: string;
+    code: string;
+    verifyPath: string;
+    issuedAt: string;
+  } | null;
   mail: { status: string; sentAt: string | null; error: string | null } | null;
   verifyCount: number;
   verifyLastAt: string | null;

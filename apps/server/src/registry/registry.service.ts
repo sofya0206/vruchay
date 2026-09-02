@@ -4,6 +4,7 @@ import { TRASH_DAYS, daysLeftInTrash } from '@gramota/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { cell } from '../documents/registry.service';
 import { fileState, type FileState } from './file-state';
+import { verifyPath } from '../verify/verify-url';
 import { registryWhere } from './registry-filter';
 import type { ListRegistryDto, RegistryFilterDto } from './registry.dto';
 import { ReplacementService } from './replacement.service';
@@ -15,6 +16,10 @@ const HISTORY_LIMIT = 100;
 export interface RegistryRow {
   fileId: string;
   publicId: string;
+  /** Код, напечатанный на бумаге: короткий у новых выпусков, UUID у старых. */
+  code: string;
+  /** Путь страницы проверки — тот же, что закодирован в QR. */
+  verifyPath: string;
   name: string;
   email: string;
   documentId: string | null;
@@ -25,7 +30,13 @@ export interface RegistryRow {
   state: FileState;
   /** Перевыпуск заказан, но нового документа ещё нет. */
   reissuePending: boolean;
-  replacedBy: { fileId: string; publicId: string; issuedAt: Date } | null;
+  replacedBy: {
+    fileId: string;
+    publicId: string;
+    code: string;
+    verifyPath: string;
+    issuedAt: Date;
+  } | null;
   mail: { status: string; sentAt: Date | null; error: string | null } | null;
   verifyCount: number;
   verifyLastAt: Date | null;
@@ -238,7 +249,7 @@ export class RegistryService {
           item.documentTitle,
           item.eventName,
           formatDate(item.issuedAt),
-          item.publicId,
+          item.code,
           stateLabel(item.state, item.reissuePending),
           mailLabel(item.mail?.status ?? null),
           String(item.verifyCount),
@@ -266,6 +277,7 @@ export class RegistryService {
         mime: true,
         originalName: true,
         publicId: true,
+        publicCode: true,
         row: { select: { data: true } },
       },
     });
@@ -298,7 +310,7 @@ export class RegistryService {
       replacementIds.length > 0
         ? this.prisma.file.findMany({
             where: { id: { in: replacementIds }, orgId: files[0].orgId },
-            select: { id: true, publicId: true, createdAt: true },
+            select: { id: true, publicId: true, publicCode: true, createdAt: true },
           })
         : Promise.resolve([]),
       this.prisma.email.findMany({
@@ -322,6 +334,8 @@ export class RegistryService {
       return {
         fileId: file.id,
         publicId: file.publicId,
+        code: file.publicCode ?? file.publicId,
+        verifyPath: verifyPath(file),
         name: data.name ?? '',
         email: data.email ?? '',
         documentId: file.documentId,
@@ -332,7 +346,13 @@ export class RegistryService {
         state: fileState(file),
         reissuePending: file.replacedByJobId !== null && file.replacedById === null,
         replacedBy: replacement
-          ? { fileId: replacement.id, publicId: replacement.publicId, issuedAt: replacement.createdAt }
+          ? {
+              fileId: replacement.id,
+              publicId: replacement.publicId,
+              code: replacement.publicCode ?? replacement.publicId,
+              verifyPath: verifyPath(replacement),
+              issuedAt: replacement.createdAt,
+            }
           : null,
         mail: email ? { status: email.status, sentAt: email.sentAt, error: email.error } : null,
         verifyCount: file.verifyCount,
@@ -357,6 +377,7 @@ const fileSelect = {
   id: true,
   orgId: true,
   publicId: true,
+  publicCode: true,
   documentId: true,
   createdAt: true,
   verifyRevoked: true,

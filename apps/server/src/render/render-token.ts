@@ -21,6 +21,12 @@ export interface RenderTokenPayload {
    * и передаёт сюда, а потом записывает в тот же файл.
    */
   publicId?: string;
+  /**
+   * Короткий публичный код того же экземпляра — тот, что печатается
+   * на бумаге и кодируется в QR (см. verify/public-code.ts). Выделяется
+   * там же и тогда же, что и publicId, по той же причине.
+   */
+  code?: string;
   /** Unix-время истечения, в секундах. */
   exp: number;
 }
@@ -70,6 +76,7 @@ export function verifyRenderToken(
 
   if (typeof payload.jobId !== 'string' || typeof payload.rowId !== 'string') return null;
   if (payload.publicId !== undefined && typeof payload.publicId !== 'string') return null;
+  if (payload.code !== undefined && typeof payload.code !== 'string') return null;
   if (typeof payload.exp !== 'number' || payload.exp <= nowSeconds) return null;
   return payload;
 }

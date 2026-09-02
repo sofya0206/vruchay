@@ -11,6 +11,7 @@ import { StorageService } from '../storage/storage.service';
 import { TildaProcessor } from './tilda.processor';
 import type { PublicConfig } from './tilda-snippet';
 import type { IntegrationDto, SubmitDto } from './tilda.dto';
+import { verifyUrl } from '../verify/verify-url';
 
 /**
  * Версия текста согласия. Меняется вместе с текстом: по ней потом видно,
@@ -278,7 +279,7 @@ export class TildaService {
     const [file, document] = await Promise.all([
       this.prisma.file.findUnique({
         where: { id: request.fileId },
-        select: { publicId: true, verifyRevoked: true },
+        select: { publicId: true, publicCode: true, verifyRevoked: true },
       }),
       this.prisma.document.findUnique({
         where: { id: request.documentId },
@@ -287,7 +288,7 @@ export class TildaService {
     ]);
 
     if (!file || file.verifyRevoked || !document?.verifyEnabled) return undefined;
-    return `${this.publicUrl()}/verify/${file.publicId}`;
+    return verifyUrl(this.publicUrl(), file);
   }
 
   private downloadable(request: {

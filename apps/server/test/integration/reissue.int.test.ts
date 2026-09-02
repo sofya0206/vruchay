@@ -22,7 +22,7 @@ describe('перевыпуск и отзыв', () => {
   let orgId: string;
   let documentId: string;
   let oldFile: { id: string; publicId: string; rowId: string | null };
-  let newFile: { id: string; publicId: string };
+  let newFile: { id: string; publicId: string; publicCode: string | null };
 
   beforeAll(async () => {
     app = await startApp({ worker: true });
@@ -88,7 +88,7 @@ describe('перевыпуск и отзыв', () => {
     newFile = await waitFor('новый документ появится', async () =>
       app.prisma.file.findFirst({
         where: { jobId: result.jobs[0].jobId, rowId: oldFile.rowId, kind: 'generated' },
-        select: { id: true, publicId: true },
+        select: { id: true, publicId: true, publicCode: true },
       }),
     );
 
@@ -103,7 +103,12 @@ describe('перевыпуск и отзыв', () => {
 
     expect(answer.valid).toBe(false);
     expect(answer.replaced).toBe(true);
-    expect(answer.replacedBy?.publicId).toBe(newFile.publicId);
+    // Ссылка ведёт на новый документ тем адресом, что и в его QR:
+    // коротким кодом, если воркер его выделил.
+    expect(answer.replacedBy?.code).toBe(newFile.publicCode ?? newFile.publicId);
+    expect(answer.replacedBy?.path).toBe(
+      newFile.publicCode ? `/c/${newFile.publicCode}` : `/verify/${newFile.publicId}`,
+    );
     // Тому, кто держит старую бумагу, отказывать не за что: перевыпуск —
     // это исправленная опечатка, а не проступок.
     expect(answer.fields).toHaveProperty('name');

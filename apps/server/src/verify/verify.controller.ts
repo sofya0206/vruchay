@@ -1,12 +1,37 @@
 import { Controller, Get, Logger, NotFoundException, Param, UseGuards } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { z } from 'zod';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { PrismaService } from '../prisma/prisma.service';
 import { Throttle } from '../common/throttle.decorator';
 import { ThrottleGuard } from '../common/throttle.guard';
 import { ReplacementService } from '../registry/replacement.service';
+import { publicCodeSecret, type Env } from '../config/env';
+import { hasValidTail, normalizePublicCode } from './public-code';
+import { verifyPath } from './verify-url';
 
-const uuidParam = new ZodValidationPipe(z.string().uuid());
+/**
+ * Идентификатор в адресе: UUID старых выпусков или короткий код новых.
+ *
+ * Длина ограничена до похода в разбор: адрес приходит снаружи, и разбирать
+ * килобайт мусора ради ответа «не найдено» незачем.
+ */
+const idParam = new ZodValidationPipe(z.string().trim().min(1).max(64));
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Почему документ не нашёлся — насколько это можно сказать, не раскрывая
+ * ничего о чужих документах. Все три причины считаются по одному лишь
+ * введённому коду и о базе не говорят ничего.
+ *
+ * - `malformed` — это не похоже ни на код, ни на UUID;
+ * - `checksum` — похоже на код, но хвост не сходится: почти наверняка
+ *   опечатка при вводе с бумаги;
+ * - `unknown` — форма верна, а такого документа нет (или он не открыт
+ *   для проверки).
+ */
+export type NotFoundReason = 'malformed' | 'checksum' | 'unknown';
 
 /**
  * Проверка подлинности выданного документа.
@@ -29,6 +54,7 @@ export class VerifyController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly replacement: ReplacementService,
+    private readonly config: ConfigService<Env, true>,
   ) {}
 
   /*
@@ -43,14 +69,19 @@ export class VerifyController {
    * Тридцати проверок в минуту с одного адреса хватает с запасом: страницу
    * открывает человек с бумагой в руках, а не список.
    */
-  @Get(':publicId')
+  @Get(':id')
   @Throttle({ max: 30, timeWindow: '1 minute' })
-  async check(@Param('publicId', uuidParam) publicId: string) {
+  async check(@Param('id', idParam) id: string) {
+    const lookup = this.lookupFor(id);
+    if (!lookup.where) throw this.notFound(lookup.reason);
+
     const file = await this.prisma.file.findUnique({
-      where: { publicId },
+      where: lookup.where,
       select: {
         id: true,
         orgId: true,
+        publicId: true,
+        publicCode: true,
         createdAt: true,
         verifyRevoked: true,
         rowId: true,
@@ -71,7 +102,7 @@ export class VerifyController {
     // Разные ответы позволяли бы отличать «такого не было» от «был и отозван»,
     // а это сведения о чужих документах.
     if (!file || file.verifyRevoked || !file.document?.verifyEnabled) {
-      throw new NotFoundException('Документ не найден');
+      throw this.notFound(lookup.reason);
     }
 
     /*
@@ -98,10 +129,15 @@ export class VerifyController {
     // Пустой список — значит показываем лишь факт подлинности.
     const fields = Object.fromEntries(allowed.filter((k) => data[k]).map((k) => [k, data[k]]));
 
+    // Код показываем тот, что напечатан на бумаге: короткий у новых
+    // выпусков, UUID у старых. По нему человек сверяет страницу с листом.
+    const code = file.publicCode ?? file.publicId;
+
     if (replacedById) {
       return {
         valid: false as const,
         replaced: true as const,
+        code,
         title: file.document.title,
         issuedAt: file.createdAt,
         fields,
@@ -115,10 +151,50 @@ export class VerifyController {
     return {
       valid: true as const,
       replaced: false as const,
+      code,
       title: file.document.title,
       issuedAt: file.createdAt,
       fields,
     };
+  }
+
+  /**
+   * Чем искать документ по тому, что пришло в адресе.
+   *
+   * UUID — прежний идентификатор, он напечатан в QR выданных раньше
+   * документов. Короткий код принимаем в любом написании (см.
+   * normalizePublicCode). Несошедшийся хвост кода в базу всё равно идёт:
+   * хвост считается секретом, а секрет могли сменить после выпуска, —
+   * и «похоже на опечатку» мы скажем только тому, у кого документа
+   * заодно и не нашлось. Перебор от этого не выигрывает: наугад
+   * набранный код не сходится с базой независимо от хвоста, а частоту
+   * держит ограничение по адресу.
+   */
+  private lookupFor(id: string): {
+    where: { publicId: string } | { publicCode: string } | null;
+    reason: NotFoundReason;
+  } {
+    if (UUID.test(id)) return { where: { publicId: id.toLowerCase() }, reason: 'unknown' };
+
+    const code = normalizePublicCode(id);
+    if (!code) return { where: null, reason: 'malformed' };
+
+    const secret = publicCodeSecret({
+      PUBLIC_CODE_SECRET: this.config.get('PUBLIC_CODE_SECRET', { infer: true }),
+      SESSION_SECRET: this.config.get('SESSION_SECRET', { infer: true }),
+    });
+    return {
+      where: { publicCode: code },
+      reason: hasValidTail(code, secret) ? 'unknown' : 'checksum',
+    };
+  }
+
+  /**
+   * «Не найдено» с причиной, которая ничего не говорит о чужих документах:
+   * все три причины выводятся из одного лишь введённого кода.
+   */
+  private notFound(reason: NotFoundReason): NotFoundException {
+    return new NotFoundException({ message: 'Документ не найден', reason });
   }
 
   /** Действующая замена — если она сама ещё действительна. */
@@ -127,12 +203,17 @@ export class VerifyController {
       where: { id: fileId, orgId, deletedAt: null, verifyRevoked: false },
       select: {
         publicId: true,
+        publicCode: true,
         createdAt: true,
         document: { select: { verifyEnabled: true } },
       },
     });
     if (!next?.document?.verifyEnabled) return null;
-    return { publicId: next.publicId, issuedAt: next.createdAt };
+    return {
+      code: next.publicCode ?? next.publicId,
+      path: verifyPath(next),
+      issuedAt: next.createdAt,
+    };
   }
 
   /**

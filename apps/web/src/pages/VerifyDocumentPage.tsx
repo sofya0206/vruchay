@@ -11,8 +11,10 @@ interface VerifyResult {
   title: string;
   issuedAt: string;
   fields: Record<string, string>;
+  /** Код, напечатанный на бумаге, — по нему человек сверяет страницу с листом. */
+  code: string;
   /** Куда смотреть вместо этого. Пусто, если замена сама недействительна. */
-  replacedBy?: { publicId: string; issuedAt: string } | null;
+  replacedBy?: { code: string; path: string; issuedAt: string } | null;
 }
 
 /**
@@ -78,7 +80,7 @@ export function VerifyDocumentPage() {
                   </p>
                   {check.data.replacedBy ? (
                     <Link
-                      to={`/verify/${check.data.replacedBy.publicId}`}
+                      to={check.data.replacedBy.path}
                       className="mt-4 inline-block rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--accent-contrast)] hover:bg-[var(--accent-hover)]"
                     >
                       Проверить действующий документ

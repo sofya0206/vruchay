@@ -71,7 +71,7 @@ export function DocumentHistory({ fileId, onClose }: Props) {
                 Страница проверки старого показывает предупреждение и ведёт на новый.{' '}
                 <a
                   className="text-[var(--accent)] hover:underline"
-                  href={`/verify/${row.replacedBy.publicId}`}
+                  href={row.replacedBy.verifyPath}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -84,7 +84,7 @@ export function DocumentHistory({ fileId, onClose }: Props) {
               <Fact label="Выдан">{formatDateTime(row.issuedAt)}</Fact>
               <Fact label="Адрес почты">{row.email || '—'}</Fact>
               <Fact label="Проверочный код">
-                <span className="font-mono text-xs">{row.publicId}</span>
+                <span className="font-mono text-xs">{row.code}</span>
               </Fact>
               <Fact label="Проверки по QR">
                 {verifyLabel(detail.data.verifyCount)}
@@ -105,7 +105,7 @@ export function DocumentHistory({ fileId, onClose }: Props) {
                   Скачать
                 </Button>
               </a>
-              <a href={`/verify/${row.publicId}`} target="_blank" rel="noopener noreferrer">
+              <a href={row.verifyPath} target="_blank" rel="noopener noreferrer">
                 <Button size="sm" icon={<ShieldCheck size={14} />}>
                   Страница проверки
                 </Button>

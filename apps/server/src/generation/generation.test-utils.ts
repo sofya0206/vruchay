@@ -25,6 +25,7 @@ export interface FileRec {
   mime: string;
   sizeBytes: number;
   publicId: string;
+  publicCode?: string | null;
   originalName: string;
   deletedAt: Date | null;
   createdAt: Date;
@@ -423,6 +424,11 @@ export class World {
         },
       },
       file: {
+        // Воркер спрашивает, свободен ли публичный код, до печати листа.
+        findUnique: async ({ where }: { where: { id?: string; publicCode?: string } }) =>
+          this.files.find((f) =>
+            where.id !== undefined ? f.id === where.id : f.publicCode === where.publicCode,
+          ) ?? null,
         findMany: async ({ where }: { where: Where }) =>
           this.files
             .filter((f) => matches(f as never, where))
