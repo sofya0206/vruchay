@@ -5,6 +5,8 @@ import type { Env } from '../config/env';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReferralService } from '../referral/referral.service';
 import { StorageService } from '../storage/storage.service';
+import { buildS3Key } from '../storage/s3-key';
+import type { AllowedImage } from '../common/image-type';
 import type { UpdatePublicProfileDto } from './public-profile.dto';
 
 /** Что организация показывает о себе наружу и как показывает получателей. */
@@ -54,6 +56,48 @@ export class OrgService {
       // Ссылка на логотип временная, как и на все файлы из хранилища.
       logoUrl: logo?.s3Key ? await this.storage.presignedGetUrl(logo.s3Key) : null,
     };
+  }
+
+  /**
+   * Логотип для публичной страницы: файл организации без материала.
+   *
+   * Прежний логотип убираем после того, как новый записан и привязан:
+   * обратный порядок при сбое оставил бы организацию вовсе без логотипа.
+   */
+  async setLogo(orgId: string, body: Buffer, image: AllowedImage, originalName: string) {
+    const previous = await this.prisma.organization.findUniqueOrThrow({
+      where: { id: orgId },
+      select: { logoFileId: true },
+    });
+
+    const file = await this.prisma.file.create({
+      data: {
+        orgId,
+        kind: 'asset',
+        // Ключ строится из идентификатора, который база выдаёт только сейчас.
+        s3Key: '',
+        sizeBytes: body.length,
+        mime: image.mime,
+        originalName: originalName.slice(0, 255),
+      },
+    });
+    const s3Key = buildS3Key({ orgId, kind: 'asset', fileId: file.id, ext: image.ext });
+    await this.storage.put(s3Key, body, image.mime);
+    await this.prisma.file.update({ where: { id: file.id }, data: { s3Key } });
+    await this.prisma.organization.update({ where: { id: orgId }, data: { logoFileId: file.id } });
+
+    if (previous.logoFileId) {
+      const old = await this.prisma.file.findFirst({
+        where: { id: previous.logoFileId, orgId },
+        select: { id: true, s3Key: true },
+      });
+      if (old) {
+        if (old.s3Key) await this.storage.remove(old.s3Key);
+        await this.prisma.file.delete({ where: { id: old.id } }).catch(() => undefined);
+      }
+    }
+
+    return this.publicProfile(orgId);
   }
 
   /**

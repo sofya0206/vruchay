@@ -17,6 +17,7 @@ import { RegistryPage } from './registry/RegistryPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { PrivacyPage } from './pages/PrivacyPage';
 import { VerifyDocumentPage } from './pages/VerifyDocumentPage';
+import { IssuerPage } from './public/IssuerPage';
 import { LandingPage } from './pages/LandingPage';
 import { InvitePage } from './pages/InvitePage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
@@ -61,6 +62,8 @@ export function App() {
         <Route path="/verify/:publicId" element={<VerifyDocumentPage />} />
         {/* Короткий адрес из QR: /c/K7M2-9QXR-4TVB. Та же страница. */}
         <Route path="/c/:publicId" element={<VerifyDocumentPage />} />
+        {/* Публичная страница организации — реестр эмитента для проверяющих. */}
+        <Route path="/org/:slug" element={<IssuerPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     );
@@ -108,6 +111,7 @@ export function App() {
       <Route path="/invite" element={<Navigate to="/" replace />} />
       <Route path="/verify/:publicId" element={<VerifyDocumentPage />} />
       <Route path="/c/:publicId" element={<VerifyDocumentPage />} />
+      <Route path="/org/:slug" element={<IssuerPage />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );

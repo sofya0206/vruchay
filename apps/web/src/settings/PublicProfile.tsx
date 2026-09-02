@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react';
-import { Check, Globe, ShieldCheck } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Check, Globe, ImagePlus, ShieldCheck } from 'lucide-react';
+import { api } from '../api/client';
 import {
   usePublicProfile,
   useUpdatePublicProfile,
@@ -57,6 +59,12 @@ export function PublicProfile() {
   const [form, setForm] = useState<Profile | null>(null);
   const [consent, setConsent] = useState(false);
   const [saved, setSaved] = useState(false);
+  const qc = useQueryClient();
+  const logoInput = useRef<HTMLInputElement>(null);
+  const uploadLogo = useMutation({
+    mutationFn: (file: File) => api.upload<Profile>('/org/public-profile/logo', file),
+    onSuccess: (profile) => qc.setQueryData(['org-public-profile'], profile),
+  });
 
   useEffect(() => {
     if (data) setForm(data);
@@ -178,6 +186,49 @@ export function PublicProfile() {
 
           {form.publicPageEnabled && (
             <div className="space-y-4 pl-6">
+              <div className="flex items-center gap-4">
+                {data?.logoUrl ? (
+                  <img
+                    src={data.logoUrl}
+                    alt=""
+                    className="h-16 w-16 rounded-xl bg-[var(--surface-sunken)] object-contain p-1"
+                  />
+                ) : (
+                  <div className="grid h-16 w-16 place-items-center rounded-xl bg-[var(--surface-sunken)] text-[var(--text-muted)]">
+                    <ImagePlus size={20} />
+                  </div>
+                )}
+                <div>
+                  <input
+                    ref={logoInput}
+                    type="file"
+                    accept="image/png,image/jpeg"
+                    className="sr-only"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) uploadLogo.mutate(file);
+                      e.target.value = '';
+                    }}
+                  />
+                  <Button
+                    size="sm"
+                    disabled={uploadLogo.isPending}
+                    onClick={() => logoInput.current?.click()}
+                  >
+                    {uploadLogo.isPending
+                      ? 'Загружаем…'
+                      : data?.logoUrl
+                        ? 'Заменить логотип'
+                        : 'Загрузить логотип'}
+                  </Button>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">PNG или JPEG до 2 МБ.</p>
+                  {uploadLogo.isError && (
+                    <p role="alert" className="mt-1 text-xs text-[var(--danger)]">
+                      {(uploadLogo.error as Error).message}
+                    </p>
+                  )}
+                </div>
+              </div>
               <div>
                 <Label>Адрес страницы</Label>
                 <div className="flex items-center gap-1">

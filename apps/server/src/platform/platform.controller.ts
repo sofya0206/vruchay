@@ -10,6 +10,7 @@ import { PlatformService } from './platform.service';
 
 const uuidParam = new ZodValidationPipe(uuidSchema);
 const planSchema = z.object({ plan: z.enum(['free', 'paid']) });
+const verifiedSchema = z.object({ verified: z.boolean() });
 
 /**
  * Организации-клиенты глазами владельца сервиса.
@@ -58,6 +59,35 @@ export class PlatformController {
       meta: { plan: dto.plan },
     });
 
+    return result;
+  }
+
+  /**
+   * Значок «Верифицированный эмитент».
+   *
+   * Ставится руками после того, как мы сами проверили домен (DNS-записи
+   * почты подтверждены) и ИНН по ЕГРЮЛ. Это наше ручательство перед
+   * проверяющими, и организация выдать его себе не может. Автоматическая
+   * проверка — отдельная задача; пока решение принимает человек, и журнал
+   * помнит, кто и когда.
+   */
+  @Patch(':id/verified')
+  async setVerified(
+    @AuditActor() actor: Actor,
+    @Param('id', uuidParam) id: string,
+    @Body(new ZodValidationPipe(verifiedSchema)) dto: z.infer<typeof verifiedSchema>,
+  ) {
+    const result = await this.platform.setVerified(id, dto.verified);
+    await this.audit.record({
+      actor,
+      action: 'platform.verified',
+      summary: dto.verified
+        ? `Организации «${result.name}» присвоен значок верифицированного эмитента`
+        : `С организации «${result.name}» снят значок верифицированного эмитента`,
+      targetType: 'organization',
+      targetId: id,
+      meta: { verified: dto.verified },
+    });
     return result;
   }
 }

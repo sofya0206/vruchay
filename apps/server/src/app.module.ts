@@ -31,6 +31,7 @@ import { TokensModule } from './tokens/tokens.module';
 import { BackupModule } from './backup/backup.module';
 import { PlatformModule } from './platform/platform.module';
 import { ExpiryModule } from './expiry/expiry.module';
+import { PublicOrgModule } from './public-org/public-org.module';
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import { ExpiryModule } from './expiry/expiry.module';
     BackupModule,
     PlatformModule,
     ExpiryModule,
+    PublicOrgModule,
   ],
   controllers: [HealthController],
 })

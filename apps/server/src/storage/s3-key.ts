@@ -17,6 +17,9 @@ export function buildS3Key(params: {
   const ext = params.ext.replace(/^\./, '').toLowerCase();
 
   if (kind === 'font') return `org/${orgId}/fonts/${fileId}.${ext}`;
+  // Файлы самой организации — логотип для публичной страницы — живут
+  // вне материалов: материал могут удалить, а организация остаётся.
+  if (kind === 'asset' && !documentId) return `org/${orgId}/asset/${fileId}.${ext}`;
 
   if (!documentId) {
     throw new Error(`documentId обязателен для файлов типа "${kind}"`);
