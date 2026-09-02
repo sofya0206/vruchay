@@ -377,8 +377,11 @@ describe.skipIf(!CHROMIUM_TESTS)('вердикт «влезает» против
           for (const sample of samples) {
             el.innerHTML = '';
             // Один внутренний блок, как в RichText: flex-контейнер выравнивает
-            // строку целиком, а не каждый прогон по отдельности.
+            // стопку целиком, а не каждый прогон по отдельности; ширина
+            // на весь блок и выравнивание текстом — как там.
             const line = document.createElement('div');
+            line.style.width = '100%';
+            line.style.textAlign = 'center';
             for (const run of sample) {
               const span = document.createElement('span');
               Object.assign(span.style, {

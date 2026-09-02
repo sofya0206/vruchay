@@ -116,7 +116,9 @@ export function EditorPage() {
   useEffect(() => {
     if (!sheet || loaded.current === sheet.id) return;
     loaded.current = sheet.id;
-    reset(sheet.layout);
+    // Через разбор схемы: в базе ещё долго будут макеты первой версии,
+    // с текстом строкой, а холсту нужно дерево.
+    reset(sheetLayout.parse(sheet.layout));
   }, [sheet, sheetId, reset]);
 
   /*
@@ -559,8 +561,8 @@ export function EditorPage() {
                 backgroundUrl={background.data?.url}
                 data={previewData}
                 unfilled="token"
-                selectedId={selectedId}
-                onSelect={setSelectedId}
+                selectedIds={selectedId ? new Set([selectedId]) : null}
+                onSelect={(id) => setSelectedId(id)}
               />
             </div>
 

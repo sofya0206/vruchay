@@ -42,6 +42,15 @@ export interface FitTarget {
   variables: string[];
 }
 
+/**
+ * Коробка, доступная тексту: рамка и внутренний отступ отнимают у блока
+ * место с каждой стороны — ровно так же, как на печати (box-sizing: border-box).
+ */
+function innerBox(element: TextElement): { w: number; h: number } {
+  const inset = 2 * (element.props.padding + element.props.borderWidth);
+  return { w: Math.max(element.w - inset, 0.1), h: Math.max(element.h - inset, 0.1) };
+}
+
 function styleOf(element: TextElement): TextStyle {
   const p = element.props;
   return {
@@ -79,7 +88,7 @@ export function fitTargets(sheets: SheetLayout[]): FitTarget[] {
         sheetNumber: index + 1,
         doc: element.props.doc,
         style,
-        box: { w: element.w, h: element.h },
+        box: innerBox(element),
         autoFit: element.props.autoFit,
         substitutedFace: resolveFace(style).substituted,
         variables,
@@ -112,7 +121,7 @@ export function staticOverflows(sheets: SheetLayout[]): { elementId: string; tex
       const text = runsText(runs);
       if (!text.trim()) continue;
 
-      const result = fitRuns(runs, style, { w: element.w, h: element.h }, element.props.autoFit);
+      const result = fitRuns(runs, style, innerBox(element), element.props.autoFit);
       if (!result.fits) {
         out.push({ elementId: element.id, text, sheetNumber: index + 1 });
       }

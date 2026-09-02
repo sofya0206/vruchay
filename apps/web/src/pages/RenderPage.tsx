@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { substituteForRow, type SheetLayout } from '@gramota/shared';
+import { resolveRichDoc, sheetLayout, type SheetLayout } from '@gramota/shared';
+import { runFace } from '../render/RichText';
 import { SheetRenderer } from '../render/SheetRenderer';
 import { SHEET_SELECTOR, overlayProblem, probePoints } from '../render/overlay-guard';
 
@@ -47,26 +48,45 @@ export interface UsedFont {
  *    те, что нужны показанным символам. Поэтому спрашивать надо про тот
  *    самый текст: кириллическое имя и латинский заголовок берут разные файлы.
  *
- * Переменные подставляем той же функцией, что и рендер: в шаблоне стоит
- * латинское «%name», а печатается кириллическое имя — то есть совсем
- * другое подмножество.
+ * Поля подставляем той же функцией, что и рендер: в шаблоне стоит поле
+ * «name», а печатается кириллическое имя — то есть совсем другое
+ * подмножество. И идём по прогонам, а не по блокам: полужирная фамилия
+ * внутри обычной строки — отдельное начертание, и спросить надо и про него.
  */
 export function usedFonts(state: Pick<RenderData, 'sheets' | 'data'>): UsedFont[] {
   const byKey = new Map<string, UsedFont>();
+  const add = (face: { family: string; weight: number; style: 'normal' | 'italic' }, text: string) => {
+    const key = `${face.family}|${face.weight}|${face.style}`;
+    const seen = byKey.get(key);
+    if (seen) seen.text += text;
+    else byKey.set(key, { ...face, text });
+  };
+
   for (const sheet of state.sheets) {
     for (const element of sheet.layout) {
-      if (element.type !== 'text' || !element.props.fontFamily) continue;
-      const { fontFamily: family, bold, italic } = element.props;
-      const weight = bold ? 700 : 400;
-      const style = italic ? 'italic' : 'normal';
-      const key = `${family}|${weight}|${style}`;
-      const text = substituteForRow(element.props.text, state.data ?? {});
-      const seen = byKey.get(key);
-      if (seen) seen.text += text;
-      else byKey.set(key, { family, weight, style, text });
+      if (element.type !== 'text' || !element.props.fontFamily || element.hidden) continue;
+      const blocks = resolveRichDoc(element.props.doc, { data: state.data ?? {}, unfilled: 'blank' });
+      for (const block of blocks) {
+        if (block.marker) add(runFace(element.props, undefined), block.marker);
+        for (const node of block.content) {
+          if (node.type === 'break' || node.text === '') continue;
+          add(runFace(element.props, node.marks), node.text);
+        }
+      }
     }
   }
   return [...byKey.values()];
+}
+
+/**
+ * Макеты с сервера проходят разбор схемы здесь, на входе.
+ *
+ * Сервер отдаёт лист так, как он лежит в базе, а там ещё долго будут
+ * макеты первой версии — с текстом строкой. Разбор превращает их в дерево
+ * на лету; без него страница печати получила бы блок без `doc` и упала.
+ */
+export function normalizeRenderData(raw: RenderData): RenderData {
+  return { ...raw, sheets: raw.sheets.map((s) => ({ ...s, layout: sheetLayout.parse(s.layout) })) };
 }
 
 /**
@@ -106,7 +126,7 @@ export function RenderPage() {
         if (!r.ok) throw new Error(`Сервер ответил ${r.status}`);
         return r.json() as Promise<RenderData>;
       })
-      .then(setState)
+      .then((raw) => setState(normalizeRenderData(raw)))
       .catch((err: Error) => {
         window.__RENDER_ERROR__ = err.message;
       });

@@ -218,3 +218,48 @@ h2 {
     animation: none;
   }
 }
+
+/*
+ * Фишка подставляемого поля на холсте.
+ *
+ * На печати поля не существует — там обычный текст. Здесь же поле обязано
+ * читаться как поле: подложка и скругление говорят «это подставится»,
+ * а цвет — откуда и не пропало ли. Размеры в em, а не в пикселях: фишка
+ * живёт внутри текста любого кегля и масштабируется вместе с ним.
+ */
+.merge-chip {
+  display: inline;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  border-radius: 0.2em;
+  padding: 0 0.15em;
+  margin: 0 0.02em;
+  cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.merge-chip.chip-field {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  box-shadow: inset 0 0 0 0.04em color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.merge-chip.chip-system {
+  background: color-mix(in srgb, #4a6fa5 16%, transparent);
+  box-shadow: inset 0 0 0 0.04em color-mix(in srgb, #4a6fa5 45%, transparent);
+}
+.merge-chip.chip-empty {
+  background: transparent;
+  box-shadow: inset 0 0 0 0.04em color-mix(in srgb, currentColor 45%, transparent);
+  outline: 0.04em dashed color-mix(in srgb, currentColor 55%, transparent);
+  outline-offset: -0.04em;
+  font-style: italic;
+  opacity: 0.75;
+}
+.merge-chip.chip-unknown {
+  background: color-mix(in srgb, #c0392b 18%, transparent);
+  box-shadow: inset 0 0 0 0.04em color-mix(in srgb, #c0392b 60%, transparent);
+  text-decoration: line-through;
+}
+/* Выбранная фишка — та, чей поповер открыт. */
+.merge-chip[data-selected='true'] {
+  box-shadow: 0 0 0 0.08em var(--focus);
+}

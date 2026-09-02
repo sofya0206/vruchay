@@ -9,7 +9,12 @@ import {
   Trash2,
   Underline,
 } from 'lucide-react';
-import type { SheetElement, TextElement } from '@gramota/shared';
+import {
+  richDocFromPlainText,
+  richDocToPlainText,
+  type SheetElement,
+  type TextElement,
+} from '@gramota/shared';
 import type { DocumentDetail } from '../api/types';
 import { EventFields, type EventValues } from './EventFields';
 import { VerifySettings } from './VerifySettings';
@@ -96,12 +101,12 @@ export function PropertiesPanel({
       <label className="block">
         <Label>Текст</Label>
         <Textarea
-          value={p.text}
-          onChange={(e) => onChange({ text: e.target.value }, false)}
-          onBlur={(e) => onChange({ text: e.target.value })}
+          value={richDocToPlainText(p.doc)}
+          onChange={(e) => onChange({ doc: richDocFromPlainText(e.target.value) }, false)}
+          onBlur={(e) => onChange({ doc: richDocFromPlainText(e.target.value) })}
           rows={3}
         />
-        <VariableHint text={p.text} />
+        <VariableHint text={richDocToPlainText(p.doc)} />
       </label>
 
       <label className="block">

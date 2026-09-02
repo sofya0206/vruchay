@@ -244,7 +244,7 @@ export function applyFormat(value: string, format: MergeFieldNode['attrs']['form
     case 'lower':
       return value.toLocaleLowerCase('ru-RU');
     case 'title':
-      return value.replace(/(^|[\s («„-])(\p{L})/gu, (_all, before: string, letter: string) =>
+      return value.replace(/(^|[\s\u00A0(«„-])(\p{L})/gu, (_all, before: string, letter: string) =>
         before + letter.toLocaleUpperCase('ru-RU'),
       );
     default:
