@@ -6,6 +6,18 @@ import { VerifyController, type NotFoundReason } from './verify.controller';
 
 const SECRET = 'x'.repeat(48);
 
+/** Организация-эмитент, какой её читает страница проверки. */
+interface Issuer {
+  name: string;
+  slug: string | null;
+  publicPageEnabled: boolean;
+  publicIndexable: boolean;
+  verifiedIssuer: boolean;
+  contactEmail: string;
+  website: string;
+  verifyNameMode: 'full' | 'initials' | 'none';
+}
+
 /** Выданный документ таким, каким его читает страница проверки. */
 interface Issued {
   id: string;
@@ -13,14 +25,40 @@ interface Issued {
   publicId: string;
   publicCode: string | null;
   createdAt: Date;
+  deletedAt: Date | null;
   expiresAt: Date | null;
   verifyRevoked: boolean;
+  revokedAt: Date | null;
+  revokedReasonPublic: string | null;
+  pdfSha256: string | null;
+  issuedData: Record<string, string> | null;
   rowId: string | null;
   replacedById: string | null;
   replacedByJobId: string | null;
-  document: { title: string; verifyEnabled: boolean; verifyFields: string[] } | null;
+  org: Issuer;
+  document: {
+    title: string;
+    eventName: string;
+    eventDate: string;
+    verifyEnabled: boolean;
+    verifyFields: string[];
+  } | null;
   row: { data: Record<string, string> } | null;
   rows: { data: Record<string, string> }[];
+}
+
+function issuer(over: Partial<Issuer> = {}): Issuer {
+  return {
+    name: 'Федерация плавания',
+    slug: null,
+    publicPageEnabled: false,
+    publicIndexable: false,
+    verifiedIssuer: false,
+    contactEmail: '',
+    website: '',
+    verifyNameMode: 'full',
+    ...over,
+  };
 }
 
 function issued(over: Partial<Issued> = {}): Issued {
@@ -30,12 +68,24 @@ function issued(over: Partial<Issued> = {}): Issued {
     publicId: '11111111-1111-4111-8111-111111111111',
     publicCode: null,
     createdAt: new Date('2026-06-17T09:00:00Z'),
+    deletedAt: null,
     expiresAt: null,
     verifyRevoked: false,
+    revokedAt: null,
+    revokedReasonPublic: null,
+    pdfSha256: null,
+    issuedData: null,
     rowId: 'row-1',
     replacedById: null,
     replacedByJobId: null,
-    document: { title: 'Грамота', verifyEnabled: true, verifyFields: ['name'] },
+    org: issuer(),
+    document: {
+      title: 'Грамота',
+      eventName: 'Первенство области',
+      eventDate: '17 июня 2026',
+      verifyEnabled: true,
+      verifyFields: ['name'],
+    },
     row: { data: { name: 'Иванов Пётр Ильич', email: 'ivanov@example.ru' } },
     rows: [],
     ...over,
@@ -160,6 +210,115 @@ describe('страница проверки: срок действия', () => {
   });
 });
 
+describe('страница проверки: отзыв, эмитент и снимок данных', () => {
+  it('отозванный — это 200 и красная страница с причиной, а не «не найдено»', async () => {
+    const revokedAt = new Date('2026-07-01T10:00:00Z');
+    const { controller } = controllerWith([
+      issued({ verifyRevoked: true, revokedAt, revokedReasonPublic: 'Выдан по ошибке' }),
+    ]);
+    const answer = await controller.check('11111111-1111-4111-8111-111111111111');
+    expect(answer.state).toBe('revoked');
+    expect(answer.valid).toBe(false);
+    expect(answer.revoked).toBe(true);
+    expect(answer.revokedAt).toEqual(revokedAt);
+    expect(answer.revokedReason).toBe('Выдан по ошибке');
+    // Получателя на красной странице не называем: причина может быть
+    // неприятной, и связывать её с фамилией на открытой странице нельзя.
+    expect(answer.fields).toEqual({});
+    expect(answer.title).toBe('Грамота');
+  });
+
+  it('отзыв сильнее замены и срока', async () => {
+    const { controller } = controllerWith([
+      issued({ verifyRevoked: true, replacedById: 'new', expiresAt: new Date(0) }),
+    ]);
+    const answer = await controller.check('11111111-1111-4111-8111-111111111111');
+    expect(answer.state).toBe('revoked');
+    expect(answer.replacedBy).toBeNull();
+  });
+
+  it('показывает получателя так, как разрешил эмитент', async () => {
+    const initials = issued({ org: issuer({ verifyNameMode: 'initials' }) });
+    const { controller } = controllerWith([initials]);
+    const answer = await controller.check(initials.publicId);
+    expect(answer.fields.name.replace(/\u00a0/g, ' ')).toBe('Иванов П. И.');
+
+    const none = issued({ org: issuer({ verifyNameMode: 'none' }) });
+    const nothing = await controllerWith([none]).controller.check(none.publicId);
+    expect(nothing.fields).toEqual({});
+    expect(nothing.issuer.name).toBe('Федерация плавания');
+  });
+
+  it('читает снимок на момент выпуска, а не живую строку', async () => {
+    const { controller } = controllerWith([
+      issued({
+        issuedData: { name: 'Иванов Пётр Ильич' },
+        row: { data: { name: 'Иванов Петр Ильич (исправлено)' } },
+      }),
+    ]);
+    const answer = await controller.check('11111111-1111-4111-8111-111111111111');
+    expect(answer.fields).toEqual({ name: 'Иванов Пётр Ильич' });
+  });
+
+  it('отдаёт эмитента, отпечаток и решение об индексации', async () => {
+    const { controller } = controllerWith([
+      issued({
+        pdfSha256: 'ab'.repeat(32),
+        org: issuer({
+          slug: 'federation',
+          publicPageEnabled: true,
+          publicIndexable: true,
+          verifiedIssuer: true,
+          contactEmail: 'docs@federation.ru',
+        }),
+      }),
+    ]);
+    const answer = await controller.check('11111111-1111-4111-8111-111111111111');
+    expect(answer.sha256).toBe('ab'.repeat(32));
+    expect(answer.indexable).toBe(true);
+    expect(answer.issuer).toEqual({
+      name: 'Федерация плавания',
+      verified: true,
+      publicPath: '/org/federation',
+      contactEmail: 'docs@federation.ru',
+      website: null,
+    });
+    expect(answer.event).toEqual({ name: 'Первенство области', date: '17 июня 2026' });
+  });
+
+  it('страница без адреса не показывается ссылкой', async () => {
+    const { controller } = controllerWith([
+      issued({ org: issuer({ slug: 'federation', publicPageEnabled: false }) }),
+    ]);
+    const answer = await controller.check('11111111-1111-4111-8111-111111111111');
+    expect(answer.issuer.publicPath).toBeNull();
+  });
+
+  it('удалённый файл не проверяется', async () => {
+    const { controller } = controllerWith([issued({ deletedAt: new Date() })]);
+    expect(
+      await notFoundReason(() => controller.check('11111111-1111-4111-8111-111111111111')),
+    ).toBe('unknown');
+  });
+
+  it('ставит кэш на минуту действующему и запрещает кэш остальным', async () => {
+    const headers: Record<string, string> = {};
+    const reply = { header: (k: string, v: string) => void (headers[k] = v) } as never;
+
+    await controllerWith([issued()]).controller.check(
+      '11111111-1111-4111-8111-111111111111',
+      reply,
+    );
+    expect(headers['cache-control']).toBe('public, max-age=60, stale-while-revalidate=60');
+
+    await controllerWith([issued({ verifyRevoked: true })]).controller.check(
+      '11111111-1111-4111-8111-111111111111',
+      reply,
+    );
+    expect(headers['cache-control']).toBe('no-store');
+  });
+});
+
 describe('страница проверки: «не найдено» с причиной', () => {
   it('мусор вместо кода — «не похоже на код», и в базу не ходим', async () => {
     const { controller, lookups } = controllerWith([issued()]);
@@ -196,7 +355,15 @@ describe('страница проверки: «не найдено» с прич
   });
 
   it('выключенная проверка и неизвестный UUID отвечают одинаково', async () => {
-    const off = issued({ document: { title: 'Грамота', verifyEnabled: false, verifyFields: [] } });
+    const off = issued({
+      document: {
+        title: 'Грамота',
+        eventName: '',
+        eventDate: '',
+        verifyEnabled: false,
+        verifyFields: [],
+      },
+    });
     const { controller } = controllerWith([off]);
     expect(await notFoundReason(() => controller.check(off.publicId))).toBe('unknown');
     expect(

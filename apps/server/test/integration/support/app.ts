@@ -97,7 +97,7 @@ export async function startApp(options: AppOptions = {}): Promise<IntegrationApp
   const asStorage = storage as unknown as StorageService;
 
   const referral = new ReferralService(prisma, config);
-  const org = new OrgService(prisma, referral, config);
+  const org = new OrgService(prisma, referral, config, asStorage);
   const renderer = new PdfRenderer(config);
   const generation = new GenerationService(prisma, referral, config);
   const processor = new GenerationProcessor(prisma, asStorage, config, renderer, generation);

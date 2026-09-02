@@ -22,7 +22,7 @@ function serviceWith({ plan, used, bonus = 0 }: {
     user: { findUnique: async () => ({ name: 'Мария', email: 'm@example.test' }) },
   };
   const referral = { bonusDocuments: async () => bonus };
-  return new OrgService(prisma as never, referral as never, testConfig() as never);
+  return new OrgService(prisma as never, referral as never, testConfig() as never, {} as never);
 }
 
 describe('остаток пробы', () => {

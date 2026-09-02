@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue, Worker } from 'bullmq';
@@ -554,6 +554,12 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
             // Срок — факт выпуска, а не ссылка на правило материала:
             // правило потом поменяют, а бумага уже напечатана.
             expiresAt: expiresAtFor(new Date(), job.document),
+            // Отпечаток тех самых байтов, что ушли в хранилище: по нему
+            // человек сверит файл на руках прямо в браузере.
+            pdfSha256: createHash('sha256').update(body).digest('hex'),
+            // Снимок строки на момент печати: страница проверки показывает
+            // то, что на бумаге, а не то, что потом поправят в таблице.
+            issuedData: row.data as Record<string, string>,
             s3Key,
             sizeBytes: body.length,
             mime,

@@ -137,13 +137,18 @@ describe('перевыпуск и отзыв', () => {
     expect(result.skipped[0].reason).toContain('уже заменён');
   });
 
-  it('отзыв — отдельное состояние: документа больше нет вовсе', async () => {
+  it('отзыв — отдельное состояние: красная страница, а не «не найдено»', async () => {
     await app.registryActions.setRevoked(orgId, [newFile.id], true);
 
-    await expect(app.verify.check(newFile.publicId)).rejects.toThrow('Документ не найден');
+    // Человеку с бумагой в руках говорим прямо: документ отозван. Получателя
+    // на красной странице не называем.
+    const revokedAnswer = await app.verify.check(newFile.publicId);
+    expect(revokedAnswer.state).toBe('revoked');
+    expect(revokedAnswer.valid).toBe(false);
+    expect(revokedAnswer.fields).toEqual({});
 
     // Старый по-прежнему заменён, но вести человека на отозванную замену
-    // нельзя: он получил бы «не найдено» и пошёл разбираться сам.
+    // нельзя: он попал бы на красную страницу и пошёл разбираться сам.
     const answer = await app.verify.check(oldFile.publicId);
     expect(answer.replaced).toBe(true);
     expect(answer.replacedBy).toBeNull();

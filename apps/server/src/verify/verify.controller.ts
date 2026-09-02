@@ -1,15 +1,17 @@
-import { Controller, Get, Logger, NotFoundException, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Logger, NotFoundException, Param, Res, UseGuards } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { PrismaService } from '../prisma/prisma.service';
 import { Throttle } from '../common/throttle.decorator';
 import { ThrottleGuard } from '../common/throttle.guard';
 import { ReplacementService } from '../registry/replacement.service';
+import { fileState, type FileState } from '../registry/file-state';
 import { publicCodeSecret, type Env } from '../config/env';
 import { hasValidTail, normalizePublicCode } from './public-code';
+import { maskVerifyFields } from './name-mask';
 import { verifyPath } from './verify-url';
-import { fileState } from '../registry/file-state';
 
 /**
  * Идентификатор в адресе: UUID старых выпусков или короткий код новых.
@@ -33,6 +35,15 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  *   для проверки).
  */
 export type NotFoundReason = 'malformed' | 'checksum' | 'unknown';
+
+/**
+ * Сколько секунд ответ о действующем документе может жить в кэше.
+ *
+ * Минута: страницу открывают по QR и тут же закрывают, повторный визит
+ * через минуту не должен снова ходить в базу. Дольше нельзя — отзыв
+ * должен доезжать до страницы быстро, это и есть его смысл.
+ */
+const VALID_CACHE_SECONDS = 60;
 
 /**
  * Проверка подлинности выданного документа.
@@ -68,11 +79,13 @@ export class VerifyController {
    * посторонний мог без входа нагружать базу сколько угодно.
    *
    * Тридцати проверок в минуту с одного адреса хватает с запасом: страницу
-   * открывает человек с бумагой в руках, а не список.
+   * открывает человек с бумагой в руках, а не список. Вместе с хвостом
+   * кода (см. public-code.ts) это делает перебор бессмысленным: наугад
+   * набранный код не сходится с базой почти никогда.
    */
   @Get(':id')
   @Throttle({ max: 30, timeWindow: '1 minute' })
-  async check(@Param('id', idParam) id: string) {
+  async check(@Param('id', idParam) id: string, @Res({ passthrough: true }) reply?: FastifyReply) {
     const lookup = this.lookupFor(id);
     if (!lookup.where) throw this.notFound(lookup.reason);
 
@@ -84,13 +97,36 @@ export class VerifyController {
         publicId: true,
         publicCode: true,
         createdAt: true,
+        deletedAt: true,
         expiresAt: true,
         verifyRevoked: true,
+        revokedAt: true,
+        revokedReasonPublic: true,
+        pdfSha256: true,
+        issuedData: true,
         rowId: true,
         replacedById: true,
         replacedByJobId: true,
+        org: {
+          select: {
+            name: true,
+            slug: true,
+            publicPageEnabled: true,
+            publicIndexable: true,
+            verifiedIssuer: true,
+            contactEmail: true,
+            website: true,
+            verifyNameMode: true,
+          },
+        },
         document: {
-          select: { title: true, verifyEnabled: true, verifyFields: true },
+          select: {
+            title: true,
+            eventName: true,
+            eventDate: true,
+            verifyEnabled: true,
+            verifyFields: true,
+          },
         },
         row: { select: { data: true } },
         rows: {
@@ -100,81 +136,92 @@ export class VerifyController {
       },
     });
 
-    // Отозванный, отключённый и несуществующий отвечают одинаково.
-    // Разные ответы позволяли бы отличать «такого не было» от «был и отозван»,
+    // Отключённый и несуществующий отвечают одинаково: разные ответы
+    // позволяли бы отличать «такого не было» от «был, но закрыт»,
     // а это сведения о чужих документах.
-    if (!file || file.verifyRevoked || !file.document?.verifyEnabled) {
+    if (!file || file.deletedAt || !file.document?.verifyEnabled) {
       throw this.notFound(lookup.reason);
     }
 
     /*
-     * Заменённый документ отвечает иначе, чем отозванный, и это
-     * осознанное исключение из правила выше.
+     * Отозванный — это 200 и красная страница, а не «не найдено».
      *
-     * Перевыпуск — это исправленная опечатка в фамилии, а не проступок:
-     * человеку с бумагой в руках надо не отказать, а показать, где взять
-     * действующую. Скрывать замену значило бы отправлять его выяснять
-     * отношения с организацией по поводу документа, который у неё
-     * в порядке.
-     *
-     * Лишнего это не раскрывает: ответ получает только тот, кто уже держит
-     * старый идентификатор, то есть кому этот документ и выдавали.
+     * Раньше отзыв прятался за тем же отказом, что и несуществующий код:
+     * так «был и отозван» нельзя было отличить от «не было никогда».
+     * Но человек с бумагой в руках, получив «не найдено», решит, что
+     * ошибся в коде, и будет пробовать снова, — а ему надо сказать
+     * прямо: документ отозван, вот причина, вот куда обратиться.
+     * Лишнего это не раскрывает: ответ получает только тот, кто уже
+     * держит код, а перебор кодов не даёт ничего (см. public-code.ts).
+     * Самого получателя на красной странице не называем: причина отзыва
+     * может быть неприятной, и связывать её с фамилией на открытой
+     * странице мы не вправе.
      */
     const replacedById = await this.replacement.settleOne(file);
-    const replacement = replacedById ? await this.replacementFor(replacedById, file.orgId) : null;
-
-    await this.countCheck(file.id);
-
-    const data = (file.rows[0]?.data ?? file.row?.data ?? {}) as Record<string, string>;
-    const allowed = (file.document.verifyFields as string[]) ?? [];
-    // Только те поля, которые организация сама отметила показываемыми.
-    // Пустой список — значит показываем лишь факт подлинности.
-    const fields = Object.fromEntries(allowed.filter((k) => data[k]).map((k) => [k, data[k]]));
-
-    // Код показываем тот, что напечатан на бумаге: короткий у новых
-    // выпусков, UUID у старых. По нему человек сверяет страницу с листом.
-    const code = file.publicCode ?? file.publicId;
-
     const state = fileState({
-      verifyRevoked: false,
+      verifyRevoked: file.verifyRevoked,
       replacedById,
       expiresAt: file.expiresAt,
     });
+    const replacement =
+      state === 'replaced' && replacedById
+        ? await this.replacementFor(replacedById, file.orgId)
+        : null;
 
-    if (state === 'replaced') {
-      return {
-        valid: false as const,
-        replaced: true as const,
-        expired: false as const,
-        state,
-        code,
-        title: file.document.title,
-        issuedAt: file.createdAt,
-        expiresAt: file.expiresAt,
-        fields,
-        // Замену могли, в свою очередь, отозвать — тогда ссылки не даём:
-        // вести человека на страницу, которая ответит «не найдено», хуже,
-        // чем честно отправить его в выдавшую организацию.
-        replacedBy: replacement,
-      };
-    }
+    this.cacheHeaders(reply, state);
+    await this.countCheck(file.id);
 
     /*
-     * Истёкший документ — не отозванный. Он был настоящим и остаётся
-     * настоящим, просто подтверждает прошлое: «на июнь 2025 года допуск
-     * был». Поэтому отвечаем полноценной страницей со всеми полями,
-     * а не отказом, и красим её жёлтым, а не красным.
+     * Снимок на момент выпуска, если он есть, иначе живая строка.
+     *
+     * Снимок важнее: строку потом правят — опечатку в фамилии перед
+     * перевыпуском, — и страница не должна показывать имя, которого
+     * нет на бумаге. У документов, выпущенных до появления снимка,
+     * остаётся строка: другого источника у них нет.
      */
+    const source = (file.issuedData ?? file.rows[0]?.data ?? file.row?.data ?? {}) as Record<
+      string,
+      string
+    >;
+    const allowed = (file.document.verifyFields as string[]) ?? [];
+    // Только те поля, которые организация сама отметила показываемыми,
+    // и только так, как разрешил эмитент. Пустой список — лишь факт.
+    const picked = Object.fromEntries(allowed.filter((k) => source[k]).map((k) => [k, source[k]]));
+    const fields = state === 'revoked' ? {} : maskVerifyFields(picked, file.org.verifyNameMode);
+
+    const org = file.org;
     return {
-      valid: state === 'valid',
-      replaced: false as const,
-      expired: state === 'expired',
       state,
-      code,
+      valid: state === 'valid',
+      replaced: state === 'replaced',
+      expired: state === 'expired',
+      revoked: state === 'revoked',
+      // Код показываем тот, что напечатан на бумаге: короткий у новых
+      // выпусков, UUID у старых. По нему человек сверяет страницу с листом.
+      code: file.publicCode ?? file.publicId,
       title: file.document.title,
+      event: { name: file.document.eventName, date: file.document.eventDate },
       issuedAt: file.createdAt,
       expiresAt: file.expiresAt,
       fields,
+      issuer: {
+        name: org.name,
+        verified: org.verifiedIssuer,
+        publicPath: org.publicPageEnabled && org.slug ? `/org/${org.slug}` : null,
+        contactEmail: org.contactEmail || null,
+        website: org.website || null,
+      },
+      // Пускать ли поисковики: решение эмитента, а не наше.
+      indexable: org.publicIndexable,
+      // Отпечаток выпущенного файла — для сверки в браузере. Null у документов,
+      // выпущенных до того, как отпечаток стали сохранять.
+      sha256: file.pdfSha256,
+      revokedAt: state === 'revoked' ? file.revokedAt : null,
+      revokedReason: state === 'revoked' ? file.revokedReasonPublic || null : null,
+      // Замену могли, в свою очередь, отозвать — тогда ссылки не даём:
+      // вести человека на страницу, которая ответит «не найдено», хуже,
+      // чем честно отправить его в выдавшую организацию.
+      replacedBy: replacement,
     };
   }
 
@@ -215,6 +262,24 @@ export class VerifyController {
    */
   private notFound(reason: NotFoundReason): NotFoundException {
     return new NotFoundException({ message: 'Документ не найден', reason });
+  }
+
+  /**
+   * Кэш: действующий документ — на минуту, всё остальное — не хранить.
+   *
+   * Отозванный, истёкший и заменённый не кэшируются нигде: человек
+   * открывает страницу, чтобы узнать текущее положение дел, и минутной
+   * давности ответ «действителен» после отзыва — ровно то, чего отзыв
+   * должен не допускать.
+   */
+  private cacheHeaders(reply: FastifyReply | undefined, state: FileState): void {
+    if (!reply) return;
+    reply.header(
+      'cache-control',
+      state === 'valid'
+        ? `public, max-age=${VALID_CACHE_SECONDS}, stale-while-revalidate=${VALID_CACHE_SECONDS}`
+        : 'no-store',
+    );
   }
 
   /** Действующая замена — если она сама ещё действительна. */

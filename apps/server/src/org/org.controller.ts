@@ -6,6 +6,7 @@ import { AuthGuard } from '../auth/auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
 import type { SessionUser } from '../auth/auth.service';
 import { OrgService } from './org.service';
+import { updatePublicProfileSchema, type UpdatePublicProfileDto } from './public-profile.dto';
 
 const orgNameSchema = z.object({
   name: z.string().trim().min(2, 'Название не может быть короче двух букв').max(200),
@@ -43,6 +44,26 @@ export class OrgController {
     @Body(new ZodValidationPipe(orgNameSchema)) dto: z.infer<typeof orgNameSchema>,
   ) {
     return this.org.renameOrg(user.orgId, dto.name);
+  }
+
+  /**
+   * Публичное лицо организации: страница снаружи и то, что о ней говорит
+   * страница проверки. Читать могут все сотрудники — им надо знать, что
+   * видят проверяющие; менять — владелец и управляющий: это решение
+   * о том, сколько организация показывает о себе и об участниках.
+   */
+  @Get('public-profile')
+  publicProfile(@CurrentUser() user: SessionUser) {
+    return this.org.publicProfile(user.orgId);
+  }
+
+  @Patch('public-profile')
+  @Roles('owner', 'admin')
+  updatePublicProfile(
+    @CurrentUser() user: SessionUser,
+    @Body(new ZodValidationPipe(updatePublicProfileSchema)) dto: UpdatePublicProfileDto,
+  ) {
+    return this.org.updatePublicProfile(user.orgId, dto);
   }
 
   /** Своё имя правит кто угодно: это его имя. */

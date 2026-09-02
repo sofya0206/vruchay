@@ -9,6 +9,7 @@ import { InviteFriend } from '../settings/InviteFriend';
 import { Review } from '../settings/Review';
 import { AuditLog } from '../settings/AuditLog';
 import { ApiTokens } from '../settings/ApiTokens';
+import { PublicProfile } from '../settings/PublicProfile';
 
 /** Настройки организации: отправка писем и приём заявок с сайта. */
 export function SettingsPage() {
@@ -30,6 +31,9 @@ export function SettingsPage() {
           и приём заявок с сайта — только тем, кто до них дорос. */}
       <main className="mx-auto max-w-4xl space-y-10 px-6 py-8">
         <Organization />
+        <hr className="border-[var(--line)]" />
+        {/* Сразу за названием: это тоже про то, как организация выглядит снаружи. */}
+        <PublicProfile />
         <hr className="border-[var(--line)]" />
         <InviteFriend />
         <hr className="border-[var(--line)]" />
