@@ -353,10 +353,13 @@ function Actions({ data }: { data: VerifyResult }) {
   }
 
   // Сообщить о проблеме — эмитенту, если он оставил адрес: это его документ
-  // и его ответственность. Иначе нам: мы хотя бы знаем, кому передать.
+  // и его ответственность. Без адреса кнопки нет: выдуманный ящик сервиса
+  // хуже её отсутствия — письмо ушло бы в никуда.
   const subject = encodeURIComponent(`Вопрос по документу ${data.code}`);
   const body = encodeURIComponent(`Страница проверки: ${url}\n\nОпишите, что не так:\n`);
-  const report = `mailto:${data.issuer.contactEmail ?? 'support@vruchay.ru'}?subject=${subject}&body=${body}`;
+  const report = data.issuer.contactEmail
+    ? `mailto:${data.issuer.contactEmail}?subject=${subject}&body=${body}`
+    : null;
 
   return (
     <div className="mt-6 flex flex-wrap justify-center gap-2">
@@ -368,13 +371,15 @@ function Actions({ data }: { data: VerifyResult }) {
         {copied ? <Check size={14} /> : <Share2 size={14} />}
         {copied ? 'Ссылка скопирована' : 'Поделиться'}
       </button>
-      <a
-        href={report}
-        className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
-      >
-        <Flag size={14} />
-        Сообщить о проблеме
-      </a>
+      {report && (
+        <a
+          href={report}
+          className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
+        >
+          <Flag size={14} />
+          Сообщить о проблеме
+        </a>
+      )}
     </div>
   );
 }
