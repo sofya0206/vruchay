@@ -178,10 +178,11 @@ export function validateBatch(input: ValidationInput): BatchValidation {
 
     // Переполнение блока.
     for (const target of targets) {
-      const text = renderTarget(target, data);
+      const rendered = renderTarget(target, data);
+      const text = rendered.text;
       if (!text.trim()) continue;
 
-      const result = cache.measure(target, text);
+      const result = cache.measure(target, rendered);
       if (result.fits) continue;
 
       const percent = Math.round((result.overflowRatio - 1) * 100);

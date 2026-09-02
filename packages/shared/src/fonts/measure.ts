@@ -33,9 +33,30 @@ export interface TextStyle {
   lineHeight: number;
   /** Разрядка в пунктах. */
   letterSpacing: number;
+  /**
+   * Межсловный интервал в пунктах: Chromium добавляет его к каждому
+   * пробелу. Необязательный — у блока целиком его нет, он бывает только
+   * у прогона с маркой.
+   */
+  wordSpacing?: number;
   uppercase: boolean;
   /** Обводка вокруг букв в миллиметрах: она выступает за края глифов. */
   strokeWidth: number;
+}
+
+/**
+ * Прогон: кусок текста и его начертание.
+ *
+ * Строка блока больше не набрана одним стилем: фамилия в имени может быть
+ * полужирной, одно слово — другим кеглем. Измеритель поэтому работает
+ * со списком прогонов, а прежние функции с одной строкой и одним стилем
+ * — частный случай с одним прогоном. Ширина считается на прогон
+ * и складывается: она линейна по буквам, и разрез строки на прогоны
+ * одного стиля даёт ровно ту же сумму, что и строка целиком.
+ */
+export interface StyledRun {
+  text: string;
+  style: TextStyle;
 }
 
 /** Размеры блока в миллиметрах — те же, в которых хранится макет. */
@@ -92,7 +113,21 @@ export function measureLine(
   const glyphsMm =
     ptToMm((units / metrics.unitsPerEm) * style.fontSize) * shapingFor(metrics, mode);
   const spacingMm = ptToMm(style.letterSpacing) * count;
-  return glyphsMm + spacingMm;
+  const wordsMm = style.wordSpacing ? ptToMm(style.wordSpacing) * spaces(source) : 0;
+  return glyphsMm + spacingMm + wordsMm;
+}
+
+function spaces(text: string): number {
+  let n = 0;
+  for (const char of text) if (char === ' ' || char === '\u00A0') n++;
+  return n;
+}
+
+/** Ширина строки из нескольких прогонов — сумма ширин прогонов. */
+export function measureRuns(runs: StyledRun[], mode: MeasureMode = 'estimate'): number {
+  let width = 0;
+  for (const run of runs) width += measureLine(run.text, run.style, undefined, mode);
+  return width;
 }
 
 /**
@@ -163,10 +198,184 @@ function breakLongLine(
   return out;
 }
 
+/** Строка из прогонов без пробелов на конце: так её меряет и рисует браузер. */
+function trimEndRuns(line: StyledRun[]): StyledRun[] {
+  const out = [...line];
+  while (out.length) {
+    const last = out[out.length - 1];
+    const trimmed = last.text.trimEnd();
+    if (trimmed !== '') {
+      out[out.length - 1] = { ...last, text: trimmed };
+      break;
+    }
+    out.pop();
+  }
+  return out;
+}
+
+/** Кусок абзаца, набранного прогонами, по границам символов. */
+function sliceRuns(runs: StyledRun[], offsets: number[], start: number, end: number): StyledRun[] {
+  const out: StyledRun[] = [];
+  for (let i = 0; i < runs.length; i++) {
+    const from = Math.max(start, offsets[i]);
+    const to = Math.min(end, offsets[i + 1]);
+    if (to <= from) continue;
+    out.push({ text: runs[i].text.slice(from - offsets[i], to - offsets[i]), style: runs[i].style });
+  }
+  return out;
+}
+
+/**
+ * Перенос по словам строки из нескольких прогонов.
+ *
+ * Правила те же, что у `wrapText`, — pre-wrap и break-word браузера, —
+ * но слово может начинаться в одном прогоне и кончаться в другом:
+ * «Ива**нов**». Поэтому абзац сначала склеивается в одну строку, режется
+ * на слова как обычно, а каждое слово потом раскладывается обратно
+ * по прогонам по своим границам.
+ *
+ * Один прогон идёт прежней дорогой: это и быстрее, и гарантирует, что
+ * старый макет без марок меряется ровно так, как мерился.
+ */
+export function wrapRuns(
+  runs: StyledRun[],
+  widthMm: number,
+  mode: MeasureMode = 'safe',
+): StyledRun[][] {
+  if (runs.length === 0) return [[]];
+  if (runs.length === 1) {
+    return wrapText(runs[0].text, runs[0].style, widthMm, mode).map((text) =>
+      text === '' ? [] : [{ text, style: runs[0].style }],
+    );
+  }
+
+  const lines: StyledRun[][] = [];
+  for (const paragraph of splitParagraphs(runs)) {
+    if (paragraph.length === 0) {
+      lines.push([]);
+      continue;
+    }
+
+    const offsets = [0];
+    for (const run of paragraph) offsets.push(offsets[offsets.length - 1] + run.text.length);
+    const whole = paragraph.map((r) => r.text).join('');
+    const chunks = [...whole.matchAll(/\S+\s*|\s+/g)];
+
+    let line: StyledRun[] = [];
+    let lineStart = 0;
+    let lineEnd = 0;
+
+    for (const chunk of chunks) {
+      const end = (chunk.index ?? 0) + chunk[0].length;
+      const candidate = sliceRuns(paragraph, offsets, lineStart, end);
+      if (line.length === 0 || measureRuns(trimEndRuns(candidate), mode) <= widthMm) {
+        line = candidate;
+        lineEnd = end;
+        continue;
+      }
+
+      lines.push(trimEndRuns(line));
+      // Новая строка начинается со слова без ведущих пробелов — как у браузера.
+      const leading = chunk[0].length - chunk[0].trimStart().length;
+      lineStart = (chunk.index ?? 0) + leading;
+      lineEnd = end;
+      line = sliceRuns(paragraph, offsets, lineStart, lineEnd);
+    }
+
+    for (const piece of breakLongRuns(line, widthMm, mode)) lines.push(piece);
+  }
+
+  return lines;
+}
+
+/** Абзацы: переводы строк могут стоять внутри любого прогона. */
+function splitParagraphs(runs: StyledRun[]): StyledRun[][] {
+  const paragraphs: StyledRun[][] = [[]];
+  for (const run of runs) {
+    const parts = run.text.split('\n');
+    parts.forEach((part, i) => {
+      if (i > 0) paragraphs.push([]);
+      if (part !== '') paragraphs[paragraphs.length - 1].push({ text: part, style: run.style });
+    });
+  }
+  return paragraphs;
+}
+
+/** Слово шире блока рвётся посимвольно — с сохранением стиля каждой буквы. */
+function breakLongRuns(line: StyledRun[], widthMm: number, mode: MeasureMode): StyledRun[][] {
+  const trimmed = trimEndRuns(line);
+  if (measureRuns(trimmed, mode) <= widthMm) return [trimmed];
+
+  const out: StyledRun[][] = [];
+  let current: StyledRun[] = [];
+
+  const append = (list: StyledRun[], char: string, style: TextStyle): StyledRun[] => {
+    const last = list[list.length - 1];
+    if (last && last.style === style) {
+      return [...list.slice(0, -1), { text: last.text + char, style }];
+    }
+    return [...list, { text: char, style }];
+  };
+
+  for (const run of line) {
+    for (const char of run.text) {
+      const next = append(current, char, run.style);
+      if (current.length !== 0 && measureRuns(next, mode) > widthMm) {
+        out.push(current);
+        current = [{ text: char, style: run.style }];
+      } else {
+        current = next;
+      }
+    }
+  }
+  if (current.length) out.push(trimEndRuns(current));
+  return out;
+}
+
 export interface Measured {
   lines: string[];
   widthMm: number;
   heightMm: number;
+}
+
+export interface MeasuredRuns {
+  lines: StyledRun[][];
+  widthMm: number;
+  heightMm: number;
+}
+
+/**
+ * Высота строки из прогонов — по самому высокому из них.
+ *
+ * Так строит строку и браузер: при `line-height` числом каждый прогон
+ * получает свою высоту от своего кегля, а строка растёт до самого
+ * высокого. Пустая строка — высоты блока.
+ */
+function lineHeightMm(line: StyledRun[], base: TextStyle): number {
+  let tallest = 0;
+  for (const run of line) tallest = Math.max(tallest, run.style.fontSize * run.style.lineHeight);
+  if (line.length === 0) tallest = base.fontSize * base.lineHeight;
+  return ptToMm(tallest);
+}
+
+/** Во что превратится набранный прогонами текст в блоке заданной ширины. */
+export function layoutRuns(
+  runs: StyledRun[],
+  base: TextStyle,
+  box: BoxMm,
+  mode: MeasureMode = 'safe',
+): MeasuredRuns {
+  const inner = Math.max(box.w - base.strokeWidth, 0.1);
+  const lines = wrapRuns(runs, inner, mode);
+
+  let widthMm = 0;
+  let heightMm = 0;
+  for (const line of lines) {
+    widthMm = Math.max(widthMm, measureRuns(line, mode));
+    heightMm += lineHeightMm(line, base);
+  }
+
+  return { lines, widthMm: widthMm + base.strokeWidth, heightMm: heightMm + base.strokeWidth };
 }
 
 /** Во что превратится текст в блоке заданной ширины. */
@@ -219,9 +428,8 @@ export const MIN_FONT_SIZE_PT = 5;
 /**
  * Влезает ли текст в блок — и если включён автомасштаб, при каком кегле.
  *
- * Подбор половинным делением: кегль монотонно влияет на высоту, поэтому
- * перебирать по пункту незачем. Точность в четверть пункта — мельче
- * человек не различает, а лишние итерации на десяти тысячах строк заметны.
+ * Один прогон: то же, что `fitRuns` с одним прогоном, и ровно те же числа,
+ * что были до прогонов, — на этом стоят вердикты проверки списка.
  */
 export function fitText(
   text: string,
@@ -229,48 +437,58 @@ export function fitText(
   box: BoxMm,
   autoFit: boolean,
 ): FitResult {
-  const measured = layoutText(text, style, box);
-  const fitsAsIs = measured.heightMm <= box.h && measured.widthMm <= box.w + 1e-9;
+  return fitRuns([{ text, style }], style, box, autoFit);
+}
 
-  if (fitsAsIs || !autoFit) {
-    return {
-      fits: fitsAsIs,
-      fontSize: style.fontSize,
-      lines: measured.lines.length,
-      widthMm: measured.widthMm,
-      heightMm: measured.heightMm,
-      overflowRatio: box.h > 0 ? measured.heightMm / box.h : Infinity,
-    };
-  }
+/**
+ * Влезает ли набранный прогонами текст — и при каком кегле, если включён
+ * автомасштаб.
+ *
+ * Кегль блока — единица масштаба: прогон, набранный крупнее блока,
+ * уменьшается вместе с ним в той же пропорции, иначе автомасштаб ломал бы
+ * соотношение размеров внутри строки. Подбор половинным делением: кегль
+ * монотонно влияет на высоту, поэтому перебирать по пункту незачем.
+ * Точность в четверть пункта — мельче человек не различает, а лишние
+ * итерации на десяти тысячах строк заметны.
+ */
+export function fitRuns(
+  runs: StyledRun[],
+  base: TextStyle,
+  box: BoxMm,
+  autoFit: boolean,
+): FitResult {
+  const report = (m: MeasuredRuns, fontSize: number): FitResult => ({
+    fits: m.heightMm <= box.h && m.widthMm <= box.w + 1e-9,
+    fontSize,
+    lines: m.lines.length,
+    widthMm: m.widthMm,
+    heightMm: m.heightMm,
+    overflowRatio: box.h > 0 ? m.heightMm / box.h : Infinity,
+  });
 
-  const floor = Math.max(style.fontSize * MIN_AUTO_FIT_RATIO, MIN_FONT_SIZE_PT);
-  if (floor >= style.fontSize) {
-    return {
-      fits: false,
-      fontSize: style.fontSize,
-      lines: measured.lines.length,
-      widthMm: measured.widthMm,
-      heightMm: measured.heightMm,
-      overflowRatio: box.h > 0 ? measured.heightMm / box.h : Infinity,
-    };
-  }
+  const measured = layoutRuns(runs, base, box);
+  const asIs = report(measured, base.fontSize);
+  if (asIs.fits || !autoFit) return asIs;
 
-  const at = (size: number) => layoutText(text, { ...style, fontSize: size }, box);
+  const floor = Math.max(base.fontSize * MIN_AUTO_FIT_RATIO, MIN_FONT_SIZE_PT);
+  if (floor >= base.fontSize) return asIs;
+
+  const at = (size: number) => {
+    const scale = size / base.fontSize;
+    const scaled = runs.map((run) => ({
+      text: run.text,
+      style: { ...run.style, fontSize: run.style.fontSize * scale },
+    }));
+    return layoutRuns(scaled, { ...base, fontSize: size }, box);
+  };
 
   const smallest = at(floor);
   if (smallest.heightMm > box.h || smallest.widthMm > box.w + 1e-9) {
-    return {
-      fits: false,
-      fontSize: floor,
-      lines: smallest.lines.length,
-      widthMm: smallest.widthMm,
-      heightMm: smallest.heightMm,
-      overflowRatio: box.h > 0 ? smallest.heightMm / box.h : Infinity,
-    };
+    return { ...report(smallest, floor), fits: false };
   }
 
   let low = floor;
-  let high = style.fontSize;
+  let high = base.fontSize;
   while (high - low > 0.25) {
     const middle = (low + high) / 2;
     const attempt = at(middle);
@@ -289,16 +507,7 @@ export function fitText(
   const chosen = Math.max(Math.floor(low * 4) / 4, floor);
   // Меряем ещё раз именно на выбранном кегле: числа в отчёте должны
   // описывать его, а не соседнюю ступень перебора.
-  const best = at(chosen);
-
-  return {
-    fits: best.heightMm <= box.h && best.widthMm <= box.w + 1e-9,
-    fontSize: chosen,
-    lines: best.lines.length,
-    widthMm: best.widthMm,
-    heightMm: best.heightMm,
-    overflowRatio: box.h > 0 ? best.heightMm / box.h : Infinity,
-  };
+  return report(at(chosen), chosen);
 }
 
 export { resolveFace, knownFaces } from './metrics';

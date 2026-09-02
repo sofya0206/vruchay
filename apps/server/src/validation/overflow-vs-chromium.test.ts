@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium, type Browser, type Page } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { fitText, type BoxMm, type TextStyle } from '@gramota/shared/fonts';
+import { fitRuns, fitText, type BoxMm, type StyledRun, type TextStyle } from '@gramota/shared/fonts';
 
 /*
  * Главная сверка всей функции: совпадает ли наш вердикт «влезает / обрежет»
@@ -144,6 +144,93 @@ const SPACED: Case = {
 
 const ALL = [...CASES, SPACED];
 
+/**
+ * Строки из нескольких прогонов: фамилия полужирная, слово крупнее строки,
+ * рукописная подпись в строке с наборной. Это то, что стало возможным
+ * с форматированием внутри блока, и измеритель обязан отвечать про такие
+ * строки так же честно, как про однородные.
+ */
+interface RunCase {
+  block: string;
+  base: TextStyle;
+  box: BoxMm;
+  samples: StyledRun[][];
+}
+
+const RUN_CASES: RunCase[] = [
+  {
+    block: 'имя с полужирной фамилией, PT Serif 30pt, 207×14 мм',
+    base: style({ fontFamily: 'PT Serif', fontSize: 30 }),
+    box: { w: 207, h: 14 },
+    samples: [
+      [
+        { text: 'Иванов', style: style({ fontFamily: 'PT Serif', fontSize: 30, bold: true }) },
+        { text: ' Пётр Ильич', style: style({ fontFamily: 'PT Serif', fontSize: 30 }) },
+      ],
+      [
+        { text: 'Константинопольский', style: style({ fontFamily: 'PT Serif', fontSize: 30, bold: true }) },
+        { text: ' Владислав Вячеславович', style: style({ fontFamily: 'PT Serif', fontSize: 30 }) },
+      ],
+      [
+        { text: 'Тер-Аванесян', style: style({ fontFamily: 'PT Serif', fontSize: 30, bold: true }) },
+        { text: ' Гарри Артёмович', style: style({ fontFamily: 'PT Serif', fontSize: 30 }) },
+      ],
+    ],
+  },
+  {
+    block: 'разные кегли в одной строке, PT Sans 14pt, 120×10 мм',
+    base: style({ fontSize: 14 }),
+    box: { w: 120, h: 10 },
+    samples: [
+      [
+        { text: 'за ', style: style({ fontSize: 14 }) },
+        { text: 'первое', style: style({ fontSize: 22, bold: true }) },
+        { text: ' место', style: style({ fontSize: 14 }) },
+      ],
+      [
+        { text: 'за ', style: style({ fontSize: 14 }) },
+        { text: 'первое', style: style({ fontSize: 28, bold: true }) },
+        { text: ' место в первенстве области', style: style({ fontSize: 14 }) },
+      ],
+      [
+        { text: 'в объёме ', style: style({ fontSize: 14 }) },
+        { text: '120', style: style({ fontSize: 14, bold: true }) },
+        { text: ' часов', style: style({ fontSize: 14 }) },
+      ],
+    ],
+  },
+  {
+    block: 'наборная с рукописной вставкой, PT Sans 16pt, 100×12 мм',
+    base: style({ fontSize: 16 }),
+    box: { w: 100, h: 12 },
+    samples: [
+      [
+        { text: 'Награждается ', style: style({ fontSize: 16 }) },
+        { text: 'Иванов Пётр', style: style({ fontFamily: 'Caveat', fontSize: 22 }) },
+      ],
+      [
+        { text: 'Награждается ', style: style({ fontSize: 16 }) },
+        { text: 'Константинопольский Владислав', style: style({ fontFamily: 'Caveat', fontSize: 22 }) },
+      ],
+    ],
+  },
+  {
+    block: 'курсив и разрядка вперемешку, Montserrat 18pt, 90×10 мм',
+    base: style({ fontFamily: 'Montserrat', fontSize: 18 }),
+    box: { w: 90, h: 10 },
+    samples: [
+      [
+        { text: 'ДИПЛОМ', style: style({ fontFamily: 'Montserrat', fontSize: 18, letterSpacing: 3, bold: true }) },
+        { text: ' участника', style: style({ fontFamily: 'Montserrat', fontSize: 18, italic: true }) },
+      ],
+      [
+        { text: 'ДИПЛОМ', style: style({ fontFamily: 'Montserrat', fontSize: 18, letterSpacing: 3, bold: true }) },
+        { text: ' победителя первенства', style: style({ fontFamily: 'Montserrat', fontSize: 18, italic: true }) },
+      ],
+    ],
+  },
+];
+
 interface Verdict {
   block: string;
   text: string;
@@ -239,6 +326,88 @@ describe.skipIf(!CHROMIUM_TESTS)('вердикт «влезает» против
           text,
           chromiumClips: clipped[i],
           weSayFits: fitText(text, testCase.style, testCase.box, false).fits,
+        });
+      });
+    }
+
+    for (const runCase of RUN_CASES) {
+      const clipped = await page.evaluate(
+        async ({ base, box, samples }) => {
+          const host = document.getElementById('host')!;
+          host.innerHTML = '';
+
+          const el = document.createElement('div');
+          /*
+           * Блок — теми же правилами, что и однородный. Прогоны внутри —
+           * `span` с собственным начертанием: ровно так их рисует
+           * RichText в apps/web/src/render.
+           */
+          Object.assign(el.style, {
+            position: 'absolute',
+            left: '0',
+            top: '0',
+            width: `${box.w}mm`,
+            height: `${box.h}mm`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontFamily: base.fontFamily,
+            fontSize: `${base.fontSize}pt`,
+            fontWeight: base.bold ? '700' : '400',
+            fontStyle: base.italic ? 'italic' : 'normal',
+            lineHeight: String(base.lineHeight),
+            letterSpacing: `${base.letterSpacing}pt`,
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+            overflow: 'hidden',
+          });
+          host.appendChild(el);
+
+          for (const sample of samples) {
+            for (const run of sample) {
+              await document.fonts.load(
+                `${run.style.italic ? 'italic' : 'normal'} ${run.style.bold ? 700 : 400} ` +
+                  `${run.style.fontSize}pt "${run.style.fontFamily}"`,
+                run.text,
+              );
+            }
+          }
+
+          const out: boolean[] = [];
+          for (const sample of samples) {
+            el.innerHTML = '';
+            // Один внутренний блок, как в RichText: flex-контейнер выравнивает
+            // строку целиком, а не каждый прогон по отдельности.
+            const line = document.createElement('div');
+            for (const run of sample) {
+              const span = document.createElement('span');
+              Object.assign(span.style, {
+                fontFamily: run.style.fontFamily,
+                fontSize: `${run.style.fontSize}pt`,
+                fontWeight: run.style.bold ? '700' : '400',
+                fontStyle: run.style.italic ? 'italic' : 'normal',
+                letterSpacing: `${run.style.letterSpacing}pt`,
+                textTransform: run.style.uppercase ? 'uppercase' : 'none',
+              });
+              span.textContent = run.text;
+              line.appendChild(span);
+            }
+            el.appendChild(line);
+            out.push(
+              el.scrollHeight > el.clientHeight + 0.5 || el.scrollWidth > el.clientWidth + 0.5,
+            );
+          }
+          return out;
+        },
+        { base: runCase.base, box: runCase.box, samples: runCase.samples },
+      );
+
+      runCase.samples.forEach((runs, i) => {
+        verdicts.push({
+          block: runCase.block,
+          text: runs.map((r) => r.text).join(''),
+          chromiumClips: clipped[i],
+          weSayFits: fitRuns(runs, runCase.base, runCase.box, false).fits,
         });
       });
     }

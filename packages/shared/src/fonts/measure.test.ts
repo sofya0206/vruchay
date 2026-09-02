@@ -1,14 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import {
+  fitRuns,
   fitText,
+  layoutRuns,
   layoutText,
   measureLine,
+  measureRuns,
   MIN_AUTO_FIT_RATIO,
   ptToMm,
   resolveFace,
+  wrapRuns,
   wrapText,
+  type StyledRun,
   type TextStyle,
 } from './measure';
+import { runsOfBlocks, runsText } from './runs';
+import type { ResolvedBlock } from '../schema/rich-text-resolve';
 
 /*
  * Измерение текста без браузера.
@@ -199,5 +206,185 @@ describe('подбор начертания', () => {
     const r = resolveFace({ fontFamily: 'Неведомый шрифт', bold: false, italic: false });
     expect(r.substituted).toBe(true);
     expect(r.metrics.unitsPerEm).toBeGreaterThan(0);
+  });
+});
+
+/*
+ * Прогоны: строка, набранная несколькими стилями.
+ *
+ * Главное обещание — обратная совместимость: старый макет без марок это
+ * один прогон, и он обязан мериться теми же числами, что и раньше.
+ * Иначе вердикты проверки списка поменялись бы у клиентов, у которых
+ * в макете ничего не менялось.
+ */
+describe('прогоны', () => {
+  const bold = style({ bold: true });
+
+  it('один прогон меряется как строка — байт в байт', () => {
+    const text = 'Награждается Иванов Пётр Ильич';
+    expect(measureRuns([{ text, style: style() }])).toBe(measureLine(text, style()));
+    expect(fitRuns([{ text, style: style() }], style(), { w: 60, h: 20 }, true)).toEqual(
+      fitText(text, style(), { w: 60, h: 20 }, true),
+    );
+  });
+
+  it('разрез строки на прогоны одного стиля не меняет ширину', () => {
+    const whole = measureLine('Иванов Пётр Ильич', style());
+    const parts = measureRuns([
+      { text: 'Иванов ', style: style() },
+      { text: 'Пётр ', style: style() },
+      { text: 'Ильич', style: style() },
+    ]);
+    expect(parts).toBeCloseTo(whole, 9);
+  });
+
+  it('смешанная строка — сумма своих прогонов, каждый своим начертанием', () => {
+    const mixed = measureRuns([{ text: 'Иванов', style: bold }, { text: ' Пётр', style: style() }]);
+    expect(mixed).toBeCloseTo(measureLine('Иванов', bold) + measureLine(' Пётр', style()), 9);
+    expect(mixed).not.toBeCloseTo(measureLine('Иванов Пётр', style()), 3);
+  });
+
+  it('слово, начатое в одном прогоне и законченное в другом, не рвётся на переносе', () => {
+    const runs: StyledRun[] = [
+      { text: 'Награждается Ива', style: style() },
+      { text: 'нов', style: bold },
+      { text: ' Пётр', style: style() },
+    ];
+    const width = measureRuns([{ text: 'Награждается Иванов', style: style() }]) + 1;
+    const lines = wrapRuns(runs, width);
+    expect(lines.map((l) => l.map((r) => r.text).join(''))).toEqual([
+      'Награждается Иванов',
+      'Пётр',
+    ]);
+    // Стили внутри переносов сохранились.
+    expect(lines[0].map((r) => r.style.bold)).toEqual([false, true]);
+  });
+
+  it('перевод строки внутри прогона начинает новую строку', () => {
+    const lines = wrapRuns(
+      [{ text: 'Иванов\nПётр', style: style() }, { text: ' Ильич', style: bold }],
+      1000,
+    );
+    expect(lines.map((l) => l.map((r) => r.text).join(''))).toEqual(['Иванов', 'Пётр Ильич']);
+  });
+
+  it('высота строки берётся по самому крупному прогону', () => {
+    const small = style({ fontSize: 10 });
+    const large = style({ fontSize: 30 });
+    const one = layoutRuns([{ text: 'Иванов', style: small }], small, { w: 1000, h: 100 });
+    const mixed = layoutRuns(
+      [{ text: 'Ива', style: small }, { text: 'нов', style: large }],
+      small,
+      { w: 1000, h: 100 },
+    );
+    expect(one.heightMm).toBeCloseTo(ptToMm(10 * 1.2), 6);
+    expect(mixed.heightMm).toBeCloseTo(ptToMm(30 * 1.2), 6);
+  });
+
+  it('автомасштаб уменьшает прогоны в той же пропорции, что и блок', () => {
+    const large = style({ fontSize: 40 });
+    const runs: StyledRun[] = [
+      { text: 'Награждается ', style: style({ fontSize: 20 }) },
+      { text: 'Константинопольский Владислав', style: large },
+    ];
+    const result = fitRuns(runs, style({ fontSize: 20 }), { w: 80, h: 40 }, true);
+    expect(result.fits).toBe(true);
+    expect(result.fontSize).toBeLessThan(20);
+    // Кегль крупного прогона на выбранном масштабе — вдвое больше кегля блока.
+    const scale = result.fontSize / 20;
+    const scaled = layoutRuns(
+      runs.map((r) => ({ ...r, style: { ...r.style, fontSize: r.style.fontSize * scale } })),
+      style({ fontSize: result.fontSize }),
+      { w: 80, h: 40 },
+    );
+    expect(scaled.heightMm).toBeLessThanOrEqual(40);
+  });
+
+  it('межсловный интервал добавляется к каждому пробелу', () => {
+    const plain = measureLine('Иванов Пётр Ильич', style());
+    const spaced = measureLine('Иванов Пётр Ильич', style({ wordSpacing: 2 }));
+    expect(spaced).toBeCloseTo(plain + ptToMm(2) * 2, 9);
+  });
+});
+
+describe('прогоны из марок', () => {
+  const base = style();
+  const block = (content: ResolvedBlock['content'], marker: string | null = null): ResolvedBlock => ({
+    marker,
+    align: null,
+    indent: 0,
+    content,
+  });
+
+  it('старый блок без марок — один прогон в стиле блока', () => {
+    const runs = runsOfBlocks([block([{ type: 'text', text: 'Иванов' }])], base);
+    expect(runs).toEqual([{ text: 'Иванов', style: base }]);
+  });
+
+  it('полужирная марка даёт полужирный прогон', () => {
+    const runs = runsOfBlocks(
+      [block([{ type: 'text', text: 'Ива' }, { type: 'text', text: 'нов', marks: [{ type: 'bold' }] }])],
+      base,
+    );
+    expect(runs[1].style.bold).toBe(true);
+    expect(runs[0].style).toBe(base);
+  });
+
+  it('кегль и гарнитура из textStyle перекрывают стиль блока', () => {
+    const runs = runsOfBlocks(
+      [
+        block([
+          {
+            type: 'text',
+            text: 'Иванов',
+            marks: [{ type: 'textStyle', attrs: { fontSize: 30, fontFamily: 'Lora', fontWeight: 600 } }],
+          },
+        ]),
+      ],
+      base,
+    );
+    expect(runs[0].style).toMatchObject({ fontSize: 30, fontFamily: 'Lora', bold: true });
+  });
+
+  it('капитель меряется прописными — в сторону «шире»', () => {
+    const runs = runsOfBlocks(
+      [block([{ type: 'text', text: 'Иванов', marks: [{ type: 'textStyle', attrs: { transform: 'smallcaps' } }] }])],
+      base,
+    );
+    expect(runs[0].style.uppercase).toBe(true);
+  });
+
+  it('индекс — мельче строки', () => {
+    const runs = runsOfBlocks(
+      [block([{ type: 'text', text: '2', marks: [{ type: 'superscript' }] }])],
+      base,
+    );
+    expect(runs[0].style.fontSize).toBeLessThan(base.fontSize);
+  });
+
+  it('строки — через перевод строки, маркер — в начале своей строки', () => {
+    const runs = runsOfBlocks(
+      [block([{ type: 'text', text: 'первое' }], '1.'), block([{ type: 'text', text: 'второе' }], '2.')],
+      base,
+    );
+    expect(runsText(runs)).toBe('1. первое\n2. второе');
+  });
+
+  it('поле меряется своим значением с марками поля', () => {
+    const runs = runsOfBlocks(
+      [
+        block([
+          {
+            type: 'field',
+            attrs: { source: 'name', fieldId: null, fallback: null, format: 'none' },
+            marks: [{ type: 'italic' }],
+            text: 'Иванов',
+            state: 'ok',
+          },
+        ]),
+      ],
+      base,
+    );
+    expect(runs).toEqual([{ text: 'Иванов', style: { ...base, italic: true } }]);
   });
 });

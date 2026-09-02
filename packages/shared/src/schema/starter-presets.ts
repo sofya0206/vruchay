@@ -1,4 +1,4 @@
-import { CURRENT_LAYOUT_SCHEMA_VERSION, type SheetLayout } from './layout';
+import { CURRENT_LAYOUT_SCHEMA_VERSION, textProps, type SheetLayout } from './layout';
 
 /**
  * Готовые заготовки: вид документа плюс расставленный по листу текст.
@@ -420,6 +420,7 @@ function textElement(o: {
   const isTitle = o.role === 'title';
   const isLabel = o.role === 'label';
 
+  // Через разбор по той же причине, что и в presets.ts: умолчания — в схеме.
   return {
     id: o.id,
     type: 'text',
@@ -429,7 +430,12 @@ function textElement(o: {
     h: round(o.h),
     rotation: 0,
     z: o.z,
-    props: {
+    opacity: 1,
+    locked: false,
+    hidden: false,
+    groupId: null,
+    name: null,
+    props: textProps.parse({
       text: o.text,
       fontFamily: isName || isTitle ? 'Playfair Display' : 'PT Serif',
       fontSize: Number((o.sizeMm * MM_TO_PT).toFixed(1)),
@@ -438,13 +444,9 @@ function textElement(o: {
       lineHeight: isName ? 1.15 : 1.3,
       letterSpacing: isTitle || isLabel ? Number((o.sizeMm * 0.1 * MM_TO_PT).toFixed(2)) : 0,
       bold: o.bold || isTitle,
-      italic: false,
-      underline: false,
       uppercase: isLabel,
-      strokeWidth: 0,
-      strokeColor: '#ffffff',
       autoFit: true,
-    },
+    }),
   };
 }
 

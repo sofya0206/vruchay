@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import type { QuotaVerdict, SheetLayout, TextElement } from '@gramota/shared';
+import { textElement, type QuotaVerdict, type SheetLayout, type TextElement } from '@gramota/shared';
 import { validateBatch, type ValidationInput, type ValidationRow } from './validate-batch';
 
 /*
@@ -109,7 +109,9 @@ function text(
   box: { x: number; y: number; w: number; h: number },
   over: Partial<TextElement['props']> = {},
 ): TextElement {
-  return {
+  // Через разбор схемы: текст «%name» переходит на дерево той же дорогой,
+  // что и сохранённые макеты, — перф-тест меряет настоящий путь.
+  return textElement.parse({
     id,
     type: 'text',
     ...box,
@@ -131,7 +133,7 @@ function text(
       autoFit: false,
       ...over,
     },
-  };
+  });
 }
 
 /** Макет вроде настоящей грамоты: заголовок, имя, мероприятие, дата, номер. */

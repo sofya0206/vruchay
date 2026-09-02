@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium, type Browser } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { measureLine, type TextStyle } from '@gramota/shared/fonts';
+import { measureLine, measureRuns, type StyledRun, type TextStyle } from '@gramota/shared/fonts';
 
 /*
  * Сверка измерения с настоящим Chromium.
@@ -99,6 +99,68 @@ function styleFor(sample: Sample): TextStyle {
   };
 }
 
+/**
+ * Строки из нескольких прогонов.
+ *
+ * Меряются не холстом, а настоящей строкой из `span`: холст умеет один
+ * шрифт на вызов, а расхождение с прогонами возникает как раз на стыке —
+ * кернинг между последней буквой одного прогона и первой другого
+ * браузер не считает, а мы и подавно. Этот стык и проверяем.
+ */
+const RUN_SAMPLES: { name: string; runs: StyledRun[] }[] = [
+  {
+    name: 'PT Serif: полужирная фамилия',
+    runs: [
+      { text: 'Иванов', style: styleOf('PT Serif', { bold: true }) },
+      { text: ' Пётр Ильич', style: styleOf('PT Serif') },
+    ],
+  },
+  {
+    name: 'PT Sans: слово крупнее строки',
+    runs: [
+      { text: 'за ', style: styleOf('PT Sans') },
+      { text: 'первое', style: { ...styleOf('PT Sans', { bold: true }), fontSize: SIZE_PX * 1.5 * (72 / 96) } },
+      { text: ' место', style: styleOf('PT Sans') },
+    ],
+  },
+  {
+    name: 'Montserrat: разрядка и курсив',
+    runs: [
+      { text: 'ДИПЛОМ', style: { ...styleOf('Montserrat', { bold: true }), letterSpacing: 2 } },
+      { text: ' участника', style: styleOf('Montserrat', { italic: true }) },
+    ],
+  },
+  {
+    name: 'наборная с рукописной вставкой',
+    runs: [
+      { text: 'Награждается ', style: styleOf('PT Sans') },
+      { text: 'Иванов Пётр', style: styleOf('Caveat') },
+    ],
+  },
+  {
+    name: 'три гарнитуры подряд',
+    runs: [
+      { text: 'Сертификат ', style: styleOf('Playfair Display', { italic: true }) },
+      { text: 'участника ', style: styleOf('Inter') },
+      { text: 'первенства', style: styleOf('Lora', { bold: true }) },
+    ],
+  },
+];
+
+function styleOf(family: string, over: Partial<TextStyle> = {}): TextStyle {
+  return {
+    fontFamily: family,
+    fontSize: (SIZE_PX * 72) / 96,
+    bold: false,
+    italic: false,
+    lineHeight: 1.2,
+    letterSpacing: 0,
+    uppercase: false,
+    strokeWidth: 0,
+    ...over,
+  };
+}
+
 const FAMILY_BY_SLUG: Record<string, string> = {
   'pt-sans': 'PT Sans',
   'pt-serif': 'PT Serif',
@@ -153,6 +215,7 @@ const CHROMIUM_TESTS = process.env.CHROMIUM_TESTS === '1';
 describe.skipIf(!CHROMIUM_TESTS)('измерение против Chromium', () => {
   let browser: Browser;
   let chromiumWidths: number[];
+  let chromiumRunWidths: number[];
 
   beforeAll(async () => {
     browser = await chromium.launch({
@@ -187,11 +250,61 @@ describe.skipIf(!CHROMIUM_TESTS)('измерение против Chromium', () 
       { samples: SAMPLES, sizePx: SIZE_PX },
     );
 
+    chromiumRunWidths = await page.evaluate(
+      async ({ samples }) => {
+        const out: number[] = [];
+        for (const sample of samples) {
+          const line = document.createElement('span');
+          line.style.whiteSpace = 'pre';
+          for (const run of sample.runs) {
+            const font =
+              `${run.style.italic ? 'italic' : 'normal'} ${run.style.bold ? 700 : 400} ` +
+              `${(run.style.fontSize * 96) / 72}px "${run.style.fontFamily}"`;
+            await document.fonts.load(font, run.text);
+            if (!document.fonts.check(font, run.text)) {
+              out.push(Number.NaN);
+              line.remove();
+              break;
+            }
+            const span = document.createElement('span');
+            span.style.font = font;
+            span.style.letterSpacing = `${run.style.letterSpacing}pt`;
+            span.textContent = run.text;
+            line.appendChild(span);
+          }
+          if (!line.isConnected && out.length && Number.isNaN(out[out.length - 1])) continue;
+          document.body.appendChild(line);
+          out.push(line.getBoundingClientRect().width);
+          line.remove();
+        }
+        return out;
+      },
+      { samples: RUN_SAMPLES },
+    );
+
     await page.close();
   }, 120_000);
 
   afterAll(async () => {
     await browser?.close();
+  });
+
+  const runCases = RUN_SAMPLES.map((s, i) => [s.name, i] as const);
+
+  it.each(runCases)('прогоны: %s — оценка близка к браузеру', (_name, index) => {
+    const chromiumPx = chromiumRunWidths[index];
+    expect(chromiumPx, 'браузер не загрузил начертание').toBeGreaterThan(0);
+    const ourPx = (measureRuns(RUN_SAMPLES[index].runs, 'estimate') / 25.4) * 96;
+    const scripted = RUN_SAMPLES[index].runs.some((r) => SCRIPT_FAMILIES.has(r.style.fontFamily));
+    const drift = (ourPx - chromiumPx) / chromiumPx;
+    expect(Math.abs(drift)).toBeLessThan(scripted ? ESTIMATE_TOLERANCE_SCRIPT : ESTIMATE_TOLERANCE);
+  });
+
+  it.each(runCases)('прогоны: %s — осторожная мера не уже браузера', (_name, index) => {
+    const chromiumPx = chromiumRunWidths[index];
+    expect(chromiumPx, 'браузер не загрузил начертание').toBeGreaterThan(0);
+    const ourPx = (measureRuns(RUN_SAMPLES[index].runs, 'safe') / 25.4) * 96;
+    expect((ourPx - chromiumPx) / chromiumPx).toBeGreaterThan(-SAFE_UNDERSHOOT);
   });
 
   /** Наша ширина в пикселях CSS — measureLine отдаёт миллиметры. */
