@@ -103,6 +103,7 @@ export class VerifyController {
         revokedAt: true,
         revokedReasonPublic: true,
         pdfSha256: true,
+        signedAt: true,
         issuedData: true,
         rowId: true,
         replacedById: true,
@@ -216,6 +217,9 @@ export class VerifyController {
       // Отпечаток выпущенного файла — для сверки в браузере. Null у документов,
       // выпущенных до того, как отпечаток стали сохранять.
       sha256: file.pdfSha256,
+      // Подписан ли файл электронной подписью сервиса: Adobe Reader покажет
+      // это сам, но человеку с телефоном полезно знать, чего ждать.
+      signed: file.signedAt !== null,
       revokedAt: state === 'revoked' ? file.revokedAt : null,
       revokedReason: state === 'revoked' ? file.revokedReasonPublic || null : null,
       // Замену могли, в свою очередь, отозвать — тогда ссылки не даём:

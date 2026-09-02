@@ -254,6 +254,8 @@ export class World {
       config as never,
       renderer as never,
       this.service,
+      // Подписи в этих тестах нет: они про очередь и базу, а не про сертификат.
+      { signIfConfigured: async (bytes: Buffer) => ({ bytes, signed: false }) } as never,
     );
     (this.processor as unknown as { queue: FakeQueue }).queue = this.queue;
 

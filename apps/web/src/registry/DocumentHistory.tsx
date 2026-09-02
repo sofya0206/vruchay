@@ -99,6 +99,9 @@ export function DocumentHistory({ fileId, onClose }: Props) {
             <dl className="space-y-2 border-y border-[var(--line)] py-4 text-sm">
               <Fact label="Выдан">{formatDateTime(row.issuedAt)}</Fact>
               {row.expiresAt && <Fact label="Действителен до">{formatDate(row.expiresAt)}</Fact>}
+              <Fact label="Электронная подпись">
+                {row.signedAt ? `Подписан ${formatDate(row.signedAt)}` : 'Без подписи'}
+              </Fact>
               {row.printedName && (
                 <Fact label="Напечатано">
                   {row.printedName}

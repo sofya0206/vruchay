@@ -26,6 +26,8 @@ export interface RegistryRow {
   revokedReasonPublic: string | null;
   /** Только владельцу и управляющему; остальным null. */
   revokedReasonInternal: string | null;
+  /** Когда PDF подписан электронной подписью сервиса. null — без подписи. */
+  signedAt: string | null;
   state: FileState;
   /** Перевыпуск заказан, но нового документа ещё нет. */
   reissuePending: boolean;

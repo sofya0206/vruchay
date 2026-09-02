@@ -38,6 +38,8 @@ export interface RegistryRow {
   revokedReasonPublic: string | null;
   /** Только владельцу и управляющему; остальным — null. */
   revokedReasonInternal: string | null;
+  /** Когда PDF подписан электронной подписью сервиса. Null — без подписи. */
+  signedAt: Date | null;
   state: FileState;
   /** Перевыпуск заказан, но нового документа ещё нет. */
   reissuePending: boolean;
@@ -363,6 +365,7 @@ export class RegistryService {
         revokedAt: file.revokedAt,
         revokedReasonPublic: file.revokedReasonPublic,
         revokedReasonInternal: showInternal ? file.revokedReasonInternal : null,
+        signedAt: file.signedAt,
         state: fileState(file),
         reissuePending: file.replacedByJobId !== null && file.replacedById === null,
         replacedBy: replacement
@@ -406,6 +409,7 @@ const fileSelect = {
   revokedAt: true,
   revokedReasonPublic: true,
   revokedReasonInternal: true,
+  signedAt: true,
   replacedById: true,
   replacedByJobId: true,
   rowId: true,

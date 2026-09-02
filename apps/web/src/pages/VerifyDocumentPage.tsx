@@ -41,6 +41,8 @@ interface VerifyResult {
   indexable: boolean;
   /** Отпечаток выпущенного файла; null у документов, выпущенных до его появления. */
   sha256: string | null;
+  /** Подписан ли PDF электронной подписью сервиса. */
+  signed: boolean;
   revokedAt: string | null;
   revokedReason: string | null;
   /** Куда смотреть вместо этого. Пусто, если замена сама недействительна. */
@@ -288,6 +290,12 @@ function Verdict({ data }: { data: VerifyResult }) {
             <dt className="text-[var(--text-muted)]">Номер</dt>
             <dd className="text-right font-mono text-xs font-medium">{data.code}</dd>
           </div>
+          {data.signed && (
+            <div className="flex justify-between gap-4">
+              <dt className="text-[var(--text-muted)]">Электронная подпись</dt>
+              <dd className="text-right font-medium">Есть — видна в Adobe Reader</dd>
+            </div>
+          )}
           <div className="flex justify-between gap-4">
             <dt className="text-[var(--text-muted)]">Выдан организацией</dt>
             <dd className="text-right font-medium">

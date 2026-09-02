@@ -5,6 +5,7 @@ import type { StorageService } from '../../../src/storage/storage.service';
 import { DocumentsService } from '../../../src/documents/documents.service';
 import { GenerationProcessor } from '../../../src/generation/generation.processor';
 import { GenerationService } from '../../../src/generation/generation.service';
+import { PdfSignerService } from '../../../src/signing/pdf-signer.service';
 import { PdfRenderer } from '../../../src/generation/pdf-renderer';
 import { MailProcessor } from '../../../src/mail/mail.processor';
 import { MailService } from '../../../src/mail/mail.service';
@@ -100,7 +101,14 @@ export async function startApp(options: AppOptions = {}): Promise<IntegrationApp
   const org = new OrgService(prisma, referral, config, asStorage);
   const renderer = new PdfRenderer(config);
   const generation = new GenerationService(prisma, referral, config);
-  const processor = new GenerationProcessor(prisma, asStorage, config, renderer, generation);
+  const processor = new GenerationProcessor(
+    prisma,
+    asStorage,
+    config,
+    renderer,
+    generation,
+    new PdfSignerService(config),
+  );
   const replacement = new ReplacementService(prisma);
   const mail = new MailService(prisma, asStorage, new SmtpProvider(config), config);
   const mailProcessor = new MailProcessor(mail, config);

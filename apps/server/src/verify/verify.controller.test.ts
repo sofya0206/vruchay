@@ -31,6 +31,7 @@ interface Issued {
   revokedAt: Date | null;
   revokedReasonPublic: string | null;
   pdfSha256: string | null;
+  signedAt: Date | null;
   issuedData: Record<string, string> | null;
   rowId: string | null;
   replacedById: string | null;
@@ -74,6 +75,7 @@ function issued(over: Partial<Issued> = {}): Issued {
     revokedAt: null,
     revokedReasonPublic: null,
     pdfSha256: null,
+    signedAt: null,
     issuedData: null,
     rowId: 'row-1',
     replacedById: null,

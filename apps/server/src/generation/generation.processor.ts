@@ -7,9 +7,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { buildS3Key } from '../storage/s3-key';
 import { createRenderToken } from '../render/render-token';
-import { publicCodeSecret, type Env } from '../config/env';
+import { baseUrl, publicCodeSecret, type Env } from '../config/env';
 import { generatePublicCode } from '../verify/public-code';
 import { expiresAtFor } from '../verify/expiry';
+import { verifyUrl } from '../verify/verify-url';
+import { PdfSignerService } from '../signing/pdf-signer.service';
 import { PdfRenderer } from './pdf-renderer';
 import { GenerationService, STUCK_AFTER_MS } from './generation.service';
 import { DEFAULT_NAME_TEMPLATE, buildFileName } from './file-name';
@@ -76,6 +78,7 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
     private readonly config: ConfigService<Env, true>,
     private readonly renderer: PdfRenderer,
     private readonly generation: GenerationService,
+    private readonly signer: PdfSignerService,
   ) {}
 
   onModuleInit(): void {
@@ -459,6 +462,15 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
     });
     const byId = new Map(rows.map((r) => [r.id, r]));
 
+    // Для подписи: чьим именем подписан документ и подписывать ли вообще.
+    const org = await this.prisma.organization.findUnique({
+      where: { id: job.orgId },
+      select: { name: true, plan: true },
+    });
+    const orgName = org?.name ?? '';
+    const orgPlan = org?.plan ?? 'free';
+    const publicUrl = baseUrl(this.config.get('PUBLIC_URL', { infer: true }));
+
     const secret = this.config.get('SESSION_SECRET', { infer: true });
     const codeSecret = publicCodeSecret({
       SESSION_SECRET: secret,
@@ -530,12 +542,27 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
           secret,
           Math.floor(Date.now() / 1000),
         );
-        const body = await this.renderer.render(
+        const rendered = await this.renderer.render(
           token,
           job.document.pageWidthMm,
           job.document.pageHeightMm,
           format,
         );
+
+        /*
+         * Подпись — до отпечатка и до хранилища: участнику уходят
+         * подписанные байты, и отпечаток должен быть с них же. Только PDF
+         * и только на оплаченном тарифе: подпись — платная возможность,
+         * а JPEG подписи не носит.
+         */
+        const { bytes: body, signed } =
+          format === 'pdf' && orgPlan === 'paid'
+            ? await this.signer.signIfConfigured(rendered, {
+                issuer: orgName,
+                code,
+                verifyUrl: verifyUrl(publicUrl, { publicId, publicCode: code }),
+              })
+            : { bytes: rendered, signed: false };
 
         const mime = format === 'jpg' ? 'image/jpeg' : 'application/pdf';
         await this.storage.put(s3Key, body, mime);
@@ -557,6 +584,7 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
             // Отпечаток тех самых байтов, что ушли в хранилище: по нему
             // человек сверит файл на руках прямо в браузере.
             pdfSha256: createHash('sha256').update(body).digest('hex'),
+            signedAt: signed ? new Date() : null,
             // Снимок строки на момент печати: страница проверки показывает
             // то, что на бумаге, а не то, что потом поправят в таблице.
             issuedData: row.data as Record<string, string>,
