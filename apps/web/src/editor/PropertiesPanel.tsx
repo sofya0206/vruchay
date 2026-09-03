@@ -22,8 +22,10 @@ import {
   Underline,
   Ungroup,
 } from 'lucide-react';
-import type { SheetElement, ShapeElement, TextProps } from '@gramota/shared';
+import { useEffect, useState } from 'react';
+import { describeSize, type SheetElement, type ShapeElement, type TextProps } from '@gramota/shared';
 import type { DocumentDetail } from '../api/types';
+import { PageSizePicker, type PageSizeValue } from '../documents/PageSizePicker';
 import { EventFields, type EventValues } from './EventFields';
 import { VerifySettings } from './VerifySettings';
 import { ColorField } from './ColorField';
@@ -58,6 +60,8 @@ interface Props {
   ) => void;
   /** Что набрано в «О мероприятии» сейчас — чтобы холст обновлялся при вводе. */
   onEventDraft?: (values: EventValues) => void;
+  /** Смена размера листа: вопрос «что делать с блоками» задаёт страница. */
+  onResizePage?: (size: PageSizeValue) => void;
 }
 
 /** «Смешанное» в поле ввода — пустое место с подсказкой, а не ложное число. */
@@ -83,6 +87,11 @@ export function PropertiesPanel(props: Props) {
       <div>
         {doc && onSaveEvent ? (
           <>
+            {props.onResizePage && (
+              <div className="mb-6">
+                <PageSettings doc={doc} onResize={props.onResizePage} />
+              </div>
+            )}
             <EventFields doc={doc} onSave={onSaveEvent} onDraft={onEventDraft} />
             <div className="mt-6">
               <VerifySettings doc={doc} onSave={onSaveEvent} />
@@ -269,6 +278,31 @@ export function PropertiesPanel(props: Props) {
       <Button variant="danger" icon={<Trash2 size={15} />} onClick={props.onDelete} className="w-full">
         {elements.length > 1 ? `Удалить блоки (${elements.length})` : 'Удалить блок'}
       </Button>
+    </div>
+  );
+}
+
+/**
+ * Размер листа — здесь же, где остальные настройки материала.
+ *
+ * Применяется не на каждое изменение, а кнопкой: смена размера — вопрос
+ * с последствиями для всех блоков, и его задаёт отдельный диалог.
+ */
+function PageSettings({ doc, onResize }: { doc: DocumentDetail; onResize: (size: PageSizeValue) => void }) {
+  const current = { widthMm: doc.pageWidthMm, heightMm: doc.pageHeightMm };
+  const [draft, setDraft] = useState<PageSizeValue>(current);
+  useEffect(() => setDraft({ widthMm: doc.pageWidthMm, heightMm: doc.pageHeightMm }), [doc.pageWidthMm, doc.pageHeightMm]);
+  const changed = draft.widthMm !== current.widthMm || draft.heightMm !== current.heightMm;
+
+  return (
+    <div>
+      <p className="mb-2 text-sm font-medium">Лист: {describeSize(current)}</p>
+      <PageSizePicker value={draft} onChange={setDraft} />
+      {changed && (
+        <Button size="sm" variant="primary" onClick={() => onResize(draft)} className="mt-2">
+          Сменить лист на {describeSize(draft)}
+        </Button>
+      )}
     </div>
   );
 }

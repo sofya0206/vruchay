@@ -10,6 +10,7 @@ import {
   Layers,
   LoaderCircle,
   Magnet,
+  Printer,
   Redo2,
   Send,
   SlidersHorizontal,
@@ -45,7 +46,9 @@ import { FIELD_DRAG_TYPE, FieldsPanel } from '../editor/FieldsPanel';
 import { InlineTextEditor } from '../editor/rich/InlineTextEditor';
 import { useLayoutHistory } from '../editor/useLayoutHistory';
 import { FitPageDialog } from '../editor/FitPageDialog';
+import { ResizeDialog } from '../editor/ResizeDialog';
 import { fitPageToImage, readImageSize, type PageFit } from '../editor/fit-page';
+import { backgroundDpi, BLEED_MM, POOR_DPI, PRINT_DPI, resizeLayout, SAFE_MARGIN_MM, type ResizeMode } from '../editor/page-fit';
 import {
   applyMatches,
   fieldLabels,
@@ -143,6 +146,14 @@ export function EditorPage() {
   const [guides, setGuides] = useState<SnapLine[]>([]);
   const [marquee, setMarquee] = useState<Rect | null>(null);
   const [panel, setPanel] = useState<Panel>('props');
+  const [showSafeArea, setShowSafeArea] = useState(false);
+  /** Смена размера листа, ожидающая ответа «что делать с блоками». */
+  const [resizeTo, setResizeTo] = useState<{ widthMm: number; heightMm: number } | null>(null);
+  /** Предупреждение о разрешении загруженного бланка. */
+  const [backgroundNote, setBackgroundNote] = useState<string | null>(null);
+  /** Зажат пробел — перетаскивание холста вместо блоков. */
+  const [panning, setPanning] = useState(false);
+  const pan = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
   const [styleClipboard, setStyleClipboard] = useState<TextStylePatch | null>(null);
   /*
    * Что набрано в «О мероприятии» прямо сейчас, до сохранения.
@@ -250,6 +261,36 @@ export function EditorPage() {
     if (!size || !doc.data) return;
     const result = fitPageToImage({ widthMm: doc.data.pageWidthMm, heightMm: doc.data.pageHeightMm }, size);
     if (result.mismatched) setFit(result);
+    // Для печати нужно 300 точек на дюйм; скан с телефона даёт вдвое меньше,
+    // и на бумаге это видно. Говорим сразу, пока файл можно заменить.
+    const dpi = backgroundDpi(size, { w: doc.data.pageWidthMm, h: doc.data.pageHeightMm });
+    setBackgroundNote(
+      dpi < POOR_DPI
+        ? `Бланк ${dpi} dpi — для печати мало, будет мыло. Нужно ${PRINT_DPI}.`
+        : dpi < PRINT_DPI
+          ? `Бланк ${dpi} dpi — для экрана хватит, для типографии нужно ${PRINT_DPI}.`
+          : null,
+    );
+  }
+
+  /**
+   * Масштаб на экране — не документ: лист остаётся в миллиметрах,
+   * меняется только то, как он показан. «По ширине», «по высоте»,
+   * 100 % и колёсико с Ctrl — как в любом графическом редакторе.
+   */
+  function zoomTo(kind: 'width' | 'height' | 'fit' | 'actual') {
+    const el = containerRef.current;
+    if (!el || !doc.data) return;
+    const available = { w: el.clientWidth - 72, h: el.clientHeight - 72 };
+    const next =
+      kind === 'actual'
+        ? 1
+        : kind === 'width'
+          ? available.w / (doc.data.pageWidthMm * PX_PER_MM)
+          : kind === 'height'
+            ? available.h / (doc.data.pageHeightMm * PX_PER_MM)
+            : fitZoom(el.clientWidth - 24, el.clientHeight - 24, doc.data.pageWidthMm, doc.data.pageHeightMm);
+    setZoom(clamp(next, 0.25, 4));
   }
 
   // Автосохранение: откладываем запись, пока пользователь продолжает править.
@@ -277,6 +318,34 @@ export function EditorPage() {
     observer.observe(el);
     return () => observer.disconnect();
   }, [doc.data]);
+
+  // Ctrl+колёсико — масштаб, а не прокрутка страницы; пробел — панорамирование.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      setZoom((z) => clamp(z * Math.exp(-e.deltaY * 0.0015), 0.25, 4));
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (e.code !== 'Space' || target?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName ?? '')) return;
+      e.preventDefault();
+      setPanning(true);
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') setPanning(false);
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
+  }, []);
 
   // Выделение не переживает исчезновение блока: удалили — сняли.
   useEffect(() => {
@@ -691,6 +760,22 @@ export function EditorPage() {
     setPanel('props');
   }
 
+  /**
+   * Смена размера листа с подстройкой блоков — по выбранному в диалоге
+   * способу. Вылезшие блоки после этого выделены: человек сразу видит,
+   * что поправить, а не ищет их по листу.
+   */
+  function applyResize(mode: ResizeMode) {
+    if (!resizeTo) return;
+    const from = pageBox;
+    const to = { w: resizeTo.widthMm, h: resizeTo.heightMm };
+    const result = resizeLayout(layout, from, to, mode);
+    if (result.layout !== layout) history.setLayout(result.layout);
+    resizePage.mutate(resizeTo);
+    setSelected(new Set(result.overflowing));
+    setResizeTo(null);
+  }
+
   function align(kind: AlignKind) {
     const items = selectedElements.filter((el) => !el.locked);
     if (!items.length) return;
@@ -793,6 +878,14 @@ export function EditorPage() {
             {(uploadBackground.error as Error).message}
           </span>
         )}
+        {backgroundNote && (
+          <span role="status" className="text-sm text-[var(--text-muted)]">
+            {backgroundNote}{' '}
+            <button type="button" onClick={() => setBackgroundNote(null)} className="underline">
+              понятно
+            </button>
+          </span>
+        )}
 
         {/* Два взгляда на лист: заготовка с фишками полей и настоящая строка
             таблицы. Второй — чтобы увидеть, как ляжет длинная фамилия, не
@@ -829,19 +922,40 @@ export function EditorPage() {
           <IconButton active={snapping} onClick={() => setSnapping((v) => !v)} title="Прилипание к краям и центрам (Alt — временно выключить)">
             <Magnet size={15} />
           </IconButton>
+          <IconButton active={showSafeArea} onClick={() => setShowSafeArea((v) => !v)} title="Безопасные поля печати: обрез 3 мм, поле принтера 5 мм">
+            <Printer size={15} />
+          </IconButton>
 
           <div className="flex items-center gap-2 rounded-lg px-2 py-1 ring-1 ring-[var(--line)]">
             <ZoomIn size={15} className="text-[var(--text-muted)]" />
             <input
               type="range"
-              min={20}
-              max={200}
+              min={25}
+              max={400}
               value={Math.round(zoom * 100)}
-              onChange={(e) => setZoom(clamp(Number(e.target.value) / 100, 0.1, 4))}
+              onChange={(e) => setZoom(clamp(Number(e.target.value) / 100, 0.25, 4))}
               aria-label="Масштаб"
               className="w-24 accent-[var(--accent)]"
             />
-            <span className="tabular w-10 text-right text-sm text-[var(--text-muted)]">{Math.round(zoom * 100)}%</span>
+            <button
+              type="button"
+              onClick={() => zoomTo('fit')}
+              title="Вписать лист в окно. Ещё: Ctrl+колёсико — масштаб, пробел — перетаскивание холста"
+              className="tabular w-11 text-right text-sm text-[var(--text-muted)] hover:text-[var(--text)]"
+            >
+              {Math.round(zoom * 100)}%
+            </button>
+            <span className="flex gap-0.5 text-xs text-[var(--text-muted)]">
+              <button type="button" onClick={() => zoomTo('width')} className="rounded px-1 hover:bg-[var(--surface-sunken)]" title="По ширине">
+                Ш
+              </button>
+              <button type="button" onClick={() => zoomTo('height')} className="rounded px-1 hover:bg-[var(--surface-sunken)]" title="По высоте">
+                В
+              </button>
+              <button type="button" onClick={() => zoomTo('actual')} className="rounded px-1 hover:bg-[var(--surface-sunken)]" title="Натуральная величина">
+                1:1
+              </button>
+            </span>
           </div>
 
           <StatusChip tone={saved === 'saved' ? 'done' : saved === 'saving' ? 'progress' : 'neutral'}>
@@ -873,6 +987,23 @@ export function EditorPage() {
         <div
           ref={containerRef}
           className="relative grid flex-1 place-items-center overflow-auto bg-[var(--surface-sunken)] p-6"
+          style={panning ? { cursor: pan.current ? 'grabbing' : 'grab' } : undefined}
+          onPointerDownCapture={(e) => {
+            if (!panning) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const el = containerRef.current!;
+            pan.current = { x: e.clientX, y: e.clientY, left: el.scrollLeft, top: el.scrollTop };
+          }}
+          onPointerMoveCapture={(e) => {
+            if (!pan.current) return;
+            const el = containerRef.current!;
+            el.scrollLeft = pan.current.left - (e.clientX - pan.current.x);
+            el.scrollTop = pan.current.top - (e.clientY - pan.current.y);
+          }}
+          onPointerUpCapture={() => {
+            pan.current = null;
+          }}
         >
           {!sheet.backgroundFileId && layout.length === 0 && (
             <div className="absolute inset-x-0 top-6 z-10 flex justify-center px-6">
@@ -956,6 +1087,23 @@ export function EditorPage() {
                     backgroundSize: `${px(GRID_MM)}px ${px(GRID_MM)}px`,
                   }}
                 />
+              )}
+
+              {/* Безопасные поля печати: обрез 3 мм и поле принтера 5 мм.
+                  Всё, что ближе к краю, рискует быть срезанным. */}
+              {showSafeArea && (
+                <>
+                  <div
+                    className="pointer-events-none absolute border border-dashed border-red-400/70"
+                    style={{ inset: px(BLEED_MM) }}
+                    title="Обрез 3 мм"
+                  />
+                  <div
+                    className="pointer-events-none absolute border border-dashed border-[var(--accent)]/70"
+                    style={{ inset: px(SAFE_MARGIN_MM) }}
+                    title="Безопасное поле 5 мм"
+                  />
+                </>
               )}
 
               {/* Направляющие, к которым прилип двигаемый блок. */}
@@ -1117,6 +1265,7 @@ export function EditorPage() {
                 doc={doc.data}
                 onSaveEvent={(values) => saveEvent.mutate(values)}
                 onEventDraft={setEventDraft}
+                onResizePage={(size) => setResizeTo(size)}
                 onTextProps={patchTextProps}
                 onShapeProps={patchShapeProps}
                 onElement={(patch, commit) => patchElements(selected, (el) => ({ ...el, ...patch }) as SheetElement, commit)}
@@ -1165,6 +1314,15 @@ export function EditorPage() {
           </div>
         </aside>
       </div>
+
+      {resizeTo && (
+        <ResizeDialog
+          from={{ widthMm: page.pageWidthMm, heightMm: page.pageHeightMm }}
+          to={resizeTo}
+          onApply={applyResize}
+          onCancel={() => setResizeTo(null)}
+        />
+      )}
 
       {fit && (
         <FitPageDialog
