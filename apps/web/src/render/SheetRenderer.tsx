@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import QRCode from 'qrcode';
 import {
   keepVariable,
+  resolveHrefTemplate,
   resolveRichDoc,
   substituteVariables,
   type ResolvedField,
@@ -317,9 +318,21 @@ function ElementView({
         substituteVariables(template, data ?? {}, onMissing)
       : (verifyUrl ?? `${origin()}/verify/00000000-0000-0000-0000-000000000000`);
 
+    /*
+     * QR кликается: на экране — одним кликом, на бумаге — камерой. Это
+     * тот же `<a>`, что и у ссылки: при печати Chromium делает из него
+     * аннотацию, и в PDF квадрат кода становится горячей областью.
+     */
+    const href = /^https?:\/\//i.test(value) ? value : null;
     return (
       <div {...common} style={box}>
-        <QrImage value={value} color={element.props.color} />
+        {href ? (
+          <a href={href} rel="noreferrer noopener" target="_blank" style={{ display: 'block', width: '100%', height: '100%' }}>
+            <QrImage value={value} color={element.props.color} />
+          </a>
+        ) : (
+          <QrImage value={value} color={element.props.color} />
+        )}
       </div>
     );
   }
@@ -332,8 +345,15 @@ function ElementView({
     );
   }
 
+  /*
+   * Ссылка-область. Адрес — шаблон с полями; на печати они подставлены,
+   * на холсте остаются как есть. Если после подстановки адреса не вышло
+   * (поле пустое), область печатается без ссылки — битая аннотация хуже.
+   */
+  const href = unfilled === 'token' ? element.props.url : resolveHrefTemplate(element.props.url, data ?? {});
+  if (!href) return <div {...common} style={box} />;
   return (
-    <a {...common} style={box} href={element.props.url} rel="noreferrer noopener" target="_blank">
+    <a {...common} style={box} href={href} rel="noreferrer noopener" target="_blank">
       <span className="sr-only">{element.props.url}</span>
     </a>
   );

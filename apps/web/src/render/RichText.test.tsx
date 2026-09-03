@@ -217,3 +217,39 @@ describe('вспомогательные', () => {
     expect(() => html(<RichText blocks={blocks} base={el.props} fields="value" />)).not.toThrow();
   });
 });
+
+describe('ссылки — то, что станет аннотацией в PDF', () => {
+  it('марка-ссылка печатается настоящим <a> с подставленным адресом', () => {
+    const el = textElement({
+      type: 'doc',
+      content: [paragraph([textRun('проверить', { type: 'link', attrs: { href: 'https://x.ru/v/{{code}}', underline: false, color: '#1f5d3f' } })])],
+    });
+    const out = html(<SheetRenderer layout={[el]} pageWidthMm={297} pageHeightMm={210} data={{ code: 'K7M2' }} />);
+    expect(out).toContain('<a href="https://x.ru/v/K7M2"');
+    expect(out).toContain('color:#1f5d3f');
+    expect(out).not.toContain('text-decoration:underline');
+  });
+
+  it('QR на печати обёрнут в ссылку на адрес проверки', () => {
+    const [qr] = sheetLayout.parse([{ id: 'q', type: 'qr', x: 10, y: 10, w: 30, h: 30, props: {} }]);
+    const out = html(<SheetRenderer layout={[qr]} pageWidthMm={297} pageHeightMm={210} verifyUrl="https://vruchay.ru/verify/abc" />);
+    expect(out).toContain('<a href="https://vruchay.ru/verify/abc"');
+  });
+
+  it('ссылка-область: поля в адресе подставляются; сломанный адрес — без ссылки', () => {
+    const [link] = sheetLayout.parse([
+      { id: 'l', type: 'link', x: 10, y: 10, w: 30, h: 10, props: { url: 'https://x.ru/{{code}}' } },
+    ]);
+    const filled = html(<SheetRenderer layout={[link]} pageWidthMm={297} pageHeightMm={210} data={{ code: 'abc' }} />);
+    expect(filled).toContain('href="https://x.ru/abc"');
+    // Пустое поле в пути — адрес цел, ссылка ведёт на корень.
+    const empty = html(<SheetRenderer layout={[link]} pageWidthMm={297} pageHeightMm={210} data={{}} />);
+    expect(empty).toContain('href="https://x.ru/"');
+    // Пустое поле в хосте — адреса не вышло, области без ссылки.
+    const [hostLink] = sheetLayout.parse([
+      { id: 'h', type: 'link', x: 10, y: 10, w: 30, h: 10, props: { url: 'https://{{site}}/x' } },
+    ]);
+    const broken = html(<SheetRenderer layout={[hostLink]} pageWidthMm={297} pageHeightMm={210} data={{}} />);
+    expect(broken).not.toContain('href=');
+  });
+});

@@ -1,15 +1,16 @@
 import { resolvePairedForms, rowGender, type Gender } from '../paired-forms';
 import { typographRu } from '../typography';
-import type {
-  ListMarker,
-  ListNumbering,
-  MergeFieldNode,
-  RichAlign,
-  RichBlock,
-  RichDoc,
-  RichInline,
-  RichListItem,
-  RichMark,
+import {
+  resolveHrefTemplate,
+  type ListMarker,
+  type ListNumbering,
+  type MergeFieldNode,
+  type RichAlign,
+  type RichBlock,
+  type RichDoc,
+  type RichInline,
+  type RichListItem,
+  type RichMark,
 } from './rich-text';
 
 /**
@@ -205,9 +206,14 @@ function resolveInline(
     if (node.type === 'text') {
       // Парные формы «награждён(а)» живут в тексте шаблона и раскрываются
       // по полу строки — так же, как раскрывались в плоском тексте.
-      return { type: 'text', text: resolvePairedForms(node.text, gender), marks: node.marks };
+      return {
+        type: 'text',
+        text: resolvePairedForms(node.text, gender),
+        marks: resolveLinkMarks(node.marks, options),
+      };
     }
-    return resolveField(node, options);
+    const field = resolveField(node, options);
+    return { ...field, marks: resolveLinkMarks(field.marks, options) };
   });
 
   return options.unfilled === 'blank' ? smartSpace(resolved) : resolved;
@@ -235,6 +241,29 @@ export function resolveField(node: MergeFieldNode, options: ResolveOptions): Res
 
   if (fallback) return { ...base, text: applyFormat(fallback, format), state };
   return { ...base, text: options.unfilled === 'token' ? `%${source}` : '', state };
+}
+
+/**
+ * Поля в адресе ссылки подставляются на печати; на холсте адрес остаётся
+ * шаблоном — человек должен видеть, куда ссылка ведёт по замыслу.
+ * Ссылка, которая после подстановки перестала быть адресом, снимается:
+ * битая аннотация в PDF хуже, чем её отсутствие.
+ */
+function resolveLinkMarks(
+  marks: RichMark[] | undefined,
+  options: ResolveOptions,
+): RichMark[] | undefined {
+  if (!marks || options.unfilled === 'token') return marks;
+  const out: RichMark[] = [];
+  for (const mark of marks) {
+    if (mark.type !== 'link') {
+      out.push(mark);
+      continue;
+    }
+    const href = resolveHrefTemplate(mark.attrs.href, options.data);
+    if (href) out.push({ ...mark, attrs: { ...mark.attrs, href } });
+  }
+  return out.length ? out : undefined;
 }
 
 export function applyFormat(value: string, format: MergeFieldNode['attrs']['format']): string {

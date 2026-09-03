@@ -17,6 +17,7 @@ import {
   type RichDoc,
 } from './rich-text';
 import { resolveRichDoc, resolvedPlainText } from './rich-text-resolve';
+import { hrefFieldNames, isSafeHrefTemplate, resolveHrefTemplate } from './rich-text';
 
 /**
  * Старый макет — ровно такой, каким его сохранил редактор до этой ветки:
@@ -327,5 +328,44 @@ describe('подстановка в дерево', () => {
       ['б)', 1, 'б) второе'],
       ['☑', 2, '☑ вложенное'],
     ]);
+  });
+});
+
+describe('адрес ссылки с полями', () => {
+  it('годятся только http и https — и до, и после подстановки', () => {
+    expect(isSafeHrefTemplate('https://vruchay.ru/verify/{{code}}')).toBe(true);
+    expect(isSafeHrefTemplate('https://%site/x')).toBe(true);
+    expect(isSafeHrefTemplate('javascript:alert(1)')).toBe(false);
+    expect(isSafeHrefTemplate('data:text/html,x')).toBe(false);
+    expect(isSafeHrefTemplate('vruchay.ru')).toBe(false);
+  });
+
+  it('перечисляет поля обеих записей', () => {
+    expect(hrefFieldNames('https://x.ru/{{code}}?n=%number')).toEqual(['code', 'number']);
+  });
+
+  it('подставляет значения, кодируя их как части адреса', () => {
+    expect(resolveHrefTemplate('https://x.ru/verify/{{code}}', { code: 'K7M2 9Q' })).toBe('https://x.ru/verify/K7M2%209Q');
+    // Пустое значение хоста ломает адрес — ссылки не будет.
+    expect(resolveHrefTemplate('https://{{site}}/x', {})).toBeNull();
+    // Значение не может протащить свою схему.
+    expect(resolveHrefTemplate('https://x.ru/{{p}}', { p: 'javascript:alert(1)' })).toBe('https://x.ru/javascript%3Aalert(1)');
+  });
+
+  it('в дереве ссылка подставляется на печати и остаётся шаблоном на холсте', () => {
+    const doc: RichDoc = {
+      type: 'doc',
+      content: [paragraph([textRun('сайт', { type: 'link', attrs: { href: 'https://x.ru/{{code}}', underline: true } })])],
+    };
+    const printed = resolveRichDoc(doc, { data: { code: 'abc' }, unfilled: 'blank' });
+    expect(printed[0].content[0]).toMatchObject({ marks: [{ type: 'link', attrs: { href: 'https://x.ru/abc' } }] });
+    const canvas = resolveRichDoc(doc, { data: { code: 'abc' }, unfilled: 'token' });
+    expect(canvas[0].content[0]).toMatchObject({ marks: [{ type: 'link', attrs: { href: 'https://x.ru/{{code}}' } }] });
+    // Пустое поле в хосте — ссылка снимается, текст остаётся.
+    const broken = resolveRichDoc(
+      { type: 'doc', content: [paragraph([textRun('сайт', { type: 'link', attrs: { href: 'https://{{site}}/', underline: true } })])] },
+      { data: {}, unfilled: 'blank' },
+    );
+    expect(broken[0].content[0]).toEqual({ type: 'text', text: 'сайт', marks: undefined });
   });
 });

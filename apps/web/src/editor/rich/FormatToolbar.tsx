@@ -9,6 +9,7 @@ import {
   AlignRight,
   AtSign,
   Bold,
+  Link2,
   Italic,
   List,
   ListOrdered,
@@ -17,7 +18,7 @@ import {
   Superscript,
   Underline,
 } from 'lucide-react';
-import type { TextProps } from '@gramota/shared';
+import { isSafeHrefTemplate, type TextProps } from '@gramota/shared';
 import type { FieldInfo } from '../fields';
 import { FONTS, WEIGHTS } from '../fonts-list';
 
@@ -49,6 +50,8 @@ export function FormatToolbar({
       strike: e.isActive('strike'),
       superscript: e.isActive('superscript'),
       subscript: e.isActive('subscript'),
+      link: e.isActive('link'),
+      linkHref: (e.getAttributes('link').href as string | undefined) ?? '',
       bullet: e.isActive('bulletList'),
       ordered: e.isActive('orderedList'),
       align: (e.getAttributes('paragraph').align as string | null) ?? null,
@@ -248,6 +251,29 @@ export function FormatToolbar({
         disabled={fields.length === 0}
       >
         <AtSign size={15} />
+      </Tool>
+
+      {/* Ссылка на выделенном тексте. Адрес может быть с полем —
+          «https://…/verify/{{code}}» — оно подставится при печати. */}
+      <Tool
+        active={state.link}
+        title={state.link ? 'Изменить или убрать ссылку' : 'Ссылка на выделенном тексте'}
+        onClick={() => {
+          const href = window.prompt('Адрес ссылки (пусто — убрать). Можно с полем, например {{code}}:', state.linkHref || 'https://');
+          if (href === null) return;
+          const trimmed = href.trim();
+          if (!trimmed || trimmed === 'https://') {
+            editor.chain().focus().unsetMark('link').run();
+            return;
+          }
+          if (!isSafeHrefTemplate(trimmed)) {
+            window.alert('Ссылка должна начинаться с http:// или https://');
+            return;
+          }
+          editor.chain().focus().setMark('link', { href: trimmed }).run();
+        }}
+      >
+        <Link2 size={15} />
       </Tool>
     </div>,
     document.body,

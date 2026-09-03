@@ -56,6 +56,11 @@ export function markStyle(marks: RichMark[] | undefined): CSSProperties {
       case 'strike':
         decoration.push('line-through');
         break;
+      case 'link':
+        // Подчёркивание ссылки — её собственное решение, поверх подчёркивания текста.
+        if (mark.attrs.underline) decoration.push('underline');
+        if (mark.attrs.color) css.color = mark.attrs.color;
+        break;
       case 'textStyle': {
         const a = mark.attrs;
         if (a.color) css.color = a.color;
@@ -107,9 +112,25 @@ export function runFace(
 
 /** Индексы — тегами: браузер сам делает их мельче и сдвигает. */
 function wrapIndex(marks: RichMark[] | undefined, node: ReactNode): ReactNode {
-  if (marks?.some((m) => m.type === 'superscript')) return <sup>{node}</sup>;
-  if (marks?.some((m) => m.type === 'subscript')) return <sub>{node}</sub>;
-  return node;
+  const inner = wrapLink(marks, node);
+  if (marks?.some((m) => m.type === 'superscript')) return <sup>{inner}</sup>;
+  if (marks?.some((m) => m.type === 'subscript')) return <sub>{inner}</sub>;
+  return inner;
+}
+
+/**
+ * Ссылка — настоящим `<a>`: Chromium при печати превращает его в аннотацию,
+ * и в PDF по ней можно кликнуть. На холсте адрес остаётся шаблоном
+ * с полями — переход по нему не нужен и не работает, это только вид.
+ */
+function wrapLink(marks: RichMark[] | undefined, node: ReactNode): ReactNode {
+  const link = marks?.find((m) => m.type === 'link');
+  if (!link || link.type !== 'link') return node;
+  return (
+    <a href={link.attrs.href} rel="noreferrer noopener" target="_blank" style={{ color: 'inherit', textDecoration: 'inherit' }}>
+      {node}
+    </a>
+  );
 }
 
 export interface RichTextProps {

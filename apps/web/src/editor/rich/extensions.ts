@@ -3,7 +3,7 @@ import StarterKit from '@tiptap/starter-kit';
 import Superscript from '@tiptap/extension-superscript';
 import Subscript from '@tiptap/extension-subscript';
 import { ReactNodeViewRenderer } from '@tiptap/react';
-import { FONT_FAMILY_RE, mergeFieldFormat, type RichMark } from '@gramota/shared';
+import { FONT_FAMILY_RE, isSafeHrefTemplate, mergeFieldFormat, type RichMark } from '@gramota/shared';
 import { markStyle } from '../../render/RichText';
 import { MergeFieldView } from './MergeFieldView';
 
@@ -324,6 +324,45 @@ export const TextStyle = Mark.create({
 });
 
 /**
+ * Ссылка — марка со своими атрибутами схемы: адрес-шаблон, подчёркивание,
+ * цвет. Своя, а не из StarterKit: там атрибуты другие (`target`, `rel`),
+ * и круг «схема → редактор → схема» их бы не пережил. Адрес проверяется
+ * той же функцией, что и в схеме, — `javascript:` не пройдёт и здесь.
+ */
+export const Link = Mark.create({
+  name: 'link',
+  // Ссылка не «липнет» к набираемому дальше тексту: закончил слово — вышел из ссылки.
+  inclusive: false,
+
+  addAttributes() {
+    return {
+      href: {
+        default: '',
+        parseHTML: (el) => {
+          const href = el.getAttribute('href') ?? '';
+          return isSafeHrefTemplate(href) ? href : '';
+        },
+      },
+      underline: attr<boolean>(true, 'data-underline', (raw) => raw !== 'false'),
+      color: attr<string | null>(null, 'data-color'),
+    };
+  },
+
+  parseHTML() {
+    return [{ tag: 'a[href]' }];
+  },
+
+  renderHTML({ mark, HTMLAttributes }) {
+    const css = cssText(markStyle([{ type: 'link', attrs: mark.attrs } as RichMark]));
+    return [
+      'a',
+      mergeAttributes(HTMLAttributes, { href: mark.attrs.href, rel: 'noreferrer noopener', style: css }),
+      0,
+    ];
+  },
+});
+
+/**
  * Неразрывный пробел и мягкий перенос — символами, а не узлами.
  *
  * Это обычные символы Unicode, печать понимает их без дополнительной
@@ -367,6 +406,7 @@ export function editorExtensions() {
     BulletList,
     OrderedList,
     TextStyle,
+    Link,
     Superscript,
     Subscript,
     MergeField,

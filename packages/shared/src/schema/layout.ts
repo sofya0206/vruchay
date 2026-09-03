@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import {
+  hrefFieldNames,
+  isSafeHrefTemplate,
   richDoc,
   richDocFieldNames,
   richDocFromPlainText,
@@ -160,16 +162,17 @@ export const qrElement = elementBase.extend({
   }),
 });
 
+/**
+ * Ссылка-область: невидимый прямоугольник поверх чего угодно — логотипа,
+ * картинки, подписи. В PDF становится аннотацией, и она кликается.
+ * Адрес — шаблон: в нём допустимы поля (`{{code}}`, `%site`), которые
+ * подставляются при печати; `javascript:` и `data:` не проходят по той же
+ * причине, что и раньше — адрес попадает в `href` печатаемой страницы.
+ */
 export const linkElement = elementBase.extend({
   type: z.literal('link'),
   props: z.object({
-    // Только http и https: z.string().url() пропускает javascript: и data:,
-    // а ссылка попадает в href на странице, которую печатает браузер.
-    url: z
-      .string()
-      .max(2_000)
-      .url()
-      .refine((v) => /^https?:\/\//i.test(v), 'Ссылка должна начинаться с http:// или https://'),
+    url: z.string().max(2_000).refine(isSafeHrefTemplate, 'Ссылка должна начинаться с http:// или https://'),
   }),
 });
 
@@ -231,6 +234,9 @@ export function extractVariables(layout: SheetLayout): string[] {
     }
     if (el.type === 'qr' && el.props.template) {
       for (const m of el.props.template.matchAll(VARIABLE_RE)) vars.add(m[1]);
+    }
+    if (el.type === 'link') {
+      for (const name of hrefFieldNames(el.props.url)) vars.add(name);
     }
   }
   return [...vars];

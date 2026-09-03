@@ -85,6 +85,25 @@ export const textStyleMark = z.object({
     .default({}),
 });
 
+/**
+ * Ссылка — марка на прогоне, а не отдельный блок: «подробнее на сайте»
+ * внутри строки. В адресе допустимы поля — `{{verify_url}}`, `%site` —
+ * они подставляются при печати. Проверяем адрес по белому списку схем:
+ * ссылка уходит в PDF аннотацией и в `href` страницы, которую печатает
+ * браузер, а `javascript:` в ней — не ссылка.
+ *
+ * Синее подчёркнутое на грамоте смотрится плохо, поэтому оформление
+ * ссылки выключается: `underline: false` и свой цвет.
+ */
+export const linkMark = z.object({
+  type: z.literal('link'),
+  attrs: z.object({
+    href: z.string().max(2_000).refine(isSafeHrefTemplate, 'Ссылка должна начинаться с http:// или https://'),
+    underline: z.boolean().default(true),
+    color: z.string().regex(HEX_COLOR_RE).nullish(),
+  }),
+});
+
 export const richMark = z.discriminatedUnion('type', [
   boldMark,
   italicMark,
@@ -93,9 +112,46 @@ export const richMark = z.discriminatedUnion('type', [
   superscriptMark,
   subscriptMark,
   textStyleMark,
+  linkMark,
 ]);
 
 export type RichMark = z.infer<typeof richMark>;
+
+/** Поля в адресе ссылки: и новая запись `{{name}}`, и прежняя `%name`. */
+const HREF_FIELD_RE = /\{\{\s*([a-zA-Z][a-zA-Z0-9_]*)\s*\}\}|%([a-zA-Z][a-zA-Z0-9_]*)/g;
+
+/**
+ * Годится ли адрес-шаблон: после подстановки любых значений в поля он
+ * обязан оставаться http(s)-адресом. Проверяем с заглушкой вместо полей.
+ */
+export function isSafeHrefTemplate(template: string): boolean {
+  const probe = template.replace(HREF_FIELD_RE, 'x');
+  // Хост обязан быть: `new URL('https:///x')` молча делает из пути хост.
+  if (!/^https?:\/\/[^/?#\s]+/i.test(probe)) return false;
+  try {
+    new URL(probe);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Поля в адресе ссылки — по данным строки. */
+export function hrefFieldNames(template: string): string[] {
+  return [...template.matchAll(HREF_FIELD_RE)].map((m) => m[1] ?? m[2]);
+}
+
+/**
+ * Адрес с подставленными полями — или null, если после подстановки это
+ * уже не http(s)-адрес (пустое поле посреди хоста и т.п.). Значения
+ * кодируются как части адреса: пробел и кириллица в фамилии не ломают ссылку.
+ */
+export function resolveHrefTemplate(template: string, data: Record<string, string>): string | null {
+  const href = template.replace(HREF_FIELD_RE, (_all, a?: string, b?: string) =>
+    encodeURIComponent(data[a ?? b ?? ''] ?? ''),
+  );
+  return isSafeHrefTemplate(href) ? href : null;
+}
 
 /** Сколько марок на один прогон: больше семи их просто не бывает. */
 const marks = z.array(richMark).max(8).optional();

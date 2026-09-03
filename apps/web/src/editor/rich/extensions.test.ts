@@ -131,6 +131,19 @@ describe('круг схема → редактор → схема', () => {
     expect(roundTrip(doc)).toEqual(doc);
   });
 
+  it('ссылка с полем в адресе, без подчёркивания и своим цветом', () => {
+    const doc: RichDoc = {
+      type: 'doc',
+      content: [
+        paragraph([
+          textRun('проверить: '),
+          textRun('на сайте', { type: 'link', attrs: { href: 'https://vruchay.ru/verify/{{code}}', underline: false, color: '#1f5d3f' } }),
+        ]),
+      ],
+    };
+    expect(roundTrip(doc)).toEqual(doc);
+  });
+
   it('перевод строки внутри абзаца', () => {
     const doc: RichDoc = {
       type: 'doc',
