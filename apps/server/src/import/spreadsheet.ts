@@ -72,12 +72,64 @@ export function decodeCsv(buffer: Buffer): string {
   return iconv.decode(buffer, 'win1251');
 }
 
+/**
+ * Чем разделены колонки.
+ *
+ * Считаем сами, а не отдаём автоопределению papaparse: оно смотрит, какой
+ * знак чаще, и на выгрузке из судейской программы ошибается. Там колонки
+ * разделены точкой с запятой, а внутри значений — запятые («Иванов И.И.,
+ * 2005 г.р.»), и запятых выходит больше. Файл рассыпается на лишние
+ * колонки, а вместе с ним и весь список.
+ *
+ * Правило: считаем знаки вне кавычек и берём тот, что даёт одинаковое
+ * число колонок в большинстве строк; при равенстве точка с запятой и
+ * табуляция важнее запятой — они разделителями и бывают, а запятая живёт
+ * ещё и внутри текста.
+ */
+export function detectDelimiter(text: string): string {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim()).slice(0, 20);
+  if (!lines.length) return ',';
+
+  let best = ',';
+  let bestScore = -1;
+  for (const candidate of [';', '\t', ',']) {
+    const counts = lines.map((line) => countOutsideQuotes(line, candidate));
+    if (counts.every((n) => n === 0)) continue;
+    // Ровные строки — признак настоящего разделителя: у чужого знака
+    // число вхождений скачет от строки к строке.
+    const first = counts[0];
+    const steady = counts.filter((n) => n === first).length / counts.length;
+    const score = steady * 100 + Math.min(first, 50);
+    if (score > bestScore) {
+      bestScore = score;
+      best = candidate;
+    }
+  }
+  return best;
+}
+
+/** Разделители внутри кавычек — часть значения, а не границы колонок. */
+function countOutsideQuotes(line: string, needle: string): number {
+  let count = 0;
+  let quoted = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      // Удвоенная кавычка внутри значения — это экранированная кавычка.
+      if (quoted && line[i + 1] === '"') i++;
+      else quoted = !quoted;
+      continue;
+    }
+    if (!quoted && ch === needle) count++;
+  }
+  return count;
+}
+
 export function parseCsv(buffer: Buffer): string[][] {
   const text = decodeCsv(buffer);
   const result = Papa.parse<string[]>(text, {
     skipEmptyLines: false,
-    // Разделитель определяется автоматически: встречаются и запятая, и точка с запятой.
-    delimiter: '',
+    delimiter: detectDelimiter(text),
   });
   return result.data.map((row) => row.map((cell) => String(cell ?? '').trim()));
 }
