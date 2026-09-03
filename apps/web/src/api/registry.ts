@@ -1,12 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
 
-/** Состояние выданного документа: действителен, отозван или заменён. */
-export type FileState = 'valid' | 'revoked' | 'replaced';
+/** Состояние выданного документа: действителен, отозван, заменён или срок истёк. */
+export type FileState = 'valid' | 'revoked' | 'replaced' | 'expired';
 
 export interface RegistryRow {
   fileId: string;
   publicId: string;
+  /** Код, напечатанный на бумаге: короткий у новых выпусков, UUID у старых. */
+  code: string;
+  /** Путь страницы проверки — тот же, что в QR на документе. */
+  verifyPath: string;
   name: string;
   email: string;
   documentId: string | null;
@@ -14,10 +18,26 @@ export interface RegistryRow {
   eventName: string;
   eventDate: string;
   issuedAt: string;
+  /** Когда документ перестаёт действовать. null — бессрочный. */
+  expiresAt: string | null;
+  /** Имя на бумаге, если строку таблицы после выпуска поправили. */
+  printedName: string | null;
+  revokedAt: string | null;
+  revokedReasonPublic: string | null;
+  /** Только владельцу и управляющему; остальным null. */
+  revokedReasonInternal: string | null;
+  /** Когда PDF подписан электронной подписью сервиса. null — без подписи. */
+  signedAt: string | null;
   state: FileState;
   /** Перевыпуск заказан, но нового документа ещё нет. */
   reissuePending: boolean;
-  replacedBy: { fileId: string; publicId: string; issuedAt: string } | null;
+  replacedBy: {
+    fileId: string;
+    publicId: string;
+    code: string;
+    verifyPath: string;
+    issuedAt: string;
+  } | null;
   mail: { status: string; sentAt: string | null; error: string | null } | null;
   verifyCount: number;
   verifyLastAt: string | null;
@@ -48,6 +68,7 @@ export interface RegistryAnalytics {
   issued: number;
   revoked: number;
   replaced: number;
+  expired: number;
   mail: {
     queued: number;
     sent: number;
@@ -89,6 +110,34 @@ export interface RegistryDetail {
   history: HistoryEntry[];
 }
 
+/** Кого отзывать: отмеченные документы либо всё найденное по отбору. */
+export type RevokeTarget =
+  | { fileIds: string[]; filter?: undefined }
+  | { fileIds?: undefined; filter: Record<string, string> };
+
+/** Что будет отозвано — до необратимого действия. */
+export interface RevokePreview {
+  count: number;
+  alreadyRevoked: number;
+  sample: { fileId: string; name: string; code: string; documentTitle: string; state: FileState }[];
+}
+
+/**
+ * Можно ли отзывать «всё найденное» по этому отбору.
+ *
+ * Только суженный отбор: материал, мероприятие или период. Пустой отбор —
+ * это всё выданное организацией за всё время, и один клик мимо гасил бы
+ * всю историю. Сервер проверяет то же самое ещё раз.
+ */
+export function revokableByFilter(filters: RegistryFilters): boolean {
+  return Boolean(filters.documentId || filters.event || filters.from || filters.to);
+}
+
+/** Отбор для сервера: только заполненные поля. */
+export function filterForRevoke(filters: RegistryFilters): Record<string, string> {
+  return Object.fromEntries(Object.entries(filters).filter(([, v]) => v));
+}
+
 /** Кого действие не коснулось и почему. */
 export interface SkippedItem {
   fileId: string;
@@ -117,7 +166,7 @@ export const emptyFilters: RegistryFilters = {
 };
 
 /** Состояния, которые отбор вообще знает. */
-const STATES: FileState[] = ['valid', 'revoked', 'replaced'];
+const STATES: FileState[] = ['valid', 'revoked', 'replaced', 'expired'];
 
 /**
  * Отбор из строки адреса.

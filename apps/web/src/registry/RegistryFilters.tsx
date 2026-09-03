@@ -107,6 +107,7 @@ export function RegistryFilters({ value, facets, onChange, onReset }: Props) {
             <option value="">Любое</option>
             <option value="valid">Действителен</option>
             <option value="replaced">Заменён</option>
+            <option value="expired">Срок истёк</option>
             <option value="revoked">Отозван</option>
           </Select>
         </label>

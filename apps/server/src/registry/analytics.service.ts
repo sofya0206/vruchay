@@ -29,7 +29,7 @@ export class AnalyticsService {
   async summary(orgId: string, filter: RegistryFilterDto) {
     const where = registryWhere(orgId, filter);
 
-    const [totals, revoked, replaced, verifiedFiles, downloadedFiles, mail, byDocument] =
+    const [totals, revoked, replaced, expired, verifiedFiles, downloadedFiles, mail, byDocument] =
       await Promise.all([
         this.prisma.file.aggregate({
           where,
@@ -38,6 +38,16 @@ export class AnalyticsService {
         }),
         this.prisma.file.count({ where: { ...where, verifyRevoked: true } }),
         this.prisma.file.count({ where: { ...where, replacedById: { not: null } } }),
+        // Истёкшие — только среди тех, что не отозваны и не заменены:
+        // так же считает состояние fileState.
+        this.prisma.file.count({
+          where: {
+            ...where,
+            verifyRevoked: false,
+            replacedById: null,
+            expiresAt: { lte: new Date() },
+          },
+        }),
         this.prisma.file.count({ where: { ...where, verifyCount: { gt: 0 } } }),
         this.prisma.file.count({ where: { ...where, downloadCount: { gt: 0 } } }),
         this.prisma.email.groupBy({
@@ -72,6 +82,7 @@ export class AnalyticsService {
       issued: totals._count._all,
       revoked,
       replaced,
+      expired,
       /*
        * Воронка письма считается нарастающим итогом, а не по текущему
        * состоянию: прочитанное письмо когда-то было и отправленным,

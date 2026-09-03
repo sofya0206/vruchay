@@ -33,6 +33,19 @@ describe('токен страницы рендера', () => {
     expect(verifyRenderToken(token, SECRET, NOW + RENDER_TOKEN_TTL_SECONDS + 1)).toBeNull();
   });
 
+  it('несёт публичный код экземпляра, если он выделен', () => {
+    const withCode = { ...payload, publicId: 'pub-1', code: 'K7M2-9QXR-4TVB' };
+    const token = createRenderToken(withCode, SECRET, NOW);
+    expect(verifyRenderToken(token, SECRET, NOW)).toMatchObject(withCode);
+
+    // Код в токене — строка или ничего; иной тип означает подделку данных.
+    const forged = Buffer.from(
+      JSON.stringify({ ...payload, code: 42, exp: NOW + 600 }),
+      'utf8',
+    ).toString('base64url');
+    expect(verifyRenderToken(`${forged}.x`, SECRET, NOW)).toBeNull();
+  });
+
   it('не падает на мусоре вместо токена', () => {
     for (const bad of ['', '.', 'abc', 'a.b.c', 'нетоken', '..']) {
       expect(verifyRenderToken(bad, SECRET, NOW)).toBeNull();

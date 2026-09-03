@@ -65,13 +65,29 @@ export function DocumentHistory({ fileId, onClose }: Props) {
               )}
             </div>
 
+            {row.state === 'revoked' && (
+              <div className="rounded-xl bg-[var(--danger-soft)] p-4 text-sm text-[var(--text)]">
+                <p>
+                  Отозван{row.revokedAt ? ` ${formatDate(row.revokedAt)}` : ''}.
+                  {row.revokedReasonPublic
+                    ? ` Причина для проверяющих: ${row.revokedReasonPublic}.`
+                    : ' Причина для проверяющих не указана.'}
+                </p>
+                {row.revokedReasonInternal && (
+                  <p className="mt-1 text-[var(--text-muted)]">
+                    Внутренняя причина: {row.revokedReasonInternal}
+                  </p>
+                )}
+              </div>
+            )}
+
             {row.replacedBy && (
               <p className="rounded-xl bg-[var(--award-soft)] p-4 text-sm text-[var(--text)]">
                 Этот документ заменён на выданный {formatDate(row.replacedBy.issuedAt)}.
                 Страница проверки старого показывает предупреждение и ведёт на новый.{' '}
                 <a
                   className="text-[var(--accent)] hover:underline"
-                  href={`/verify/${row.replacedBy.publicId}`}
+                  href={row.replacedBy.verifyPath}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -82,9 +98,21 @@ export function DocumentHistory({ fileId, onClose }: Props) {
 
             <dl className="space-y-2 border-y border-[var(--line)] py-4 text-sm">
               <Fact label="Выдан">{formatDateTime(row.issuedAt)}</Fact>
+              {row.expiresAt && <Fact label="Действителен до">{formatDate(row.expiresAt)}</Fact>}
+              <Fact label="Электронная подпись">
+                {row.signedAt ? `Подписан ${formatDate(row.signedAt)}` : 'Без подписи'}
+              </Fact>
+              {row.printedName && (
+                <Fact label="Напечатано">
+                  {row.printedName}
+                  <span className="block text-xs text-[var(--text-muted)]">
+                    строка в таблице поправлена после выпуска
+                  </span>
+                </Fact>
+              )}
               <Fact label="Адрес почты">{row.email || '—'}</Fact>
               <Fact label="Проверочный код">
-                <span className="font-mono text-xs">{row.publicId}</span>
+                <span className="font-mono text-xs">{row.code}</span>
               </Fact>
               <Fact label="Проверки по QR">
                 {verifyLabel(detail.data.verifyCount)}
@@ -105,7 +133,7 @@ export function DocumentHistory({ fileId, onClose }: Props) {
                   Скачать
                 </Button>
               </a>
-              <a href={`/verify/${row.publicId}`} target="_blank" rel="noopener noreferrer">
+              <a href={row.verifyPath} target="_blank" rel="noopener noreferrer">
                 <Button size="sm" icon={<ShieldCheck size={14} />}>
                   Страница проверки
                 </Button>

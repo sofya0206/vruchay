@@ -5,6 +5,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { baseUrl, type Env } from '../config/env';
 import { verifyRenderToken } from './render-token';
+import { verifyUrl } from '../verify/verify-url';
+import { expiresAtFor } from '../verify/expiry';
 
 /**
  * Данные для страницы, которую печатает в PDF браузер воркера.
@@ -44,6 +46,10 @@ export class RenderController {
     if (!row) throw new NotFoundException('Ссылка недействительна');
 
     const doc = row.document;
+    // Дата выдачи материала, если задана; иначе — момент печати. От неё же
+    // считается срок действия: на листе и на странице проверки должна
+    // стоять одна пара дат, а не «выдан вчера, действителен от сегодня».
+    const issuedAt = issuedAtOf(doc.issueDate);
     const total = await this.prisma.recipientRow.count({ where: { documentId: doc.id } });
     const sheets = await Promise.all(
       doc.sheets.map(async (sheet) => ({
@@ -62,11 +68,15 @@ export class RenderController {
       // печати нет ни часов в нужном поясе, ни названия организации,
       // ни порядкового номера строки.
       data: mergeVariables(row.data as Record<string, string>, {
-        // Дата выдачи материала, если задана; иначе — момент печати.
-        issuedAt: issuedAtOf(doc.issueDate),
+        issuedAt,
         number: row.position + 1,
         total,
-        publicId: payload.publicId ?? null,
+        // Тем же правилом, что и воркер при записи файла: на бумаге
+        // и на странице проверки должна стоять одна дата.
+        expiresAt: expiresAtFor(issuedAt, doc),
+        // На бумагу (%code) идёт короткий код, когда он есть: его и будут
+        // диктовать по телефону. UUID остаётся только у старых выпусков.
+        publicId: payload.code ?? payload.publicId ?? null,
         regNumber: payload.regNumber ?? null,
         orgName: doc.org?.name,
         event: {
@@ -81,7 +91,10 @@ export class RenderController {
       // по внутреннему адресу контейнера, и он попал бы в код на бумаге.
       verifyUrl:
         doc.verifyEnabled && payload.publicId
-          ? `${baseUrl(this.config.get('PUBLIC_URL', { infer: true }))}/verify/${payload.publicId}`
+          ? verifyUrl(baseUrl(this.config.get('PUBLIC_URL', { infer: true })), {
+              publicId: payload.publicId,
+              publicCode: payload.code ?? null,
+            })
           : null,
     };
   }

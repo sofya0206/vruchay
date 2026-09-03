@@ -74,6 +74,13 @@ export interface DocumentDetail extends DocumentSummary {
   eventDate: string;
   eventPlace: string;
   eventHours: string;
+  /**
+   * Срок действия выпускаемых документов: длительность от выдачи
+   * (ISO 8601, `P1Y`) либо фиксированная дата. null и там и там —
+   * бессрочные.
+   */
+  expiresIn: string | null;
+  expiresAt: string | null;
   /** Дата выдачи днём (ГГГГ-ММ-ДД) либо null — в день выпуска. */
   issueDate: string | null;
   sheets: Sheet[];

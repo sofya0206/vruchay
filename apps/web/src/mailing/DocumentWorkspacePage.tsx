@@ -8,6 +8,7 @@ import { RecipientsTable } from '../recipients/RecipientsTable';
 import { RulesTab } from '../awards/RulesTab';
 import { ValidationScreen } from '../validation/ValidationScreen';
 import { EmailTemplateEditor } from '../mail/EmailTemplateEditor';
+import { VerifyPanel } from '../verify/VerifyPanel';
 import { WORKSPACE_TABS, workspaceTab, type WorkspaceTab } from './workspace-tabs';
 
 /**
@@ -111,6 +112,10 @@ export function DocumentWorkspacePage() {
       ) : tab === 'mail' ? (
         <div className="min-h-0 flex-1 overflow-auto">
           <EmailTemplateEditor documentId={id} />
+        </div>
+      ) : tab === 'verify' ? (
+        <div className="min-h-0 flex-1 overflow-auto">
+          <VerifyPanel doc={page} />
         </div>
       ) : (
         <RecipientsTable

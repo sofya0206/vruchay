@@ -266,6 +266,11 @@ interface PlatformOrg {
   ownerEmail: string;
   ownerName: string;
   issued: number;
+  /** Что организация назвала о себе — по этому решается вопрос о значке. */
+  slug: string | null;
+  inn: string;
+  verifiedIssuer: boolean;
+  publicPageEnabled: boolean;
 }
 
 /**
@@ -294,6 +299,17 @@ function Organizations() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['platform-orgs'] }),
   });
 
+  /*
+   * Значок «Верифицированный эмитент» — руками, после того как мы сами
+   * проверили домен и ИНН. Автоматической проверки по DNS и ЕГРЮЛ пока
+   * нет, поэтому кнопка и пишется в журнал: кто и когда поручился.
+   */
+  const setVerified = useMutation({
+    mutationFn: (v: { id: string; verified: boolean }) =>
+      api.patch(`/platform/organizations/${v.id}/verified`, { verified: v.verified }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['platform-orgs'] }),
+  });
+
   if (orgs.isPending) return <p className="text-[var(--text-muted)]">Загрузка…</p>;
   if (orgs.isError) return <NoAccess />;
 
@@ -319,7 +335,22 @@ function Organizations() {
               {org.ownerEmail || 'владелец не найден'} · выпущено {org.issued} · с{' '}
               {when(org.createdAt)}
             </p>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">
+              {org.verifiedIssuer ? 'верифицированный эмитент' : 'без значка'}
+              {org.inn ? ` · ИНН ${org.inn}` : ' · ИНН не указан'}
+              {org.slug
+                ? ` · страница ${org.publicPageEnabled ? '' : '(выключена) '}/org/${org.slug}`
+                : ' · без публичной страницы'}
+            </p>
           </div>
+
+          <Button
+            size="sm"
+            disabled={setVerified.isPending}
+            onClick={() => setVerified.mutate({ id: org.id, verified: !org.verifiedIssuer })}
+          >
+            {org.verifiedIssuer ? 'Снять значок' : 'Присвоить значок'}
+          </Button>
 
           {org.plan === 'free' ? (
             <Button

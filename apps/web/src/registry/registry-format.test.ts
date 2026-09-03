@@ -27,6 +27,11 @@ describe('состояние документа', () => {
   it('отзыв сильнее замены: отозванный не показывается заменённым', () => {
     expect(stateLabel({ state: 'revoked', reissuePending: true })).toBe('Отозван');
   });
+
+  it('истёкший срок — жёлтое предупреждение, а не красный отказ', () => {
+    expect(stateLabel({ state: 'expired', reissuePending: false })).toBe('Срок истёк');
+    expect(stateTone({ state: 'expired', reissuePending: false })).toBe('warn');
+  });
 });
 
 describe('состояние письма', () => {

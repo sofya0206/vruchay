@@ -19,6 +19,15 @@ describe('buildS3Key', () => {
     ).toBe(`org/${org}/doc/${doc}/gen/${job}/${file}.pdf`);
   });
 
+  it('файлы организации без материала — логотип — лежат вне документа', () => {
+    expect(buildS3Key({ orgId: org, kind: 'asset', fileId: file, ext: 'png' })).toBe(
+      `org/${org}/asset/${file}.png`,
+    );
+    expect(buildS3Key({ orgId: org, documentId: doc, kind: 'asset', fileId: file, ext: 'png' })).toBe(
+      `org/${org}/doc/${doc}/asset/${file}.png`,
+    );
+  });
+
   it('шрифты лежат вне документа', () => {
     expect(buildS3Key({ orgId: org, kind: 'font', fileId: file, ext: 'woff2' })).toBe(
       `org/${org}/fonts/${file}.woff2`,

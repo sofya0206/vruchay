@@ -6,6 +6,7 @@ import { VerifyController } from '../verify/verify.controller';
 import { UnsubscribeController } from '../mailing/unsubscribe.controller';
 import { TrackingController } from '../mail/tracking.controller';
 import { TeamInviteController } from '../team/team.controller';
+import { PublicOrgController } from '../public-org/public-org.controller';
 import { ThrottleGuard } from './throttle.guard';
 import { THROTTLE_KEY, type ThrottleOptions } from './throttle.decorator';
 import { RateLimitService } from './rate-limit.service';
@@ -67,6 +68,8 @@ const PUBLIC_ROUTES = [
   { name: 'подтверждение отписки', controller: UnsubscribeController, method: 'confirm' },
   { name: 'отметка о прочтении', controller: TrackingController, method: 'open' },
   { name: 'приём приглашения', controller: TeamInviteController, method: 'accept' },
+  { name: 'публичная страница организации', controller: PublicOrgController, method: 'page' },
+  { name: 'поиск в публичном реестре', controller: PublicOrgController, method: 'search' },
 ] as const;
 
 describe.each(PUBLIC_ROUTES)('$name', ({ controller, method }) => {

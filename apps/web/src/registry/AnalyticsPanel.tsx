@@ -56,6 +56,7 @@ export function AnalyticsPanel({ filters, active }: { filters: RegistryFilters; 
           <Tile value={data.downloads.total} label="Скачано из кабинета" />
           <Tile value={data.mail.bounced} label="Не доставлено" tone="bad" />
           <Tile value={data.replaced} label="Заменено перевыпуском" tone="warn" />
+          <Tile value={data.expired} label="Срок истёк" tone="warn" />
           <Tile value={data.revoked} label="Отозвано" tone="bad" />
         </div>
         <p className="mt-3 max-w-prose text-xs text-[var(--text-muted)]">

@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import type { RegistryFilterDto } from './registry.dto';
+import { normalizePublicCode } from '../verify/public-code';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -18,6 +19,7 @@ export function registryWhere(
   orgId: string,
   filter: RegistryFilterDto,
   ids: string[] = [],
+  now: Date = new Date(),
 ): Prisma.FileWhereInput {
   const where: Prisma.FileWhereInput = {
     orgId,
@@ -45,14 +47,23 @@ export function registryWhere(
     where.document = { eventName: filter.event };
   }
 
+  // Те же правила старшинства, что в fileState: отзыв сильнее замены,
+  // замена сильнее срока. Разойдись условия с функцией — отбор «истёк»
+  // показал бы не то, что помечено «истёк» в самой таблице.
   if (filter.state === 'revoked') where.verifyRevoked = true;
   if (filter.state === 'replaced') {
     where.verifyRevoked = false;
     where.replacedById = { not: null };
   }
+  if (filter.state === 'expired') {
+    where.verifyRevoked = false;
+    where.replacedById = null;
+    where.expiresAt = { lte: now };
+  }
   if (filter.state === 'valid') {
     where.verifyRevoked = false;
     where.replacedById = null;
+    where.AND = [{ OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] }];
   }
 
   if (filter.mail) {
@@ -66,12 +77,16 @@ export function registryWhere(
 
   const search = filter.search?.trim();
   if (search) {
+    // Короткий код принимаем так, как его продиктовали: без дефисов,
+    // строчными, с O вместо нуля. Ищем целиком, как и UUID.
+    const code = normalizePublicCode(search);
     where.OR = [
       { row: { data: { path: ['name'], string_contains: search, mode: 'insensitive' } } },
       { row: { data: { path: ['email'], string_contains: search, mode: 'insensitive' } } },
       // Проверочный код ищем целиком: это идентификатор, и «содержит»
       // для него означало бы перебор чужих кодов по кускам.
       ...(UUID.test(search) ? [{ publicId: search.toLowerCase() }] : []),
+      ...(code ? [{ publicCode: code }] : []),
     ];
   }
 

@@ -4,6 +4,7 @@ import { TRASH_DAYS, daysLeftInTrash } from '@gramota/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { cell } from '../documents/registry.service';
 import { fileState, type FileState } from './file-state';
+import { verifyPath } from '../verify/verify-url';
 import { registryWhere } from './registry-filter';
 import type { ListRegistryDto, RegistryFilterDto } from './registry.dto';
 import { ReplacementService } from './replacement.service';
@@ -15,6 +16,10 @@ const HISTORY_LIMIT = 100;
 export interface RegistryRow {
   fileId: string;
   publicId: string;
+  /** Код, напечатанный на бумаге: короткий у новых выпусков, UUID у старых. */
+  code: string;
+  /** Путь страницы проверки — тот же, что закодирован в QR. */
+  verifyPath: string;
   name: string;
   email: string;
   documentId: string | null;
@@ -22,10 +27,29 @@ export interface RegistryRow {
   eventName: string;
   eventDate: string;
   issuedAt: Date;
+  /** Когда документ перестаёт действовать. Null — бессрочный. */
+  expiresAt: Date | null;
+  /**
+   * Имя, напечатанное на документе, если оно отличается от строки таблицы:
+   * строку могли поправить после выпуска. Null — совпадает или снимка нет.
+   */
+  printedName: string | null;
+  revokedAt: Date | null;
+  revokedReasonPublic: string | null;
+  /** Только владельцу и управляющему; остальным — null. */
+  revokedReasonInternal: string | null;
+  /** Когда PDF подписан электронной подписью сервиса. Null — без подписи. */
+  signedAt: Date | null;
   state: FileState;
   /** Перевыпуск заказан, но нового документа ещё нет. */
   reissuePending: boolean;
-  replacedBy: { fileId: string; publicId: string; issuedAt: Date } | null;
+  replacedBy: {
+    fileId: string;
+    publicId: string;
+    code: string;
+    verifyPath: string;
+    issuedAt: Date;
+  } | null;
   mail: { status: string; sentAt: Date | null; error: string | null } | null;
   verifyCount: number;
   verifyLastAt: Date | null;
@@ -57,7 +81,7 @@ export class RegistryService {
    * тысяч выданных документов, и выгрузка их в браузер целиком означала бы
    * минуту белого экрана вместо таблицы.
    */
-  async list(orgId: string, query: ListRegistryDto) {
+  async list(orgId: string, query: ListRegistryDto, showInternal = false) {
     const where = registryWhere(orgId, query);
 
     const [files, total] = await Promise.all([
@@ -71,7 +95,7 @@ export class RegistryService {
       this.prisma.file.count({ where }),
     ]);
 
-    const items = await this.decorate(files);
+    const items = await this.decorate(files, showInternal);
     return { items, total, limit: query.limit, offset: query.offset };
   }
 
@@ -112,7 +136,7 @@ export class RegistryService {
     });
     if (!file) throw new NotFoundException('Документ не найден');
 
-    const [row] = await this.decorate([file]);
+    const [row] = await this.decorate([file], showActors);
 
     const emails = await this.prisma.email.findMany({
       where: { orgId, fileId },
@@ -221,6 +245,7 @@ export class RegistryService {
       'Материал',
       'Мероприятие',
       'Выдан',
+      'Действителен до',
       'Проверочный код',
       'Состояние',
       'Письмо',
@@ -238,7 +263,8 @@ export class RegistryService {
           item.documentTitle,
           item.eventName,
           formatDate(item.issuedAt),
-          item.publicId,
+          item.expiresAt ? formatDate(item.expiresAt) : '',
+          item.code,
           stateLabel(item.state, item.reissuePending),
           mailLabel(item.mail?.status ?? null),
           String(item.verifyCount),
@@ -266,6 +292,7 @@ export class RegistryService {
         mime: true,
         originalName: true,
         publicId: true,
+        publicCode: true,
         row: { select: { data: true } },
       },
     });
@@ -278,7 +305,7 @@ export class RegistryService {
    * по строке: полсотни строк — это полсотни лишних обращений к базе,
    * и на них уходит больше времени, чем на саму выборку.
    */
-  private async decorate(files: FileRecord[]): Promise<RegistryRow[]> {
+  private async decorate(files: FileRecord[], showInternal = false): Promise<RegistryRow[]> {
     if (files.length === 0) return [];
 
     const settled = await this.replacement.settle(files);
@@ -298,7 +325,7 @@ export class RegistryService {
       replacementIds.length > 0
         ? this.prisma.file.findMany({
             where: { id: { in: replacementIds }, orgId: files[0].orgId },
-            select: { id: true, publicId: true, createdAt: true },
+            select: { id: true, publicId: true, publicCode: true, createdAt: true },
           })
         : Promise.resolve([]),
       this.prisma.email.findMany({
@@ -316,12 +343,16 @@ export class RegistryService {
 
     return resolved.map((file) => {
       const data = (file.row?.data ?? {}) as Record<string, string>;
+      const printed = (file.issuedData ?? null) as Record<string, string> | null;
+      const printedName = (printed?.name ?? '').trim();
       const email = lastEmail.get(file.id);
       const replacement = file.replacedById ? byId.get(file.replacedById) : undefined;
 
       return {
         fileId: file.id,
         publicId: file.publicId,
+        code: file.publicCode ?? file.publicId,
+        verifyPath: verifyPath(file),
         name: data.name ?? '',
         email: data.email ?? '',
         documentId: file.documentId,
@@ -329,10 +360,22 @@ export class RegistryService {
         eventName: file.document?.eventName ?? '',
         eventDate: file.document?.eventDate ?? '',
         issuedAt: file.createdAt,
+        expiresAt: file.expiresAt,
+        printedName: printedName && printedName !== (data.name ?? '').trim() ? printedName : null,
+        revokedAt: file.revokedAt,
+        revokedReasonPublic: file.revokedReasonPublic,
+        revokedReasonInternal: showInternal ? file.revokedReasonInternal : null,
+        signedAt: file.signedAt,
         state: fileState(file),
         reissuePending: file.replacedByJobId !== null && file.replacedById === null,
         replacedBy: replacement
-          ? { fileId: replacement.id, publicId: replacement.publicId, issuedAt: replacement.createdAt }
+          ? {
+              fileId: replacement.id,
+              publicId: replacement.publicId,
+              code: replacement.publicCode ?? replacement.publicId,
+              verifyPath: verifyPath(replacement),
+              issuedAt: replacement.createdAt,
+            }
           : null,
         mail: email ? { status: email.status, sentAt: email.sentAt, error: email.error } : null,
         verifyCount: file.verifyCount,
@@ -357,9 +400,16 @@ const fileSelect = {
   id: true,
   orgId: true,
   publicId: true,
+  publicCode: true,
   documentId: true,
   createdAt: true,
+  expiresAt: true,
+  issuedData: true,
   verifyRevoked: true,
+  revokedAt: true,
+  revokedReasonPublic: true,
+  revokedReasonInternal: true,
+  signedAt: true,
   replacedById: true,
   replacedByJobId: true,
   rowId: true,
@@ -401,6 +451,7 @@ function formatDate(date: Date): string {
 export function stateLabel(state: FileState, pending: boolean): string {
   if (state === 'revoked') return 'отозван';
   if (state === 'replaced') return 'заменён';
+  if (state === 'expired') return 'срок истёк';
   return pending ? 'перевыпускается' : 'действителен';
 }
 

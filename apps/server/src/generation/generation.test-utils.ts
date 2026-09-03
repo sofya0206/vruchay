@@ -25,6 +25,7 @@ export interface FileRec {
   mime: string;
   sizeBytes: number;
   publicId: string;
+  publicCode?: string | null;
   originalName: string;
   deletedAt: Date | null;
   createdAt: Date;
@@ -255,6 +256,8 @@ export class World {
       config as never,
       renderer as never,
       this.service,
+      // Подписи в этих тестах нет: они про очередь и базу, а не про сертификат.
+      { signIfConfigured: async (bytes: Buffer) => ({ bytes, signed: false }) } as never,
     );
     (this.processor as unknown as { queue: FakeQueue }).queue = this.queue;
 
@@ -427,6 +430,11 @@ export class World {
         },
       },
       file: {
+        // Воркер спрашивает, свободен ли публичный код, до печати листа.
+        findUnique: async ({ where }: { where: { id?: string; publicCode?: string } }) =>
+          this.files.find((f) =>
+            where.id !== undefined ? f.id === where.id : f.publicCode === where.publicCode,
+          ) ?? null,
         findMany: async ({ where }: { where: Where }) =>
           this.files
             .filter((f) => matches(f as never, where))

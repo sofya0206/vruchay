@@ -77,7 +77,7 @@ export function RegistryTable({ rows, selected, onToggle, onToggleAll, onOpen }:
                     type="checkbox"
                     checked={selected.has(row.fileId)}
                     onChange={() => onToggle(row.fileId)}
-                    aria-label={`Отметить документ: ${row.name || row.publicId}`}
+                    aria-label={`Отметить документ: ${row.name || row.code}`}
                     className="size-4 accent-[var(--accent)]"
                   />
                 </td>
@@ -102,8 +102,13 @@ export function RegistryTable({ rows, selected, onToggle, onToggleAll, onOpen }:
 
                 <td className="px-3 py-3 align-top whitespace-nowrap tabular-nums">
                   {formatDate(row.issuedAt)}
+                  {row.expiresAt && (
+                    <p className="text-[11px] text-[var(--text-muted)]">
+                      до {formatDate(row.expiresAt)}
+                    </p>
+                  )}
                   <p className="font-mono text-[11px] text-[var(--text-muted)]">
-                    {row.publicId.slice(0, 8)}
+                    {row.code.length > 14 ? row.code.slice(0, 8) : row.code}
                   </p>
                 </td>
 
@@ -123,7 +128,7 @@ export function RegistryTable({ rows, selected, onToggle, onToggleAll, onOpen }:
                   </StateChip>
                   {row.replacedBy && (
                     <a
-                      href={`/verify/${row.replacedBy.publicId}`}
+                      href={row.replacedBy.verifyPath}
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
@@ -143,7 +148,7 @@ export function RegistryTable({ rows, selected, onToggle, onToggleAll, onOpen }:
                       e.stopPropagation();
                       onOpen(row.fileId);
                     }}
-                    aria-label={`Открыть карточку: ${row.name || row.publicId}`}
+                    aria-label={`Открыть карточку: ${row.name || row.code}`}
                     className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-[var(--surface)] hover:text-[var(--text)]"
                   >
                     <ArrowUpRight size={16} />

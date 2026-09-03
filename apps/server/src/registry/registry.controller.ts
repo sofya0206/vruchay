@@ -40,6 +40,8 @@ import {
   resendSchema,
   RevokeDto,
   revokeSchema,
+  RevokePreviewDto,
+  revokePreviewSchema,
 } from './registry.dto';
 
 const uuidParam = new ZodValidationPipe(uuidSchema);
@@ -75,7 +77,9 @@ export class RegistryController {
     @CurrentUser() user: SessionUser,
     @Query(new ZodValidationPipe(listRegistrySchema)) query: ListRegistryDto,
   ) {
-    return this.registry.list(user.orgId, query);
+    // Внутренняя причина отзыва — только владельцу и управляющему.
+    const showInternal = user.role === 'owner' || user.role === 'admin';
+    return this.registry.list(user.orgId, query, showInternal);
   }
 
   @Get('facets')
@@ -195,18 +199,40 @@ export class RegistryController {
     @AuditActor() actor: Actor,
     @Body(new ZodValidationPipe(revokeSchema)) dto: RevokeDto,
   ) {
-    const result = await this.actions.setRevoked(user.orgId, dto.fileIds, dto.revoked);
+    const result = await this.actions.setRevoked(
+      user.orgId,
+      { fileIds: dto.fileIds, filter: dto.filter },
+      dto.revoked,
+      {
+        expectedCount: dto.expectedCount,
+        reasonPublic: dto.reasonPublic,
+        reasonInternal: dto.reasonInternal,
+      },
+    );
     await this.audit.record({
       actor,
       action: dto.revoked ? 'verify.revoke' : 'verify.restore',
       summary: dto.revoked
-        ? `Отозвана проверка документов: ${result.changed}`
+        ? `Отозвана проверка документов: ${result.changed}` +
+          (dto.reasonPublic ? ` — ${dto.reasonPublic}` : '')
         : `Проверка документов возвращена: ${result.changed}`,
-      targetType: 'file',
-      targetId: dto.fileIds[0],
-      meta: { count: result.changed },
+      targetType: dto.fileIds ? 'file' : 'document',
+      targetId: dto.fileIds?.[0] ?? dto.filter?.documentId,
+      // Внутреннюю причину в журнал не пишем: журнал видят все сотрудники,
+      // а внутренняя причина — только владелец и управляющий.
+      meta: { count: result.changed, byFilter: !dto.fileIds, reasonPublic: dto.reasonPublic ?? '' },
     });
     return result;
+  }
+
+  /** Что будет отозвано: число и первые имена — до необратимого действия. */
+  @Post('revoke/preview')
+  @Roles('owner', 'admin')
+  previewRevoke(
+    @CurrentUser() user: SessionUser,
+    @Body(new ZodValidationPipe(revokePreviewSchema)) dto: RevokePreviewDto,
+  ) {
+    return this.actions.previewRevoke(user.orgId, dto);
   }
 
   /**

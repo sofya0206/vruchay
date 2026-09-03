@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { verifyPath } from '../verify/verify-url';
 
 /**
  * Реестр выданных документов.
@@ -32,6 +33,7 @@ export class RegistryService {
           select: {
             id: true,
             publicId: true,
+            publicCode: true,
             createdAt: true,
             sizeBytes: true,
             verifyRevoked: true,
@@ -45,7 +47,7 @@ export class RegistryService {
              * недействителен, а у заменённого есть действующий двойник,
              * и человеку нужно всего лишь показать, где он.
              */
-            replacedBy: { select: { publicId: true, createdAt: true } },
+            replacedBy: { select: { publicId: true, publicCode: true, createdAt: true } },
           },
         },
       },
@@ -78,11 +80,15 @@ export class RegistryService {
           fields: data,
           fileId: row.lastFile!.id,
           publicId: row.lastFile!.publicId,
+          code: row.lastFile!.publicCode ?? row.lastFile!.publicId,
+          verifyPath: verifyPath(row.lastFile!),
           issuedAt: row.lastFile!.createdAt,
           revoked: row.lastFile!.verifyRevoked,
           replacedBy: row.lastFile!.replacedBy
             ? {
                 publicId: row.lastFile!.replacedBy.publicId,
+                code: row.lastFile!.replacedBy.publicCode ?? row.lastFile!.replacedBy.publicId,
+                verifyPath: verifyPath(row.lastFile!.replacedBy),
                 issuedAt: row.lastFile!.replacedBy.createdAt,
               }
             : null,
@@ -112,14 +118,28 @@ export class RegistryService {
   async setRevoked(orgId: string, documentId: string, fileId: string, revoked: boolean) {
     const file = await this.prisma.file.findFirst({
       where: { id: fileId, orgId, documentId, kind: 'generated', deletedAt: null },
-      select: { id: true, publicId: true, rows: { take: 1, select: { data: true } } },
+      select: {
+        id: true,
+        publicId: true,
+        publicCode: true,
+        rows: { take: 1, select: { data: true } },
+      },
     });
     if (!file) throw new NotFoundException('Документ не найден');
 
-    await this.prisma.file.update({ where: { id: fileId }, data: { verifyRevoked: revoked } });
+    await this.prisma.file.update({
+      where: { id: fileId },
+      data: revoked ? { verifyRevoked: true, revokedAt: new Date() } : { verifyRevoked: false },
+    });
 
     const data = (file.rows[0]?.data ?? {}) as Record<string, string>;
-    return { ok: true, revoked, name: data.name ?? '', publicId: file.publicId };
+    return {
+      ok: true,
+      revoked,
+      name: data.name ?? '',
+      publicId: file.publicId,
+      code: file.publicCode ?? file.publicId,
+    };
   }
 
   /**

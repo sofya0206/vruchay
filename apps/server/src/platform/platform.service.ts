@@ -23,6 +23,10 @@ export class PlatformService {
         name: true,
         plan: true,
         createdAt: true,
+        slug: true,
+        inn: true,
+        verifiedIssuer: true,
+        publicPageEnabled: true,
         members: {
           where: { role: 'owner' },
           take: 1,
@@ -46,10 +50,33 @@ export class PlatformService {
       name: o.name,
       plan: o.plan,
       createdAt: o.createdAt,
+      // Что нужно, чтобы решить о значке: адрес страницы и ИНН, которые
+      // организация назвала сама, и текущее состояние значка.
+      slug: o.slug,
+      inn: o.inn,
+      verifiedIssuer: o.verifiedIssuer,
+      publicPageEnabled: o.publicPageEnabled,
       ownerEmail: o.members[0]?.user.email ?? '',
       ownerName: o.members[0]?.user.name ?? '',
       issued: counts.get(o.id) ?? 0,
     }));
+  }
+
+  async setVerified(orgId: string, verified: boolean) {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { name: true },
+    });
+    if (!org) throw new NotFoundException('Организация не найдена');
+
+    await this.prisma.organization.update({
+      where: { id: orgId },
+      data: { verifiedIssuer: verified, verifiedAt: verified ? new Date() : null },
+    });
+    this.logger.log(
+      `Организация ${orgId} («${org.name}»): значок верифицированного эмитента ${verified ? 'присвоен' : 'снят'}`,
+    );
+    return { ok: true as const, id: orgId, name: org.name, verified };
   }
 
   async setPlan(orgId: string, plan: 'free' | 'paid') {

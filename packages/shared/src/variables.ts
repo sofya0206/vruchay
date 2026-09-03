@@ -37,6 +37,7 @@ export const SYSTEM_VARIABLES: SystemVariable[] = [
   { name: 'reg_number', title: 'Регистрационный номер', hint: '142/2026 — сквозной за год' },
   { name: 'code', title: 'Проверочный код', hint: 'для сверки с QR' },
   { name: 'org', title: 'Название организации', hint: 'из настроек кабинета' },
+  { name: 'valid_until', title: 'Действителен до', hint: 'если у материала задан срок' },
 
   /*
    * Мероприятие. Заполняется один раз на весь документ, а не колонкой
@@ -110,6 +111,8 @@ export interface SystemVariableContext {
   total?: number;
   /** Публичный идентификатор экземпляра — он же в QR. */
   publicId?: string | null;
+  /** Когда документ перестаёт действовать. Нет срока — пусто на листе. */
+  expiresAt?: Date | null;
   /** Регистрационный номер экземпляра: «142/2026». До выпуска его нет. */
   regNumber?: string | null;
   /** Название организации-издателя. */
@@ -142,12 +145,7 @@ export interface EventFields {
  * точка отсчёта для российской отчётности.
  */
 export function systemVariables(ctx: SystemVariableContext): Record<string, string> {
-  const date = new Intl.DateTimeFormat('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    timeZone: 'Europe/Moscow',
-  }).format(ctx.issuedAt);
+  const date = formatDate(ctx.issuedAt);
 
   return {
     date,
@@ -159,12 +157,23 @@ export function systemVariables(ctx: SystemVariableContext): Record<string, stri
     total: ctx.total === undefined ? '' : String(ctx.total),
     reg_number: ctx.regNumber ?? '',
     code: ctx.publicId ?? '',
+    valid_until: ctx.expiresAt ? formatDate(ctx.expiresAt) : '',
     org: ctx.orgName ?? '',
     event: ctx.event?.name ?? '',
     event_date: ctx.event?.date ?? '',
     event_place: ctx.event?.place ?? '',
     hours: ctx.event?.hours ?? '',
   };
+}
+
+/** Дата по Москве в виде 04.08.2026 — так она печатается на документах. */
+function formatDate(value: Date): string {
+  return new Intl.DateTimeFormat('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    timeZone: 'Europe/Moscow',
+  }).format(value);
 }
 
 /**
