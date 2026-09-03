@@ -39,11 +39,50 @@ export interface PublicProfile {
   publicSearchByName: boolean;
   publicIndexable: boolean;
   verifyNameMode: VerifyNameMode;
+  /** Свой домен страницы проверки; пусто — общий домен сервиса. */
+  verifyDomain: string;
 }
 
 export type PublicProfilePatch = Partial<
-  Omit<PublicProfile, 'name' | 'logoFileId' | 'logoUrl' | 'verifiedIssuer' | 'verifiedAt'>
+  Omit<
+    PublicProfile,
+    'name' | 'logoFileId' | 'logoUrl' | 'verifiedIssuer' | 'verifiedAt' | 'verifyDomain'
+  >
 > & { consentConfirmed?: boolean };
+
+/** Кто платит: от вида зависит, какие реквизиты вообще бывают. */
+export type BillingKind = 'legal' | 'ie' | 'self_employed' | 'individual';
+
+export interface Billing {
+  kind: BillingKind | null;
+  name: string;
+  inn: string;
+  kpp: string;
+  ogrn: string;
+  address: string;
+  email: string;
+  /**
+   * Чем заполнить пустую форму: реквизиты из последнего счёта, а если
+   * счетов не было — то, что известно об организации.
+   */
+  suggested: {
+    from: 'invoice' | 'org';
+    name: string;
+    inn: string;
+    email: string;
+    at: string | null;
+  };
+}
+
+export type BillingPatch = Omit<Billing, 'suggested' | 'kind'> & { kind: BillingKind };
+
+export type UiTheme = 'system' | 'light' | 'dark';
+export type DateFormat = 'numeric' | 'long' | 'iso';
+
+export interface Preferences {
+  theme: UiTheme;
+  dateFormat: DateFormat;
+}
 
 export function useOrgProfile() {
   return useQuery({ queryKey: ['org'], queryFn: () => api.get<OrgProfile>('/org') });
@@ -87,4 +126,40 @@ export function useOrgMutations() {
       onSuccess: refresh,
     }),
   };
+}
+
+export function useBilling() {
+  return useQuery({ queryKey: ['org-billing'], queryFn: () => api.get<Billing>('/org/billing') });
+}
+
+export function useUpdateBilling() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (patch: BillingPatch) => api.patch<{ ok: true }>('/org/billing', patch),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['org-billing'] }),
+  });
+}
+
+export function useSetVerifyDomain() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (domain: string) => api.patch<{ ok: true }>('/org/verify-domain', { domain }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['org-public-profile'] }),
+  });
+}
+
+export function usePreferences() {
+  return useQuery({
+    queryKey: ['preferences'],
+    queryFn: () => api.get<Preferences>('/org/preferences'),
+  });
+}
+
+export function useUpdatePreferences() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (patch: Partial<Preferences>) =>
+      api.patch<Preferences>('/org/preferences', patch),
+    onSuccess: (prefs) => qc.setQueryData(['preferences'], prefs),
+  });
 }
