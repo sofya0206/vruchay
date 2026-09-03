@@ -13,6 +13,27 @@ export interface TeamMember {
   joinedAt: string;
 }
 
+/** Право и то, каким ролям оно доступно. Приходит с сервера — там же, где проверяется. */
+export interface Permission {
+  key: string;
+  title: string;
+  roles: Record<TeamRole, boolean>;
+}
+
+export interface RolesInfo {
+  roles: { role: TeamRole; title: string }[];
+  permissions: Permission[];
+}
+
+export function useRoles() {
+  return useQuery({
+    queryKey: ['team-roles'],
+    queryFn: () => api.get<RolesInfo>('/team/roles'),
+    // Таблица прав меняется вместе с кодом, а не в течение дня.
+    staleTime: 60 * 60 * 1000,
+  });
+}
+
 export function useTeam() {
   return useQuery({
     queryKey: ['team'],

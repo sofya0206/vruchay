@@ -60,6 +60,7 @@ export const settingsApi = {
   deleteDomain: (id: string) => api.delete<{ ok: true }>(`/mail/domains/${id}`),
   addSender: (domainId: string, email: string, displayName: string) =>
     api.post<Sender>('/mail/senders', { domainId, email, displayName }),
+  deleteSender: (id: string) => api.delete<{ ok: true }>(`/mail/senders/${id}`),
 
   integrations: () => api.get<Integration[]>('/integrations/tilda'),
   createIntegration: (body: unknown) => api.post<Integration>('/integrations/tilda', body),

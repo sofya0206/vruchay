@@ -13,6 +13,8 @@ import { uuidSchema } from '../documents/documents.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditActor } from '../audit/actor.decorator';
 import { AuditService, type Actor } from '../audit/audit.service';
+import { SessionService, clientMeta } from '../auth/session.service';
+import { ROLE_TITLE } from './role-permissions';
 import { TeamService } from './team.service';
 
 const uuidParam = new ZodValidationPipe(uuidSchema);
@@ -30,15 +32,6 @@ const inviteSchema = z.object({
 
 const roleSchema = z.object({ role: z.enum(['admin', 'member']) });
 
-/**
- * Названия ролей по-русски. Журнал читает не разработчик, а владелец
- * организации: «admin» ему ничего не говорит, «Управляющий» — говорит.
- */
-const ROLE_TITLE: Record<'owner' | 'admin' | 'member', string> = {
-  owner: 'Владелец',
-  admin: 'Управляющий',
-  member: 'Сотрудник',
-};
 
 /**
  * Сотрудники организации.
@@ -60,6 +53,7 @@ export class TeamController {
     private readonly team: TeamService,
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly sessions: SessionService,
   ) {}
 
   @Get()
@@ -67,13 +61,25 @@ export class TeamController {
     return this.team.list(user.orgId);
   }
 
-  /** Свой пароль меняет кто угодно — роль тут ни при чём. */
+  /** Что может каждая роль — одним списком, чтобы кабинет не пересказывал своими словами. */
+  @Get('roles')
+  roles() {
+    return this.team.roles();
+  }
+
+  /**
+   * Свой пароль меняет кто угодно — роль тут ни при чём. Остальные сессии
+   * при этом закрываются: пароль меняют, когда он утёк, и тот, кто его
+   * знал, не должен остаться внутри.
+   */
   @Post('password')
   async changePassword(
     @CurrentUser() user: SessionUser,
+    @Req() req: FastifyRequest,
     @Body(new ZodValidationPipe(changePasswordSchema)) dto: z.infer<typeof changePasswordSchema>,
   ) {
     await this.team.changePassword(user.userId, dto.current, dto.next);
+    await this.sessions.revokeOthers(user.userId, req.session.get('sid'));
     return { ok: true as const };
   }
 
@@ -183,7 +189,10 @@ const acceptSchema = z.object({
 @Controller('team-invite')
 @UseGuards(ThrottleGuard)
 export class TeamInviteController {
-  constructor(private readonly team: TeamService) {}
+  constructor(
+    private readonly team: TeamService,
+    private readonly sessions: SessionService,
+  ) {}
 
   @Post('accept')
   @Throttle({ max: 10, timeWindow: '15 minutes' })
@@ -194,8 +203,7 @@ export class TeamInviteController {
     const user = await this.team.acceptInvite(dto.token, dto.password);
     // Сразу входим: заставлять человека вводить только что придуманный
     // пароль ещё раз — бессмысленный шаг.
-    req.session.set('userId', user.userId);
-    req.session.set('orgId', user.orgId);
+    await this.sessions.open(req, user, clientMeta(req));
     return { email: user.email, name: user.name, role: user.role };
   }
 }
