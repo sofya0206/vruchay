@@ -15,6 +15,8 @@
  * участника, решает пользователь, а не мы.
  */
 
+import { suggestColumnName } from './column-names';
+
 /** Что предлагается исправить — пользователь подтверждает это явно. */
 export interface ImportSuggestion {
   kind: 'uppercase' | 'email-homoglyph';
@@ -116,12 +118,36 @@ export function isShouting(value: string): boolean {
   return value.includes(' ') || letters.length >= 6;
 }
 
-/** «ИВАНОВ ИВАН» → «Иванов Иван»; дефис и апостроф считаются границей слова. */
-export function toTitleCase(value: string): string {
+/**
+ * «ИВАНОВ ИВАН» → «Иванов Иван»; дефис и апостроф считаются границей слова.
+ *
+ * `keepAbbreviations` бережёт короткие слова целиком из заглавных: в графе
+ * «Организация» стоит «ИМ СО РАН», «МБУ ДО СШОР», «ГБОУ» — приведение
+ * превращало их в «Им Со Ран», то есть портило данные вместо чистки.
+ * В графе с ФИО его выключаем: там аббревиатур не бывает, а имя из четырёх
+ * букв («ИВАН», «АННА») — сплошь и рядом.
+ */
+export function toTitleCase(value: string, keepAbbreviations = false): string {
   return value.replace(/\p{L}+/gu, (word) => {
+    if (keepAbbreviations && isAbbreviation(word)) return word;
     const [first, ...rest] = [...word];
     return first.toLocaleUpperCase('ru') + rest.join('').toLocaleLowerCase('ru');
   });
+}
+
+/** Короткое слово целиком из заглавных: СО, РАН, СШОР, ГБОУ. */
+function isAbbreviation(word: string): boolean {
+  const letters = [...word];
+  return letters.length <= 4 && letters.every(isUpper);
+}
+
+/**
+ * Графа с именем человека — по заголовку, тем же разбором, что и импорт.
+ * От неё зависит, беречь ли аббревиатуры при чистке капслока.
+ */
+function isNameColumn(columnTitle: string): boolean {
+  const suggested = suggestColumnName(columnTitle);
+  return suggested === 'name' || suggested === 'surname' || suggested === 'firstname' || suggested === 'patronymic';
 }
 
 /**
@@ -180,8 +206,9 @@ export function sanitizeRows(rows: string[][], columnTitles: string[]): Sanitize
       break;
     }
 
+    const keepAbbreviations = !isNameColumn(columnTitle);
     const shouting = collect(cleaned, col, (value) =>
-      isShouting(value) ? toTitleCase(value) : null,
+      isShouting(value) ? toTitleCase(value, keepAbbreviations) : null,
     );
     if (shouting) suggestions.push({ kind: 'uppercase', column: col, columnTitle, ...shouting });
 

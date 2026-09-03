@@ -9,12 +9,21 @@
 
 /** Известные соответствия: проверяются по вхождению, порядок важен. */
 const KNOWN: [RegExp, string][] = [
-  [/^(фио|ф\.и\.о|фамилия имя отчество|участник|спортсмен|полное имя)/i, 'name'],
+  /*
+   * Английские написания рядом с русскими: судейские программы и
+   * международные соревнования выгружают шапку на латинице, и без них
+   * колонка «Name» не опознавалась как ФИО — участник уезжал в импорт
+   * безымянным.
+   */
+  [
+    /^(фио|ф\.и\.о|фамилия имя отчество|участник|спортсмен|полное имя|name|full ?name|participant|athlete)/i,
+    'name',
+  ],
   [/(e-?mail|почт|электрон)/i, 'email'],
   [/(телефон|моб|phone)/i, 'phone'],
-  [/(отчество)/i, 'patronymic'],
-  [/^(фамилия|surname)/i, 'surname'],
-  [/^(имя|first)/i, 'firstname'],
+  [/(отчество|patronymic|middle ?name)/i, 'patronymic'],
+  [/^(фамилия|surname|last ?name|family ?name)/i, 'surname'],
+  [/^(имя|first ?name|given ?name|first)/i, 'firstname'],
   [/(мест[оа]|place|rank)/i, 'place'],
   [/(результат|время|result)/i, 'result'],
   [/(разряд|категор|group|катег)/i, 'category'],
@@ -38,6 +47,11 @@ const CANONICAL: [string, string][] = [
   ['фио', 'name'],
   ['фамилияимяотчество', 'name'],
   ['полноеимя', 'name'],
+  ['name', 'name'],
+  ['fullname', 'name'],
+  ['participant', 'name'],
+  ['lastname', 'surname'],
+  ['firstname', 'firstname'],
   ['участник', 'name'],
   ['спортсмен', 'name'],
   ['электроннаяпочта', 'email'],

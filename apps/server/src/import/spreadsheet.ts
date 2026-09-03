@@ -3,6 +3,7 @@ import Papa from 'papaparse';
 import iconv from 'iconv-lite';
 import { suggestColumnName } from './column-names';
 import { cleanCell, sanitizeRows, type ImportSuggestion } from './sanitize';
+import { isJunkRow, junkRowsWarning } from './junk-rows';
 
 /**
  * Разбор файлов со списками участников.
@@ -72,12 +73,64 @@ export function decodeCsv(buffer: Buffer): string {
   return iconv.decode(buffer, 'win1251');
 }
 
+/**
+ * Чем разделены колонки.
+ *
+ * Считаем сами, а не отдаём автоопределению papaparse: оно смотрит, какой
+ * знак чаще, и на выгрузке из судейской программы ошибается. Там колонки
+ * разделены точкой с запятой, а внутри значений — запятые («Иванов И.И.,
+ * 2005 г.р.»), и запятых выходит больше. Файл рассыпается на лишние
+ * колонки, а вместе с ним и весь список.
+ *
+ * Правило: считаем знаки вне кавычек и берём тот, что даёт одинаковое
+ * число колонок в большинстве строк; при равенстве точка с запятой и
+ * табуляция важнее запятой — они разделителями и бывают, а запятая живёт
+ * ещё и внутри текста.
+ */
+export function detectDelimiter(text: string): string {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim()).slice(0, 20);
+  if (!lines.length) return ',';
+
+  let best = ',';
+  let bestScore = -1;
+  for (const candidate of [';', '\t', ',']) {
+    const counts = lines.map((line) => countOutsideQuotes(line, candidate));
+    if (counts.every((n) => n === 0)) continue;
+    // Ровные строки — признак настоящего разделителя: у чужого знака
+    // число вхождений скачет от строки к строке.
+    const first = counts[0];
+    const steady = counts.filter((n) => n === first).length / counts.length;
+    const score = steady * 100 + Math.min(first, 50);
+    if (score > bestScore) {
+      bestScore = score;
+      best = candidate;
+    }
+  }
+  return best;
+}
+
+/** Разделители внутри кавычек — часть значения, а не границы колонок. */
+function countOutsideQuotes(line: string, needle: string): number {
+  let count = 0;
+  let quoted = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      // Удвоенная кавычка внутри значения — это экранированная кавычка.
+      if (quoted && line[i + 1] === '"') i++;
+      else quoted = !quoted;
+      continue;
+    }
+    if (!quoted && ch === needle) count++;
+  }
+  return count;
+}
+
 export function parseCsv(buffer: Buffer): string[][] {
   const text = decodeCsv(buffer);
   const result = Papa.parse<string[]>(text, {
     skipEmptyLines: false,
-    // Разделитель определяется автоматически: встречаются и запятая, и точка с запятой.
-    delimiter: '',
+    delimiter: detectDelimiter(text),
   });
   return result.data.map((row) => row.map((cell) => String(cell ?? '').trim()));
 }
@@ -399,8 +452,10 @@ function collectRows(
   firstDataRow: number,
   lastDataRow: number,
   pick: (row: string[]) => string[],
-): { raw: string[][]; skippedEmptyRows: number } {
+  header: string[] = [],
+): { raw: string[][]; skippedEmptyRows: number; skippedJunkRows: number } {
   let skippedEmptyRows = 0;
+  let skippedJunkRows = 0;
   const raw: string[][] = [];
   for (let i = firstDataRow; i <= lastDataRow && raw.length < MAX_ROWS; i++) {
     const values = pick(grid[i] ?? []);
@@ -408,9 +463,14 @@ function collectRows(
       skippedEmptyRows++;
       continue;
     }
+    // Итоги, подписи и повтор шапки участниками не являются.
+    if (isJunkRow(values, header)) {
+      skippedJunkRows++;
+      continue;
+    }
     raw.push(values);
   }
-  return { raw, skippedEmptyRows };
+  return { raw, skippedEmptyRows, skippedJunkRows };
 }
 
 /** Номер последней колонки, где вообще что-то есть. */
@@ -500,8 +560,12 @@ export function buildSheet(name: string, grid: string[][], mode: HeaderMode = 'a
     return { source: c.value, suggested };
   });
 
-  const { raw, skippedEmptyRows } = collectRows(grid, firstDataRow, lastDataRow, (source) =>
-    keptColumns.map((c) => (source[c.index] ?? '').trim()),
+  const { raw, skippedEmptyRows, skippedJunkRows } = collectRows(
+    grid,
+    firstDataRow,
+    lastDataRow,
+    (source) => keptColumns.map((c) => (source[c.index] ?? '').trim()),
+    keptColumns.map((c) => c.value),
   );
 
   /*
@@ -539,6 +603,9 @@ export function buildSheet(name: string, grid: string[][], mode: HeaderMode = 'a
   }
   if (skippedEmptyRows > 0) {
     warnings.push(`Пропущено пустых строк: ${skippedEmptyRows}`);
+  }
+  if (skippedJunkRows > 0) {
+    warnings.push(junkRowsWarning(skippedJunkRows));
   }
   if (lastDataRow - firstDataRow + 1 > MAX_ROWS) {
     warnings.push(`Взяты первые ${MAX_ROWS} строк — остальные не поместились`);

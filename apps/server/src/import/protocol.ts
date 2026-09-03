@@ -1,6 +1,7 @@
 import { isNoPlace, parsePlace, parseStatus } from '@gramota/shared';
 import { parseWorkbook } from './spreadsheet';
 import { suggestColumnName } from './column-names';
+import { isJunkRow, junkRowsWarning } from './junk-rows';
 
 /**
  * Разбор протокола соревнований.
@@ -272,6 +273,7 @@ export function buildProtocol(sheetName: string, grid: string[][]): ParsedProtoc
   const groups: ProtocolGroup[] = [];
   let sectionGroup = '';
   let skippedEmptyRows = 0;
+  let skippedJunkRows = 0;
   let overflow = false;
 
   for (let i = dataStart; i < grid.length; i++) {
@@ -286,6 +288,16 @@ export function buildProtocol(sheetName: string, grid: string[][]): ParsedProtoc
     const title = looksLikeGroupTitle(values, nameIndex);
     if (title !== null) {
       sectionGroup = title;
+      continue;
+    }
+
+    /*
+     * Итоги, подписи судейской коллегии и повтор шапки на новой странице —
+     * не участники. Раньше они становились получателями и уезжали
+     * в награждение наравне с живыми людьми.
+     */
+    if (isJunkRow(values, header.map((h) => h.source))) {
+      skippedJunkRows++;
       continue;
     }
 
@@ -368,6 +380,7 @@ export function buildProtocol(sheetName: string, grid: string[][]): ParsedProtoc
     );
   }
   if (skippedEmptyRows > 0) warnings.push(`Пропущено пустых строк: ${skippedEmptyRows}`);
+  if (skippedJunkRows > 0) warnings.push(junkRowsWarning(skippedJunkRows));
   if (overflow) {
     warnings.push(
       `Взяты первые ${MAX_ROWS} строк — остальные не поместились и в награждение не попадут`,
