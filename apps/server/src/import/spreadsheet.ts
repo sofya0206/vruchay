@@ -3,6 +3,7 @@ import Papa from 'papaparse';
 import iconv from 'iconv-lite';
 import { suggestColumnName } from './column-names';
 import { cleanCell, sanitizeRows, type ImportSuggestion } from './sanitize';
+import { isJunkRow, junkRowsWarning } from './junk-rows';
 
 /**
  * Разбор файлов со списками участников.
@@ -451,8 +452,10 @@ function collectRows(
   firstDataRow: number,
   lastDataRow: number,
   pick: (row: string[]) => string[],
-): { raw: string[][]; skippedEmptyRows: number } {
+  header: string[] = [],
+): { raw: string[][]; skippedEmptyRows: number; skippedJunkRows: number } {
   let skippedEmptyRows = 0;
+  let skippedJunkRows = 0;
   const raw: string[][] = [];
   for (let i = firstDataRow; i <= lastDataRow && raw.length < MAX_ROWS; i++) {
     const values = pick(grid[i] ?? []);
@@ -460,9 +463,14 @@ function collectRows(
       skippedEmptyRows++;
       continue;
     }
+    // Итоги, подписи и повтор шапки участниками не являются.
+    if (isJunkRow(values, header)) {
+      skippedJunkRows++;
+      continue;
+    }
     raw.push(values);
   }
-  return { raw, skippedEmptyRows };
+  return { raw, skippedEmptyRows, skippedJunkRows };
 }
 
 /** Номер последней колонки, где вообще что-то есть. */
@@ -552,8 +560,12 @@ export function buildSheet(name: string, grid: string[][], mode: HeaderMode = 'a
     return { source: c.value, suggested };
   });
 
-  const { raw, skippedEmptyRows } = collectRows(grid, firstDataRow, lastDataRow, (source) =>
-    keptColumns.map((c) => (source[c.index] ?? '').trim()),
+  const { raw, skippedEmptyRows, skippedJunkRows } = collectRows(
+    grid,
+    firstDataRow,
+    lastDataRow,
+    (source) => keptColumns.map((c) => (source[c.index] ?? '').trim()),
+    keptColumns.map((c) => c.value),
   );
 
   /*
@@ -591,6 +603,9 @@ export function buildSheet(name: string, grid: string[][], mode: HeaderMode = 'a
   }
   if (skippedEmptyRows > 0) {
     warnings.push(`Пропущено пустых строк: ${skippedEmptyRows}`);
+  }
+  if (skippedJunkRows > 0) {
+    warnings.push(junkRowsWarning(skippedJunkRows));
   }
   if (lastDataRow - firstDataRow + 1 > MAX_ROWS) {
     warnings.push(`Взяты первые ${MAX_ROWS} строк — остальные не поместились`);
