@@ -56,7 +56,7 @@ interface Props {
   /** Материал целиком — для его собственных настроек, когда блок не выбран. */
   doc?: DocumentDetail;
   onSaveEvent?: (
-    values: Partial<EventValues> & { verifyEnabled?: boolean; verifyFields?: string[] },
+    values: Partial<Record<keyof EventValues, string | null>> & { verifyEnabled?: boolean; verifyFields?: string[] },
   ) => void;
   /** Что набрано в «О мероприятии» сейчас — чтобы холст обновлялся при вводе. */
   onEventDraft?: (values: EventValues) => void;

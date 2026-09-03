@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SYSTEM_VARIABLE_NAMES, mergeVariables, systemVariables } from './variables';
+import { SYSTEM_VARIABLE_NAMES, formatRegNumber, issuedAtOf, mergeVariables, systemVariables } from './variables';
 
 /*
  * Ошибка здесь печатается на бумаге и рассылается участникам. Пустое место
@@ -194,5 +194,35 @@ describe('ФИО, разложенное импортом по колонкам'
   it('колонка «name» по-прежнему сильнее разложенных', () => {
     const v = mergeVariables({ ...split, name: 'Иванов Пётр Ильич' }, { issuedAt: AUG_4 });
     expect(v.name_dat).toBe('Иванову Петру Ильичу');
+  });
+});
+
+describe('дата выдачи и номера', () => {
+  const issued = new Date('2026-08-04T09:00:00Z');
+
+  it('дата в трёх записях, всё по Москве', () => {
+    const vars = systemVariables({ issuedAt: issued });
+    expect(vars.date).toBe('04.08.2026');
+    expect(vars.date_long).toBe('4 августа 2026 г.');
+    expect(vars.date_iso).toBe('2026-08-04');
+    expect(vars.date_en).toBe('4 August 2026');
+    expect(vars.year).toBe('2026');
+  });
+
+  it('заданная дата выдачи сильнее дня выпуска и не сдвигается поясом', () => {
+    const at = issuedAtOf('2026-06-17', new Date('2026-09-03T21:30:00Z'));
+    expect(systemVariables({ issuedAt: at }).date).toBe('17.06.2026');
+    // Пусто или мусор — сегодняшний день.
+    expect(issuedAtOf(null, issued)).toBe(issued);
+    expect(issuedAtOf('вчера', issued)).toBe(issued);
+  });
+
+  it('номер по списку, всего в списке, регистрационный номер', () => {
+    const vars = systemVariables({ issuedAt: issued, number: 3, total: 120, regNumber: formatRegNumber(142, 2026) });
+    expect(vars.number).toBe('3');
+    expect(vars.total).toBe('120');
+    expect(vars.reg_number).toBe('142/2026');
+    // До выпуска номера нет — и подставлять нечего.
+    expect(systemVariables({ issuedAt: issued }).reg_number).toBe('');
   });
 });

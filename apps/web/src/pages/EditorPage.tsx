@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import type { Editor } from '@tiptap/core';
 import {
+  issuedAtOf,
   sheetLayout,
   type RichDoc,
   type SheetElement,
@@ -382,9 +383,11 @@ export function EditorPage() {
           place: eventDraft?.eventPlace ?? doc.data?.eventPlace,
           hours: eventDraft?.eventHours ?? doc.data?.eventHours,
         },
-        issuedAt: new Date(),
+        issuedAt: issuedAtOf(eventDraft?.issueDate || doc.data?.issueDate),
+        number: safeRow + 1,
+        total: rowCount,
       }),
-    [rows, safeRow, org.data, doc.data, eventDraft],
+    [rows, safeRow, rowCount, org.data, doc.data, eventDraft],
   );
 
   const matches = useMemo(() => proposeMatches(layout, columns), [layout, columns]);

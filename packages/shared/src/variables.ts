@@ -22,9 +22,19 @@ export interface SystemVariable {
 }
 
 export const SYSTEM_VARIABLES: SystemVariable[] = [
-  { name: 'date', title: 'Дата выпуска', hint: '04.08.2026' },
-  { name: 'year', title: 'Год выпуска', hint: '2026' },
+  { name: 'date', title: 'Дата выдачи', hint: '04.08.2026' },
+  /*
+   * Та же дата в других записях — отдельными полями, а не настройкой
+   * формата у поля: так же устроены падежи имени, и человек выбирает
+   * запись глазами из списка, а не из выпадающего меню внутри фишки.
+   */
+  { name: 'date_long', title: 'Дата выдачи словами', hint: '4 августа 2026 г.' },
+  { name: 'date_iso', title: 'Дата выдачи цифрами (ISO)', hint: '2026-08-04' },
+  { name: 'date_en', title: 'Дата выдачи по-английски', hint: '4 August 2026' },
+  { name: 'year', title: 'Год выдачи', hint: '2026' },
   { name: 'number', title: 'Номер по списку', hint: '1, 2, 3…' },
+  { name: 'total', title: 'Всего в списке', hint: 'для «3 из 120»' },
+  { name: 'reg_number', title: 'Регистрационный номер', hint: '142/2026 — сквозной за год' },
   { name: 'code', title: 'Проверочный код', hint: 'для сверки с QR' },
   { name: 'org', title: 'Название организации', hint: 'из настроек кабинета' },
 
@@ -96,8 +106,12 @@ export interface SystemVariableContext {
   issuedAt: Date;
   /** Порядковый номер строки в таблице, считая с единицы. */
   number?: number;
+  /** Сколько всего строк в списке — для «3 из 120». */
+  total?: number;
   /** Публичный идентификатор экземпляра — он же в QR. */
   publicId?: string | null;
+  /** Регистрационный номер экземпляра: «142/2026». До выпуска его нет. */
+  regNumber?: string | null;
   /** Название организации-издателя. */
   orgName?: string;
   /** Мероприятие: одно на весь документ, заполняется в свойствах материала. */
@@ -137,8 +151,13 @@ export function systemVariables(ctx: SystemVariableContext): Record<string, stri
 
   return {
     date,
+    date_long: `${new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Moscow' }).format(ctx.issuedAt)}`,
+    date_iso: new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Moscow' }).format(ctx.issuedAt),
+    date_en: new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Moscow' }).format(ctx.issuedAt),
     year: date.slice(-4),
     number: ctx.number === undefined ? '' : String(ctx.number),
+    total: ctx.total === undefined ? '' : String(ctx.total),
+    reg_number: ctx.regNumber ?? '',
     code: ctx.publicId ?? '',
     org: ctx.orgName ?? '',
     event: ctx.event?.name ?? '',
@@ -232,4 +251,23 @@ function hoursWord(hours: string): string {
   const source = hours.trim();
   if (!/^\d{1,6}$/.test(source)) return source;
   return numberInWordsWith(Number(source), 'час', 'часа', 'часов');
+}
+
+/**
+ * Момент выдачи для подстановки: дата выдачи материала, если задана,
+ * иначе — сейчас.
+ *
+ * Дата хранится днём без времени; берём полдень по Москве, чтобы
+ * ни один часовой пояс не сдвинул её на соседние сутки при форматировании.
+ */
+export function issuedAtOf(issueDate: string | Date | null | undefined, now: Date = new Date()): Date {
+  if (!issueDate) return now;
+  const day = issueDate instanceof Date ? issueDate.toISOString().slice(0, 10) : issueDate.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return now;
+  return new Date(`${day}T12:00:00+03:00`);
+}
+
+/** Регистрационный номер из счётчика: «142/2026». */
+export function formatRegNumber(value: number, year: number): string {
+  return `${value}/${year}`;
 }

@@ -201,6 +201,8 @@ export class World {
 
   private nextFile = 1;
   private createAttempts = 0;
+  /** Счётчик регистрационных номеров — как таблица issue_counters, но в памяти. */
+  regCounter = 0;
 
   constructor(private readonly options: WorldOptions = {}) {
     this.plan = options.plan ?? 'free';
@@ -394,6 +396,8 @@ export class World {
 
     return {
       generationJob: jobs,
+      // Единственный сырой запрос воркера — выделение регистрационного номера.
+      $queryRaw: async () => [{ value: ++this.regCounter }],
       document: {
         findFirst: async ({ where }: { where: Where }) => {
           const doc = this.documents.find((d) => matches(d as never, where));

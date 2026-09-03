@@ -24,17 +24,23 @@ export function canvasPreviewData(input: {
   orgName?: string;
   event?: EventFields;
   issuedAt: Date;
+  /** Сколько строк в списке — для «3 из 120». */
+  total?: number;
+  /** Номер строки, которую показываем, считая с единицы. */
+  number?: number;
 }): Record<string, string> {
   const row = input.row && Object.keys(input.row).length > 0 ? input.row : SAMPLE_RECIPIENT;
 
   const merged = mergeVariables(row, {
     issuedAt: input.issuedAt,
-    // Первый в списке: номер на холсте должен быть настоящим числом,
-    // иначе не видно, влезает ли он в отведённый блок.
-    number: 1,
-    // Проверочный код выделяется в момент выпуска — до него его нет,
-    // и на холсте вместо него остаётся «%code».
+    // Номер на холсте должен быть настоящим числом, иначе не видно,
+    // влезает ли он в отведённый блок.
+    number: input.number ?? 1,
+    total: input.total,
+    // Проверочный код и регистрационный номер выделяются в момент выпуска —
+    // до него их нет; номер показываем образцом той длины, что будет.
     publicId: null,
+    regNumber: '1/' + new Date().getFullYear(),
     orgName: input.orgName,
     event: input.event,
   });

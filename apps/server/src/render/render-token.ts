@@ -21,6 +21,8 @@ export interface RenderTokenPayload {
    * и передаёт сюда, а потом записывает в тот же файл.
    */
   publicId?: string;
+  /** Регистрационный номер экземпляра, выделенный до печати, — как и publicId. */
+  regNumber?: string;
   /** Unix-время истечения, в секундах. */
   exp: number;
 }
