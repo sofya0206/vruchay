@@ -62,7 +62,16 @@ const SUBSCRIPTION = [
 
 type Mode = 'subscription' | 'payg';
 
-export function Pricing() {
+interface Props {
+  /**
+   * Куда ведёт «Запросить счёт». На главной это блок для организаций,
+   * на странице тарифов — форма запроса внизу той же страницы: якорь,
+   * которого нет на текущей странице, ведёт в никуда.
+   */
+  contactHref?: string;
+}
+
+export function Pricing({ contactHref = '#federatsiyam' }: Props) {
   const [mode, setMode] = useState<Mode>('subscription');
 
   return (
@@ -75,7 +84,7 @@ export function Pricing() {
 
       <Switcher mode={mode} onChange={setMode} />
 
-      {mode === 'subscription' ? <Subscription /> : <PayAsYouGo />}
+      {mode === 'subscription' ? <Subscription contactHref={contactHref} /> : <PayAsYouGo />}
     </section>
   );
 }
@@ -113,7 +122,7 @@ function Switcher({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => void 
   );
 }
 
-function Subscription() {
+function Subscription({ contactHref }: { contactHref: string }) {
   return (
     <>
       <div className="mt-8 grid gap-5 lg:grid-cols-3">
@@ -146,7 +155,7 @@ function Subscription() {
                 </li>
               ))}
             </ul>
-            <a href="#federatsiyam" className="mt-6">
+            <a href={contactHref} className="mt-6">
               <Button variant={t.highlight ? 'primary' : 'secondary'} className="w-full">
                 Запросить счёт
               </Button>
@@ -163,7 +172,7 @@ function Subscription() {
             хранилище, обучение сотрудников.
           </p>
         </div>
-        <a href="#federatsiyam">
+        <a href={contactHref}>
           <Button variant="secondary">Обсудить</Button>
         </a>
       </div>
