@@ -1,0 +1,179 @@
+# Вручай — API массового выпуска именных документов
+
+> Сервис принимает таблицу участников и макет листа, а возвращает готовые
+> документы: по одному PDF или JPEG на человека, с подстановкой имени,
+> склонением по падежам, номером и ссылкой на проверку подлинности.
+> Всё, что делает кабинет, доступно по токену API — кроме управления людьми.
+
+Базовый адрес API: https://vruchay.ru/api. Аутентификация: заголовок Authorization: Bearer vru_… .
+Полная выжимка одним файлом: https://vruchay.ru/llms-full.txt
+
+## Начало работы
+
+- [API сервиса «Вручай»](https://vruchay.ru/docs/README): «Вручай» выпускает именные документы: сертификаты, грамоты, дипломы и благодарности.
+- [Аутентификация](https://vruchay.ru/docs/authentication): API опознаёт вызывающего по заголовку
+- [Ограничения частоты](https://vruchay.ru/docs/rate-limits): Лимит стоит не на всём API, а точечно — на маршрутах, где он действительно нужен: вход,
+- [Ошибки](https://vruchay.ru/docs/errors): Ошибка — это всегда JSON.
+- [AGENTS.md — «Вручай» для ИИ-помощника](https://vruchay.ru/docs/AGENTS): Этот файл написан для программы, которая будет работать с API вместо человека.
+
+## Эндпоинты: audit
+
+- [GET /api/audit — Журнал действий](https://vruchay.ru/docs/endpoints/audit/get-audit): Журнал действий организации, новые сверху, страницами.
+
+## Эндпоинты: auth
+
+- [GET /api/auth/me — Кто я](https://vruchay.ru/docs/endpoints/auth/get-auth-me): Возвращает, от чьего имени выполняются запросы: имя, роль в организации и признак, что это организация самого сервиса.
+
+## Эндпоинты: awards
+
+- [DELETE /api/award-rules/{id} — Удалить набор правил](https://vruchay.ru/docs/endpoints/awards/delete-award-rules-id): Убирает набор из списка.
+- [GET /api/award-rules/{id} — Набор правил целиком](https://vruchay.ru/docs/endpoints/awards/get-award-rules-id): Набор правил со всеми правилами, условиями и выходами — то, что показывает конструктор и применяет движок раскладки.
+- [GET /api/award-rules/templates — Документы, годные в шаблоны правил](https://vruchay.ru/docs/endpoints/awards/get-award-rules-templates): Список документов организации, из которых выбирают шаблон для выхода правила (outputs[].templateDocumentId).
+- [GET /api/award-rules — Список наборов правил награждения](https://vruchay.ru/docs/endpoints/awards/get-award-rules): Наборы правил награждения организации.
+- [PATCH /api/award-rules/{id} — Изменить набор правил](https://vruchay.ru/docs/endpoints/awards/patch-award-rules-id): Меняет набор правил.
+- [POST /api/award-rules/{id}/duplicate — Скопировать набор правил](https://vruchay.ru/docs/endpoints/awards/post-award-rules-id-duplicate): Делает копию набора — «взять как на прошлом соревновании и поправить».
+- [POST /api/award-rules — Создать набор правил награждения](https://vruchay.ru/docs/endpoints/awards/post-award-rules): Заводит набор правил награждения у организации.
+- [POST /api/documents/{id}/awards/preview — Раскладка награждения — что выйдет, если выпустить сейчас](https://vruchay.ru/docs/endpoints/awards/post-documents-id-awards-preview): Прогоняет правила по таблице получателей документа и возвращает раскладку: кому какой шаблон полагается, сколько документов выйдет после дедупликации и какие строки остались без документа и почему.
+- [POST /api/documents/{id}/awards/rule-set — Привязать набор правил к соревнованию](https://vruchay.ru/docs/endpoints/awards/post-documents-id-awards-rule-set): Выбирает, по какому набору правил награждается это соревнование.
+- [POST /api/documents/{id}/awards/suggest — Заготовка правил по колонкам таблицы](https://vruchay.ru/docs/endpoints/awards/post-documents-id-awards-suggest): Собирает черновик набора правил по колонкам уже загруженной таблицы получателей.
+
+## Эндпоинты: documents
+
+- [DELETE /api/documents/{id}/purge — Удалить документ из корзины навсегда](https://vruchay.ru/docs/endpoints/documents/delete-documents-id-purge): Окончательное удаление документа, который уже лежит в корзине.
+- [DELETE /api/documents/{id}/sheets/{sheetId} — Удалить лист](https://vruchay.ru/docs/endpoints/documents/delete-documents-id-sheets-sheetId): Удаляет лист документа и перенумеровывает оставшиеся (position без дыр).
+- [DELETE /api/documents/{id} — Отправить документ в корзину](https://vruchay.ru/docs/endpoints/documents/delete-documents-id): Мягкое удаление: документ помечается deletedAt и пропадает из списка, но остаётся
+- [GET /api/documents/files/{fileId}/url — Подписанная ссылка на файл](https://vruchay.ru/docs/endpoints/documents/get-documents-files-fileId-url): Возвращает временную подписанную ссылку на файл организации в хранилище — в первую
+- [GET /api/documents/{id}/registry.csv — Реестр выданных документов в CSV](https://vruchay.ru/docs/endpoints/documents/get-documents-id-registry-csv): Тот же реестр, что GET /api/documents/{id}/registry, но таблицей под русский Excel
+- [GET /api/documents/{id}/registry — Реестр выданных документов](https://vruchay.ru/docs/endpoints/documents/get-documents-id-registry): Реестр выдач по документу: по одной строке на каждого получателя, у которого есть
+- [GET /api/documents/{id} — Карточка документа](https://vruchay.ru/docs/endpoints/documents/get-documents-id): Документ целиком с листами (и их макетами) в порядке position.
+- [GET /api/documents — Список документов организации](https://vruchay.ru/docs/endpoints/documents/get-documents): Библиотека материалов организации: страница списка с итоговым числом.
+- [PATCH /api/documents/{id}/sheets/{sheetId} — Сохранить макет листа](https://vruchay.ru/docs/endpoints/documents/patch-documents-id-sheets-sheetId): Заменяет макет листа целиком: в layout передаётся весь массив элементов, а не
+- [PATCH /api/documents/{id} — Изменить свойства документа](https://vruchay.ru/docs/endpoints/documents/patch-documents-id): Частичное обновление карточки: название, размер листа, настройки проверки подлинности,
+- [POST /api/documents/{id}/duplicate — Копия документа под новое мероприятие](https://vruchay.ru/docs/endpoints/documents/post-documents-id-duplicate): Создаёт новый документ на основе существующего: копируются размер листа, настройки
+- [POST /api/documents/{id}/registry/{fileId}/revoke — Отозвать или вернуть проверку экземпляра](https://vruchay.ru/docs/endpoints/documents/post-documents-id-registry-fileId-revoke): Отзывает проверку подлинности конкретного выданного файла (revoked: true) или
+- [POST /api/documents/{id}/restore — Вернуть документ из корзины](https://vruchay.ru/docs/endpoints/documents/post-documents-id-restore): Снимает пометку удаления с документа в корзине.
+- [POST /api/documents/{id}/sheets/{sheetId}/background — Загрузить фон листа](https://vruchay.ru/docs/endpoints/documents/post-documents-id-sheets-sheetId-background): Загружает картинку фона листа (бланк) и ставит её листу в backgroundFileId.
+- [POST /api/documents/{id}/sheets — Добавить лист](https://vruchay.ru/docs/endpoints/documents/post-documents-id-sheets): Добавляет в конец документа пустой лист (layout: [], schemaVersion: 2).
+- [POST /api/documents — Создать документ](https://vruchay.ru/docs/endpoints/documents/post-documents): Создаёт материал сразу с одним листом и колонками таблицы получателей.
+
+## Эндпоинты: generation
+
+- [GET /api/documents/{id}/jobs — Выпуски по материалу](https://vruchay.ru/docs/endpoints/generation/get-documents-id-jobs): Последние выпуски по материалу — новые первыми.
+- [GET /api/jobs/{jobId}/archive — Скачать готовые документы](https://vruchay.ru/docs/endpoints/generation/get-jobs-jobId-archive): Отдаёт готовый пакет файлом: ZIP со всеми документами задания или один PDF
+- [GET /api/jobs/{jobId}/download-options — Что можно скачать по заданию](https://vruchay.ru/docs/endpoints/generation/get-jobs-jobId-download-options): Что сейчас можно сделать с готовым пакетом: сколько в нём файлов, сколько они
+- [GET /api/jobs/{jobId}/failures — Кого выпуск не осилил](https://vruchay.ru/docs/endpoints/generation/get-jobs-jobId-failures): Поимённый разбор неудач задания: по каким строкам документ не создался и
+- [GET /api/jobs/{jobId} — Состояние выпуска](https://vruchay.ru/docs/endpoints/generation/get-jobs-jobId): Текущее состояние задания.
+- [POST /api/documents/{id}/generate — Запустить выпуск документов](https://vruchay.ru/docs/endpoints/generation/post-documents-id-generate): Заводит задание на выпуск и ставит его в очередь.
+- [POST /api/jobs/{jobId}/cancel — Отменить выпуск](https://vruchay.ru/docs/endpoints/generation/post-jobs-jobId-cancel): Отменяет остаток начатого выпуска.
+- [POST /api/jobs/{jobId}/resume — Продолжить прерванный выпуск](https://vruchay.ru/docs/endpoints/generation/post-jobs-jobId-resume): Доделывает то же самое задание с того места, где оно встало.
+
+## Эндпоинты: integrations
+
+- [DELETE /api/integrations/tilda/{id} — Удалить интеграцию с формой](https://vruchay.ru/docs/endpoints/integrations/delete-integrations-tilda-id): Удаляет интеграцию насовсем.
+- [GET /api/integrations/tilda/{id} — Настройки одной интеграции](https://vruchay.ru/docs/endpoints/integrations/get-integrations-tilda-id): Одна интеграция организации целиком.
+- [GET /api/integrations/tilda/requests — Заявки с форм на сайте](https://vruchay.ru/docs/endpoints/integrations/get-integrations-tilda-requests): Последние 200 заявок организации, новые первыми, — журнал выдачи документов посторонним людям через формы на сайте.
+- [GET /api/integrations/tilda — Интеграции с формами на сайте](https://vruchay.ru/docs/endpoints/integrations/get-integrations-tilda): Все интеграции организации, новые первыми, вместе со счётчиком принятых заявок.
+- [PATCH /api/integrations/tilda/{id} — Изменить интеграцию с формой](https://vruchay.ru/docs/endpoints/integrations/patch-integrations-tilda-id): Меняет настройки интеграции.
+- [POST /api/integrations/tilda — Создать интеграцию с формой](https://vruchay.ru/docs/endpoints/integrations/post-integrations-tilda): Заводит интеграцию: форма на указанных доменах сможет запрашивать документы из указанного списка материалов.
+
+## Эндпоинты: mail
+
+- [DELETE /api/mail/domains/{id} — Удалить почтовый домен](https://vruchay.ru/docs/endpoints/mail/delete-mail-domains-id): Удаляет домен вместе со всеми отправителями на нём (каскадно).
+- [GET /api/mail/domains — Список почтовых доменов организации](https://vruchay.ru/docs/endpoints/mail/get-mail-domains): Возвращает все домены, которые организация заявила для отправки писем от своего имени, вместе с отправителями на каждом из них.
+- [GET /api/mail/emails — Письма организации](https://vruchay.ru/docs/endpoints/mail/get-mail-emails): Последние 200 писем организации, новые первыми, — сырые записи журнала без перевода причин отказа.
+- [GET /api/mail/templates/{documentId} — Письмо о выдаче документа для материала](https://vruchay.ru/docs/endpoints/mail/get-mail-templates-documentId): Возвращает транзакционный шаблон письма (поток transactional — «выдача документа») для материала, вместе с выбранным отправителем.
+- [POST /api/mail/domains/{id}/check — Проверить DNS-записи домена](https://vruchay.ru/docs/endpoints/mail/post-mail-domains-id-check): Запрашивает DNS домена и сверяет записи из dnsRecords с тем, что реально опубликовано.
+- [POST /api/mail/domains — Добавить почтовый домен](https://vruchay.ru/docs/endpoints/mail/post-mail-domains): Заявляет домен организации для отправки писем от его имени.
+- [POST /api/mail/send/{documentId} — Разослать документ отмеченным получателям](https://vruchay.ru/docs/endpoints/mail/post-mail-send-documentId): Ставит в очередь письма о выдаче документа всем отмеченным (checked) строкам таблицы получателей материала.
+- [POST /api/mail/senders — Добавить отправителя на подтверждённом домене](https://vruchay.ru/docs/endpoints/mail/post-mail-senders): Создаёт отправителя — адрес и отображаемое имя, от которых уходят письма.
+- [POST /api/mail/templates/{documentId} — Сохранить письмо о выдаче документа](https://vruchay.ru/docs/endpoints/mail/post-mail-templates-documentId): Создаёт или обновляет транзакционный шаблон письма для материала — у материала он один, повторный вызов перезаписывает его.
+
+## Эндпоинты: mailing
+
+- [GET /api/mailing/log — Журнал доставки писем](https://vruchay.ru/docs/endpoints/mailing/get-mailing-log): Последние 200 писем организации, новые первыми, с переведённой на человеческий язык причиной недоставки и сводкой по состояниям.
+- [GET /api/mailing/templates/{documentId} — Шаблон письма выбранного потока](https://vruchay.ru/docs/endpoints/mailing/get-mailing-templates-documentId): Возвращает шаблон письма для материала в указанном потоке — вместе с отправителем.
+- [POST /api/mailing/audience — Проверить, кому уйдёт рассылка](https://vruchay.ru/docs/endpoints/mailing/post-mailing-audience): Показывает до отправки, кому письмо уйдёт и кому не уйдёт, — тем же расчётом, что и POST /api/mailing/send.
+- [POST /api/mailing/resend — Повторить недоставленные письма](https://vruchay.ru/docs/endpoints/mailing/post-mailing-resend): Ставит новые письма вместо недоставленных по одному материалу: берутся все письма в состояниях bounced и failed, по каждому адресу — последняя попытка.
+- [POST /api/mailing/send — Разослать письма по материалам](https://vruchay.ru/docs/endpoints/mailing/post-mailing-send): Ставит письма в очередь по каждому из выбранных материалов — до двадцати за вызов, по письму на материал каждому получателю.
+- [POST /api/mailing/templates/{documentId} — Сохранить письмо рассылки](https://vruchay.ru/docs/endpoints/mailing/post-mailing-templates-documentId): Создаёт или обновляет шаблон письма для материала в указанном потоке.
+- [POST /api/mailing/test — Отправить проверочное письмо себе](https://vruchay.ru/docs/endpoints/mailing/post-mailing-test): Отправляет письмо по сохранённому шаблону на адрес того, кто вошёл, — чтобы посмотреть на него своими глазами.
+
+## Эндпоинты: org
+
+- [GET /api/org/public-profile — Публичный профиль организации](https://vruchay.ru/docs/endpoints/org/get-org-public-profile): Что организация показывает о себе снаружи: на публичной странице /org/<slug> и на странице проверки документа.
+- [GET /api/org/usage — Остаток бесплатной пробы](https://vruchay.ru/docs/endpoints/org/get-org-usage): Сколько документов организация уже выпустила и сколько ещё может выпустить на бесплатной пробе.
+- [GET /api/org — Организация и свой профиль](https://vruchay.ru/docs/endpoints/org/get-org): Название организации, её тариф и данные текущего сотрудника.
+- [PATCH /api/org/me — Изменить своё имя](https://vruchay.ru/docs/endpoints/org/patch-org-me): Меняет имя текущего сотрудника — то, что отвечает GET /api/org в userName и GET /api/auth/me в name.
+- [PATCH /api/org/public-profile — Изменить публичный профиль](https://vruchay.ru/docs/endpoints/org/patch-org-public-profile): Правит публичное лицо организации.
+- [PATCH /api/org — Переименовать организацию](https://vruchay.ru/docs/endpoints/org/patch-org): Меняет название организации.
+- [POST /api/org/public-profile/logo — Загрузить логотип](https://vruchay.ru/docs/endpoints/org/post-org-public-profile-logo): Загружает логотип для публичной страницы организации.
+
+## Эндпоинты: overview
+
+- [GET /api/overview — Сводка по организации](https://vruchay.ru/docs/endpoints/overview/get-overview): Сводка для рабочего стола кабинета одним запросом: остаток пробы, счётчики выпуска и рассылки, пять последних материалов и пять последних заданий выпуска.
+
+## Эндпоинты: public
+
+- [GET /api/referral-offer — Что обещано по коду приглашения](https://vruchay.ru/docs/endpoints/public/get-referral-offer): Что получит тот, кто регистрируется по коду приглашения.
+- [GET /api/v1/public/org/{slug}/search — Поиск документа в публичном реестре организации](https://vruchay.ru/docs/endpoints/public/get-v1-public-org-slug-search): Поиск в публичном реестре эмитента — без входа.
+- [GET /api/v1/public/org/{slug} — Публичная страница организации](https://vruchay.ru/docs/endpoints/public/get-v1-public-org-slug): Публичная страница эмитента: кто это, чем подтверждена его личность и что он
+- [GET /api/v1/reviews — Опубликованные отзывы](https://vruchay.ru/docs/endpoints/public/get-v1-reviews): Отзывы заказчиков для посадочной страницы сервиса.
+- [GET /api/v1/verify/{id} — Проверка подлинности документа](https://vruchay.ru/docs/endpoints/public/get-v1-verify-id): Страница проверки выданного документа.
+
+## Эндпоинты: recipients
+
+- [DELETE /api/documents/{id}/recipients/columns/{columnId} — Удалить колонку](https://vruchay.ru/docs/endpoints/recipients/delete-documents-id-recipients-columns-columnId): Удаляет колонку и пересчитывает position у оставшихся, чтобы нумерация шла подряд.
+- [DELETE /api/documents/{id}/recipients/rows/{rowId} — Удалить строку](https://vruchay.ru/docs/endpoints/recipients/delete-documents-id-recipients-rows-rowId): Удаляет строку из таблицы получателей.
+- [GET /api/documents/{id}/recipients — Получить таблицу получателей](https://vruchay.ru/docs/endpoints/recipients/get-documents-id-recipients): Возвращает таблицу получателей документа целиком: колонки по порядку, строки по порядку (не больше 10 000) и число отмеченных строк.
+- [PATCH /api/documents/{id}/recipients/columns/{columnId} — Переименовать колонку](https://vruchay.ru/docs/endpoints/recipients/patch-documents-id-recipients-columns-columnId): Переименовывает колонку и одной транзакцией переносит значения во всех строках под новый ключ (значения хранятся по имени, а не по идентификатору колонки), а также переписывает макеты листов документа: поля, ссылавшиеся на прежнее имя, начинают ссылаться на новое.
+- [PATCH /api/documents/{id}/recipients/rows/{rowId} — Изменить строку](https://vruchay.ru/docs/endpoints/recipients/patch-documents-id-recipients-rows-rowId): Правит одну строку: значения ячеек и/или отметку к выпуску.
+- [POST /api/documents/{id}/recipients/checked — Отметить строки к выпуску](https://vruchay.ru/docs/endpoints/recipients/post-documents-id-recipients-checked): Ставит или снимает отметку к выпуску сразу у многих строк.
+- [POST /api/documents/{id}/recipients/columns — Добавить колонку](https://vruchay.ru/docs/endpoints/recipients/post-documents-id-recipients-columns): Добавляет колонку в конец таблицы получателей.
+- [POST /api/documents/{id}/recipients/import — Импортировать таблицу получателей](https://vruchay.ru/docs/endpoints/recipients/post-documents-id-recipients-import): Записывает таблицу получателей в документ: заводит недостающие колонки и добавляет строки.
+- [POST /api/documents/{id}/recipients/parse — Разобрать файл со списком получателей](https://vruchay.ru/docs/endpoints/recipients/post-documents-id-recipients-parse): Читает загруженный файл (Excel .xlsx или CSV) и возвращает, что в нём распознано: имя листа, строку с шапкой, колонки с подобранными латинскими именами переменных и сами строки.
+- [POST /api/documents/{id}/recipients/rows — Добавить строку](https://vruchay.ru/docs/endpoints/recipients/post-documents-id-recipients-rows): Добавляет одну строку в конец таблицы получателей.
+
+## Эндпоинты: referral
+
+- [GET /api/referral — Приглашение друга](https://vruchay.ru/docs/endpoints/referral/get-referral): Всё, что показывает раздел «Пригласить друга»: код приглашения организации,
+
+## Эндпоинты: registry
+
+- [GET /api/registry/analytics — Сводка по выданным документам](https://vruchay.ru/docs/endpoints/registry/get-registry-analytics): Цифры под таблицей реестра: сколько выдано, отозвано, заменено, истекло,
+- [GET /api/registry/archive — Скачать документы архивом](https://vruchay.ru/docs/endpoints/registry/get-registry-archive): Скачать пачку выданных документов одним ZIP-архивом: либо отмеченные по
+- [GET /api/registry/export.csv — Выгрузить реестр в CSV](https://vruchay.ru/docs/endpoints/registry/get-registry-export-csv): Тот же реестр таблицей для Excel — по тому же отбору, что и
+- [GET /api/registry/facets — Значения для фильтров реестра](https://vruchay.ru/docs/endpoints/registry/get-registry-facets): Что подставлять в отбор реестра: материалы и мероприятия, по которым
+- [GET /api/registry/files/{fileId}/download — Скачать один документ](https://vruchay.ru/docs/endpoints/registry/get-registry-files-fileId-download): Отдать файл одного выданного документа — посмотреть или переслать вручную.
+- [GET /api/registry/files/{fileId} — Карточка выданного документа](https://vruchay.ru/docs/endpoints/registry/get-registry-files-fileId): Что с документом было и что с ним стало: строка реестра, письма с ним и
+- [GET /api/registry — Реестр выданных документов](https://vruchay.ru/docs/endpoints/registry/get-registry): Страница реестра выданного по всей организации: каждый выпущенный документ
+- [POST /api/registry/reissue — Перевыпустить документы](https://vruchay.ru/docs/endpoints/registry/post-registry-reissue): Выдать новый документ вместо выбранного — по текущим данным той же строки
+- [POST /api/registry/resend — Переотправить письма с документами](https://vruchay.ru/docs/endpoints/registry/post-registry-resend): Ещё раз отправить письмо с уже выпущенным документом — на адрес из текущей
+- [POST /api/registry/revoke/preview — Предпросмотр отзыва](https://vruchay.ru/docs/endpoints/registry/post-registry-revoke-preview): Что будет отозвано, до того как это станет необратимым: число документов по
+- [POST /api/registry/revoke — Отозвать или вернуть проверку документов](https://vruchay.ru/docs/endpoints/registry/post-registry-revoke): Отозвать проверку у пачки документов или вернуть её.
+
+## Эндпоинты: reviews
+
+- [DELETE /api/reviews/{id} — Убрать свой отзыв](https://vruchay.ru/docs/endpoints/reviews/delete-reviews-id): Убрать отзыв своей организации.
+- [GET /api/reviews/mine — Отзыв своей организации](https://vruchay.ru/docs/endpoints/reviews/get-reviews-mine): Отзыв, который оставила ваша организация: текст, состояние проверки и замечание
+- [PATCH /api/reviews/mine — Оставить или переписать отзыв](https://vruchay.ru/docs/endpoints/reviews/patch-reviews-mine): Оставить отзыв о сервисе или переписать уже оставленный.
+
+## Эндпоинты: tokens
+
+- [DELETE /api/tokens/{id} — Отозвать токен API](https://vruchay.ru/docs/endpoints/tokens/delete-tokens-id): Отзывает токен: с этого момента запросы с ним получают 401.
+- [GET /api/tokens — Список действующих токенов API](https://vruchay.ru/docs/endpoints/tokens/get-tokens): Список действующих (не отозванных) токенов API организации, новые сверху.
+- [POST /api/tokens — Выдать токен API](https://vruchay.ru/docs/endpoints/tokens/post-tokens): Выдаёт новый токен API организации.
+
+## Эндпоинты: validation
+
+- [POST /api/documents/{id}/validation/exclude — Снять отметку с проблемных строк](https://vruchay.ru/docs/endpoints/validation/post-documents-id-validation-exclude): Снимает отметку к выпуску (checked: false) с перечисленных строк — «выпустить только чистые».
+- [POST /api/documents/{id}/validation/fix — Исправить ячейки по результатам проверки](https://vruchay.ru/docs/endpoints/validation/post-documents-id-validation-fix): Записывает новые значения в отдельные ячейки — по одной или сразу во многих строках (например, «ФИО прописными» во всех трёхстах строках протокола).
+- [POST /api/documents/{id}/validation — Проверить список получателей перед выпуском](https://vruchay.ru/docs/endpoints/validation/post-documents-id-validation): Проверяет строки таблицы получателей против макетов документа и возвращает отчёт: сколько строк чистых, сколько выпускать нельзя, поимённый список строк с проблемами и остаток квоты.
+
+## Справочники
+
+- [Набор правил награждения](https://vruchay.ru/docs/reference/award-rules): Контракт живёт в packages/shared/src/awards/rules.ts (схемы awardRuleSet, awardRule,
+- [Задание на выпуск](https://vruchay.ru/docs/reference/generation-job): Форма записи о выпуске, которую возвращают POST /api/documents/{id}/generate,
+- [Макет листа](https://vruchay.ru/docs/reference/layout): Контракт живёт в packages/shared/src/schema/layout.ts и rich-text.ts; им же
+- [Отбор в реестре выданного](https://vruchay.ru/docs/reference/registry-filter): Один и тот же набор параметров принимают GET /api/registry,
+- [Строка реестра выданного](https://vruchay.ru/docs/reference/registry-row): Форма одной строки, которую возвращают GET /api/registry (в items[]) и
+- [Коды проблем проверки списка](https://vruchay.ru/docs/reference/validation-problem-codes): Возвращаются в rows[].problems[].code ответа POST /api/documents/{id}/validation.
