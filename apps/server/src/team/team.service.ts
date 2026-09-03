@@ -9,6 +9,7 @@ import { MailService } from '../mail/mail.service';
 import { InjectRedis } from '../common/redis.module';
 import { hashPassword, validatePasswordStrength, verifyPassword } from '../auth/password';
 import { escapeHtml } from '../mail/mail-template';
+import { PERMISSIONS, ROLE_TITLE } from './role-permissions';
 
 /** Приглашение живёт неделю: успеть открыть письмо, но не бесконечно. */
 const INVITE_TTL_SECONDS = 7 * 24 * 60 * 60;
@@ -56,6 +57,14 @@ export class TeamService {
         pending: m.user.emailVerifiedAt === null,
         joinedAt: m.user.createdAt,
       })),
+    };
+  }
+
+  /** Права ролей для показа в кабинете. */
+  roles() {
+    return {
+      roles: (['owner', 'admin', 'member'] as const).map((role) => ({ role, title: ROLE_TITLE[role] })),
+      permissions: PERMISSIONS,
     };
   }
 

@@ -99,6 +99,26 @@ model Organization {
   referredBy      Organization?  @relation("OrgReferrals", fields: [referredByOrgId], references: [id], onDelete: SetNull)
   referrals       Organization[] @relation("OrgReferrals")
 
+  /**
+   * Свой домен для страницы проверки: ссылки и QR ведут на него, а не
+   * на vruchay.ru. Пусто — общий домен сервиса. Маршрутизация по чужому
+   * домену — отдельная задача; здесь только само поле и его проверка.
+   */
+  verifyDomain String @default("") @map("verify_domain")
+
+  // ─── Реквизиты для счетов и закрывающих ───────────────────────────────
+  //
+  // Кто платит: юрлицо, ИП, самозанятый или физлицо. Пустой вид — реквизиты
+  // ещё не заполнены; тогда кабинет подставляет их из последнего счёта
+  // (Invoice хранит копию реквизитов покупателя).
+  billingKind    BillingKind? @map("billing_kind")
+  billingName    String @default("") @map("billing_name")
+  billingInn     String @default("") @map("billing_inn")
+  billingKpp     String @default("") @map("billing_kpp")
+  billingOgrn    String @default("") @map("billing_ogrn")
+  billingAddress String @default("") @map("billing_address")
+  billingEmail   String @default("") @map("billing_email")
+
   members     OrgMember[]
   documents   Document[]
   files       File[]
@@ -114,8 +134,17 @@ model Organization {
   auditEvents AuditEvent[]
   apiTokens   ApiToken[]
   awardRuleSets AwardRuleSet[]
+  supportTickets SupportTicket[]
+  roadmapVotes   RoadmapVote[]
 
   @@map("organizations")
+}
+
+enum BillingKind {
+  legal
+  ie
+  self_employed
+  individual
 }
 
 model User {
@@ -128,10 +157,118 @@ model User {
   /// адрес там вводит сам оператор, проверять нечего.
   emailVerifiedAt DateTime? @map("email_verified_at")
   createdAt    DateTime    @default(now()) @map("created_at")
+
+  // ─── Второй фактор входа ─────────────────────────────────────────────
+  //
+  // Секрет TOTP лежит зашифрованным (AES-256-GCM, ключ из TOTP_SECRET_KEY,
+  // см. auth/totp-crypto.ts): утечка базы не должна отдавать чужие коды.
+  // Заполнен вместе с totpEnabledAt — до подтверждения первым кодом
+  // секрет живёт только в Redis и в базу не попадает.
+  totpSecret    String?   @map("totp_secret")
+  totpEnabledAt DateTime? @map("totp_enabled_at")
+
+  /// Тема кабинета и формат дат — настройки человека, а не организации:
+  /// один и тот же сотрудник состоит в нескольких организациях.
+  theme      UiTheme    @default(system)
+  dateFormat DateFormat @default(numeric) @map("date_format")
+
   memberships  OrgMember[]
   reviews      Review[]
+  backupCodes  TotpBackupCode[]
+  sessions     UserSession[]
+  loginEvents  LoginEvent[]
+  supportTickets   SupportTicket[]
+  supportMessages  SupportMessage[]
 
   @@map("users")
+}
+
+enum UiTheme {
+  system
+  light
+  dark
+}
+
+/// Как показывать даты в кабинете: 03.09.2026, 3 сентября 2026, 2026-09-03.
+enum DateFormat {
+  numeric
+  long
+  iso
+}
+
+/**
+ * Резервные коды второго фактора.
+ *
+ * Хранятся HMAC-SHA256 от кода с серверным ключом, а не argon2: кодов
+ * десять, и при входе сверять пришлось бы каждый — десять argon2 подряд
+ * на каждый вход это секунды. У кода 50 бит энтропии, а ключ HMAC —
+ * серверный секрет, так что без него база ничего не выдаёт.
+ */
+model TotpBackupCode {
+  id       String    @id @default(uuid()) @db.Uuid
+  userId   String    @map("user_id") @db.Uuid
+  codeHash String    @unique @map("code_hash")
+  usedAt   DateTime? @map("used_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("totp_backup_codes")
+}
+
+/**
+ * Активные сессии.
+ *
+ * Cookie сессии шифрованная и сама по себе не отзывается: раньше выйти
+ * «на всех устройствах» было нельзя вовсе. Теперь cookie несёт случайный
+ * идентификатор, а его хеш проверяется здесь на каждом запросе — так
+ * сессию можно завершить с другого устройства. Хеш, а не сам
+ * идентификатор: по строке из базы cookie собрать нельзя.
+ */
+model UserSession {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  orgId     String    @map("org_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  ip        String?   @db.Inet
+  userAgent String    @default("") @map("user_agent")
+  createdAt DateTime  @default(now()) @map("created_at")
+  lastSeenAt DateTime @default(now()) @map("last_seen_at")
+  revokedAt DateTime? @map("revoked_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@map("user_sessions")
+}
+
+enum LoginOutcome {
+  success
+  wrong_password
+  wrong_code
+  not_verified
+}
+
+/**
+ * Журнал авторизаций: удачные и неудачные входы.
+ *
+ * Пишется только для существующих учётных записей — попытка входа
+ * на несуществующий адрес никому не принадлежит, и хранить чужие адреса
+ * ради неё нельзя. Показывается человеку только его собственный.
+ */
+model LoginEvent {
+  id        BigInt       @id @default(autoincrement())
+  userId    String       @map("user_id") @db.Uuid
+  outcome   LoginOutcome
+  ip        String?      @db.Inet
+  userAgent String       @default("") @map("user_agent")
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("login_events")
 }
 
 enum OrgRole {
@@ -1322,4 +1459,82 @@ model IssueCounter {
 
   @@id([orgId, year])
   @@map("issue_counters")
+}
+
+// ─── Обратная связь: обращения в поддержку и дорожная карта ─────────────
+
+enum SupportTicketStatus {
+  open
+  answered
+  closed
+}
+
+model SupportTicket {
+  id      String @id @default(uuid()) @db.Uuid
+  orgId   String @map("org_id") @db.Uuid
+  /// Кто написал. SetNull: обращение переживает уход сотрудника.
+  userId  String? @map("user_id") @db.Uuid
+  subject String
+  status  SupportTicketStatus @default(open)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  org      Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user     User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  messages SupportMessage[]
+
+  @@index([orgId, updatedAt])
+  @@index([status, updatedAt])
+  @@map("support_tickets")
+}
+
+model SupportMessage {
+  id       String @id @default(uuid()) @db.Uuid
+  ticketId String @map("ticket_id") @db.Uuid
+  /// Пусто — ответ поддержки, а не сотрудника организации.
+  userId   String? @map("user_id") @db.Uuid
+  fromSupport Boolean @default(false) @map("from_support")
+  text     String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user   User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([ticketId, createdAt])
+  @@map("support_messages")
+}
+
+enum RoadmapStatus {
+  planned
+  in_progress
+  done
+}
+
+/// Что мы собираемся делать. Заводит владелец сервиса; клиенты голосуют.
+model RoadmapItem {
+  id          String        @id @default(uuid()) @db.Uuid
+  title       String
+  description String        @default("")
+  status      RoadmapStatus @default(planned)
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  votes RoadmapVote[]
+
+  @@index([status, createdAt])
+  @@map("roadmap_items")
+}
+
+/// Голос — один на организацию, а не на человека: иначе голосовали бы приглашениями.
+model RoadmapVote {
+  itemId    String   @map("item_id") @db.Uuid
+  orgId     String   @map("org_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  item RoadmapItem  @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, orgId])
+  @@index([orgId])
+  @@map("roadmap_votes")
 }

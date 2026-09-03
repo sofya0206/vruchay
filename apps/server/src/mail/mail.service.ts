@@ -152,6 +152,20 @@ export class MailService {
     });
   }
 
+  /**
+   * Убрать отправителя. Ищем по паре id + orgId: по чужому
+   * идентификатору получается «не найден», а не «нельзя» — иначе
+   * ответ подтверждал бы, что такой отправитель у кого-то есть.
+   *
+   * Письма, уже отправленные с этого адреса, остаются в истории:
+   * Email хранит адрес строкой, а не ссылкой на отправителя.
+   */
+  async deleteSender(orgId: string, id: string) {
+    const { count } = await this.prisma.sender.deleteMany({ where: { id, orgId } });
+    if (count === 0) throw new NotFoundException('Отправитель не найден');
+    return { ok: true as const };
+  }
+
   // ─── Шаблоны писем ───────────────────────────────────────────────────────
 
   async saveTemplate(

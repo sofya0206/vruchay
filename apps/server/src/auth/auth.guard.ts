@@ -1,10 +1,13 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import type { FastifyRequest } from 'fastify';
 import { AuthService, SessionUser } from './auth.service';
+import { SessionService } from './session.service';
 import { TokensService } from '../tokens/tokens.service';
 
 export interface AuthenticatedRequest extends FastifyRequest {
   currentUser: SessionUser;
+  /** Идентификатор сессии в базе; у входа по токену API его нет. */
+  sessionId?: string;
 }
 
 /**
@@ -17,6 +20,7 @@ export class AuthGuard implements CanActivate {
   constructor(
     private readonly auth: AuthService,
     private readonly tokens: TokensService,
+    private readonly sessions: SessionService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -33,18 +37,26 @@ export class AuthGuard implements CanActivate {
 
     const userId: unknown = req.session?.get('userId');
     const orgId: unknown = req.session?.get('orgId');
+    const sid: unknown = req.session?.get('sid');
 
-    if (typeof userId !== 'string' || typeof orgId !== 'string') {
+    if (typeof userId !== 'string' || typeof orgId !== 'string' || typeof sid !== 'string') {
       throw new UnauthorizedException('Требуется вход в систему');
     }
 
-    const user = await this.auth.resolveSession(userId, orgId);
-    if (!user) {
+    // Сессия могла быть завершена с другого устройства — проверяем по базе,
+    // а не доверяем cookie: иначе «выйти везде» не значило бы ничего.
+    const [user, session] = await Promise.all([
+      this.auth.resolveSession(userId, orgId),
+      this.sessions.resolve(sid, userId),
+    ]);
+    if (!user || !session) {
       req.session.delete();
       throw new UnauthorizedException('Требуется вход в систему');
     }
 
-    (req as unknown as AuthenticatedRequest).currentUser = user;
+    const authed = req as unknown as AuthenticatedRequest;
+    authed.currentUser = user;
+    authed.sessionId = session.id;
     return true;
   }
 }

@@ -71,6 +71,12 @@ export class MailController {
     return this.mail.addSender(user.orgId, dto.domainId, dto.email, dto.displayName);
   }
 
+  @Delete('senders/:id')
+  @Roles('owner', 'admin')
+  deleteSender(@CurrentUser() user: SessionUser, @Param('id', uuidParam) id: string) {
+    return this.mail.deleteSender(user.orgId, id);
+  }
+
   @Get('templates/:documentId')
   getTemplate(
     @CurrentUser() user: SessionUser,

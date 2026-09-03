@@ -4,7 +4,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 import { App } from './App';
 import { hideSplash } from './render/hide-splash';
+import { applyStoredTheme } from './settings/preferences';
 import './index.css';
+
+// Тему ставим до первой отрисовки: ответ сервера придёт позже, и кабинет
+// успел бы мигнуть светлым у того, кто выбрал тёмную.
+applyStoredTheme();
 
 const queryClient = new QueryClient({
   defaultOptions: {

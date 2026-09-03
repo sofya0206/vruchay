@@ -18,6 +18,7 @@ import { Roles, RolesGuard } from '../auth/roles.guard';
 import type { SessionUser } from '../auth/auth.service';
 import { OrgService } from './org.service';
 import { updatePublicProfileSchema, type UpdatePublicProfileDto } from './public-profile.dto';
+import { billingSchema, type BillingDto } from './billing.dto';
 
 const orgNameSchema = z.object({
   name: z.string().trim().min(2, 'Название не может быть короче двух букв').max(200),
@@ -25,6 +26,28 @@ const orgNameSchema = z.object({
 
 const userNameSchema = z.object({
   name: z.string().trim().max(200),
+});
+
+/**
+ * Домен для страницы проверки. Пустая строка — общий домен сервиса,
+ * поэтому проверка пропускает её отдельно от разбора имени.
+ */
+const verifyDomainSchema = z.object({
+  domain: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .max(253)
+    .refine(
+      (v) => v === '' || /^(?!-)[a-z0-9-]{1,63}(?<!-)(\.(?!-)[a-z0-9-]{1,63}(?<!-))+$/.test(v),
+      'Похоже на опечатку: домен выглядит как sertifikaty.example.com',
+    ),
+});
+
+/** Тема и формат дат: значения те же, что в схеме базы. */
+const preferencesSchema = z.object({
+  theme: z.enum(['system', 'light', 'dark']).optional(),
+  dateFormat: z.enum(['numeric', 'long', 'iso']).optional(),
 });
 
 /** Логотип — не фон формата A4: двух мегабайт хватает любому. */
@@ -104,6 +127,53 @@ export class OrgController {
     if (!image) throw new BadRequestException('Поддерживаются только изображения PNG и JPEG');
 
     return this.org.setLogo(user.orgId, body, image, part.filename ?? '');
+  }
+
+  /**
+   * Реквизиты для счетов и закрывающих.
+   *
+   * Читают владелец и управляющий: это платёжные данные организации,
+   * рядовому сотруднику они не нужны, а ИНН с адресом — уже сведения
+   * о ней. Меняет только владелец: по этим реквизитам придут документы,
+   * которые организация подпишет.
+   */
+  @Get('billing')
+  @Roles('owner', 'admin')
+  billing(@CurrentUser() user: SessionUser) {
+    return this.org.billing(user.orgId);
+  }
+
+  @Patch('billing')
+  @Roles('owner')
+  updateBilling(
+    @CurrentUser() user: SessionUser,
+    @Body(new ZodValidationPipe(billingSchema)) dto: BillingDto,
+  ) {
+    return this.org.updateBilling(user.orgId, dto);
+  }
+
+  /** Домен страницы проверки — часть публичного лица организации. */
+  @Patch('verify-domain')
+  @Roles('owner', 'admin')
+  setVerifyDomain(
+    @CurrentUser() user: SessionUser,
+    @Body(new ZodValidationPipe(verifyDomainSchema)) dto: z.infer<typeof verifyDomainSchema>,
+  ) {
+    return this.org.setVerifyDomain(user.orgId, dto.domain);
+  }
+
+  /** Тема и формат дат — свои у каждого, роль ни при чём. */
+  @Get('preferences')
+  preferences(@CurrentUser() user: SessionUser) {
+    return this.org.preferences(user.userId);
+  }
+
+  @Patch('preferences')
+  updatePreferences(
+    @CurrentUser() user: SessionUser,
+    @Body(new ZodValidationPipe(preferencesSchema)) dto: z.infer<typeof preferencesSchema>,
+  ) {
+    return this.org.updatePreferences(user.userId, dto);
   }
 
   /** Своё имя правит кто угодно: это его имя. */

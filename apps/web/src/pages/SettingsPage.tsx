@@ -1,58 +1,61 @@
-import { Link } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
-import { MailDomains } from '../settings/MailDomains';
-import { Integrations } from '../settings/Integrations';
-import { Team } from '../settings/Team';
-import { ChangePassword } from '../settings/ChangePassword';
-import { Organization } from '../settings/Organization';
-import { InviteFriend } from '../settings/InviteFriend';
-import { Review } from '../settings/Review';
-import { AuditLog } from '../settings/AuditLog';
-import { ApiTokens } from '../settings/ApiTokens';
-import { PublicProfile } from '../settings/PublicProfile';
+import { SETTINGS_SECTIONS } from '../settings/sections';
 
-/** Настройки организации: отправка писем и приём заявок с сайта. */
+/**
+ * Оболочка настроек: меню слева, раздел справа.
+ *
+ * У каждого раздела свой адрес, поэтому ссылку на нужное место можно
+ * дать коллеге, а браузер помнит, где человек был. На узком экране меню
+ * превращается в ленту сверху — на телефоне колонка съела бы весь экран.
+ */
 export function SettingsPage() {
+  const { pathname } = useLocation();
+  const current = SETTINGS_SECTIONS.find((s) => pathname === `/settings/${s.path}`);
+
   return (
     <div className="min-h-full">
       <header className="border-b border-[var(--line)] bg-[var(--surface)]">
-        <div className="mx-auto flex max-w-4xl items-center gap-3 px-6 py-3">
+        <div className="mx-auto flex max-w-6xl items-center gap-3 px-6 py-3">
           <Link
             to="/documents"
             className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)] hover:text-[var(--text)]"
           >
             <ArrowLeft size={16} />К материалам
           </Link>
-          <span className="ml-auto font-serif text-lg">Настройки</span>
+          <span className="ml-auto font-serif text-lg">
+            Настройки{current ? ` · ${current.title}` : ''}
+          </span>
         </div>
       </header>
 
-      {/* Сотрудники первыми: это нужно каждой организации, а домены
-          и приём заявок с сайта — только тем, кто до них дорос. */}
-      <main className="mx-auto max-w-4xl space-y-10 px-6 py-8">
-        <Organization />
-        <hr className="border-[var(--line)]" />
-        {/* Сразу за названием: это тоже про то, как организация выглядит снаружи. */}
-        <PublicProfile />
-        <hr className="border-[var(--line)]" />
-        <InviteFriend />
-        <hr className="border-[var(--line)]" />
-        <Review />
-        <hr className="border-[var(--line)]" />
-        <Team />
-        <hr className="border-[var(--line)]" />
-        <ChangePassword />
-        <hr className="border-[var(--line)]" />
-        <MailDomains />
-        <hr className="border-[var(--line)]" />
-        <Integrations />
-        {/* Журнал и токены последними: нужны редко и не всем, а место
-            наверху занимает то, чем пользуются каждый день. */}
-        <hr className="border-[var(--line)]" />
-        <AuditLog />
-        <hr className="border-[var(--line)]" />
-        <ApiTokens />
-      </main>
+      <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-8 md:flex-row">
+        <nav aria-label="Разделы настроек" className="md:w-56 md:shrink-0">
+          <ul className="flex gap-1 overflow-x-auto md:flex-col md:overflow-visible">
+            {SETTINGS_SECTIONS.map((s) => (
+              <li key={s.path}>
+                <NavLink
+                  to={`/settings/${s.path}`}
+                  className={({ isActive }) =>
+                    `flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm transition ${
+                      isActive
+                        ? 'bg-[var(--accent-soft)] text-[var(--accent)]'
+                        : 'text-[var(--text-muted)] hover:bg-[var(--surface)] hover:text-[var(--text)]'
+                    }`
+                  }
+                >
+                  <s.icon size={16} />
+                  {s.title}
+                </NavLink>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        <main className="min-w-0 flex-1">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }

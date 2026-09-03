@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Clock, Copy, Plus, RefreshCw, Trash2, TriangleAlert } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { settingsApi, type MailDomain } from '../api/settings';
 import { ApiError } from '../api/client';
 import { Button } from '../ui/Button';
@@ -89,21 +90,8 @@ export function MailDomains() {
 }
 
 function DomainCard({ domain, onChanged }: { domain: MailDomain; onChanged: () => void }) {
-  const [senderEmail, setSenderEmail] = useState(`info@${domain.domain}`);
-  const [senderName, setSenderName] = useState('');
-  const [senderError, setSenderError] = useState('');
-
   const check = useMutation({ mutationFn: () => settingsApi.checkDomain(domain.id), onSuccess: onChanged });
   const remove = useMutation({ mutationFn: () => settingsApi.deleteDomain(domain.id), onSuccess: onChanged });
-  const addSender = useMutation({
-    mutationFn: () => settingsApi.addSender(domain.id, senderEmail, senderName),
-    onSuccess: () => {
-      setSenderName('');
-      setSenderError('');
-      onChanged();
-    },
-    onError: (e: unknown) => setSenderError(e instanceof ApiError ? e.message : 'Не получилось'),
-  });
 
   const verified = domain.status === 'verified';
 
@@ -155,36 +143,14 @@ function DomainCard({ domain, onChanged }: { domain: MailDomain; onChanged: () =
       )}
 
       {verified && (
-        <div className="mt-4 space-y-3">
-          {domain.senders.length > 0 && (
-            <ul className="space-y-1 text-sm">
-              {domain.senders.map((s) => (
-                <li key={s.id} className="text-[var(--text-muted)]">
-                  <span className="text-[var(--text)]">{s.displayName || 'Без подписи'}</span>{' '}
-                  &lt;{s.email}&gt;
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="min-w-48 flex-1">
-              <Label>Адрес отправителя</Label>
-              <Input value={senderEmail} onChange={(e) => setSenderEmail(e.target.value)} />
-            </div>
-            <div className="min-w-48 flex-1">
-              <Label>Подпись в письме</Label>
-              <Input
-                value={senderName}
-                onChange={(e) => setSenderName(e.target.value)}
-                placeholder="Ассоциация тренеров"
-              />
-            </div>
-            <Button onClick={() => addSender.mutate()} disabled={addSender.isPending}>
-              Добавить отправителя
-            </Button>
-          </div>
-          {senderError && <p className="text-sm text-[var(--danger)]">{senderError}</p>}
-        </div>
+        <p className="mt-3 text-sm text-[var(--text-muted)]">
+          {domain.senders.length > 0
+            ? `Адресов на этом домене: ${domain.senders.length}. `
+            : 'Адресов отправки на нём пока нет. '}
+          <Link to="/settings/senders" className="text-[var(--accent)] underline">
+            Адреса рассылки
+          </Link>
+        </p>
       )}
     </article>
   );

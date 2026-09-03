@@ -10,6 +10,8 @@ import { OverviewPage } from './overview/OverviewPage';
 import { EditorPage } from './pages/EditorPage';
 import { RenderPage } from './pages/RenderPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { SETTINGS_SECTIONS } from './settings/sections';
+import { ThemeSync } from './settings/ThemeSync';
 import { MailingPage } from './mailing/MailingPage';
 import { DocumentWorkspacePage } from './mailing/DocumentWorkspacePage';
 import { InvoicesPage } from './pages/InvoicesPage';
@@ -70,7 +72,10 @@ export function App() {
   }
 
   return (
-    <Routes>
+    <>
+      {/* Тема из настроек человека — применяется на всех страницах кабинета. */}
+      <ThemeSync />
+      <Routes>
       {/* Разделы кабинета живут внутри общей оболочки: шапка и навигация
           рисуются один раз и при переходах не перерисовываются. Редактор
           материала, настройки и счета — снаружи: у редактора весь экран
@@ -99,7 +104,14 @@ export function App() {
       </Route>
 
       <Route path="/documents/:id" element={<EditorPage />} />
-      <Route path="/settings" element={<SettingsPage />} />
+      {/* Настройки: у каждого раздела свой адрес, прямая ссылка открывает
+          именно его. Список разделов — в settings/sections.tsx. */}
+      <Route path="/settings" element={<SettingsPage />}>
+        <Route index element={<Navigate to="/settings/account" replace />} />
+        {SETTINGS_SECTIONS.map((s) => (
+          <Route key={s.path} path={s.path} element={s.element} />
+        ))}
+      </Route>
       <Route path="/invoices" element={<InvoicesPage />} />
       <Route path="/login" element={<Navigate to="/" replace />} />
       {/* Вошедшему на этих страницах делать нечего: адрес уже подтверждён,
@@ -113,6 +125,7 @@ export function App() {
       <Route path="/c/:publicId" element={<VerifyDocumentPage />} />
       <Route path="/org/:slug" element={<IssuerPage />} />
       <Route path="*" element={<NotFoundPage />} />
-    </Routes>
+      </Routes>
+    </>
   );
 }

@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Prisma } from '@prisma/client';
+import { Prisma, type DateFormat, type UiTheme } from '@prisma/client';
 import type { Env } from '../config/env';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReferralService } from '../referral/referral.service';
@@ -8,6 +8,7 @@ import { StorageService } from '../storage/storage.service';
 import { buildS3Key } from '../storage/s3-key';
 import type { AllowedImage } from '../common/image-type';
 import type { UpdatePublicProfileDto } from './public-profile.dto';
+import type { BillingDto } from './billing.dto';
 
 /** Что организация показывает о себе наружу и как показывает получателей. */
 export const publicProfileSelect = {
@@ -24,6 +25,7 @@ export const publicProfileSelect = {
   publicSearchByName: true,
   publicIndexable: true,
   verifyNameMode: true,
+  verifyDomain: true,
 } satisfies Prisma.OrganizationSelect;
 
 /**
@@ -187,5 +189,123 @@ export class OrgService {
       left: Math.max(0, limit - used),
       bonus,
     };
+  }
+
+  /**
+   * Реквизиты плательщика: что сохранено и что можно подставить.
+   *
+   * Свои реквизиты организация могла ни разу не заполнять, но счёт ей
+   * уже выставляли — Invoice хранит копию реквизитов покупателя на
+   * момент выставления. Оттуда и предлагаем: искать по адресу, на
+   * который счёт ушёл, — единственная связь счёта с кабинетом (счета
+   * растут из заявок и организации не принадлежат).
+   */
+  async billing(orgId: string) {
+    const org = await this.prisma.organization.findUniqueOrThrow({
+      where: { id: orgId },
+      select: {
+        billingKind: true,
+        billingName: true,
+        billingInn: true,
+        billingKpp: true,
+        billingOgrn: true,
+        billingAddress: true,
+        billingEmail: true,
+        contactEmail: true,
+        name: true,
+        inn: true,
+        members: {
+          where: { role: 'owner' },
+          take: 1,
+          select: { user: { select: { email: true } } },
+        },
+      },
+    });
+
+    const emails = [org.contactEmail, org.members[0]?.user.email]
+      .filter((e): e is string => Boolean(e))
+      .map((e) => e.toLowerCase());
+
+    const lastInvoice = emails.length
+      ? await this.prisma.invoice.findFirst({
+          where: { email: { in: emails } },
+          orderBy: { createdAt: 'desc' },
+          select: { buyerName: true, buyerInn: true, email: true, createdAt: true },
+        })
+      : null;
+
+    return {
+      kind: org.billingKind,
+      name: org.billingName,
+      inn: org.billingInn,
+      kpp: org.billingKpp,
+      ogrn: org.billingOgrn,
+      address: org.billingAddress,
+      email: org.billingEmail,
+      /**
+       * Чем заполнить пустую форму. Не сохраняем молча: реквизиты
+       * подтверждает человек, ошибка в них — непроведённый счёт.
+       */
+      suggested: lastInvoice
+        ? {
+            from: 'invoice' as const,
+            name: lastInvoice.buyerName,
+            inn: lastInvoice.buyerInn,
+            email: lastInvoice.email,
+            at: lastInvoice.createdAt,
+          }
+        : { from: 'org' as const, name: org.name, inn: org.inn ?? '', email: emails[0] ?? '', at: null },
+    };
+  }
+
+  async updateBilling(orgId: string, dto: BillingDto) {
+    await this.prisma.organization.update({
+      where: { id: orgId },
+      data: {
+        billingKind: dto.kind,
+        billingName: dto.name,
+        billingInn: dto.inn,
+        billingKpp: dto.kpp,
+        billingOgrn: dto.ogrn,
+        billingAddress: dto.address,
+        billingEmail: dto.email,
+      },
+    });
+    return { ok: true as const };
+  }
+
+  /**
+   * Домен, на который ведут ссылки и QR со страницы проверки.
+   *
+   * Пустая строка — общий домен сервиса. Само обслуживание чужого
+   * домена (сертификат, маршрутизация) сюда не входит: поле сохраняем
+   * и показываем, чем оно станет.
+   */
+  async setVerifyDomain(orgId: string, domain: string) {
+    await this.prisma.organization.update({
+      where: { id: orgId },
+      data: { verifyDomain: domain },
+    });
+    return { ok: true as const };
+  }
+
+  /**
+   * Тема и формат дат. Настройка человека, а не организации: один
+   * сотрудник состоит в нескольких, а глаза у него одни.
+   */
+  async preferences(userId: string) {
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { theme: true, dateFormat: true },
+    });
+    return user;
+  }
+
+  async updatePreferences(userId: string, dto: { theme?: UiTheme; dateFormat?: DateFormat }) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: dto,
+      select: { theme: true, dateFormat: true },
+    });
   }
 }

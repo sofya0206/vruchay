@@ -47,6 +47,17 @@ export const envSchema = z.object({
    */
   PUBLIC_CODE_SECRET: z.string().min(16, 'PUBLIC_CODE_SECRET короче 16 символов').optional(),
 
+  /**
+   * Ключ шифрования секретов второго фактора (TOTP) в базе.
+   *
+   * Пусто — выводится из SESSION_SECRET, и это годится только до первого
+   * включения 2FA у живого клиента: смена SESSION_SECRET (обычный способ
+   * разом всех разлогинить) сделала бы все секреты нечитаемыми, и люди
+   * с включённым вторым фактором не смогли бы войти. Задать отдельно
+   * и не менять никогда. Сгенерировать: openssl rand -base64 32
+   */
+  TOTP_SECRET_KEY: z.string().min(16, 'TOTP_SECRET_KEY короче 16 символов').optional(),
+
   S3_ENDPOINT: z.string().url(),
   S3_ACCESS_KEY: z.string().min(1),
   S3_SECRET_KEY: z.string().min(1),
@@ -265,6 +276,11 @@ export function baseUrl(url: string): string {
  */
 export function publicCodeSecret(env: Pick<Env, 'PUBLIC_CODE_SECRET' | 'SESSION_SECRET'>): string {
   return env.PUBLIC_CODE_SECRET ?? env.SESSION_SECRET;
+}
+
+/** Ключ для секретов TOTP: свой, если задан, иначе сессионный (см. схему). */
+export function totpSecretKey(env: Pick<Env, 'TOTP_SECRET_KEY' | 'SESSION_SECRET'>): string {
+  return env.TOTP_SECRET_KEY ?? env.SESSION_SECRET;
 }
 
 /**
