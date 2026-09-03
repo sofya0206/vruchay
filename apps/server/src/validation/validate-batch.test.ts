@@ -361,6 +361,25 @@ describe('склонение', () => {
     );
     expect(codes(report, 'row-0')).not.toContain('name_not_declined');
   });
+
+  /*
+   * Производных от имени пять, и все они берутся из колонки «name».
+   * Раньше её требовал только падеж: макет с латиницей или сокращением
+   * проходил проверку молча, а на бумаге выходило пустое место.
+   */
+  it.each(['name_dat', 'name_gen', 'name_short', 'name_lat_gost', 'name_lat_icao'])(
+    'без колонки «name» проверка ругается на %%%s',
+    (variable) => {
+      const report = validateBatch(
+        input({
+          sheets: [nameSheet({ text: `Награждается %${variable}` })],
+          columns: ['email'],
+          rows: [row(0, { email: 'j@mail.ru' })],
+        }),
+      );
+      expect(codes(report, 'row-0')).toContain('required_empty');
+    },
+  );
 });
 
 describe('даты', () => {

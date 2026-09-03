@@ -76,6 +76,18 @@ const SAMPLE_REG_NUMBER = '1000/2026';
 
 /** Колонка с именем получателя — по ней ищут дубликаты и склонение. */
 const NAME_COLUMN = 'name';
+
+/**
+ * Переменные, которые сервис считает из колонки «name»: падежи, сокращение
+ * и две латиницы. Все требуют саму колонку — без неё выйдут пустыми.
+ */
+const NAME_DERIVED = new Set([
+  'name_dat',
+  'name_gen',
+  'name_short',
+  'name_lat_gost',
+  'name_lat_icao',
+]);
 const EMAIL_COLUMN = 'email';
 
 /** Сколько номеров строк показываем в причине: длиннее никто не читает. */
@@ -113,13 +125,15 @@ export function validateBatch(input: ValidationInput): BatchValidation {
    *
    * Всё, что упомянуто в макете и не является служебным: служебные
    * подставляет сам сервис, и спрашивать их с человека нечестно.
-   * «name_dat» служебная, но берётся из «name» — поэтому имя
-   * становится обязательным вместе с ней.
+   * Производные от имени служебные, но берутся из «name» — поэтому имя
+   * становится обязательным вместе с любой из них. Их пять, и правило
+   * одно на всех: заведи шестую — допиши сюда, иначе макет с ней молча
+   * напечатает пустое место вместо фамилии.
    */
   const used = new Set(targets.flatMap((t) => t.variables));
   const required = new Set<string>();
   for (const name of used) {
-    if (name === 'name_dat') {
+    if (NAME_DERIVED.has(name)) {
       required.add(NAME_COLUMN);
       continue;
     }
