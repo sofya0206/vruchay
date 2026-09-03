@@ -1,9 +1,11 @@
 import { Global, Module, forwardRef } from '@nestjs/common';
-import { AuthController } from './auth.controller';
+import { AuthController, SessionsController, TotpController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { RegistrationService } from './registration.service';
 import { PasswordResetService } from './password-reset.service';
 import { AuthGuard } from './auth.guard';
+import { SessionService } from './session.service';
+import { TotpService } from './totp.service';
 import { MailModule } from '../mail/mail.module';
 
 @Global()
@@ -13,9 +15,10 @@ import { MailModule } from '../mail/mail.module';
   // и forwardRef. Разрывать её выделением третьего модуля ради одного письма
   // не стоит: связь тут по существу, а не по недосмотру.
   imports: [forwardRef(() => MailModule)],
-  controllers: [AuthController],
-  providers: [AuthService, RegistrationService,
-    PasswordResetService, AuthGuard],
-  exports: [AuthService, AuthGuard],
+  controllers: [AuthController, TotpController, SessionsController],
+  providers: [AuthService, RegistrationService, PasswordResetService, AuthGuard, SessionService, TotpService],
+  // SessionService наружу: сессию открывают и приглашение сотрудника,
+  // и смена пароля закрывает остальные.
+  exports: [AuthService, AuthGuard, SessionService],
 })
 export class AuthModule {}

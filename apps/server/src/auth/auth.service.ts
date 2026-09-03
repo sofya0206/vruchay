@@ -2,6 +2,7 @@ import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { hashPassword, verifyPassword } from './password';
 import { maskEmail } from '../common/redact';
+import { SessionService, type ClientMeta } from './session.service';
 
 export interface SessionUser {
   userId: string;
@@ -39,9 +40,22 @@ const NOT_VERIFIED =
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly sessions: SessionService,
+  ) {}
 
-  async login(email: string, password: string): Promise<SessionUser> {
+  /**
+   * Проверка пароля. Если у человека включён второй фактор, сессия ещё
+   * не открывается: контроллер запоминает, чей пароль подошёл, и ждёт код.
+   * В журнал входов пишем только для существующих учётных записей —
+   * попытка на чужой адрес никому не принадлежит.
+   */
+  async login(
+    email: string,
+    password: string,
+    meta: ClientMeta = {},
+  ): Promise<{ user: SessionUser; totpRequired: boolean }> {
     const normalized = email.trim().toLowerCase();
     const user = await this.prisma.user.findUnique({
       where: { email: normalized },
@@ -57,6 +71,7 @@ export class AuthService {
       // Адрес в журнал не пишем: иначе логи превращаются в готовый список
       // действующих учётных записей для подбора паролей и фишинга.
       this.logger.warn(`Неудачная попытка входа: ${maskEmail(normalized)}`);
+      if (user) await this.sessions.recordLogin(user.id, 'wrong_password', meta);
       throw new UnauthorizedException(LOGIN_FAILED);
     }
 
@@ -70,9 +85,30 @@ export class AuthService {
     // ответ «подтвердите адрес» сам по себе сообщал бы, что такая учётная
     // запись существует, — ровно то, от чего защищает LOGIN_FAILED.
     if (!user.emailVerifiedAt) {
+      await this.sessions.recordLogin(user.id, 'not_verified', meta);
       throw new UnauthorizedException(NOT_VERIFIED);
     }
 
+    return {
+      user: {
+        userId: user.id,
+        orgId: membership.orgId,
+        email: user.email,
+        name: user.name,
+        role: membership.role,
+      },
+      totpRequired: user.totpEnabledAt !== null,
+    };
+  }
+
+  /** Тот, чей пароль уже подошёл, — для второго шага входа. */
+  async pendingUser(userId: string): Promise<SessionUser | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { memberships: { take: 1, orderBy: { orgId: 'asc' } } },
+    });
+    const membership = user?.memberships[0];
+    if (!user || !membership) return null;
     return {
       userId: user.id,
       orgId: membership.orgId,

@@ -16,11 +16,32 @@ export function useMe() {
   });
 }
 
+/**
+ * Ответ на верный пароль: либо вошли, либо ждём код второго фактора.
+ * Сессии во втором случае ещё нет — в кэш класть нечего.
+ */
+export type LoginResult = Me | { totpRequired: true };
+
+function isTotpRequired(result: LoginResult): result is { totpRequired: true } {
+  return 'totpRequired' in result;
+}
+
 export function useLogin() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (creds: { email: string; password: string }) =>
-      api.post<Me>('/auth/login', creds),
+      api.post<LoginResult>('/auth/login', creds),
+    onSuccess: (result) => {
+      if (!isTotpRequired(result)) qc.setQueryData(['me'], result);
+    },
+  });
+}
+
+/** Второй шаг входа: код из приложения или резервный код с бумажки. */
+export function useLoginTotp() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (code: string) => api.post<Me>('/auth/login/totp', { code }),
     onSuccess: (me) => qc.setQueryData(['me'], me),
   });
 }

@@ -1,22 +1,31 @@
 import { FormEvent, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Award, LoaderCircle } from 'lucide-react';
-import { useLogin } from '../auth/useAuth';
+import { useLogin, useLoginTotp } from '../auth/useAuth';
 import { ApiError } from '../api/client';
 import { Button } from '../ui/Button';
 import { Input, Label } from '../ui/Field';
 
 export function LoginPage() {
   const login = useLogin();
+  const totp = useLoginTotp();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
+
+  // Пароль подошёл, но у человека включён второй фактор: пароль с экрана
+  // убираем — вводить его заново не надо, а держать на виду незачем.
+  const awaitingCode = login.data !== undefined && 'totpRequired' in login.data;
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
-    login.mutate({ email, password });
+    if (awaitingCode) totp.mutate(code);
+    else login.mutate({ email, password });
   }
 
-  const error = login.error instanceof ApiError ? login.error.message : null;
+  const failed = awaitingCode ? totp.error : login.error;
+  const error = failed instanceof ApiError ? failed.message : null;
+  const pending = login.isPending || totp.isPending;
 
   return (
     <div className="grid h-full place-items-center p-6">
@@ -35,28 +44,45 @@ export function LoginPage() {
           onSubmit={onSubmit}
           className="space-y-5 rounded-2xl bg-[var(--surface)] p-7 ring-1 ring-[var(--line)]"
         >
-          <label className="block">
-            <Label>Электронная почта</Label>
-            <Input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoComplete="username"
-              autoFocus
-            />
-          </label>
+          {awaitingCode ? (
+            <label className="block">
+              <Label hint="Шесть цифр из приложения или резервный код">Код подтверждения</Label>
+              <Input
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                required
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder="000000"
+                autoFocus
+              />
+            </label>
+          ) : (
+            <>
+              <label className="block">
+                <Label>Электронная почта</Label>
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoComplete="username"
+                  autoFocus
+                />
+              </label>
 
-          <label className="block">
-            <Label>Пароль</Label>
-            <Input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete="current-password"
-            />
-          </label>
+              <label className="block">
+                <Label>Пароль</Label>
+                <Input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                />
+              </label>
+            </>
+          )}
 
           {error && (
             <p
@@ -70,11 +96,11 @@ export function LoginPage() {
           <Button
             type="submit"
             variant="primary"
-            disabled={login.isPending}
+            disabled={pending}
             className="w-full"
-            icon={login.isPending ? <LoaderCircle size={16} className="animate-spin" /> : undefined}
+            icon={pending ? <LoaderCircle size={16} className="animate-spin" /> : undefined}
           >
-            {login.isPending ? 'Входим' : 'Войти'}
+            {pending ? 'Входим' : awaitingCode ? 'Подтвердить' : 'Войти'}
           </Button>
         </form>
 
