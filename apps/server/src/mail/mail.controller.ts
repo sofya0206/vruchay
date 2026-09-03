@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { CurrentUser } from '../common/current-user.decorator';
@@ -14,6 +14,19 @@ import { MailProcessor } from './mail.processor';
 const uuidParam = new ZodValidationPipe(uuidSchema);
 
 const addDomainSchema = z.object({ domain: z.string().trim().min(4).max(253) });
+/**
+ * Правка отправителя: только то, что организация пишет о себе сама.
+ * Адрес и домен не меняются — они подтверждены DNS.
+ */
+const updateSenderSchema = z
+  .object({
+    displayName: z.string().trim().min(1, 'Укажите имя отправителя').max(100),
+    replyTo: z.string().trim().max(254),
+    signature: z.string().trim().max(2000),
+  })
+  .partial()
+  .refine((v) => Object.keys(v).length > 0, 'Нечего обновлять');
+
 const addSenderSchema = z.object({
   domainId: z.string().uuid(),
   email: z.string().trim().email('Некорректный адрес').max(254),
@@ -69,6 +82,28 @@ export class MailController {
     dto: { domainId: string; email: string; displayName: string },
   ) {
     return this.mail.addSender(user.orgId, dto.domainId, dto.email, dto.displayName);
+  }
+
+  @Patch('senders/:id')
+  @Roles('owner', 'admin')
+  updateSender(
+    @CurrentUser() user: SessionUser,
+    @Param('id', uuidParam) id: string,
+    @Body(new ZodValidationPipe(updateSenderSchema)) dto: z.infer<typeof updateSenderSchema>,
+  ) {
+    return this.mail.updateSender(user.orgId, id, dto);
+  }
+
+  /**
+   * Проверочное письмо — только на собственный адрес нажавшего.
+   * Адрес берём из сессии, а не из тела запроса: иначе кнопка
+   * «проверить» стала бы способом слать что угодно кому угодно
+   * с подтверждённого домена.
+   */
+  @Post('senders/:id/test')
+  @Roles('owner', 'admin')
+  sendTest(@CurrentUser() user: SessionUser, @Param('id', uuidParam) id: string) {
+    return this.mail.sendTest(user.orgId, id, user.email);
   }
 
   @Delete('senders/:id')

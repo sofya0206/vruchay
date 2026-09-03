@@ -38,6 +38,8 @@ export interface PublicProfile {
   publicPageEnabled: boolean;
   publicSearchByName: boolean;
   publicIndexable: boolean;
+  /** Сколько дней материал лежит в корзине до безвозвратного удаления. */
+  trashDays: number;
   verifyNameMode: VerifyNameMode;
   /** Свой домен страницы проверки; пусто — общий домен сервиса. */
   verifyDomain: string;
@@ -79,9 +81,13 @@ export type BillingPatch = Omit<Billing, 'suggested' | 'kind'> & { kind: Billing
 export type UiTheme = 'system' | 'light' | 'dark';
 export type DateFormat = 'numeric' | 'long' | 'iso';
 
+/** Плотность интерфейса: обычная и поджатая для длинных таблиц. */
+export type UiDensity = 'comfortable' | 'compact';
+
 export interface Preferences {
   theme: UiTheme;
   dateFormat: DateFormat;
+  density: UiDensity;
 }
 
 export function useOrgProfile() {

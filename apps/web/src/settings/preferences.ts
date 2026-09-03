@@ -1,4 +1,4 @@
-import type { DateFormat, UiTheme } from '../api/org';
+import type { DateFormat, UiDensity, UiTheme } from '../api/org';
 
 /**
  * Тема и формат дат.
@@ -9,6 +9,7 @@ import type { DateFormat, UiTheme } from '../api/org';
  * выбранная тема дублируется в localStorage и применяется до запроса.
  */
 const THEME_KEY = 'vruchay:theme';
+const DENSITY_KEY = 'vruchay:density';
 
 function isTheme(value: unknown): value is UiTheme {
   return value === 'system' || value === 'light' || value === 'dark';
@@ -28,13 +29,31 @@ export function applyTheme(theme: UiTheme): void {
   }
 }
 
+/**
+ * Плотность интерфейса. Поджатый вид меняет один корневой атрибут,
+ * от которого пляшут отступы в списках и таблицах, — так настройка
+ * не расползается по сотне компонентов.
+ */
+export function applyDensity(density: UiDensity): void {
+  const root = document.documentElement;
+  if (density === 'comfortable') root.removeAttribute('data-density');
+  else root.setAttribute('data-density', density);
+
+  try {
+    localStorage.setItem(DENSITY_KEY, density);
+  } catch {
+    // Приватный режим — плотность не переживёт перезагрузку, и только.
+  }
+}
+
 /** Тема из прошлого посещения — до того, как ответит сервер. */
 export function applyStoredTheme(): void {
   try {
     const stored: unknown = localStorage.getItem(THEME_KEY);
     if (isTheme(stored)) applyTheme(stored);
+    if (localStorage.getItem(DENSITY_KEY) === 'compact') applyDensity('compact');
   } catch {
-    // Нет хранилища — остаётся системная тема.
+    // Нет хранилища — остаются системная тема и обычная плотность.
   }
 }
 

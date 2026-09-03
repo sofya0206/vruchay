@@ -1,11 +1,11 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AtSign, Plus, Trash2 } from 'lucide-react';
+import { AtSign, Plus, Send, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { settingsApi } from '../api/settings';
+import { settingsApi, type Sender } from '../api/settings';
 import { ApiError } from '../api/client';
 import { Button } from '../ui/Button';
-import { Input, Label, Select } from '../ui/Field';
+import { Input, Label, Select, Textarea } from '../ui/Field';
 
 /**
  * Адреса, с которых уходят письма участникам.
@@ -100,6 +100,7 @@ export function Senders() {
                   disabled={remove.isPending}
                   aria-label={`Удалить отправителя ${s.email}`}
                 />
+                <SenderDetails sender={s} onSaved={refresh} />
               </li>
             ))}
           </ul>
@@ -135,7 +136,7 @@ export function Senders() {
               <Input value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="off" />
             </div>
             <div className="min-w-48 flex-1">
-              <Label>Подпись в письме</Label>
+              <Label>Имя в поле «от кого»</Label>
               <Input
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
@@ -159,5 +160,105 @@ export function Senders() {
         </>
       )}
     </section>
+  );
+}
+
+/**
+ * Обратный адрес, подпись и проверочное письмо — по каждому отправителю.
+ *
+ * Свёрнуто по умолчанию: у большинства организаций один адрес и ничего
+ * из этого не нужно, а развёрнутая форма на каждой строке превратила бы
+ * список в анкету.
+ */
+function SenderDetails({ sender, onSaved }: { sender: Sender; onSaved: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [replyTo, setReplyTo] = useState(sender.replyTo);
+  const [signature, setSignature] = useState(sender.signature);
+  const [note, setNote] = useState('');
+
+  const save = useMutation({
+    mutationFn: () =>
+      settingsApi.updateSender(sender.id, { replyTo: replyTo.trim(), signature: signature.trim() }),
+    onSuccess: () => {
+      setNote('Сохранено');
+      onSaved();
+    },
+    onError: (err) => setNote(err instanceof ApiError ? err.message : 'Не получилось сохранить'),
+  });
+
+  const test = useMutation({
+    mutationFn: () => settingsApi.testSender(sender.id),
+    onSuccess: () => setNote('Письмо отправлено вам — проверьте ящик'),
+    onError: (err) => setNote(err instanceof ApiError ? err.message : 'Не получилось отправить'),
+  });
+
+  if (!open) {
+    return (
+      <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>
+        Настроить
+      </Button>
+    );
+  }
+
+  return (
+    <div className="w-full space-y-3 border-t border-[var(--line)] pt-3">
+      <div>
+        <Label>Адрес для ответов</Label>
+        <Input
+          value={replyTo}
+          onChange={(e) => setReplyTo(e.target.value)}
+          placeholder={sender.email}
+          autoComplete="off"
+        />
+        <p className="mt-1 text-xs text-[var(--text-muted)]">
+          Куда попадёт участник, нажав «Ответить». Пусто — на сам адрес отправителя. Нужно, когда
+          письма уходят с noreply, а отвечать человек должен живому адресату.
+        </p>
+      </div>
+
+      <div>
+        <Label>Подпись в конце письма</Label>
+        <Textarea
+          rows={3}
+          value={signature}
+          onChange={(e) => setSignature(e.target.value)}
+          placeholder="С уважением, приёмная комиссия. Телефон: +7 900 000-00-00"
+        />
+        <p className="mt-1 text-xs text-[var(--text-muted)]">
+          Дописывается к письму о выдаче документа, отделённая чертой. Рекламе здесь не место:
+          рекламный кусок делает рекламным всё письмо, а письмо о выдаче уходит без согласия
+          на рекламу.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          size="sm"
+          variant="primary"
+          disabled={save.isPending}
+          onClick={() => {
+            setNote('');
+            save.mutate();
+          }}
+        >
+          {save.isPending ? 'Сохраняем…' : 'Сохранить'}
+        </Button>
+        <Button
+          size="sm"
+          icon={<Send size={14} />}
+          disabled={test.isPending}
+          onClick={() => {
+            setNote('');
+            test.mutate();
+          }}
+        >
+          {test.isPending ? 'Отправляем…' : 'Проверить отправку'}
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
+          Свернуть
+        </Button>
+        {note && <span className="text-sm text-[var(--text-muted)]">{note}</span>}
+      </div>
+    </div>
   );
 }

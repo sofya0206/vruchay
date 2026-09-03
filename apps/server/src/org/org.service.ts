@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Prisma, type DateFormat, type UiTheme } from '@prisma/client';
+import { Prisma, type DateFormat, type UiDensity, type UiTheme } from '@prisma/client';
 import type { Env } from '../config/env';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReferralService } from '../referral/referral.service';
@@ -24,6 +24,7 @@ export const publicProfileSelect = {
   publicPageEnabled: true,
   publicSearchByName: true,
   publicIndexable: true,
+  trashDays: true,
   verifyNameMode: true,
   verifyDomain: true,
 } satisfies Prisma.OrganizationSelect;
@@ -296,16 +297,19 @@ export class OrgService {
   async preferences(userId: string) {
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
-      select: { theme: true, dateFormat: true },
+      select: { theme: true, dateFormat: true, density: true },
     });
     return user;
   }
 
-  async updatePreferences(userId: string, dto: { theme?: UiTheme; dateFormat?: DateFormat }) {
+  async updatePreferences(
+    userId: string,
+    dto: { theme?: UiTheme; dateFormat?: DateFormat; density?: UiDensity },
+  ) {
     return this.prisma.user.update({
       where: { id: userId },
       data: dto,
-      select: { theme: true, dateFormat: true },
+      select: { theme: true, dateFormat: true, density: true },
     });
   }
 }

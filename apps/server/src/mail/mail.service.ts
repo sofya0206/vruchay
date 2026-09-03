@@ -166,6 +166,71 @@ export class MailService {
     return { ok: true as const };
   }
 
+  /**
+   * Правка отправителя: обратный адрес и подпись.
+   *
+   * Сам адрес и домен не меняются — они подтверждены DNS, и подмена
+   * означала бы отправку от чужого имени. Меняется только то, что
+   * организация вправе написать о себе сама.
+   */
+  async updateSender(
+    orgId: string,
+    senderId: string,
+    data: { displayName?: string; replyTo?: string; signature?: string },
+  ) {
+    const sender = await this.prisma.sender.findFirst({ where: { id: senderId, orgId } });
+    if (!sender) throw new NotFoundException('Отправитель не найден');
+
+    const replyTo = data.replyTo?.trim().toLowerCase() ?? sender.replyTo;
+    if (replyTo && !isValidEmail(replyTo)) {
+      throw new BadRequestException('Некорректный адрес для ответов');
+    }
+
+    return this.prisma.sender.update({
+      where: { id: senderId },
+      data: {
+        ...(data.displayName === undefined ? {} : { displayName: data.displayName.trim() }),
+        ...(data.replyTo === undefined ? {} : { replyTo }),
+        // Подпись — пользовательский HTML, чистим тем же способом, что тело
+        // письма: иначе туда попадут скрипты и ссылки javascript:.
+        ...(data.signature === undefined ? {} : { signature: sanitizeEmailHtml(data.signature) }),
+      },
+    });
+  }
+
+  /**
+   * Тестовое письмо самому себе.
+   *
+   * Уходит только на адрес того, кто нажал кнопку, и никуда больше:
+   * иначе кнопка «проверить» стала бы способом разослать что угодно
+   * кому угодно с подтверждённого домена.
+   */
+  async sendTest(orgId: string, senderId: string, toEmail: string) {
+    const sender = await this.prisma.sender.findFirst({
+      where: { id: senderId, orgId },
+      include: { domain: { select: { status: true, domain: true } } },
+    });
+    if (!sender) throw new NotFoundException('Отправитель не найден');
+    if (sender.domain.status !== 'verified') {
+      throw new BadRequestException(`Домен ${sender.domain.domain} не подтверждён — отправка невозможна`);
+    }
+    if (!isValidEmail(toEmail)) throw new BadRequestException('Некорректный адрес');
+
+    const body =
+      '<p style="font-size:15px">Это проверочное письмо из кабинета «Вручай».</p>' +
+      '<p style="font-size:15px">Если оно дошло и в поле «от кого» стоит то, что вы ожидали, ' +
+      'отправка настроена верно. Ответьте на него, чтобы проверить адрес для ответов.</p>';
+
+    const { providerMessageId } = await this.providerFor('smtp').send({
+      from: { email: sender.email, name: sender.displayName },
+      replyTo: sender.replyTo || undefined,
+      to: toEmail,
+      subject: 'Проверка отправки — Вручай',
+      html: renderLetterBody({ kind: 'transactional', bodyHtml: body, signature: sender.signature }),
+    });
+    return { ok: true as const, providerMessageId };
+  }
+
   // ─── Шаблоны писем ───────────────────────────────────────────────────────
 
   async saveTemplate(
@@ -444,7 +509,14 @@ export class MailService {
     // Письма по заявкам с форм шаблона могут не иметь — отправитель тогда
     // берётся по умолчанию, а тело письма служебное.
     const sender = email.template?.sender
-      ? { email: email.template.sender.email, displayName: email.template.sender.displayName }
+      ? {
+          email: email.template.sender.email,
+          displayName: email.template.sender.displayName,
+          // Обратный адрес и подпись задаются на отправителе: письма часто
+          // уходят с noreply, а отвечать участник должен живому человеку.
+          replyTo: email.template.sender.replyTo || undefined,
+          signature: email.template.sender.signature,
+        }
       : await this.resolveSender(email.orgId);
     if (!sender) {
       this.logger.error(`Письмо ${emailId}: отправка не настроена — нет PLATFORM_MAIL_FROM`);
@@ -498,7 +570,7 @@ export class MailService {
         replyTo: sender.replyTo,
         to: email.toEmail,
         subject: email.subject,
-        html: this.trackOpens(this.letterBody(email, data), email.id),
+        html: this.trackOpens(this.letterBody(email, data, sender.signature), email.id),
         attachments,
         reference: email.id,
         // Отписка ещё и заголовком: почтовые службы показывают по нему
@@ -593,6 +665,7 @@ export class MailService {
       template: { bodyHtml: string; advertiserName: string | null } | null;
     },
     data: Record<string, string>,
+    signature = '',
   ): string {
     // Готовый текст сервиса (уведомление о сроке) — как есть: он собран
     // нами с экранированием, переменных в нём нет.
@@ -600,7 +673,9 @@ export class MailService {
       email.bodyHtml ??
       (email.template ? renderHtmlTemplate(email.template.bodyHtml, data) : DEFAULT_BODY_HTML);
 
-    if (email.kind !== 'marketing') return renderLetterBody({ kind: 'transactional', bodyHtml });
+    if (email.kind !== 'marketing') {
+      return renderLetterBody({ kind: 'transactional', bodyHtml, signature });
+    }
 
     return renderLetterBody({
       kind: 'marketing',
