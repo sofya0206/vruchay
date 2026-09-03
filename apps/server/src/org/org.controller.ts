@@ -48,6 +48,7 @@ const verifyDomainSchema = z.object({
 const preferencesSchema = z.object({
   theme: z.enum(['system', 'light', 'dark']).optional(),
   dateFormat: z.enum(['numeric', 'long', 'iso']).optional(),
+  density: z.enum(['comfortable', 'compact']).optional(),
 });
 
 /** Логотип — не фон формата A4: двух мегабайт хватает любому. */

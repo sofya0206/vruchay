@@ -31,6 +31,13 @@ export const LETTER_KIND_LABELS: Record<LetterKind, string> = {
 export interface TransactionalLetter {
   kind: 'transactional';
   bodyHtml: string;
+  /**
+   * Подпись отправителя из настроек: «С уважением, приёмная комиссия».
+   * Её пишет сама организация, поэтому письмо по-прежнему уходит только
+   * тем, что написал оператор, — просто часть текста задана один раз
+   * на отправителя, а не в каждом шаблоне.
+   */
+  signature?: string;
 }
 
 /** Рекламное письмо: рекламодатель и отписка обязательны, не по желанию. */
@@ -53,11 +60,24 @@ export function renderLetterBody(letter: Letter): string {
   if (letter.kind === 'marketing') {
     return letter.bodyHtml + marketingFooter(letter.advertiserName, letter.unsubscribeUrl);
   }
-  // Транзакционное письмо уходит ровно тем, что написал оператор.
-  // Ни подписи, ни рекламного низа, ни ссылки отписки: отписка от выдачи
-  // собственного документа бессмысленна, а «Реклама» на таком письме —
-  // прямое признание того, чего не было.
-  return letter.bodyHtml;
+  /*
+   * Транзакционное письмо уходит ровно тем, что написал оператор:
+   * его текстом и его подписью. Ни рекламного низа, ни ссылки отписки —
+   * отписка от выдачи собственного документа бессмысленна, а «Реклама»
+   * на таком письме была бы признанием того, чего не было.
+   *
+   * Подпись отделена чертой: иначе она сливается с текстом письма,
+   * и участник читает её как продолжение сообщения о награждении.
+   */
+  const signature = letter.signature?.trim();
+  if (!signature) return letter.bodyHtml;
+  return (
+    letter.bodyHtml +
+    '<div style="margin-top:24px;padding-top:16px;border-top:1px solid #e5e5e5;' +
+    'color:#555;font-size:14px">' +
+    signature +
+    '</div>'
+  );
 }
 
 /**

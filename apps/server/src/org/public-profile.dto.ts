@@ -74,6 +74,18 @@ export const updatePublicProfileSchema = z
     publicSearchByName: z.boolean(),
     consentConfirmed: z.boolean().optional(),
     publicIndexable: z.boolean(),
+    /*
+     * Сколько материал лежит в корзине до безвозвратного удаления.
+     * Потолок в 90 дней — не техническое ограничение, а напоминание:
+     * держать персональные данные дольше, чем требует цель, запрещает
+     * ч. 7 ст. 5 152-ФЗ, а корзина существует ради «удалили по ошибке»,
+     * а не ради архива.
+     */
+    trashDays: z.coerce
+      .number()
+      .int()
+      .min(1, 'Меньше суток — человек не успеет заметить ошибку')
+      .max(90, 'Дольше трёх месяцев корзина перестаёт быть корзиной'),
     verifyNameMode: z.enum(['full', 'initials', 'none']),
   })
   .partial()

@@ -25,11 +25,20 @@ import { uuidSchema } from '../documents/documents.dto';
 import { HumansOnlyGuard } from './humans-only.guard';
 import { SessionService, clearSessionKeys, clientMeta } from './session.service';
 import { TotpService } from './totp.service';
+import { AccountDeletionService } from './account-deletion.service';
 import { CurrentUser } from '../common/current-user.decorator';
 import type { SessionUser } from './auth.service';
 
 /** Сколько ждём код после верного пароля. Дольше — уже не «продолжение входа». */
 const PENDING_LOGIN_TTL_MS = 5 * 60 * 1000;
+
+/**
+ * Удаление учётной записи подтверждается паролем: действие необратимо,
+ * а открытая чужая вкладка — самый обычный способ её потерять.
+ */
+const deleteAccountSchema = z.object({
+  password: z.string().min(1, 'Введите пароль'),
+});
 
 const loginSchema = z.object({
   email: z.string().trim().toLowerCase().email('Некорректный адрес электронной почты').max(254),
@@ -95,6 +104,7 @@ export class AuthController {
     private readonly sessions: SessionService,
     private readonly totp: TotpService,
     private readonly config: ConfigService<Env, true>,
+    private readonly deletion: AccountDeletionService,
   ) {}
 
   // Подбор пароля: не более 10 попыток с одного адреса за 5 минут.
@@ -238,6 +248,35 @@ export class AuthController {
   async logout(@Req() req: FastifyRequest) {
     await this.sessions.close(req);
     return { ok: true };
+  }
+
+  /**
+   * Что мешает удалить учётную запись. Показывается на экране заранее,
+   * до ввода пароля: препятствия должны быть видны раньше решения.
+   */
+  @Get('account/blockers')
+  @UseGuards(AuthGuard, HumansOnlyGuard)
+  async deletionBlockers(@Req() req: FastifyRequest) {
+    const { userId } = (req as unknown as AuthenticatedRequest).currentUser;
+    return { blockers: await this.deletion.blockers(userId) };
+  }
+
+  /**
+   * Удалить свою учётную запись. Токену API здесь делать нечего:
+   * это распоряжение человека о себе, а не действие программы.
+   */
+  @Delete('account')
+  @UseGuards(AuthGuard, HumansOnlyGuard)
+  @Throttle({ max: 5, timeWindow: '15 minutes' })
+  async deleteAccount(
+    @Req() req: FastifyRequest,
+    @Body(new ZodValidationPipe(deleteAccountSchema)) dto: z.infer<typeof deleteAccountSchema>,
+  ) {
+    const { userId } = (req as unknown as AuthenticatedRequest).currentUser;
+    const result = await this.deletion.delete(userId, dto.password);
+    // Куку гасим сразу: учётной записи, которой она принадлежала, больше нет.
+    await this.sessions.close(req);
+    return result;
   }
 
   @Get('me')

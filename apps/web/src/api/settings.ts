@@ -13,6 +13,10 @@ export interface Sender {
   email: string;
   displayName: string;
   isDefault: boolean;
+  /** Куда придёт ответ участника. Пусто — на сам адрес отправителя. */
+  replyTo: string;
+  /** Подпись, которая дописывается к письму о выдаче документа. */
+  signature: string;
 }
 
 export interface MailDomain {
@@ -60,6 +64,11 @@ export const settingsApi = {
   deleteDomain: (id: string) => api.delete<{ ok: true }>(`/mail/domains/${id}`),
   addSender: (domainId: string, email: string, displayName: string) =>
     api.post<Sender>('/mail/senders', { domainId, email, displayName }),
+  updateSender: (id: string, patch: { displayName?: string; replyTo?: string; signature?: string }) =>
+    api.patch<Sender>(`/mail/senders/${id}`, patch),
+  // Проверочное письмо уходит только на собственный адрес нажавшего —
+  // это решает сервер, тело запроса ему не нужно.
+  testSender: (id: string) => api.post<{ ok: true }>(`/mail/senders/${id}/test`),
   deleteSender: (id: string) => api.delete<{ ok: true }>(`/mail/senders/${id}`),
 
   integrations: () => api.get<Integration[]>('/integrations/tilda'),

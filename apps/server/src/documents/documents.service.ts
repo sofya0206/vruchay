@@ -320,10 +320,29 @@ export class DocumentsService {
    * Возвращает число удалённых — оно попадает в журнал, иначе про молчаливую
    * ночную работу нельзя сказать, шла она вообще или нет.
    */
-  async purgeExpired(olderThan: Date): Promise<number> {
-    const expired = await this.prisma.document.findMany({
-      where: { deletedAt: { not: null, lt: olderThan } },
-      select: { id: true },
+  async purgeExpired(defaultOlderThan: Date, now: Date = new Date()): Promise<number> {
+    /*
+     * Срок держит организация, а не общая константа: она оператор этих
+     * данных и сама решает, сколько им лежать (ч. 7 ст. 5 152-ФЗ).
+     * Поэтому берём всё, что лежит в корзине дольше самого короткого
+     * из возможных сроков, и отсеиваем по сроку конкретной организации.
+     *
+     * Отбирать по каждой организации отдельным запросом незачем:
+     * в корзине единицы материалов, а организаций у крупного клиента
+     * может быть много.
+     */
+    const candidates = await this.prisma.document.findMany({
+      where: { deletedAt: { not: null } },
+      select: { id: true, deletedAt: true, org: { select: { trashDays: true } } },
+    });
+
+    const expired = candidates.filter((doc) => {
+      if (!doc.deletedAt) return false;
+      const days = doc.org?.trashDays;
+      if (days === undefined) return doc.deletedAt < defaultOlderThan;
+      const purgeAt = new Date(doc.deletedAt);
+      purgeAt.setDate(purgeAt.getDate() + days);
+      return purgeAt <= now;
     });
 
     for (const doc of expired) {

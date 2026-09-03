@@ -16,6 +16,7 @@ import type { LucideIcon } from 'lucide-react';
 import { MyProfile, OrgName } from './Organization';
 import { ChangePassword } from './ChangePassword';
 import { TwoFactor } from './TwoFactor';
+import { DeleteAccount } from './DeleteAccount';
 import { Billing } from './Billing';
 import { MailDomains } from './MailDomains';
 import { VerifyDomain } from './VerifyDomain';
@@ -27,6 +28,7 @@ import { AuditLog } from './AuditLog';
 import { ApiTokens } from './ApiTokens';
 import { Interface } from './Interface';
 import { PublicProfile } from './PublicProfile';
+import { RetentionPolicy } from './RetentionPolicy';
 import { InviteFriend } from './InviteFriend';
 import { Support } from './Support';
 import { Roadmap } from './Roadmap';
@@ -64,6 +66,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         <MyProfile />
         <ChangePassword />
         <TwoFactor />
+        <DeleteAccount />
       </Stack>
     ),
   },
@@ -114,7 +117,17 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     ),
   },
   { path: 'interface', title: 'Интерфейс', icon: Palette, element: <Interface /> },
-  { path: 'privacy', title: 'Конфиденциальность', icon: Eye, element: <PublicProfile /> },
+  {
+    path: 'privacy',
+    title: 'Конфиденциальность',
+    icon: Eye,
+    element: (
+      <Stack>
+        <PublicProfile />
+        <RetentionPolicy />
+      </Stack>
+    ),
+  },
   { path: 'referral', title: 'Пригласить друга', icon: Gift, element: <InviteFriend /> },
   {
     path: 'support',

@@ -11,6 +11,8 @@ export interface ResolvedSender {
   replyTo?: string;
   /** Есть только у отправителя на своём домене — по нему проверяется статус. */
   domainId?: string;
+  /** Подпись из настроек отправителя; дописывается к транзакционному письму. */
+  signature?: string;
 }
 
 /**
