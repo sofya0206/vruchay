@@ -3,6 +3,11 @@
 User-agent: *
 Allow: /$
 Allow: /privacy
+# База знаний открыта намеренно: её читают до регистрации, и чаще
+# не человек, а его ИИ-помощник.
+Allow: /docs
+Allow: /llms.txt
+Allow: /llms-full.txt
 Disallow: /login
 Disallow: /settings
 Disallow: /invoices

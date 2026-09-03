@@ -1,0 +1,12 @@
+# Собранное, а не написанное
+dist
+build
+node_modules
+**/generated/**
+
+# Снимок документации API и файлы для машинного чтения: их пишет
+# scripts/sync-api-docs.mjs, и они обязаны совпадать с docs/api побайтно.
+# Переформатирование здесь разводит копию с источником — это ловит sync.test.ts.
+apps/web/src/docs/content/
+apps/web/public/llms.txt
+apps/web/public/llms-full.txt
