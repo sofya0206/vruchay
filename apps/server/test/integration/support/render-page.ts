@@ -1,6 +1,6 @@
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { sheetLayout, substituteVariables } from '@gramota/shared';
+import { resolveRichDoc, sheetLayout, substituteVariables } from '@gramota/shared';
 import type { RenderController } from '../../../src/render/render.controller';
 
 /**
@@ -90,11 +90,7 @@ function renderSheet(layout: unknown, data: RenderData, values: Record<string, s
   const elements = parsed.data
     .map((element) => {
       if (element.type === 'text') {
-        return box(
-          element,
-          textStyle(element.props),
-          substituteVariables(element.props.text, values),
-        );
+        return box(element, textStyle(element.props), plainText(element.props.doc, values));
       }
       if (element.type === 'qr') {
         // Код рисовать незачем: проверяется он не глазами, а страницей
@@ -110,6 +106,29 @@ function renderSheet(layout: unknown, data: RenderData, values: Record<string, s
     .join('');
 
   return `<div class="sheet">${elements}</div>`;
+}
+
+/**
+ * Текст блока строкой — тем же разбором, каким его печатает кабинет.
+ *
+ * Раньше здесь стояло `substituteVariables(element.props.text, …)`, но
+ * текст блока перестал быть строкой: он хранится деревом с полями, а
+ * схема отдаёт его в `props.doc`. Двойник страницы об этом не знал, читал
+ * пропавшее `props.text` и падал на `undefined.replace` — весь выпуск в
+ * интеграционном слое валился, хотя кабинет печатал нормально.
+ *
+ * Подстановку значений делает сам `resolveRichDoc`: незаполненные поля
+ * исчезают с листа, как и на печати.
+ */
+function plainText(doc: Parameters<typeof resolveRichDoc>[0], values: Record<string, string>): string {
+  return resolveRichDoc(doc, { data: values, unfilled: 'blank' })
+    .map((block) => {
+      const runs = block.content
+        .map((node) => (node.type === 'break' ? '\n' : node.text))
+        .join('');
+      return block.marker ? `${block.marker} ${runs}` : runs;
+    })
+    .join('\n');
 }
 
 interface Box {
