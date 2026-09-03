@@ -53,6 +53,18 @@ export const updateDocumentSchema = z
     eventPlace: z.string().trim().max(200),
     eventHours: z.string().trim().max(50),
 
+    /**
+     * Дата выдачи — днём, без времени; null — в день выпуска. Это дата
+     * награждения, а не набор мероприятия: у мероприятия даты живым
+     * текстом выше, а здесь нужно одно число для «выдан 17.06.2026».
+     */
+    issueDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Дата в виде ГГГГ-ММ-ДД')
+      .refine((v) => !Number.isNaN(Date.parse(v)), 'Такой даты нет')
+      .transform((v) => new Date(`${v}T00:00:00Z`))
+      .nullable(),
+
     /** null — убрать материал из разделов, а не «не менять». */
     category: documentCategory.nullable(),
 

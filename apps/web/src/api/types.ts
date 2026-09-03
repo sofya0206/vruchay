@@ -81,6 +81,8 @@ export interface DocumentDetail extends DocumentSummary {
    */
   expiresIn: string | null;
   expiresAt: string | null;
+  /** Дата выдачи днём (ГГГГ-ММ-ДД) либо null — в день выпуска. */
+  issueDate: string | null;
   sheets: Sheet[];
 }
 

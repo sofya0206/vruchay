@@ -27,6 +27,8 @@ export interface RenderTokenPayload {
    * там же и тогда же, что и publicId, по той же причине.
    */
   code?: string;
+  /** Регистрационный номер экземпляра, выделенный до печати, — как и publicId. */
+  regNumber?: string;
   /** Unix-время истечения, в секундах. */
   exp: number;
 }

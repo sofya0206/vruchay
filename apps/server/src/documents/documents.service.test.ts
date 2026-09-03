@@ -1,3 +1,4 @@
+import { CURRENT_LAYOUT_SCHEMA_VERSION } from '@gramota/shared';
 import { describe, expect, it } from 'vitest';
 import { NotFoundException } from '@nestjs/common';
 import { extractVariables } from '@gramota/shared';
@@ -138,7 +139,7 @@ describe('создание из заготовки', () => {
     const result = payload(created[0]);
     const layout = result.sheet.layout as { type: string }[];
     expect(layout.length).toBeGreaterThan(0);
-    expect(result.sheet.schemaVersion).toBe(1);
+    expect(result.sheet.schemaVersion).toBe(CURRENT_LAYOUT_SCHEMA_VERSION);
     // Заготовке нужна колонка «place», иначе «за %place_word место»
     // напечатается как «за  место».
     expect(result.columns).toContain('place');

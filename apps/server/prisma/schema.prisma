@@ -181,6 +181,12 @@ model Document {
   eventDate   String @default("") @map("event_date")
   eventPlace  String @default("") @map("event_place")
   eventHours  String @default("") @map("event_hours")
+  /**
+   * Дата выдачи, если она не совпадает с днём выпуска: грамоты за прошедшее
+   * мероприятие печатают позже, а на них должна стоять дата награждения.
+   * null — дата выпуска, как и раньше.
+   */
+  issueDate   DateTime? @map("issue_date") @db.Date
 
   /**
    * Срок действия выпускаемых документов — правило, а не факт.
@@ -305,6 +311,16 @@ model File {
    * Задним числом код им не назначается — на их бумаге его всё равно нет.
    */
   publicCode    String?  @unique @map("public_code")
+  /**
+   * Регистрационный номер «по-бухгалтерски»: «142/2026», сквозной
+   * у организации за год. Выделяется при выпуске экземпляра, до печати,
+   * из счётчика IssueCounter — и печатается на документе полем reg_number.
+   *
+   * Не то же самое, что публичный код: номер ведёт организация для своей
+   * отчётности, код — для проверки посторонним. Первый может повторяться
+   * между организациями, второй уникален на весь сервис.
+   */
+  regNumber     String?  @map("reg_number")
   verifyRevoked Boolean  @default(false) @map("verify_revoked")
   createdAt     DateTime @default(now()) @map("created_at")
   deletedAt     DateTime? @map("deleted_at")
@@ -1289,4 +1305,21 @@ model AwardRule {
 
   @@unique([ruleSetId, position])
   @@map("award_rules")
+}
+
+/**
+ * Счётчик регистрационных номеров организации за год.
+ *
+ * Отдельная таблица, а не `MAX(reg_number) + 1`: воркеры выпускают
+ * документы параллельно, и два из них взяли бы один номер. Атомарный
+ * `INSERT … ON CONFLICT DO UPDATE … RETURNING` выдаёт номера без гонок.
+ * Год в ключе — это «сбрасывать 1 января» без отдельной настройки.
+ */
+model IssueCounter {
+  orgId String @map("org_id") @db.Uuid
+  year  Int
+  value Int    @default(0)
+
+  @@id([orgId, year])
+  @@map("issue_counters")
 }

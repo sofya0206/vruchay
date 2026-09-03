@@ -3,6 +3,13 @@ import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { defineConfig } from 'vite';
 
+/**
+ * Куда проксировать API. Переопределяется переменной окружения, чтобы
+ * второй стенд (из worktree, на другом порту) не спорил с основным
+ * за localhost:3000.
+ */
+const API_TARGET = process.env.VITE_API_TARGET ?? 'http://localhost:3000';
+
 export default defineConfig({
   plugins: [
     react(),
@@ -51,8 +58,8 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/api': { target: 'http://localhost:3000', changeOrigin: true },
-      '/health': 'http://localhost:3000',
+      '/api': { target: API_TARGET, changeOrigin: true },
+      '/health': API_TARGET,
     },
   },
   // Тот же прокси для просмотра собранной версии: нужен, чтобы проверять
@@ -60,8 +67,8 @@ export default defineConfig({
   preview: {
     port: 4173,
     proxy: {
-      '/api': { target: 'http://localhost:3000', changeOrigin: true },
-      '/health': 'http://localhost:3000',
+      '/api': { target: API_TARGET, changeOrigin: true },
+      '/health': API_TARGET,
     },
   },
 });

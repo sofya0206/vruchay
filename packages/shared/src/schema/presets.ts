@@ -1,5 +1,5 @@
 import { SYSTEM_VARIABLE_NAMES } from '../variables';
-import { VARIABLE_RE, type SheetLayout } from './layout';
+import { textProps, VARIABLE_RE, type SheetLayout } from './layout';
 
 /**
  * Готовые раскладки документа.
@@ -597,6 +597,13 @@ function textElement(
   const isName = role === 'name';
   const isTitle = role === 'title';
 
+  /*
+   * Через разбор, а не литералом: умолчания новых свойств живут в схеме,
+   * и заготовка обязана получить ровно те же, что получил бы блок,
+   * вставленный руками. Текст отдаём в прежнем плоском виде — разбор сам
+   * превращает «%name» в поля, и это та же дорога, которой идут старые
+   * сохранённые макеты.
+   */
   return {
     id,
     type: 'text',
@@ -606,7 +613,12 @@ function textElement(
     h: o.h,
     rotation: 0,
     z,
-    props: {
+    opacity: 1,
+    locked: false,
+    hidden: false,
+    groupId: null,
+    name: null,
+    props: textProps.parse({
       text: o.text,
       fontFamily: isName
         ? spec.nameFont
@@ -620,11 +632,8 @@ function textElement(
       letterSpacing: role === 'label' || isTitle ? Number((o.size * 0.1 * MM_TO_PT).toFixed(2)) : 0,
       bold: o.bold || isTitle,
       italic: isName ? (spec.nameItalic ?? false) : false,
-      underline: false,
       uppercase: role === 'label',
-      strokeWidth: 0,
-      strokeColor: '#ffffff',
       autoFit: true,
-    },
+    }),
   };
 }

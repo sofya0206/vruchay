@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sheetLayout, extractVariables, VARIABLE_RE } from './layout';
+import { CURRENT_LAYOUT_SCHEMA_VERSION, sheetLayout, extractVariables, VARIABLE_RE } from './layout';
 import { PAGE_FORMATS, rotate } from './page-sizes';
 import {
   buildStarterLayout,
@@ -120,7 +120,7 @@ describe('заготовки', () => {
       pageHeightMm: 210,
     });
     expect(sheet.position).toBe(0);
-    expect(sheet.schemaVersion).toBe(1);
+    expect(sheet.schemaVersion).toBe(CURRENT_LAYOUT_SCHEMA_VERSION);
     expect(sheet.layout.length).toBeGreaterThan(0);
   });
 

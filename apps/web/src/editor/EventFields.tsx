@@ -8,6 +8,8 @@ export interface EventValues {
   eventDate: string;
   eventPlace: string;
   eventHours: string;
+  /** Дата выдачи днём (ГГГГ-ММ-ДД); пусто — в день выпуска. */
+  issueDate: string;
 }
 
 const FIELDS: Array<{
@@ -60,7 +62,8 @@ export function EventFields({
   onDraft,
 }: {
   doc: DocumentDetail;
-  onSave: (values: Partial<EventValues>) => void;
+  /** Дата выдачи уходит null, когда поле очищено: «в день выпуска». */
+  onSave: (values: Partial<Record<keyof EventValues, string | null>>) => void;
   /**
    * Набранное прямо сейчас, ещё не сохранённое. Нужно холсту: он рисует
    * подставленные значения, и без этого название появлялось бы на листе
@@ -83,8 +86,8 @@ export function EventFields({
   }
 
   function commit(key: keyof EventValues) {
-    if (values[key] === doc[key]) return;
-    onSave({ [key]: values[key] });
+    if (values[key] === (doc[key] ?? '')) return;
+    onSave({ [key]: key === 'issueDate' ? values[key] || null : values[key] });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
@@ -118,6 +121,23 @@ export function EventFields({
         </div>
       ))}
 
+      {/* Дата выдачи — отдельно от дат мероприятия: это одно число для
+          «выдан 17.06.2026», а не «17–19 июня». Пусто — день выпуска:
+          грамоты за прошедшее мероприятие печатают позже награждения. */}
+      <div>
+        <Label>Дата выдачи</Label>
+        <Input
+          type="date"
+          value={values.issueDate}
+          onChange={(e) => edit('issueDate', e.target.value)}
+          onBlur={() => commit('issueDate')}
+        />
+        <span className="mt-1 block text-xs text-[var(--text-muted)]">
+          Пусто — день выпуска. Поля: <code className="font-mono">%date</code>,{' '}
+          <code className="font-mono">%date_long</code>, <code className="font-mono">%year</code>
+        </span>
+      </div>
+
       {saved && (
         <p className="flex items-center gap-1.5 text-sm text-[var(--accent)]">
           <Check size={14} /> Сохранено
@@ -133,5 +153,6 @@ function pick(doc: DocumentDetail): EventValues {
     eventDate: doc.eventDate ?? '',
     eventPlace: doc.eventPlace ?? '',
     eventHours: doc.eventHours ?? '',
+    issueDate: doc.issueDate ? doc.issueDate.slice(0, 10) : '',
   };
 }

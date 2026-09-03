@@ -14,12 +14,22 @@ export interface PageSize {
   heightMm: number;
 }
 
-/** Книжные форматы. Альбомные получаются переворотом — см. rotate(). */
+/**
+ * Книжные форматы. Альбомные получаются переворотом — см. rotate().
+ *
+ * Letter и Legal — для партнёров за рубежом: у них A4 не печатается
+ * без полей. Квадрат и 16:9 — не бумага, а картинка для соцсетей
+ * и экрана: бейдж участника, диплом в сторис.
+ */
 export const PAGE_FORMATS = [
   { id: 'a3', label: 'A3', widthMm: 297, heightMm: 420 },
   { id: 'a4', label: 'A4', widthMm: 210, heightMm: 297 },
   { id: 'a5', label: 'A5', widthMm: 148, heightMm: 210 },
   { id: 'a6', label: 'A6', widthMm: 105, heightMm: 148 },
+  { id: 'letter', label: 'US Letter', widthMm: 216, heightMm: 279 },
+  { id: 'legal', label: 'US Legal', widthMm: 216, heightMm: 356 },
+  { id: 'square', label: 'Квадрат 1:1', widthMm: 210, heightMm: 210 },
+  { id: 'wide', label: 'Экран 16:9', widthMm: 167, heightMm: 297 },
 ] as const;
 
 export type PageOrientation = 'portrait' | 'landscape';

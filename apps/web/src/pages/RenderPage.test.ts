@@ -92,3 +92,50 @@ describe('usedFonts', () => {
     expect(usedFonts({ sheets: [sheet([])], data: {} })).toEqual([]);
   });
 });
+
+describe('usedFonts с марками', () => {
+  it('полужирная фамилия внутри обычной строки — отдельное начертание', () => {
+    const doc = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'Награждается ' },
+            { type: 'mergeField', attrs: { source: 'name' }, marks: [{ type: 'bold' }] },
+          ],
+        },
+      ],
+    };
+    const fonts = usedFonts({
+      sheets: [sheet([{ ...base, id: 'a', type: 'text', props: { doc, fontFamily: 'PT Serif' } }])],
+      data: { name: 'Иванов' },
+    });
+    expect(fonts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ family: 'PT Serif', weight: 400, text: 'Награждается ' }),
+        expect.objectContaining({ family: 'PT Serif', weight: 700, text: 'Иванов' }),
+      ]),
+    );
+  });
+
+  it('гарнитура из марки — своё семейство', () => {
+    const doc = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'Подпись: ' },
+            { type: 'text', text: 'Иванов', marks: [{ type: 'textStyle', attrs: { fontFamily: 'Caveat' } }] },
+          ],
+        },
+      ],
+    };
+    const fonts = usedFonts({
+      sheets: [sheet([{ ...base, id: 'a', type: 'text', props: { doc, fontFamily: 'PT Sans' } }])],
+      data: {},
+    });
+    expect(fonts.map((f) => f.family).sort()).toEqual(['Caveat', 'PT Sans']);
+  });
+});

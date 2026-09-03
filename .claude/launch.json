@@ -4,9 +4,40 @@
     {
       "name": "vruchay-api",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@gramota/server", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@gramota/server",
+        "dev"
+      ],
       "port": 3000
     },
-    { "name": "vruchay", "runtimeExecutable": "pnpm", "runtimeArgs": ["--filter", "@gramota/web", "dev"], "port": 5173 }
+    {
+      "name": "vruchay",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@gramota/web",
+        "dev"
+      ],
+      "port": 5173
+    },
+    {
+      "name": "vruchay-wt-api",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd apps/server && node dist/main.js"
+      ],
+      "port": 3877
+    },
+    {
+      "name": "vruchay-wt",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "VITE_API_TARGET=http://localhost:3877 pnpm --filter @gramota/web exec vite --port 5175 --strictPort"
+      ],
+      "port": 5175
+    }
   ]
 }

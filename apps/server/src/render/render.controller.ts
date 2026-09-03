@@ -1,6 +1,6 @@
 import { Controller, Get, NotFoundException, Param } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { mergeVariables } from '@gramota/shared';
+import { issuedAtOf, mergeVariables } from '@gramota/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { baseUrl, type Env } from '../config/env';
@@ -46,7 +46,11 @@ export class RenderController {
     if (!row) throw new NotFoundException('Ссылка недействительна');
 
     const doc = row.document;
-    const issuedAt = new Date();
+    // Дата выдачи материала, если задана; иначе — момент печати. От неё же
+    // считается срок действия: на листе и на странице проверки должна
+    // стоять одна пара дат, а не «выдан вчера, действителен от сегодня».
+    const issuedAt = issuedAtOf(doc.issueDate);
+    const total = await this.prisma.recipientRow.count({ where: { documentId: doc.id } });
     const sheets = await Promise.all(
       doc.sheets.map(async (sheet) => ({
         layout: sheet.layout,
@@ -66,12 +70,14 @@ export class RenderController {
       data: mergeVariables(row.data as Record<string, string>, {
         issuedAt,
         number: row.position + 1,
+        total,
         // Тем же правилом, что и воркер при записи файла: на бумаге
         // и на странице проверки должна стоять одна дата.
         expiresAt: expiresAtFor(issuedAt, doc),
         // На бумагу (%code) идёт короткий код, когда он есть: его и будут
         // диктовать по телефону. UUID остаётся только у старых выпусков.
         publicId: payload.code ?? payload.publicId ?? null,
+        regNumber: payload.regNumber ?? null,
         orgName: doc.org?.name,
         event: {
           name: doc.eventName,

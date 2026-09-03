@@ -72,6 +72,7 @@ export interface ValidationInput {
  * той же длины, что и настоящий идентификатор.
  */
 const SAMPLE_PUBLIC_ID = '00000000-0000-0000-0000-000000000000';
+const SAMPLE_REG_NUMBER = '1000/2026';
 
 /** Колонка с именем получателя — по ней ищут дубликаты и склонение. */
 const NAME_COLUMN = 'name';
@@ -150,7 +151,11 @@ export function validateBatch(input: ValidationInput): BatchValidation {
       mergeVariables(row.data, {
         issuedAt: input.issuedAt,
         number: row.position + 1,
+        total: rows.length,
         publicId: SAMPLE_PUBLIC_ID,
+        // Настоящий номер выделяется при выпуске; для измерения — образец
+        // той же длины, что и настоящий у крупной организации.
+        regNumber: SAMPLE_REG_NUMBER,
         orgName: document.orgName,
         event: {
           name: document.eventName,
@@ -178,10 +183,11 @@ export function validateBatch(input: ValidationInput): BatchValidation {
 
     // Переполнение блока.
     for (const target of targets) {
-      const text = renderTarget(target, data);
+      const rendered = renderTarget(target, data);
+      const text = rendered.text;
       if (!text.trim()) continue;
 
-      const result = cache.measure(target, text);
+      const result = cache.measure(target, rendered);
       if (result.fits) continue;
 
       const percent = Math.round((result.overflowRatio - 1) * 100);
