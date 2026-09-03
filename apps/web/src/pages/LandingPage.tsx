@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom';
 import {
-  Award,
   CheckCircle2,
   FileText,
   Globe,
@@ -16,6 +15,7 @@ import { Pricing } from '../landing/Pricing';
 import { ForBusiness } from '../landing/ForBusiness';
 import { Certificate } from '../landing/Certificate';
 import { Scope } from '../landing/Scope';
+import { SiteFooter, SiteHeader } from '../landing/Chrome';
 import { Meta } from '../seo/Meta';
 import { LANDING_JSON_LD } from '../seo/landing-schema';
 
@@ -59,7 +59,12 @@ export function LandingPage() {
         path="/"
         jsonLd={LANDING_JSON_LD}
       />
-      <Header />
+      <SiteHeader
+        links={[
+          { href: '#kak', label: 'Как это работает' },
+          { href: '#ceny', label: 'Цены', compact: true },
+        ]}
+      />
       <Hero />
       <HowItWorks />
       <Scope />
@@ -72,34 +77,8 @@ export function LandingPage() {
       <Pricing />
       <Faq />
       <FinalCta />
-      <Footer />
+      <SiteFooter />
     </div>
-  );
-}
-
-function Header() {
-  return (
-    <header className="sticky top-0 z-20 border-b border-[var(--line)] bg-[var(--surface)]/85 backdrop-blur">
-      <div className="mx-auto flex max-w-5xl items-center gap-3 px-6 py-3">
-        <span className="grid h-8 w-8 place-items-center rounded-lg bg-[var(--accent)] text-[var(--accent-contrast)]">
-          <Award size={17} strokeWidth={1.75} />
-        </span>
-        <span className="font-serif text-lg">Вручай</span>
-        <nav className="ml-auto flex items-center gap-1 text-sm">
-          <a href="#kak" className="rounded-lg px-3 py-1.5 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]">
-            Как это работает
-          </a>
-          <a href="#ceny" className="hidden rounded-lg px-3 py-1.5 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)] sm:inline">
-            Цены
-          </a>
-          <Link to="/login">
-            <Button size="sm" variant="primary">
-              Войти
-            </Button>
-          </Link>
-        </nav>
-      </div>
-    </header>
   );
 }
 
@@ -290,22 +269,5 @@ function FinalCta() {
         </Link>
       </div>
     </section>
-  );
-}
-
-function Footer() {
-  return (
-    <footer className="border-t border-[var(--line)]">
-      <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-3 px-6 py-8 text-sm text-[var(--text-muted)]">
-        <span className="font-serif text-[var(--text)]">Вручай</span>
-        <a href="/privacy" className="transition-colors hover:text-[var(--text)]">
-          Политика обработки данных
-        </a>
-        <a href="/oferta" className="transition-colors hover:text-[var(--text)]">
-          Оферта
-        </a>
-        <span className="ml-auto">© 2026</span>
-      </div>
-    </footer>
   );
 }

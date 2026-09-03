@@ -14,7 +14,12 @@ import { ChevronDown } from 'lucide-react';
  * что-то в ней изменится, менять надо и здесь.
  */
 
-const ITEMS = [
+export interface FaqItem {
+  q: string;
+  a: string;
+}
+
+const ITEMS: FaqItem[] = [
   {
     q: 'Что будет, если участников окажется больше, чем в тарифе?',
     a: 'Документы продолжат создаваться, превышение считается по 3 ₽ за штуку. Сервис не блокируется: остановить выдачу в разгар награждения — худшее, что можно сделать.',
@@ -49,20 +54,29 @@ const ITEMS = [
   },
 ];
 
-export function Faq() {
+interface Props {
+  /** Отраслевые страницы подставляют свои вопросы; главная живёт на общих. */
+  items?: FaqItem[];
+  title?: string;
+  lead?: string;
+}
+
+export function Faq({
+  items = ITEMS,
+  title = 'Вопросы, которые задают до подписания',
+  lead = 'Если вашего вопроса здесь нет — напишите, ответим по существу.',
+}: Props) {
   // Первый вопрос открыт: пустая гармошка не показывает, что внутри вообще есть.
   const [open, setOpen] = useState<number | null>(0);
 
   return (
     <section className="border-t border-[var(--line)]">
       <div className="mx-auto max-w-3xl px-6 py-16">
-        <h2 className="font-serif text-3xl">Вопросы, которые задают до подписания</h2>
-        <p className="mt-2 text-[var(--text-muted)]">
-          Если вашего вопроса здесь нет — напишите, ответим по существу.
-        </p>
+        <h2 className="font-serif text-3xl">{title}</h2>
+        <p className="mt-2 text-[var(--text-muted)]">{lead}</p>
 
         <div className="mt-10">
-          {ITEMS.map((item, i) => {
+          {items.map((item, i) => {
             const isOpen = open === i;
             return (
               <div key={item.q} className="border-b border-[var(--line)]">
