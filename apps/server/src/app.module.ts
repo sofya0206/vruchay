@@ -25,6 +25,7 @@ import { TeamModule } from './team/team.module';
 import { AuditModule } from './audit/audit.module';
 import { ReferralModule } from './referral/referral.module';
 import { ReviewsModule } from './reviews/reviews.module';
+import { SupportModule } from './support/support.module';
 import { OrgModule } from './org/org.module';
 import { OverviewModule } from './overview/overview.module';
 import { TokensModule } from './tokens/tokens.module';
@@ -59,6 +60,7 @@ import { PublicOrgModule } from './public-org/public-org.module';
     AuditModule,
     ReferralModule,
     ReviewsModule,
+    SupportModule,
     OrgModule,
     OverviewModule,
     TokensModule,
