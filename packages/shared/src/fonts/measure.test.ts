@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  applyFitStepToStyle,
+  CONTENT_AREA_EM,
   fitRuns,
   fitText,
   layoutRuns,
@@ -169,8 +171,10 @@ describe('помещается ли в блок', () => {
     const box = { w: 50, h: 12 };
     const r = fitText('Иванов Пётр Ильич', style({ fontSize: 30 }), box, true);
     expect(r.fits).toBe(true);
-    const check = layoutText('Иванов Пётр Ильич', style({ fontSize: r.fontSize }), box);
+    // Ступень — это не только кегль: межстрочный и разрядка ужимаются вместе с ним.
+    const check = layoutText('Иванов Пётр Ильич', applyFitStepToStyle(style({ fontSize: 30 }), r.fit), box);
     expect(check.heightMm).toBeLessThanOrEqual(box.h + 1e-9);
+    expect(r.step).toBeGreaterThan(0);
   });
 
   it('обводка съедает место в блоке', () => {
@@ -277,8 +281,10 @@ describe('прогоны', () => {
       small,
       { w: 1000, h: 100 },
     );
-    expect(one.heightMm).toBeCloseTo(ptToMm(10 * 1.2), 6);
-    expect(mixed.heightMm).toBeCloseTo(ptToMm(30 * 1.2), 6);
+    // Плюс хвост области глифов за строкой: при межстрочном 1,2 это 0,1 em.
+    const overhang = (size: number) => ptToMm((CONTENT_AREA_EM - 1.2) * size);
+    expect(one.heightMm).toBeCloseTo(ptToMm(10 * 1.2) + overhang(10), 6);
+    expect(mixed.heightMm).toBeCloseTo(ptToMm(30 * 1.2) + overhang(30), 6);
   });
 
   it('автомасштаб уменьшает прогоны в той же пропорции, что и блок', () => {

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { resolveRichDoc, sheetLayout, type SheetLayout } from '@gramota/shared';
 import { runFace } from '../render/RichText';
 import { SheetRenderer } from '../render/SheetRenderer';
+import { whenFitsSettle } from '../render/useAutoFit';
 import { SHEET_SELECTOR, overlayProblem, probePoints } from '../render/overlay-guard';
 
 interface RenderData {
@@ -142,7 +143,12 @@ export function RenderPage() {
         img.addEventListener('error', () => res(null), { once: true });
       }),
     );
-    void Promise.all([document.fonts.ready, ...images]).then(() => {
+    // Автомасштаб подбирает ступень уже после загрузки шрифтов и несколькими
+    // перерисовками; печатать, пока он не остановился, значит напечатать
+    // промежуточную ступень.
+    void Promise.all([document.fonts.ready, ...images])
+      .then(() => whenFitsSettle())
+      .then(() => {
       // fonts.ready разрешается и тогда, когда шрифт загрузить не удалось:
       // он означает «загрузка завершилась», а не «завершилась успешно».
       // Поэтому спрашиваем про каждое начертание отдельно. Без этой проверки

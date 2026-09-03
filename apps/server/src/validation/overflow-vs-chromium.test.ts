@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { chromium, type Browser, type Page } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { fitRuns, fitText, type BoxMm, type StyledRun, type TextStyle } from '@gramota/shared/fonts';
+import { applyFitStepToStyle, fitSteps } from '@gramota/shared';
 
 /*
  * Главная сверка всей функции: совпадает ли наш вердикт «влезает / обрежет»
@@ -239,6 +240,44 @@ interface Verdict {
 }
 
 /**
+ * Автомасштаб: на какой ступени лестницы остановился браузер и на какой —
+ * измеритель. Ступени у них одни (`fitSteps`), меряют они по-разному:
+ * браузер — своей вёрсткой, измеритель — метриками без браузера.
+ */
+interface FitVerdict {
+  block: string;
+  text: string;
+  /** Первая ступень, на которой браузер не обрезает; -1 — не влезло и на последней. */
+  chromiumStep: number;
+  ourStep: number;
+  ourFits: boolean;
+}
+
+/** Блоки с автомасштабом: тесные, чтобы лестница правда работала. */
+const FIT_CASES: Case[] = [
+  {
+    block: 'автомасштаб имени, PT Serif 30pt, 120×14 мм',
+    style: style({ fontFamily: 'PT Serif', fontSize: 30, bold: true }),
+    box: { w: 120, h: 14 },
+    texts: [
+      'Иванов Пётр',
+      'Петрова Мария Сергеевна',
+      'Константинопольский Владислав Вячеславович',
+      'Александропулос-Константиниди Апостолос',
+    ],
+  },
+  {
+    block: 'автомасштаб подзаголовка, PT Sans 14pt, 120×12 мм, межстрочный 1,3',
+    style: style({ fontSize: 14, lineHeight: 1.3 }),
+    box: { w: 120, h: 12 },
+    texts: [
+      'за участие в первенстве области по плаванию',
+      'за многолетний добросовестный труд и значительный вклад в развитие физической культуры',
+    ],
+  },
+];
+
+/**
  * Тесты с настоящим браузером идут только по явному требованию.
  *
  *   CHROMIUM_TESTS=1 pnpm --filter @gramota/server test
@@ -256,6 +295,7 @@ const CHROMIUM_TESTS = process.env.CHROMIUM_TESTS === '1';
 describe.skipIf(!CHROMIUM_TESTS)('вердикт «влезает» против настоящего Chromium', () => {
   let browser: Browser;
   const verdicts: Verdict[] = [];
+  const fitVerdicts: FitVerdict[] = [];
 
   beforeAll(async () => {
     browser = await chromium.launch({
@@ -415,11 +455,106 @@ describe.skipIf(!CHROMIUM_TESTS)('вердикт «влезает» против
       });
     }
 
+    for (const testCase of FIT_CASES) {
+      const steps = fitSteps(testCase.style.lineHeight);
+      const chromiumSteps = await page.evaluate(
+        async ({ style: s, box, texts, ladder }) => {
+          const host = document.getElementById('host')!;
+          host.innerHTML = '';
+          const el = document.createElement('div');
+          Object.assign(el.style, {
+            position: 'absolute',
+            left: '0',
+            top: '0',
+            width: `${box.w}mm`,
+            height: `${box.h}mm`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontFamily: s.fontFamily,
+            fontWeight: s.bold ? '700' : '400',
+            fontStyle: s.italic ? 'italic' : 'normal',
+            textTransform: s.uppercase ? 'uppercase' : 'none',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+            overflow: 'hidden',
+          });
+          host.appendChild(el);
+          await document.fonts.load(
+            `${s.italic ? 'italic' : 'normal'} ${s.bold ? 700 : 400} ${s.fontSize}pt "${s.fontFamily}"`,
+            texts.join(''),
+          );
+
+          const out: number[] = [];
+          for (const text of texts) {
+            el.textContent = text;
+            let found = -1;
+            for (let i = 0; i < ladder.length; i++) {
+              const fontSize = s.fontSize * ladder[i].fontScale;
+              el.style.fontSize = `${fontSize}pt`;
+              el.style.lineHeight = String(s.lineHeight * ladder[i].lineScale);
+              el.style.letterSpacing = `${s.letterSpacing + ladder[i].trackingEm * fontSize}pt`;
+              const clips =
+                el.scrollHeight > el.clientHeight + 0.5 || el.scrollWidth > el.clientWidth + 0.5;
+              if (!clips) {
+                found = i;
+                break;
+              }
+            }
+            out.push(found);
+          }
+          return out;
+        },
+        { style: testCase.style, box: testCase.box, texts: testCase.texts, ladder: steps },
+      );
+
+      testCase.texts.forEach((text, i) => {
+        const ours = fitText(text, testCase.style, testCase.box, true);
+        fitVerdicts.push({
+          block: testCase.block,
+          text,
+          chromiumStep: chromiumSteps[i],
+          ourStep: ours.step,
+          ourFits: ours.fits,
+        });
+      });
+    }
+
     await page.close();
   }, 120_000);
 
   afterAll(async () => {
     await browser?.close();
+  });
+
+  it('автомасштаб: измеритель не обещает ступень крупнее той, на которой остановился браузер', () => {
+    /*
+     * Та же логика, что и без автомасштаба: ошибиться можно только
+     * в сторону «ужать сильнее». Ступень мельче браузерной — лишняя
+     * осторожность; ступень крупнее — «сказали, что влезло», а обрезало.
+     */
+    const dangerous = fitVerdicts.filter(
+      (v) => v.ourFits && (v.chromiumStep === -1 || v.ourStep < v.chromiumStep),
+    );
+    expect(
+      dangerous.map((v) => `${v.block}: «${v.text}» — мы ${v.ourStep}, браузер ${v.chromiumStep}`),
+    ).toEqual([]);
+  });
+
+  it('автомасштаб: лестница действительно срабатывает, и измеритель не перестраховывается', () => {
+    expect(fitVerdicts.some((v) => v.chromiumStep > 0)).toBe(true);
+    const tooCautious = fitVerdicts.filter((v) => v.chromiumStep >= 0 && v.ourStep - v.chromiumStep > 2);
+    expect(
+      tooCautious.map((v) => `${v.block}: «${v.text}» — мы ${v.ourStep}, браузер ${v.chromiumStep}`),
+    ).toEqual([]);
+  });
+
+  it('автомасштаб: одна ступень — одно начертание и у браузера, и у измерителя', () => {
+    const steps = fitSteps(1.2);
+    const fitted = applyFitStepToStyle({ fontSize: 30, lineHeight: 1.2, letterSpacing: 0 }, steps[steps.length - 1]);
+    expect(fitted.fontSize).toBeCloseTo(15, 6);
+    expect(fitted.lineHeight).toBeCloseTo(1, 6);
+    expect(fitted.letterSpacing).toBeCloseTo(-0.45, 6);
   });
 
   it('пробы охватывают оба исхода — иначе сверять было бы нечего', () => {

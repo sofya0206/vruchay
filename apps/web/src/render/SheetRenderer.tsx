@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import {
+  applyFitStepToStyle,
   keepVariable,
+  NO_FIT,
   resolveHrefTemplate,
   resolveRichDoc,
   substituteVariables,
+  type FitStep,
   type ResolvedField,
   type ShapeElement,
   type SheetElement,
@@ -12,6 +15,7 @@ import {
   type TextElement,
 } from '@gramota/shared';
 import { RichText, type FieldRender } from './RichText';
+import { useAutoFit } from './useAutoFit';
 
 /**
  * Единый рендер листа: используется редактором, превью и страницей, которую
@@ -183,8 +187,23 @@ function origin(): string {
  * редактору поверх него. Оба обязаны получить один и тот же CSS — иначе
  * текст «прыгал» бы при входе в правку.
  */
-export function textBlockStyle(props: TextElement['props']): React.CSSProperties {
+export function textBlockStyle(props: TextElement['props'], fit: FitStep = NO_FIT): React.CSSProperties {
   const inset = props.padding + props.borderWidth;
+  // Кегль, межстрочный и разрядка на ступени лестницы — той же функцией,
+  // что и у измерителя: ужатый блок на печати совпадает с тем, что он посчитал.
+  const fitted = applyFitStepToStyle(
+    {
+      fontFamily: props.fontFamily,
+      fontSize: props.fontSize,
+      bold: props.bold,
+      italic: props.italic,
+      lineHeight: props.lineHeight,
+      letterSpacing: props.letterSpacing,
+      uppercase: props.uppercase,
+      strokeWidth: props.strokeWidth,
+    },
+    fit,
+  );
   return {
     display: 'flex',
     alignItems:
@@ -198,14 +217,14 @@ export function textBlockStyle(props: TextElement['props']): React.CSSProperties
     backgroundColor: props.background ?? undefined,
     border: props.borderWidth ? `${props.borderWidth}mm solid ${props.borderColor}` : undefined,
     fontFamily: props.fontFamily,
-    fontSize: `${props.fontSize}pt`,
+    fontSize: `${roundPt(fitted.fontSize)}pt`,
     color: props.color,
     fontWeight: props.bold ? 700 : 400,
     fontStyle: props.italic ? 'italic' : 'normal',
     textDecoration: props.underline ? 'underline' : 'none',
     textTransform: props.uppercase ? 'uppercase' : 'none',
-    lineHeight: props.lineHeight,
-    letterSpacing: `${props.letterSpacing}pt`,
+    lineHeight: roundPt(fitted.lineHeight),
+    letterSpacing: `${roundPt(fitted.letterSpacing)}pt`,
     textAlign: props.align,
     textShadow: props.shadow ? '0 0.3mm 0.6mm rgba(0,0,0,0.35)' : undefined,
     // Обводка кладётся под буквы (paint-order), иначе она съедала бы
@@ -223,14 +242,27 @@ export function textBlockStyle(props: TextElement['props']): React.CSSProperties
   };
 }
 
-function ElementView({
+/** Пункты до сотых — как в марках. */
+function roundPt(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function ElementView(props: ElementViewProps) {
+  if (props.element.type === 'text') return <TextElementView {...props} element={props.element} />;
+  return <PlainElementView {...props} />;
+}
+
+/**
+ * Текстовый блок — отдельным компонентом ради подгонки: у него есть
+ * состояние (ступень лестницы), которого у остальных блоков нет.
+ */
+function TextElementView({
   element,
   data,
   unfilled,
   fields,
   knownFields,
   fieldLabels,
-  verifyUrl,
   interactive,
   selected,
   onSelect,
@@ -238,9 +270,61 @@ function ElementView({
   onFieldClick,
   editing,
   renderEditing,
-}: ElementViewProps) {
-  const onMissing = unfilled === 'token' ? keepVariable : undefined;
-  const box: React.CSSProperties = {
+}: ElementViewProps & { element: TextElement }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const fit = useAutoFit(ref, element.props.autoFit && !editing, element.props.lineHeight, [
+    element.props,
+    element.w,
+    element.h,
+    data,
+    unfilled,
+    fields,
+  ]);
+
+  return (
+    <div
+      ref={ref}
+      data-element-id={element.id}
+      data-fit-step={fit.fontScale < 1 || fit.lineScale < 1 || fit.trackingEm !== 0 ? fit.fontScale : undefined}
+      onPointerDown={
+        interactive
+          ? (e: React.PointerEvent) => {
+              e.stopPropagation();
+              onSelect?.(element.id, e.shiftKey);
+            }
+          : undefined
+      }
+      onDoubleClick={
+        interactive && onEdit
+          ? (e: React.MouseEvent) => {
+              e.stopPropagation();
+              onEdit(element.id);
+            }
+          : undefined
+      }
+      className={selected ? 'outline-2 outline-indigo-500 outline-dashed' : undefined}
+      style={{ ...boxStyle(element), ...textBlockStyle(element.props, fit) }}
+    >
+      {editing && renderEditing ? (
+        renderEditing(element)
+      ) : (
+        <TextBody
+          element={element}
+          data={data}
+          unfilled={unfilled}
+          fields={fields}
+          knownFields={knownFields}
+          fieldLabels={fieldLabels}
+          onFieldClick={onFieldClick}
+          fit={fit}
+        />
+      )}
+    </div>
+  );
+}
+
+function boxStyle(element: SheetElement): React.CSSProperties {
+  return {
     position: 'absolute',
     left: `${element.x}mm`,
     top: `${element.y}mm`,
@@ -250,6 +334,20 @@ function ElementView({
     zIndex: element.z,
     opacity: element.opacity < 1 ? element.opacity : undefined,
   };
+}
+
+function PlainElementView({
+  element,
+  data,
+  unfilled,
+  verifyUrl,
+  interactive,
+  selected,
+  onSelect,
+  onEdit,
+}: ElementViewProps) {
+  const onMissing = unfilled === 'token' ? keepVariable : undefined;
+  const box = boxStyle(element);
 
   const common = {
     'data-element-id': element.id,
@@ -269,25 +367,7 @@ function ElementView({
     className: selected ? 'outline-2 outline-indigo-500 outline-dashed' : undefined,
   };
 
-  if (element.type === 'text') {
-    return (
-      <div {...common} style={{ ...box, ...textBlockStyle(element.props) }}>
-        {editing && renderEditing ? (
-          renderEditing(element)
-        ) : (
-          <TextBody
-            element={element}
-            data={data}
-            unfilled={unfilled}
-            fields={fields}
-            knownFields={knownFields}
-            fieldLabels={fieldLabels}
-            onFieldClick={onFieldClick}
-          />
-        )}
-      </div>
-    );
-  }
+  if (element.type === 'text') return null;
 
   if (element.type === 'image') {
     return (
@@ -407,6 +487,7 @@ function TextBody({
   knownFields,
   fieldLabels,
   onFieldClick,
+  fit,
 }: {
   element: TextElement;
   data?: Record<string, string>;
@@ -415,6 +496,7 @@ function TextBody({
   knownFields?: ReadonlySet<string> | null;
   fieldLabels?: Record<string, string>;
   onFieldClick?: (elementId: string, field: ResolvedField) => void;
+  fit: FitStep;
 }) {
   const blocks = useMemo(
     () =>
@@ -431,6 +513,7 @@ function TextBody({
       blocks={blocks}
       base={element.props}
       fields={fields}
+      fit={fit}
       labels={fieldLabels}
       onFieldClick={onFieldClick ? (field) => onFieldClick(element.id, field) : undefined}
     />

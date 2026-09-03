@@ -1,5 +1,6 @@
 export * from './schema/layout';
 export * from './schema/rich-text';
+export * from './schema/autofit';
 export * from './schema/rich-text-resolve';
 export * from './typography';
 export * from './schema/page-sizes';

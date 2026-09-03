@@ -1,6 +1,8 @@
 import type { CSSProperties, ReactNode } from 'react';
 import {
+  NO_FIT,
   SYSTEM_VARIABLE_NAMES,
+  type FitStep,
   type ResolvedBlock,
   type ResolvedField,
   type ResolvedInline,
@@ -36,11 +38,23 @@ export type FieldRender = 'value' | 'chip' | 'highlight';
 /** Ступень отступа списка в миллиметрах — примерно ширина двух букв. */
 export const INDENT_MM = 6;
 
+/**
+ * Ступень автомасштаба, применённая к прогону: кегль марки ужимается
+ * в той же доле, что и кегль блока, а разрядка марки получает ту же
+ * добавку в долях em — ровно так считает и измеритель (`applyFitStepToStyle`).
+ */
+export interface MarkFit {
+  step: FitStep;
+  /** Кегль блока в пунктах — от него считается em для прогона без своего кегля. */
+  baseFontSize: number;
+}
+
 /** Оформление прогона из его марок — CSS поверх стиля блока. */
-export function markStyle(marks: RichMark[] | undefined): CSSProperties {
+export function markStyle(marks: RichMark[] | undefined, fit?: MarkFit): CSSProperties {
   if (!marks || marks.length === 0) return {};
   const css: CSSProperties = {};
   const decoration: string[] = [];
+  const scale = fit?.step.fontScale ?? 1;
 
   for (const mark of marks) {
     switch (mark.type) {
@@ -66,9 +80,13 @@ export function markStyle(marks: RichMark[] | undefined): CSSProperties {
         if (a.color) css.color = a.color;
         if (a.background) css.backgroundColor = a.background;
         if (a.fontFamily) css.fontFamily = a.fontFamily;
-        if (a.fontSize) css.fontSize = `${a.fontSize}pt`;
+        if (a.fontSize) css.fontSize = `${round(a.fontSize * scale)}pt`;
         if (a.fontWeight != null) css.fontWeight = a.fontWeight;
-        if (a.letterSpacing != null) css.letterSpacing = `${a.letterSpacing}pt`;
+        if (a.letterSpacing != null) {
+          const runFontSize = (a.fontSize ?? fit?.baseFontSize ?? 0) * scale;
+          const tracking = fit ? fit.step.trackingEm * runFontSize : 0;
+          css.letterSpacing = `${round(a.letterSpacing + tracking)}pt`;
+        }
         if (a.wordSpacing != null) css.wordSpacing = `${a.wordSpacing}pt`;
         if (a.transform === 'uppercase') css.textTransform = 'uppercase';
         if (a.transform === 'lowercase') css.textTransform = 'lowercase';
@@ -82,6 +100,11 @@ export function markStyle(marks: RichMark[] | undefined): CSSProperties {
 
   if (decoration.length) css.textDecoration = decoration.join(' ');
   return css;
+}
+
+/** Пункты до сотых: дальше браузер не различает, а в разметке мусор. */
+function round(value: number): number {
+  return Math.round(value * 100) / 100;
 }
 
 /**
@@ -137,6 +160,8 @@ export interface RichTextProps {
   blocks: ResolvedBlock[];
   base: TextProps;
   fields: FieldRender;
+  /** Ступень автомасштаба блока — для кеглей и разрядки марок. */
+  fit?: FitStep;
   /**
    * Названия колонок по ключу — для подписи фишки на холсте.
    * На печати не нужно: там поле уже текст.
@@ -146,7 +171,8 @@ export interface RichTextProps {
   onFieldClick?: (field: ResolvedField) => void;
 }
 
-export function RichText({ blocks, base, fields, labels, onFieldClick }: RichTextProps) {
+export function RichText({ blocks, base, fields, labels, onFieldClick, fit = NO_FIT }: RichTextProps) {
+  const markFit: MarkFit = { step: fit, baseFontSize: base.fontSize };
   return (
     // Одна обёртка на всю стопку абзацев: flex-контейнер блока выравнивает
     // по вертикали её целиком, а не каждый абзац отдельно.
@@ -172,7 +198,7 @@ export function RichText({ blocks, base, fields, labels, onFieldClick }: RichTex
             <br />
           ) : (
             block.content.map((node, j) => (
-              <Inline key={j} node={node} fields={fields} labels={labels} onFieldClick={onFieldClick} />
+              <Inline key={j} node={node} fields={fields} labels={labels} onFieldClick={onFieldClick} fit={markFit} />
             ))
           )}
         </div>
@@ -186,36 +212,38 @@ function Inline({
   fields,
   labels,
   onFieldClick,
+  fit,
 }: {
   node: ResolvedInline;
   fields: FieldRender;
   labels?: Record<string, string>;
   onFieldClick?: (field: ResolvedField) => void;
+  fit: MarkFit;
 }) {
   if (node.type === 'break') return <br />;
 
   if (node.type === 'text') {
     // Текст — содержимым узла: React экранирует его сам, разметка
     // из данных получателей отрисована не будет.
-    return wrapIndex(node.marks, <span style={markStyle(node.marks)}>{node.text}</span>);
+    return wrapIndex(node.marks, <span style={markStyle(node.marks, fit)}>{node.text}</span>);
   }
 
   if (fields === 'value') {
     if (node.text === '') return null;
-    return wrapIndex(node.marks, <span style={markStyle(node.marks)}>{node.text}</span>);
+    return wrapIndex(node.marks, <span style={markStyle(node.marks, fit)}>{node.text}</span>);
   }
 
   if (fields === 'highlight') {
     if (node.text === '') return null;
     return wrapIndex(
       node.marks,
-      <span className="merge-value" data-field={node.attrs.source} style={markStyle(node.marks)}>
+      <span className="merge-value" data-field={node.attrs.source} style={markStyle(node.marks, fit)}>
         {node.text}
       </span>,
     );
   }
 
-  return <FieldChip field={node} labels={labels} onClick={onFieldClick} />;
+  return <FieldChip field={node} labels={labels} onClick={onFieldClick} fit={fit} />;
 }
 
 /**
@@ -231,10 +259,12 @@ function FieldChip({
   field,
   labels,
   onClick,
+  fit,
 }: {
   field: ResolvedField;
   labels?: Record<string, string>;
   onClick?: (field: ResolvedField) => void;
+  fit?: MarkFit;
 }) {
   const { source, fallback } = field.attrs;
   const system = SYSTEM_VARIABLE_NAMES.includes(source);
@@ -267,7 +297,7 @@ function FieldChip({
               : `Из таблицы: ${label}`
       }
       className={`merge-chip ${tone}`}
-      style={markStyle(field.marks)}
+      style={markStyle(field.marks, fit)}
       onPointerDown={onClick ? (e) => e.stopPropagation() : undefined}
       onClick={onClick ? (e) => { e.stopPropagation(); onClick(field); } : undefined}
     >

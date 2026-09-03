@@ -1,3 +1,4 @@
+import { applyFitStepToStyle, fitSteps, NO_FIT, type FitStep } from '../schema/autofit';
 import { resolveFace, type FaceMetrics } from './metrics';
 
 /**
@@ -358,6 +359,30 @@ function lineHeightMm(line: StyledRun[], base: TextStyle): number {
   return ptToMm(tallest);
 }
 
+/**
+ * Высота области глифов в долях кегля — то, что выступает за строку,
+ * когда межстрочный меньше неё.
+ *
+ * Строка в CSS — это `line-height`, а буквы рисуются в своей области
+ * (подъём плюс спуск шрифта), и у наборных гарнитур она около 1,3 em.
+ * При межстрочном 1,2 нижний хвост последней строки выступает за блок
+ * на 0,05 em, при 1,0 — на 0,15 em, и Chromium считает этот хвост
+ * переполнением: с `overflow: hidden` спуски последней строки обрезаются.
+ * Блок выравнивает текст по центру, поэтому хвост «стоит» дважды —
+ * сверху и снизу. Значение одно на все семейства и с запасом (у PT Serif
+ * замерено 1,28): ошибка в сторону лишнего предупреждения.
+ */
+export const CONTENT_AREA_EM = 1.3;
+
+/** Насколько область глифов выступает за строки блока — в мм. */
+function glyphOverhangMm(runs: StyledRun[], base: TextStyle): number {
+  let worst = Math.max(0, CONTENT_AREA_EM - base.lineHeight) * base.fontSize;
+  for (const run of runs) {
+    worst = Math.max(worst, Math.max(0, CONTENT_AREA_EM - run.style.lineHeight) * run.style.fontSize);
+  }
+  return ptToMm(worst);
+}
+
 /** Во что превратится набранный прогонами текст в блоке заданной ширины. */
 export function layoutRuns(
   runs: StyledRun[],
@@ -375,7 +400,11 @@ export function layoutRuns(
     heightMm += lineHeightMm(line, base);
   }
 
-  return { lines, widthMm: widthMm + base.strokeWidth, heightMm: heightMm + base.strokeWidth };
+  return {
+    lines,
+    widthMm: widthMm + base.strokeWidth,
+    heightMm: heightMm + base.strokeWidth + glyphOverhangMm(runs, base),
+  };
 }
 
 /** Во что превратится текст в блоке заданной ширины. */
@@ -410,6 +439,10 @@ export interface FitResult {
   heightMm: number;
   /** Во сколько раз текст выше блока: 1,0 — впритык, 1,5 — вылезает в полтора раза. */
   overflowRatio: number;
+  /** Ступень лестницы автомасштаба, на которой остановились: 0 — как есть. */
+  step: number;
+  /** Сама ступень — то, что применяет и браузер. */
+  fit: FitStep;
 }
 
 /**
@@ -441,15 +474,15 @@ export function fitText(
 }
 
 /**
- * Влезает ли набранный прогонами текст — и при каком кегле, если включён
- * автомасштаб.
+ * Влезает ли набранный прогонами текст — и на какой ступени лестницы
+ * автомасштаба, если она включена.
  *
+ * Ступени — из `fitSteps`, те же, по которым текст ужимает браузер
+ * на холсте и на печати; здесь они лишь примеряются заранее, без
+ * браузера, чтобы проверка списка сказала «не влезет» до печати.
  * Кегль блока — единица масштаба: прогон, набранный крупнее блока,
- * уменьшается вместе с ним в той же пропорции, иначе автомасштаб ломал бы
- * соотношение размеров внутри строки. Подбор половинным делением: кегль
- * монотонно влияет на высоту, поэтому перебирать по пункту незачем.
- * Точность в четверть пункта — мельче человек не различает, а лишние
- * итерации на десяти тысячах строк заметны.
+ * уменьшается вместе с ним в той же пропорции, иначе лестница ломала бы
+ * соотношение размеров внутри строки.
  */
 export function fitRuns(
   runs: StyledRun[],
@@ -457,58 +490,39 @@ export function fitRuns(
   box: BoxMm,
   autoFit: boolean,
 ): FitResult {
-  const report = (m: MeasuredRuns, fontSize: number): FitResult => ({
+  const report = (m: MeasuredRuns, step: number, fit: FitStep): FitResult => ({
     fits: m.heightMm <= box.h && m.widthMm <= box.w + 1e-9,
-    fontSize,
+    fontSize: Math.round(base.fontSize * fit.fontScale * 100) / 100,
     lines: m.lines.length,
     widthMm: m.widthMm,
     heightMm: m.heightMm,
     overflowRatio: box.h > 0 ? m.heightMm / box.h : Infinity,
+    step,
+    fit,
   });
 
-  const measured = layoutRuns(runs, base, box);
-  const asIs = report(measured, base.fontSize);
+  const asIs = report(layoutRuns(runs, base, box), 0, NO_FIT);
   if (asIs.fits || !autoFit) return asIs;
 
-  const floor = Math.max(base.fontSize * MIN_AUTO_FIT_RATIO, MIN_FONT_SIZE_PT);
-  if (floor >= base.fontSize) return asIs;
-
-  const at = (size: number) => {
-    const scale = size / base.fontSize;
-    const scaled = runs.map((run) => ({
-      text: run.text,
-      style: { ...run.style, fontSize: run.style.fontSize * scale },
-    }));
-    return layoutRuns(scaled, { ...base, fontSize: size }, box);
-  };
-
-  const smallest = at(floor);
-  if (smallest.heightMm > box.h || smallest.widthMm > box.w + 1e-9) {
-    return { ...report(smallest, floor), fits: false };
+  const steps = fitSteps(base.lineHeight);
+  let last = asIs;
+  for (let i = 1; i < steps.length; i++) {
+    const step = steps[i];
+    // Мельче осмысленного кегля не спускаемся, какой бы ни была ступень.
+    if (base.fontSize * step.fontScale < MIN_FONT_SIZE_PT) break;
+    const attempt = layoutRuns(applyFitStep(runs, step), applyFitStepToStyle(base, step), box);
+    last = report(attempt, i, step);
+    if (last.fits) return last;
   }
-
-  let low = floor;
-  let high = base.fontSize;
-  while (high - low > 0.25) {
-    const middle = (low + high) / 2;
-    const attempt = at(middle);
-    if (attempt.heightMm <= box.h && attempt.widthMm <= box.w + 1e-9) low = middle;
-    else high = middle;
-  }
-
-  /*
-   * Округляем вниз, а не к ближайшему.
-   *
-   * Округление вверх поднимает кегль выше проверенного, и текст может
-   * перескочить на лишнюю строку — тогда мы возвращали бы «влезает»
-   * вместе с размером, при котором оно уже не влезает. Разница в четверть
-   * пункта незаметна, а такая ошибка — это обрезанная фамилия на бумаге.
-   */
-  const chosen = Math.max(Math.floor(low * 4) / 4, floor);
-  // Меряем ещё раз именно на выбранном кегле: числа в отчёте должны
-  // описывать его, а не соседнюю ступень перебора.
-  return report(at(chosen), chosen);
+  return last;
 }
 
+/** Прогоны на ступени лестницы — каждый своим кеглем, в той же пропорции. */
+export function applyFitStep(runs: StyledRun[], step: FitStep): StyledRun[] {
+  if (step === NO_FIT) return runs;
+  return runs.map((run) => ({ text: run.text, style: applyFitStepToStyle(run.style, step) }));
+}
+
+export { applyFitStepToStyle } from '../schema/autofit';
 export { resolveFace, knownFaces } from './metrics';
 export type { FaceMetrics, ResolvedFace } from './metrics';
