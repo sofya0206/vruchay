@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { useMe } from './auth/useAuth';
 import { LoginPage } from './pages/LoginPage';
@@ -19,6 +20,16 @@ import { RegistryPage } from './registry/RegistryPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { PrivacyPage } from './pages/PrivacyPage';
 import { VerifyDocumentPage } from './pages/VerifyDocumentPage';
+import { GovPage } from './pages/GovPage';
+import { BusinessPage } from './pages/BusinessPage';
+import { PersonalPage } from './pages/PersonalPage';
+import { SportPage } from './pages/SportPage';
+import { EducationPage } from './pages/EducationPage';
+import { InternationalPage } from './pages/InternationalPage';
+import { PricingPage } from './pages/PricingPage';
+import { OfferPage } from './pages/OfferPage';
+import { DpaPage } from './pages/DpaPage';
+import { KnowledgeBasePage } from './docs/KnowledgeBasePage';
 import { IssuerPage } from './public/IssuerPage';
 import { LandingPage } from './pages/LandingPage';
 import { InvitePage } from './pages/InvitePage';
@@ -26,6 +37,32 @@ import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { rememberRefFromUrl } from './auth/referral-code';
 import { Loading } from './ui/Loading';
+
+/**
+ * Страницы, открытые всем: отраслевые лендинги, тарифы, юридические
+ * документы и база знаний.
+ *
+ * Перечислены один раз и подставляются в обе ветки маршрутов — для гостя
+ * и для вошедшего. Иначе половина ссылок работала бы только до входа:
+ * человек, уже открывший кабинет, попадал бы со ссылки на «страница
+ * не найдена».
+ */
+const PUBLIC_PAGES: [string, ReactNode][] = [
+  ['/gov', <GovPage />],
+  ['/business', <BusinessPage />],
+  ['/personal', <PersonalPage />],
+  ['/sport', <SportPage />],
+  ['/education', <EducationPage />],
+  ['/international', <InternationalPage />],
+  ['/pricing', <PricingPage />],
+  ['/oferta', <OfferPage />],
+  ['/dpa', <DpaPage />],
+  ['/docs/*', <KnowledgeBasePage />],
+];
+
+function publicRoutes() {
+  return PUBLIC_PAGES.map(([path, element]) => <Route key={path} path={path} element={element} />);
+}
 
 export function App() {
   const me = useMe();
@@ -66,6 +103,7 @@ export function App() {
         <Route path="/c/:publicId" element={<VerifyDocumentPage />} />
         {/* Публичная страница организации — реестр эмитента для проверяющих. */}
         <Route path="/org/:slug" element={<IssuerPage />} />
+        {publicRoutes()}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     );
@@ -124,6 +162,7 @@ export function App() {
       <Route path="/verify/:publicId" element={<VerifyDocumentPage />} />
       <Route path="/c/:publicId" element={<VerifyDocumentPage />} />
       <Route path="/org/:slug" element={<IssuerPage />} />
+      {publicRoutes()}
       <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </>

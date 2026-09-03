@@ -23,7 +23,26 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
 const DIST = join(dirname(fileURLToPath(import.meta.url)), 'dist');
-const ROUTES = ['/', '/privacy'];
+/*
+ * Что отрисовываем заранее для поисковика.
+ *
+ * Посадочная, политика и отраслевые лендинги: их ищут и по ним приходят.
+ * Черновики оферты и договора-поручения сюда не входят намеренно — они
+ * помечены noindex и ждут юриста. База знаний тоже: её содержимое
+ * подгружается частями, и предотрисовка тянула бы мегабайт документации
+ * в статику.
+ */
+const ROUTES = [
+  '/',
+  '/privacy',
+  '/gov',
+  '/business',
+  '/personal',
+  '/sport',
+  '/education',
+  '/international',
+  '/pricing',
+];
 const PORT = 4178;
 
 const TYPES = {
