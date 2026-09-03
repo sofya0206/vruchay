@@ -1,5 +1,11 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import {
+  CURRENT_LAYOUT_SCHEMA_VERSION,
+  renameRichDocField,
+  sheetLayout,
+  type SheetLayout,
+} from '@gramota/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AddColumnDto, ImportDto, UpdateRowDto } from './recipients.dto';
 
@@ -59,8 +65,14 @@ export class RecipientsService {
     });
     if (!column) throw new NotFoundException('Колонка не найдена');
 
-    // Переименование колонки должно переносить значения во всех строках,
-    // иначе данные потеряются: они хранятся по имени, а не по идентификатору.
+    /*
+     * Переименование колонки переносит значения во всех строках — они
+     * хранятся по имени, а не по идентификатору, — и переписывает макеты:
+     * поле в блоке ссылается на колонку по имени (`source`), и без правки
+     * макета грамота печаталась бы с пустым местом вместо фамилии.
+     * Поле, вставленное из панели, помнит и идентификатор колонки
+     * (`fieldId`); поля из старых макетов находятся по прежнему имени.
+     */
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.recipientColumn.update({ where: { id: columnId }, data: { name } });
       const rows = await tx.recipientRow.findMany({ where: { documentId } });
@@ -73,6 +85,22 @@ export class RecipientsService {
           return tx.recipientRow.update({ where: { id: row.id }, data: { data } });
         }),
       );
+
+      const sheets = await tx.sheet.findMany({
+        where: { documentId },
+        select: { id: true, layout: true },
+      });
+      await Promise.all(
+        sheets.map((sheet) => {
+          const renamed = renameFieldInLayout(sheet.layout, { fieldId: column.id, source: column.name }, name);
+          if (!renamed) return null;
+          return tx.sheet.update({
+            where: { id: sheet.id },
+            data: { layout: renamed as Prisma.InputJsonValue, schemaVersion: CURRENT_LAYOUT_SCHEMA_VERSION },
+          });
+        }),
+      );
+
       return updated;
     });
   }
@@ -210,4 +238,31 @@ export class RecipientsService {
 
 function isUniqueViolation(err: unknown): boolean {
   return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
+}
+
+/**
+ * Макет с переименованным полем — или null, если поля в нём не было.
+ *
+ * Макет, который не разбирается схемой, не трогаем: переименование
+ * колонки не должно падать из-за чужой поломки, а испорченный макет
+ * человек увидит в редакторе и без нас.
+ */
+export function renameFieldInLayout(
+  layout: unknown,
+  from: { fieldId: string; source: string },
+  to: string,
+): SheetLayout | null {
+  const parsed = sheetLayout.safeParse(layout);
+  if (!parsed.success) return null;
+
+  let touched = false;
+  const next = parsed.data.map((el) => {
+    if (el.type !== 'text') return el;
+    const doc = renameRichDocField(el.props.doc, from, to);
+    if (JSON.stringify(doc) === JSON.stringify(el.props.doc)) return el;
+    touched = true;
+    return { ...el, props: { ...el.props, doc } };
+  });
+
+  return touched ? next : null;
 }

@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import { quotaFits, type QuotaVerdict, type SheetLayout } from '@gramota/shared';
+import { quotaFits, sheetLayout, type QuotaVerdict, type SheetLayout } from '@gramota/shared';
 import { validateBatch, type ValidationInput, type ValidationRow } from './validate-batch';
 
 /*
@@ -11,9 +11,15 @@ import { validateBatch, type ValidationInput, type ValidationRow } from './valid
  * реально приносят федерации.
  */
 
-/** Блок с именем: широкий и невысокий, как на настоящей грамоте. */
+/**
+ * Блок с именем: широкий и невысокий, как на настоящей грамоте.
+ *
+ * Через разбор схемы, а не литералом: так блок получает те же умолчания,
+ * что и настоящий, а текст с «%name» проходит тот же переход на дерево,
+ * что и сохранённые макеты.
+ */
 function nameSheet(over: Partial<{ w: number; h: number; fontSize: number; text: string }> = {}): SheetLayout {
-  return [
+  return sheetLayout.parse([
     {
       id: 'name',
       type: 'text',
@@ -39,7 +45,7 @@ function nameSheet(over: Partial<{ w: number; h: number; fontSize: number; text:
         autoFit: false,
       },
     },
-  ];
+  ]);
 }
 
 const PAID: QuotaVerdict = {

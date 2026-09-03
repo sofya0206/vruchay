@@ -1,3 +1,4 @@
+import { formatRegNumber } from '@gramota/shared';
 import { randomUUID } from 'node:crypto';
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -382,6 +383,28 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /**
+   * Следующий регистрационный номер организации за текущий год: «142/2026».
+   *
+   * Атомарно, одним запросом: воркеры выпускают параллельно, и «прочитать
+   * максимум, прибавить единицу» выдало бы двум документам один номер.
+   * Год — по Москве, как и дата на документе. Номера идут подряд в пределах
+   * года и с нового года начинаются заново; пропуски после неудачных
+   * попыток допустимы — зато ни один номер не выдан дважды.
+   */
+  private async allocateRegNumber(orgId: string): Promise<string> {
+    const year = Number(
+      new Intl.DateTimeFormat('en-GB', { year: 'numeric', timeZone: 'Europe/Moscow' }).format(new Date()),
+    );
+    const rows = await this.prisma.$queryRaw<{ value: number }[]>`
+      INSERT INTO issue_counters (org_id, year, value)
+      VALUES (${orgId}::uuid, ${year}, 1)
+      ON CONFLICT (org_id, year) DO UPDATE SET value = issue_counters.value + 1
+      RETURNING value
+    `;
+    return formatRegNumber(rows[0].value, year);
+  }
+
   private async process(chunk: GenerationChunk): Promise<void> {
     const { jobId } = chunk;
     const job = await this.prisma.generationJob.findUnique({
@@ -505,6 +528,8 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
        */
       const fileId = randomUUID();
       const publicId = randomUUID();
+      // Регистрационный номер — до печати, как и publicId: он стоит на листе.
+      const regNumber = await this.allocateRegNumber(job.orgId);
       const s3Key = buildS3Key({
         orgId: job.orgId,
         documentId: job.documentId,
@@ -519,7 +544,7 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
         // Идентификатор выделяем до печати: он попадает в QR на самом листе,
         // а значит должен быть известен раньше, чем лист отрисован.
         const token = createRenderToken(
-          { jobId, rowId, publicId },
+          { jobId, rowId, publicId, regNumber },
           secret,
           Math.floor(Date.now() / 1000),
         );
@@ -543,6 +568,7 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
             rowId,
             kind: 'generated',
             publicId,
+            regNumber,
             s3Key,
             sizeBytes: body.length,
             mime,

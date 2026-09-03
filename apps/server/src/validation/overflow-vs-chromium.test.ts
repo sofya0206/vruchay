@@ -2,7 +2,8 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium, type Browser, type Page } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { fitText, type BoxMm, type TextStyle } from '@gramota/shared/fonts';
+import { fitRuns, fitText, type BoxMm, type StyledRun, type TextStyle } from '@gramota/shared/fonts';
+import { applyFitStepToStyle, fitSteps } from '@gramota/shared';
 
 /*
  * Главная сверка всей функции: совпадает ли наш вердикт «влезает / обрежет»
@@ -144,12 +145,137 @@ const SPACED: Case = {
 
 const ALL = [...CASES, SPACED];
 
+/**
+ * Строки из нескольких прогонов: фамилия полужирная, слово крупнее строки,
+ * рукописная подпись в строке с наборной. Это то, что стало возможным
+ * с форматированием внутри блока, и измеритель обязан отвечать про такие
+ * строки так же честно, как про однородные.
+ */
+interface RunCase {
+  block: string;
+  base: TextStyle;
+  box: BoxMm;
+  samples: StyledRun[][];
+}
+
+const RUN_CASES: RunCase[] = [
+  {
+    block: 'имя с полужирной фамилией, PT Serif 30pt, 207×14 мм',
+    base: style({ fontFamily: 'PT Serif', fontSize: 30 }),
+    box: { w: 207, h: 14 },
+    samples: [
+      [
+        { text: 'Иванов', style: style({ fontFamily: 'PT Serif', fontSize: 30, bold: true }) },
+        { text: ' Пётр Ильич', style: style({ fontFamily: 'PT Serif', fontSize: 30 }) },
+      ],
+      [
+        { text: 'Константинопольский', style: style({ fontFamily: 'PT Serif', fontSize: 30, bold: true }) },
+        { text: ' Владислав Вячеславович', style: style({ fontFamily: 'PT Serif', fontSize: 30 }) },
+      ],
+      [
+        { text: 'Тер-Аванесян', style: style({ fontFamily: 'PT Serif', fontSize: 30, bold: true }) },
+        { text: ' Гарри Артёмович', style: style({ fontFamily: 'PT Serif', fontSize: 30 }) },
+      ],
+    ],
+  },
+  {
+    block: 'разные кегли в одной строке, PT Sans 14pt, 120×10 мм',
+    base: style({ fontSize: 14 }),
+    box: { w: 120, h: 10 },
+    samples: [
+      [
+        { text: 'за ', style: style({ fontSize: 14 }) },
+        { text: 'первое', style: style({ fontSize: 22, bold: true }) },
+        { text: ' место', style: style({ fontSize: 14 }) },
+      ],
+      [
+        { text: 'за ', style: style({ fontSize: 14 }) },
+        { text: 'первое', style: style({ fontSize: 28, bold: true }) },
+        { text: ' место в первенстве области', style: style({ fontSize: 14 }) },
+      ],
+      [
+        { text: 'в объёме ', style: style({ fontSize: 14 }) },
+        { text: '120', style: style({ fontSize: 14, bold: true }) },
+        { text: ' часов', style: style({ fontSize: 14 }) },
+      ],
+    ],
+  },
+  {
+    block: 'наборная с рукописной вставкой, PT Sans 16pt, 100×12 мм',
+    base: style({ fontSize: 16 }),
+    box: { w: 100, h: 12 },
+    samples: [
+      [
+        { text: 'Награждается ', style: style({ fontSize: 16 }) },
+        { text: 'Иванов Пётр', style: style({ fontFamily: 'Caveat', fontSize: 22 }) },
+      ],
+      [
+        { text: 'Награждается ', style: style({ fontSize: 16 }) },
+        { text: 'Константинопольский Владислав', style: style({ fontFamily: 'Caveat', fontSize: 22 }) },
+      ],
+    ],
+  },
+  {
+    block: 'курсив и разрядка вперемешку, Montserrat 18pt, 90×10 мм',
+    base: style({ fontFamily: 'Montserrat', fontSize: 18 }),
+    box: { w: 90, h: 10 },
+    samples: [
+      [
+        { text: 'ДИПЛОМ', style: style({ fontFamily: 'Montserrat', fontSize: 18, letterSpacing: 3, bold: true }) },
+        { text: ' участника', style: style({ fontFamily: 'Montserrat', fontSize: 18, italic: true }) },
+      ],
+      [
+        { text: 'ДИПЛОМ', style: style({ fontFamily: 'Montserrat', fontSize: 18, letterSpacing: 3, bold: true }) },
+        { text: ' победителя первенства', style: style({ fontFamily: 'Montserrat', fontSize: 18, italic: true }) },
+      ],
+    ],
+  },
+];
+
 interface Verdict {
   block: string;
   text: string;
   chromiumClips: boolean;
   weSayFits: boolean;
 }
+
+/**
+ * Автомасштаб: на какой ступени лестницы остановился браузер и на какой —
+ * измеритель. Ступени у них одни (`fitSteps`), меряют они по-разному:
+ * браузер — своей вёрсткой, измеритель — метриками без браузера.
+ */
+interface FitVerdict {
+  block: string;
+  text: string;
+  /** Первая ступень, на которой браузер не обрезает; -1 — не влезло и на последней. */
+  chromiumStep: number;
+  ourStep: number;
+  ourFits: boolean;
+}
+
+/** Блоки с автомасштабом: тесные, чтобы лестница правда работала. */
+const FIT_CASES: Case[] = [
+  {
+    block: 'автомасштаб имени, PT Serif 30pt, 120×14 мм',
+    style: style({ fontFamily: 'PT Serif', fontSize: 30, bold: true }),
+    box: { w: 120, h: 14 },
+    texts: [
+      'Иванов Пётр',
+      'Петрова Мария Сергеевна',
+      'Константинопольский Владислав Вячеславович',
+      'Александропулос-Константиниди Апостолос',
+    ],
+  },
+  {
+    block: 'автомасштаб подзаголовка, PT Sans 14pt, 120×12 мм, межстрочный 1,3',
+    style: style({ fontSize: 14, lineHeight: 1.3 }),
+    box: { w: 120, h: 12 },
+    texts: [
+      'за участие в первенстве области по плаванию',
+      'за многолетний добросовестный труд и значительный вклад в развитие физической культуры',
+    ],
+  },
+];
 
 /**
  * Тесты с настоящим браузером идут только по явному требованию.
@@ -169,6 +295,7 @@ const CHROMIUM_TESTS = process.env.CHROMIUM_TESTS === '1';
 describe.skipIf(!CHROMIUM_TESTS)('вердикт «влезает» против настоящего Chromium', () => {
   let browser: Browser;
   const verdicts: Verdict[] = [];
+  const fitVerdicts: FitVerdict[] = [];
 
   beforeAll(async () => {
     browser = await chromium.launch({
@@ -243,11 +370,191 @@ describe.skipIf(!CHROMIUM_TESTS)('вердикт «влезает» против
       });
     }
 
+    for (const runCase of RUN_CASES) {
+      const clipped = await page.evaluate(
+        async ({ base, box, samples }) => {
+          const host = document.getElementById('host')!;
+          host.innerHTML = '';
+
+          const el = document.createElement('div');
+          /*
+           * Блок — теми же правилами, что и однородный. Прогоны внутри —
+           * `span` с собственным начертанием: ровно так их рисует
+           * RichText в apps/web/src/render.
+           */
+          Object.assign(el.style, {
+            position: 'absolute',
+            left: '0',
+            top: '0',
+            width: `${box.w}mm`,
+            height: `${box.h}mm`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontFamily: base.fontFamily,
+            fontSize: `${base.fontSize}pt`,
+            fontWeight: base.bold ? '700' : '400',
+            fontStyle: base.italic ? 'italic' : 'normal',
+            lineHeight: String(base.lineHeight),
+            letterSpacing: `${base.letterSpacing}pt`,
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+            overflow: 'hidden',
+          });
+          host.appendChild(el);
+
+          for (const sample of samples) {
+            for (const run of sample) {
+              await document.fonts.load(
+                `${run.style.italic ? 'italic' : 'normal'} ${run.style.bold ? 700 : 400} ` +
+                  `${run.style.fontSize}pt "${run.style.fontFamily}"`,
+                run.text,
+              );
+            }
+          }
+
+          const out: boolean[] = [];
+          for (const sample of samples) {
+            el.innerHTML = '';
+            // Один внутренний блок, как в RichText: flex-контейнер выравнивает
+            // стопку целиком, а не каждый прогон по отдельности; ширина
+            // на весь блок и выравнивание текстом — как там.
+            const line = document.createElement('div');
+            line.style.width = '100%';
+            line.style.textAlign = 'center';
+            for (const run of sample) {
+              const span = document.createElement('span');
+              Object.assign(span.style, {
+                fontFamily: run.style.fontFamily,
+                fontSize: `${run.style.fontSize}pt`,
+                fontWeight: run.style.bold ? '700' : '400',
+                fontStyle: run.style.italic ? 'italic' : 'normal',
+                letterSpacing: `${run.style.letterSpacing}pt`,
+                textTransform: run.style.uppercase ? 'uppercase' : 'none',
+              });
+              span.textContent = run.text;
+              line.appendChild(span);
+            }
+            el.appendChild(line);
+            out.push(
+              el.scrollHeight > el.clientHeight + 0.5 || el.scrollWidth > el.clientWidth + 0.5,
+            );
+          }
+          return out;
+        },
+        { base: runCase.base, box: runCase.box, samples: runCase.samples },
+      );
+
+      runCase.samples.forEach((runs, i) => {
+        verdicts.push({
+          block: runCase.block,
+          text: runs.map((r) => r.text).join(''),
+          chromiumClips: clipped[i],
+          weSayFits: fitRuns(runs, runCase.base, runCase.box, false).fits,
+        });
+      });
+    }
+
+    for (const testCase of FIT_CASES) {
+      const steps = fitSteps(testCase.style.lineHeight);
+      const chromiumSteps = await page.evaluate(
+        async ({ style: s, box, texts, ladder }) => {
+          const host = document.getElementById('host')!;
+          host.innerHTML = '';
+          const el = document.createElement('div');
+          Object.assign(el.style, {
+            position: 'absolute',
+            left: '0',
+            top: '0',
+            width: `${box.w}mm`,
+            height: `${box.h}mm`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontFamily: s.fontFamily,
+            fontWeight: s.bold ? '700' : '400',
+            fontStyle: s.italic ? 'italic' : 'normal',
+            textTransform: s.uppercase ? 'uppercase' : 'none',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+            overflow: 'hidden',
+          });
+          host.appendChild(el);
+          await document.fonts.load(
+            `${s.italic ? 'italic' : 'normal'} ${s.bold ? 700 : 400} ${s.fontSize}pt "${s.fontFamily}"`,
+            texts.join(''),
+          );
+
+          const out: number[] = [];
+          for (const text of texts) {
+            el.textContent = text;
+            let found = -1;
+            for (let i = 0; i < ladder.length; i++) {
+              const fontSize = s.fontSize * ladder[i].fontScale;
+              el.style.fontSize = `${fontSize}pt`;
+              el.style.lineHeight = String(s.lineHeight * ladder[i].lineScale);
+              el.style.letterSpacing = `${s.letterSpacing + ladder[i].trackingEm * fontSize}pt`;
+              const clips =
+                el.scrollHeight > el.clientHeight + 0.5 || el.scrollWidth > el.clientWidth + 0.5;
+              if (!clips) {
+                found = i;
+                break;
+              }
+            }
+            out.push(found);
+          }
+          return out;
+        },
+        { style: testCase.style, box: testCase.box, texts: testCase.texts, ladder: steps },
+      );
+
+      testCase.texts.forEach((text, i) => {
+        const ours = fitText(text, testCase.style, testCase.box, true);
+        fitVerdicts.push({
+          block: testCase.block,
+          text,
+          chromiumStep: chromiumSteps[i],
+          ourStep: ours.step,
+          ourFits: ours.fits,
+        });
+      });
+    }
+
     await page.close();
   }, 120_000);
 
   afterAll(async () => {
     await browser?.close();
+  });
+
+  it('автомасштаб: измеритель не обещает ступень крупнее той, на которой остановился браузер', () => {
+    /*
+     * Та же логика, что и без автомасштаба: ошибиться можно только
+     * в сторону «ужать сильнее». Ступень мельче браузерной — лишняя
+     * осторожность; ступень крупнее — «сказали, что влезло», а обрезало.
+     */
+    const dangerous = fitVerdicts.filter(
+      (v) => v.ourFits && (v.chromiumStep === -1 || v.ourStep < v.chromiumStep),
+    );
+    expect(
+      dangerous.map((v) => `${v.block}: «${v.text}» — мы ${v.ourStep}, браузер ${v.chromiumStep}`),
+    ).toEqual([]);
+  });
+
+  it('автомасштаб: лестница действительно срабатывает, и измеритель не перестраховывается', () => {
+    expect(fitVerdicts.some((v) => v.chromiumStep > 0)).toBe(true);
+    const tooCautious = fitVerdicts.filter((v) => v.chromiumStep >= 0 && v.ourStep - v.chromiumStep > 2);
+    expect(
+      tooCautious.map((v) => `${v.block}: «${v.text}» — мы ${v.ourStep}, браузер ${v.chromiumStep}`),
+    ).toEqual([]);
+  });
+
+  it('автомасштаб: одна ступень — одно начертание и у браузера, и у измерителя', () => {
+    const steps = fitSteps(1.2);
+    const fitted = applyFitStepToStyle({ fontSize: 30, lineHeight: 1.2, letterSpacing: 0 }, steps[steps.length - 1]);
+    expect(fitted.fontSize).toBeCloseTo(15, 6);
+    expect(fitted.lineHeight).toBeCloseTo(1, 6);
+    expect(fitted.letterSpacing).toBeCloseTo(-0.45, 6);
   });
 
   it('пробы охватывают оба исхода — иначе сверять было бы нечего', () => {

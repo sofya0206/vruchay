@@ -74,6 +74,8 @@ export interface DocumentDetail extends DocumentSummary {
   eventDate: string;
   eventPlace: string;
   eventHours: string;
+  /** Дата выдачи днём (ГГГГ-ММ-ДД) либо null — в день выпуска. */
+  issueDate: string | null;
   sheets: Sheet[];
 }
 

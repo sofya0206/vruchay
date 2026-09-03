@@ -1,6 +1,6 @@
 import { Controller, Get, NotFoundException, Param } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { mergeVariables } from '@gramota/shared';
+import { issuedAtOf, mergeVariables } from '@gramota/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { baseUrl, type Env } from '../config/env';
@@ -44,6 +44,7 @@ export class RenderController {
     if (!row) throw new NotFoundException('Ссылка недействительна');
 
     const doc = row.document;
+    const total = await this.prisma.recipientRow.count({ where: { documentId: doc.id } });
     const sheets = await Promise.all(
       doc.sheets.map(async (sheet) => ({
         layout: sheet.layout,
@@ -61,9 +62,12 @@ export class RenderController {
       // печати нет ни часов в нужном поясе, ни названия организации,
       // ни порядкового номера строки.
       data: mergeVariables(row.data as Record<string, string>, {
-        issuedAt: new Date(),
+        // Дата выдачи материала, если задана; иначе — момент печати.
+        issuedAt: issuedAtOf(doc.issueDate),
         number: row.position + 1,
+        total,
         publicId: payload.publicId ?? null,
+        regNumber: payload.regNumber ?? null,
         orgName: doc.org?.name,
         event: {
           name: doc.eventName,

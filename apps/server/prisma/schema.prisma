@@ -120,6 +120,12 @@ model Document {
   eventDate   String @default("") @map("event_date")
   eventPlace  String @default("") @map("event_place")
   eventHours  String @default("") @map("event_hours")
+  /**
+   * Дата выдачи, если она не совпадает с днём выпуска: грамоты за прошедшее
+   * мероприятие печатают позже, а на них должна стоять дата награждения.
+   * null — дата выпуска, как и раньше.
+   */
+  issueDate   DateTime? @map("issue_date") @db.Date
 
   /**
    * Раздел библиотеки: спортивные соревнования, обучение, благодарности.
@@ -218,6 +224,12 @@ model File {
    * сертификаты нельзя будет проверить задним числом.
    */
   publicId      String   @unique @default(uuid()) @map("public_id") @db.Uuid
+  /**
+   * Регистрационный номер «по-бухгалтерски»: «142/2026», сквозной
+   * у организации за год. Выделяется при выпуске экземпляра, до печати,
+   * из счётчика IssueCounter — и печатается на документе полем reg_number.
+   */
+  regNumber     String?  @map("reg_number")
   verifyRevoked Boolean  @default(false) @map("verify_revoked")
   createdAt     DateTime @default(now()) @map("created_at")
   deletedAt     DateTime? @map("deleted_at")
@@ -1125,4 +1137,21 @@ model AwardRule {
 
   @@unique([ruleSetId, position])
   @@map("award_rules")
+}
+
+/**
+ * Счётчик регистрационных номеров организации за год.
+ *
+ * Отдельная таблица, а не `MAX(reg_number) + 1`: воркеры выпускают
+ * документы параллельно, и два из них взяли бы один номер. Атомарный
+ * `INSERT … ON CONFLICT DO UPDATE … RETURNING` выдаёт номера без гонок.
+ * Год в ключе — это «сбрасывать 1 января» без отдельной настройки.
+ */
+model IssueCounter {
+  orgId String @map("org_id") @db.Uuid
+  year  Int
+  value Int    @default(0)
+
+  @@id([orgId, year])
+  @@map("issue_counters")
 }

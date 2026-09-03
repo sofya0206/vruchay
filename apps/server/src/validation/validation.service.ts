@@ -3,8 +3,7 @@ import {
   sheetLayout,
   type BatchValidation,
   type QuotaVerdict,
-  type SheetLayout,
-} from '@gramota/shared';
+  type SheetLayout, issuedAtOf, } from '@gramota/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { OrgService } from '../org/org.service';
 import { validateBatch, type ValidationRow } from './validate-batch';
@@ -124,7 +123,7 @@ export class ValidationService {
         eventPlace: doc.eventPlace,
         eventHours: doc.eventHours,
       },
-      issuedAt: new Date(),
+      issuedAt: issuedAtOf(doc.issueDate),
     };
 
     const report = validateBatch(input);
