@@ -970,6 +970,33 @@ export class MailService {
   }
 
   /**
+   * Ссылка для подтверждения адреса — вместо кода.
+   *
+   * Нужна, когда форма отправлена прямо на наш адрес, без нашего скрипта
+   * на странице: окно с полем для кода рисует скрипт, и без него человеку
+   * было бы негде этот код ввести. Ссылка закрывает вопрос одним нажатием.
+   */
+  async sendConfirmLink(orgId: string, to: string, url: string): Promise<void> {
+    const sender = await this.resolveSender(orgId);
+    if (!sender) {
+      throw new BadRequestException('Отправка писем не настроена — ссылку выслать некуда');
+    }
+
+    const safeUrl = escapeHtml(url);
+    await this.providerFor('smtp').send({
+      from: { email: sender.email, name: sender.displayName },
+      to,
+      subject: 'Подтвердите адрес, чтобы получить документ',
+      html:
+        `<p style="font-size:15px">Нажмите, чтобы подтвердить адрес — и мы пришлём документ:</p>` +
+        `<p><a href="${safeUrl}" style="display:inline-block;padding:12px 22px;background:#1f5d3f;` +
+        `color:#fff;border-radius:10px;text-decoration:none;font-size:15px">Подтвердить и получить документ</a></p>` +
+        `<p style="font-size:13px;color:#5f6b64">Ссылка действует 10 минут. ` +
+        `Если вы не запрашивали документ, просто проигнорируйте это письмо.</p>`,
+    });
+  }
+
+  /**
    * Вложение по идентификатору файла — с проверкой, что файл наш.
    *
    * Файл ищется вместе с организацией из сессии, а не по одному

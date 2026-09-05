@@ -55,6 +55,11 @@ export const TILDA_STYLES = `
   padding:8px 14px;border:1px solid #cfccc2;border-radius:10px;background:#fff;color:#16211c;
   font-size:13px;text-decoration:none;cursor:pointer}
 .vru-verify{display:block;margin-top:12px;font-size:13px;color:#5f6b64}
+.vru-list{display:flex;flex-direction:column;gap:8px;margin:14px 0;text-align:left}
+.vru-item{display:flex;justify-content:space-between;gap:12px;padding:10px 12px;
+  border:1px solid #cfccc2;border-radius:10px;color:#16211c;text-decoration:none;font-size:14px}
+.vru-item:hover{border-color:#1f5d3f}
+.vru-item-date{color:#5f6b64;white-space:nowrap}
 .vru-spin{width:26px;height:26px;margin:0 auto 14px;border:3px solid #e3e1da;
   border-top-color:#1f5d3f;border-radius:50%;animation:vru-rot .8s linear infinite}
 @keyframes vru-rot{to{transform:rotate(360deg)}}
@@ -406,6 +411,93 @@ export function buildTildaScript(baseUrl: string, config: PublicConfig): string 
     };
   }
 
+  /**
+   * «Мои документы»: перечень всего, что выдавали на этот адрес.
+   *
+   * Код спрашивается всегда, даже в кабинете: один документ без проверки —
+   * риск организатора, а перечень по чужому адресу — уже раскрытие того,
+   * где человек участвовал.
+   */
+  function myDocuments(box, prefill) {
+    box.innerHTML = '';
+    box.appendChild(el('p', 'vru-title', 'Мои документы'));
+    box.appendChild(el('p', 'vru-text', 'Укажите почту, на которую получали документы'));
+    var wrap = el('div', 'vru-field');
+    var input = el('input', 'vru-input');
+    input.type = 'email';
+    input.value = prefill.email || '';
+    input.setAttribute('aria-label', 'Почта');
+    wrap.appendChild(input);
+    box.appendChild(wrap);
+    var btn = el('button', 'vru-btn', 'Показать документы');
+    var err = el('div', 'vru-err');
+    box.appendChild(btn);
+    box.appendChild(err);
+    if (!input.value) input.focus();
+
+    btn.onclick = function () {
+      err.textContent = '';
+      var email = input.value.trim();
+      if (!email) { err.textContent = 'Укажите почту'; return; }
+      btn.disabled = true;
+      post('/api/v1/tilda/my', { token: CFG.token, email: email, accountEmail: prefill.email || undefined })
+        .then(function (r) { myCode(r.listId, box); })
+        .catch(function (e) { err.textContent = e.message; btn.disabled = false; });
+    };
+    input.onkeydown = function (e) { if (e.key === 'Enter') btn.click(); };
+  }
+
+  function myCode(listId, box) {
+    box.innerHTML = '';
+    box.appendChild(el('p', 'vru-title', 'Введите код из письма'));
+    box.appendChild(el('p', 'vru-text', 'Мы отправили шестизначный код, чтобы убедиться, что адрес ваш'));
+    var input = el('input', 'vru-code');
+    input.inputMode = 'numeric';
+    input.maxLength = 6;
+    input.setAttribute('aria-label', 'Код подтверждения');
+    var btn = el('button', 'vru-btn', 'Подтвердить');
+    var err = el('div', 'vru-err');
+    box.appendChild(input);
+    box.appendChild(btn);
+    box.appendChild(err);
+    input.focus();
+
+    btn.onclick = function () {
+      err.textContent = '';
+      btn.disabled = true;
+      post('/api/v1/tilda/my/confirm', { listId: listId, code: input.value })
+        .then(function (r) { myList(listId, r.items, box); })
+        .catch(function (e) { err.textContent = e.message; btn.disabled = false; });
+    };
+    input.onkeydown = function (e) { if (e.key === 'Enter') btn.click(); };
+  }
+
+  function myList(listId, items, box) {
+    box.innerHTML = '';
+    box.appendChild(el('p', 'vru-title', 'Мои документы'));
+    if (!items.length) {
+      box.appendChild(el('p', 'vru-text', 'На этот адрес документов пока не выдавали'));
+      return;
+    }
+    var list = el('div', 'vru-list');
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      var a = el('a', 'vru-item');
+      a.href = API + '/api/v1/tilda/my/' + listId + '/download/' + item.requestId;
+      var t = el('span', 'vru-item-title');
+      // textContent: название документа задаёт организатор, и вставлять
+      // его как разметку на чужую страницу нельзя.
+      t.textContent = item.title;
+      var d = el('span', 'vru-item-date');
+      d.textContent = new Date(item.issuedAt).toLocaleDateString('ru-RU');
+      a.appendChild(t);
+      a.appendChild(d);
+      list.appendChild(a);
+    }
+    box.appendChild(list);
+    box.appendChild(el('p', 'vru-text', 'Ссылки действуют час'));
+  }
+
   function handle(form) {
     form.addEventListener('submit', function (e) {
       e.preventDefault();
@@ -414,6 +506,12 @@ export function buildTildaScript(baseUrl: string, config: PublicConfig): string 
       var data = collect(form);
       var box = el('div');
       overlay(box);
+
+      // doc_id=all — так список просили у сервиса, который мы заменяем.
+      if (data.documentId.toLowerCase() === 'all') {
+        var acc0 = account(form);
+        return myDocuments(box, { email: data.email || acc0.email });
+      }
 
       if (!data.consent) {
         return fail(box, 'Отметьте согласие на обработку персональных данных');
@@ -468,11 +566,31 @@ export function buildTildaScript(baseUrl: string, config: PublicConfig): string 
     }
   }
 
+  function initMyButtons() {
+    var nodes = document.querySelectorAll('[data-vruchay-my]');
+    for (var i = 0; i < nodes.length; i++) {
+      (function (node) {
+        if (node.getAttribute('data-vruchay-ready')) return;
+        node.setAttribute('data-vruchay-ready', '1');
+        var btn = el('button', 'vru-btn', node.getAttribute('data-label') || 'Мои документы');
+        btn.style.width = 'auto';
+        btn.style.padding = '11px 22px';
+        btn.onclick = function () {
+          var box = el('div');
+          overlay(box);
+          myDocuments(box, account(node));
+        };
+        node.appendChild(btn);
+      })(nodes[i]);
+    }
+  }
+
   function init() {
     // Формы Тильды и обычные формы с признаком нашей интеграции.
     var forms = document.querySelectorAll('form.t-form, form[data-vruchay]');
     for (var i = 0; i < forms.length; i++) handle(forms[i]);
     initButtons();
+    initMyButtons();
   }
 
   if (document.readyState === 'loading') {

@@ -54,4 +54,14 @@ describe('скрипт формы', () => {
     expect(script).toContain('authMode: "none"');
     expect(script).toContain(`token: "${base.token}"`);
   });
+
+  it('умеет показывать перечень документов', () => {
+    const script = buildTildaScript('https://vruchay.ru', base);
+    evaluatable(script);
+    expect(script).toContain("'/api/v1/tilda/my'");
+    expect(script).toContain("'/api/v1/tilda/my/confirm'");
+    expect(script).toContain('[data-vruchay-my]');
+    // Путь совместимости: так список просили у сервиса, который мы заменяем.
+    expect(script).toContain("=== 'all'");
+  });
 });

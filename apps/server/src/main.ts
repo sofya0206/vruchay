@@ -116,7 +116,9 @@ async function bootstrap() {
   });
 
   await app.register(fastifyMultipart, {
-    limits: { fileSize: MAX_IMAGE_BYTES, files: 1, fields: 10 },
+    // Полей до сорока: форма Тильды кроме своих полей прикладывает ещё
+    // с десяток служебных, и десяти на всё не хватало.
+    limits: { fileSize: MAX_IMAGE_BYTES, files: 1, fields: 40 },
   });
 
   registerPublicCors(app.getHttpAdapter().getInstance());
