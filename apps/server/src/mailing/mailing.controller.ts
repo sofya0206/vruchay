@@ -20,6 +20,7 @@ import {
   type TemplateDto,
 } from './mailing.dto';
 import { LETTER_KIND_LABELS } from './letter-kind';
+import { PlanFeatureGuard, RequiresFeature } from '../plans/plan-feature.guard';
 
 const uuidParam = new ZodValidationPipe(uuidSchema);
 
@@ -37,7 +38,7 @@ const audienceSchema = z.strictObject({
  * самостоятельная работа, а не продолжение правки макета.
  */
 @Controller('mailing')
-@UseGuards(AuthGuard)
+@UseGuards(AuthGuard, PlanFeatureGuard)
 export class MailingController {
   constructor(
     private readonly mailing: MailingService,
@@ -76,6 +77,7 @@ export class MailingController {
     });
   }
 
+  @RequiresFeature('mailing')
   @Post('send')
   async send(
     @CurrentUser() user: SessionUser,
@@ -108,6 +110,7 @@ export class MailingController {
    * жмут по три раза, не дождавшись письма, и общий домен получает
    * всплеск отправок на ровном месте.
    */
+  @RequiresFeature('mailing')
   @Post('test')
   async test(
     @CurrentUser() user: SessionUser,
@@ -130,6 +133,7 @@ export class MailingController {
     return this.mailing.log(user.orgId, query);
   }
 
+  @RequiresFeature('mailing')
   @Post('resend')
   async resend(
     @CurrentUser() user: SessionUser,

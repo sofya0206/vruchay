@@ -16,6 +16,7 @@ interface Call {
 }
 
 function serviceWith({
+  issuedTotal = 0,
   issuedMonth = 0,
   emailsSent = 0,
   materials = 0,
@@ -32,9 +33,11 @@ function serviceWith({
 
   const prisma = {
     file: {
+      // Первый счёт — за всё время, второй — за месяц: их различает
+      // условие по дате, и путать их нельзя.
       count: vi.fn(async (args: Call) => {
         calls.file.push(args);
-        return issuedMonth;
+        return args.where?.createdAt === undefined ? issuedTotal : issuedMonth;
       }),
     },
     email: {
@@ -96,7 +99,7 @@ describe('сводка', () => {
       ...calls.jobs,
     ].map((c) => c.where?.orgId);
 
-    expect(orgIds).toHaveLength(5);
+    expect(orgIds).toHaveLength(6);
     expect(orgIds.every((id) => id === 'org-1')).toBe(true);
   });
 
@@ -105,7 +108,7 @@ describe('сводка', () => {
     const summary = await service.summary('org-1', new Date('2026-08-28T10:00:00Z'));
 
     expect(summary.issuedMonth).toBe(7);
-    expect(calls.file[0].where).toMatchObject({
+    expect(calls.file[1].where).toMatchObject({
       kind: 'generated',
       createdAt: { gte: new Date('2026-07-31T21:00:00.000Z') },
     });
@@ -119,11 +122,15 @@ describe('сводка', () => {
     expect(calls.email[0].where?.status).toEqual({ in: ['sent', 'delivered', 'opened'] });
   });
 
-  it('выпущено за всё время — та же цифра, по которой считается проба', async () => {
-    const { service } = serviceWith({});
+  it('выпущено за всё время считается отдельно от остатка по плану', async () => {
+    // По плану израсходованным считается выпущенное с начала плана,
+    // а «за всё время» на рабочем столе означает ровно то, что написано:
+    // прошлогодние документы из этой цифры пропасть не должны.
+    const { service, calls } = serviceWith({ issuedTotal: 900, issuedMonth: 7 });
     const summary = await service.summary('org-1');
 
-    expect(summary.issuedTotal).toBe(12);
+    expect(summary.issuedTotal).toBe(900);
+    expect(calls.file[0].where?.createdAt).toBeUndefined();
     expect(summary.usage).toMatchObject({ left: 38, limit: 50 });
   });
 

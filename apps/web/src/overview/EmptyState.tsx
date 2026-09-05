@@ -86,8 +86,8 @@ export function EmptyState({ data }: { data: Overview }) {
       <p className="mt-5 text-sm text-[var(--text-muted)]">
         {data.usage.limit !== null && (
           <>
-            В бесплатной пробе {data.usage.limit}{' '}
-            {plural(data.usage.limit, 'документ', 'документа', 'документов')}.{' '}
+            {data.usage.source === 'trial' ? 'В бесплатной пробе' : `По плану «${data.usage.planName}»`}{' '}
+            {data.usage.limit} {plural(data.usage.limit, 'документ', 'документа', 'документов')}.{' '}
           </>
         )}
         Считаются только созданные файлы: черновики, правки макета и просмотры не расходуют ничего.

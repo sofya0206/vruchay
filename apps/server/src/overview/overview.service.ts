@@ -6,16 +6,24 @@ import { OrgService } from '../org/org.service';
 const MSK_OFFSET_MS = 3 * 60 * 60 * 1000;
 
 /**
- * Начало текущего месяца по московскому времени.
+ * Начало месяца по московскому времени.
  *
  * Считаем от Москвы, а не от часового пояса сервера: «за этот месяц» —
  * это то, что человек сверяет со своим календарём, а сервер живёт в UTC.
  * Первого числа до трёх часов ночи разница видна невооружённым глазом:
  * выпущенное вчера вечером попало бы уже в новый месяц.
+ *
+ * `shiftMonths` сдвигает границу на соседние месяцы: −1 — начало прошлого,
+ * +1 — начало следующего. Нужно аналитике и месячной сводке, которым
+ * помимо начала периода нужен и его конец. Отдельной функции для этого
+ * не заводим намеренно: две константы московского времени в одном
+ * приложении однажды разойдутся.
  */
-export function monthStart(now: Date): Date {
+export function monthStart(now: Date, shiftMonths = 0): Date {
   const msk = new Date(now.getTime() + MSK_OFFSET_MS);
-  return new Date(Date.UTC(msk.getUTCFullYear(), msk.getUTCMonth(), 1) - MSK_OFFSET_MS);
+  return new Date(
+    Date.UTC(msk.getUTCFullYear(), msk.getUTCMonth() + shiftMonths, 1) - MSK_OFFSET_MS,
+  );
 }
 
 /** Сколько последних материалов и заданий показываем на рабочем столе. */
@@ -48,10 +56,15 @@ export class OverviewService {
   async summary(orgId: string, now = new Date()) {
     const since = monthStart(now);
 
-    const [usage, issuedMonth, emailsSent, materials, documents, jobs] = await Promise.all([
-      // Остаток пробы берём у той же службы, что решает, пускать ли к выпуску:
+    const [usage, issuedTotal, issuedMonth, emailsSent, materials, documents, jobs] =
+      await Promise.all([
+      // Остаток берём у той же службы, что решает, пускать ли к выпуску:
       // разойдись эти две цифры — человек упёрся бы в предел, видя запас.
       this.org.usage(orgId),
+      // Выпущенное за всё время считаем отдельно: израсходованное по плану —
+      // это документы с начала плана, а «за всё время» на рабочем столе
+      // означает ровно то, что написано.
+      this.prisma.file.count({ where: { orgId, kind: 'generated' } }),
       this.prisma.file.count({
         where: { orgId, kind: 'generated', createdAt: { gte: since } },
       }),
@@ -82,8 +95,8 @@ export class OverviewService {
 
     return {
       usage,
-      /** Выпущено за всё время — те же созданные файлы, по которым считается проба. */
-      issuedTotal: usage.used,
+      /** Выпущено за всё время — те же созданные файлы, по которым считается квота. */
+      issuedTotal,
       issuedMonth,
       emailsSent,
       /** Материалов в работе. Ноль означает, что организация ещё ничего не начинала. */

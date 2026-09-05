@@ -20,6 +20,7 @@ import {
   type ValidatedRow,
 } from '@gramota/shared';
 import { useValidation, useValidationFixes, type CellFix } from '../api/validation';
+import { DiscussTermsLink } from '../billing/DiscussTermsLink';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Field';
 
@@ -279,9 +280,13 @@ function QuotaLine({ quota }: { quota: BatchValidation['quota'] }) {
    *
    * Никакой доплаты здесь не предлагается: выпуска сверх предела в сервисе
    * нет, кнопка «Создать документы» на этом же наборе строк ответит отказом.
-   * Раньше тут стояло «сверх лимита N документов по 3 ₽» — обещание,
+   * Раньше тут стояла доплата за документы сверх предела — обещание,
    * которого продукт не выполняет, и человек упирался в отказ уже после того,
    * как поверил проверке.
+   *
+   * Но и тупика быть не должно: рядом с отказом стоит путь дальше —
+   * разговор об условиях. Он единственный: цен у сервиса нет, купить
+   * себе предел кнопкой человек не может.
    */
   return (
     <p className="flex flex-wrap items-baseline gap-x-1.5 border-t border-[var(--line)] bg-[var(--award-soft)] px-4 py-2 text-sm">
@@ -292,7 +297,7 @@ function QuotaLine({ quota }: { quota: BatchValidation['quota'] }) {
         <span className="tabular font-medium">{left}</span>{' '}
         {plural(left, 'документ', 'документа', 'документов')} из{' '}
         <span className="tabular">{quota.limit}</span>. Выпуск не начнётся: снимите лишние
-        отметки или выберите тариф.
+        отметки или <DiscussTermsLink>обсудите условия под ваш объём</DiscussTermsLink>.
       </span>
     </p>
   );

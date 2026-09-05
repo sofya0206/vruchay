@@ -17,6 +17,7 @@ import { MailingPage } from './mailing/MailingPage';
 import { DocumentWorkspacePage } from './mailing/DocumentWorkspacePage';
 import { InvoicesPage } from './pages/InvoicesPage';
 import { RegistryPage } from './registry/RegistryPage';
+import { AnalyticsPage } from './analytics/AnalyticsPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { PrivacyPage } from './pages/PrivacyPage';
 import { VerifyDocumentPage } from './pages/VerifyDocumentPage';
@@ -32,6 +33,7 @@ import { DpaPage } from './pages/DpaPage';
 import { KnowledgeBasePage } from './docs/KnowledgeBasePage';
 import { IssuerPage } from './public/IssuerPage';
 import { LandingPage } from './pages/LandingPage';
+import { DiscussTermsPage } from './pages/DiscussTermsPage';
 import { InvitePage } from './pages/InvitePage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
@@ -90,6 +92,10 @@ export function App() {
     return (
       <Routes>
         <Route path="/" element={<LandingPage />} />
+        {/* Форма «Обсудить условия» стоит и здесь, и в ветке для вошедших:
+            адрес у неё обязан быть один. Ссылки на неё ведут из кабинета,
+            где главная — это «Обзор», а не рассказ о сервисе. */}
+        <Route path="/obsudit" element={<DiscussTermsPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/confirm" element={<ConfirmEmailPage />} />
@@ -136,6 +142,7 @@ export function App() {
             Раньше это были вкладки редактора макета. */}
         <Route path="/mailing/:id" element={<DocumentWorkspacePage />} />
         <Route path="/registry" element={<RegistryPage />} />
+        <Route path="/analytics" element={<AnalyticsPage />} />
         <Route path="/integrations" element={<SectionStub path="/integrations" />} />
         <Route path="/billing" element={<SectionStub path="/billing" />} />
         {/* ───────── КОНЕЦ МАРШРУТОВ РАЗДЕЛОВ БЛОКА 1 ───────── */}

@@ -1,4 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
+import {
+  CALL_TIME_LABELS,
+  CONSENT_TEXT_VERSION,
+  EVENT_KIND_LABELS,
+  VOLUME_BAND_LABELS,
+} from '@gramota/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { InvoicesService } from '../invoices/invoices.service';
@@ -12,7 +18,7 @@ export interface LeadContext {
 }
 
 /**
- * Заявки на счёт с посадочной страницы.
+ * Заявки на разговор об условиях.
  *
  * Единственный вход для крупных клиентов, поэтому здесь важнее не потерять
  * заявку, чем красиво обработать ошибку: она сначала сохраняется в базу
@@ -29,7 +35,13 @@ export class LeadsService {
     private readonly invoices: InvoicesService,
   ) {}
 
-  /** Цены тарифов в копейках. Совпадают с посадочной страницей. */
+  /**
+   * Цены тарифов в копейках — на случай заявки с уже согласованным тарифом.
+   *
+   * Публичных цен на сайте нет, форма тариф не присылает, и счёт по такой
+   * заявке сам не выставляется: сумма появляется после разговора. Таблица
+   * остаётся здесь ради дня, когда публичные пакеты вернутся.
+   */
   private static readonly PRICES: Record<string, number> = {
     Старт: 2_900_000,
     Про: 6_900_000,
@@ -51,8 +63,24 @@ export class LeadsService {
         phone: dto.phone || null,
         inn: dto.inn || null,
         tariff: dto.tariff || null,
-        volume: dto.volume || null,
-        comment: dto.comment || null,
+        volume: dto.volume ? VOLUME_BAND_LABELS[dto.volume] : null,
+        /*
+         * Отдельные колонки под заявку (их завела миграция ветки A).
+         * По тексту в comment нельзя ни искать, ни сортировать, а «позвонить
+         * утром» — это то, что разбирают списком, а не читают глазами.
+         * Редакция согласия лежит здесь же: это юридический факт о заявке,
+         * и он не должен зависеть от того, не переписал ли кто-то заметку.
+         */
+        eventKinds: dto.eventKinds ?? [],
+        callTime: dto.callTime || null,
+        consentTextVersion: CONSENT_TEXT_VERSION,
+        /*
+         * Тот же текст остаётся и в comment: его показывает карточка заявки
+         * (apps/web/src/pages/InvoicesPage.tsx). Колонки — запись для машины,
+         * comment — то, что читает человек; убрать его отсюда можно только
+         * вместе с правкой карточки.
+         */
+        comment: LeadsService.describe(dto),
         ip: ctx.ip,
         userAgent: ctx.userAgent?.slice(0, 500),
         source: ctx.referer?.slice(0, 500),
@@ -90,6 +118,26 @@ export class LeadsService {
   }
 
   /**
+   * Что человек рассказал о себе, одним текстом.
+   *
+   * Сами значения теперь лежат в колонках `eventKinds`, `callTime`
+   * и `consentTextVersion`; этот текст — их читаемый пересказ для карточки
+   * заявки и для письма продавцу. Подписи берутся из общего справочника,
+   * поэтому переименование варианта не разъедет форму и заявку.
+   */
+  private static describe(dto: LeadDto): string {
+    const kinds = (dto.eventKinds ?? []).map((k) => EVENT_KIND_LABELS[k]);
+    return [
+      dto.comment || null,
+      kinds.length ? `Тип мероприятий: ${kinds.join(', ')}` : null,
+      dto.callTime ? `Удобное время звонка: ${CALL_TIME_LABELS[dto.callTime]}` : null,
+      `Согласие на обработку данных: дано, редакция текста ${CONSENT_TEXT_VERSION}`,
+    ]
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  /**
    * Письмо себе о новой заявке. Адрес получателя — отправитель по умолчанию
    * организации-владельца сервиса: отдельной настройки заводить не стали,
    * пока продавец один.
@@ -106,14 +154,14 @@ export class LeadsService {
     await this.mail.sendNotice(
       sender.orgId,
       sender.email,
-      `Заявка на счёт: ${dto.orgName}`,
+      `Заявка на обсуждение условий: ${dto.orgName}`,
       [
         `Организация: ${dto.orgName}`,
         `Контакт: ${dto.contact}`,
         `Почта: ${dto.email}`,
         dto.phone ? `Телефон: ${dto.phone}` : null,
-        dto.volume ? `Объём: ${dto.volume}` : null,
-        dto.comment ? `Комментарий: ${dto.comment}` : null,
+        dto.volume ? `Объём: ${VOLUME_BAND_LABELS[dto.volume]}` : null,
+        LeadsService.describe(dto),
       ]
         .filter(Boolean)
         .join('\n'),

@@ -1,10 +1,9 @@
 import { createHash } from 'node:crypto';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import type { Prisma } from '@prisma/client';
-import type { Env } from '../config/env';
 import { PrismaService } from '../prisma/prisma.service';
-import { ReferralService } from '../referral/referral.service';
+import { PlansService } from '../plans/plans.service';
+import { refusal } from '../plans/plan';
 import { GenerationProcessor } from '../generation/generation.processor';
 import { MailService } from '../mail/mail.service';
 import { MailProcessor } from '../mail/mail.processor';
@@ -54,11 +53,10 @@ export class RegistryActionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly replacement: ReplacementService,
-    private readonly referral: ReferralService,
+    private readonly plans: PlansService,
     private readonly generation: GenerationProcessor,
     private readonly mail: MailService,
     private readonly mailProcessor: MailProcessor,
-    private readonly config: ConfigService<Env, true>,
   ) {}
 
   /**
@@ -387,7 +385,7 @@ export class RegistryActionsService {
         );
       }
 
-      await this.checkFreeLimit(orgId, rowIds.length, tx);
+      await this.checkQuota(orgId, rowIds.length, tx);
 
       /*
        * Отметку строки восстанавливаем: воркер печатает только отмеченные,
@@ -420,40 +418,33 @@ export class RegistryActionsService {
   }
 
   /**
-   * Бесплатная проба: перевыпуск создаёт новые файлы и потому считается.
+   * Перевыпуск создаёт новые файлы и потому считается наравне с выпуском.
    *
-   * Повторяет проверку из `GenerationService`, а не вызывает её: очередь
-   * выпуска в этой ветке только читается и не меняется, а вынести проверку
-   * в общее место — правка её модуля. Общий смысл один: выпущенное
-   * считается по фактам (числу файлов), к нему прибавляется бронь уже
-   * принятых заданий.
+   * Что положено организации, спрашиваем у PlansService — там же, где
+   * спрашивает выпуск. Раньше эта проверка была здесь переписана заново,
+   * и пока условия были одни на всех, расхождение никого не трогало.
+   * С планами по договорённости две копии правил разошлись бы на первом
+   * же клиенте с особыми условиями.
    */
-  private async checkFreeLimit(
+  private async checkQuota(
     orgId: string,
     adding: number,
     tx: Prisma.TransactionClient,
   ): Promise<void> {
-    const org = await tx.organization.findUnique({ where: { id: orgId } });
-    if (!org || org.plan !== 'free') return;
+    const quota = await this.plans.quota(orgId, tx);
+    if (quota.expired) throw new BadRequestException(refusal({ quota, adding, reserved: 0 }));
+    if (quota.limit === null) return;
 
-    const base = this.config.get('FREE_DOCUMENT_LIMIT', { infer: true });
-    const bonus = await this.referral.bonusDocuments(orgId, tx);
-    const limit = base + bonus;
-
-    const issued = await tx.file.count({ where: { orgId, kind: 'generated' } });
     const active = await tx.generationJob.findMany({
       where: { orgId, status: { in: [...ACTIVE_STATUSES] } },
       select: { total: true, done: true, failed: true },
     });
     const reserved = active.reduce((sum, j) => sum + Math.max(0, j.total - j.done - j.failed), 0);
-    const used = issued + reserved;
 
-    if (used + adding > limit) {
-      const left = Math.max(0, limit - used);
+    if (quota.used + reserved + adding > quota.limit) {
       throw new BadRequestException(
-        `На бесплатной пробе осталось ${left} документов из ${limit}, ` +
-          `а на перевыпуск отмечено ${adding}. Перевыпуск создаёт новые документы ` +
-          `и считается наравне с обычным выпуском.`,
+        refusal({ quota, adding, reserved }) +
+          ' Перевыпуск создаёт новые документы и считается наравне с обычным выпуском.',
       );
     }
   }

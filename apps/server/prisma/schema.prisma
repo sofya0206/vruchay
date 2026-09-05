@@ -33,6 +33,57 @@ enum VerifyNameMode {
   none
 }
 
+/// Чем отмеряется срок плана.
+///
+/// Разовый пакет и год различаются не длиной, а тем, чем кончаются:
+/// год — датой, пакет — документами.
+enum PlanPeriod {
+  package
+  year
+}
+
+/// Условия конкретной организации: сколько документов, на какой срок
+/// и что входит.
+///
+/// Отдельная запись, а не колонка у организации и тем более не `if` в коде:
+/// цена и объём обсуждаются с каждым клиентом отдельно, и менять их
+/// правкой кода означало бы релиз на каждый разговор. Прошлые планы
+/// не удаляются — по ним видно, что и когда было обещано.
+model Plan {
+  id    String       @id @default(uuid()) @db.Uuid
+  orgId String       @map("org_id") @db.Uuid
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  /// Как план называют в разговоре: «500 документов на год».
+  name          String
+  /// Сколько документов можно выпустить за период.
+  documentLimit Int        @map("document_limit")
+  period        PlanPeriod
+  startsAt      DateTime   @map("starts_at")
+  /// Пусто — срок не ограничен.
+  endsAt        DateTime?  @map("ends_at")
+
+  /// Что входит. Значения — из PLAN_FEATURES в packages/shared: список
+  /// один на сервер и кабинет, иначе кнопка была бы на экране
+  /// и запрещена сервером.
+  features String[]
+
+  /// Пакет не сгорает: остаток документов доступен и после даты окончания.
+  /// Для годового доступа обычно нет, для оплаченного пакета — да.
+  neverExpires Boolean @default(false) @map("never_expires")
+
+  /// Чем закончились переговоры. Наша заметка, клиенту не показывается,
+  /// персональных данных здесь быть не должно.
+  note String?
+
+  /// Кто назначил — адрес сотрудника платформы, для разбора «откуда это взялось».
+  assignedBy String?  @map("assigned_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([orgId, startsAt])
+  @@map("plans")
+}
+
 model Organization {
   id        String      @id @default(uuid()) @db.Uuid
   name      String
@@ -145,6 +196,7 @@ model Organization {
   awardRuleSets AwardRuleSet[]
   supportTickets SupportTicket[]
   roadmapVotes   RoadmapVote[]
+  plans         Plan[]
 
   @@map("organizations")
 }
@@ -1214,6 +1266,21 @@ model Lead {
   /** Сколько документов в год, если тариф не выбран. */
   volume  String?
   comment String?
+
+  /*
+   * Поля заявки «Обсудить условия» (ветка 10-B).
+   *
+   * Заведены здесь, потому что миграции блока делает только эта ветка.
+   * До них тип мероприятий и удобное время звонка складывались в comment
+   * одним текстом — искать по такому нельзя, а «позвонить утром» надо
+   * не читать глазами, а сортировать.
+   */
+  /** Какие мероприятия проводит: соревнования, конференции, курсы. */
+  eventKinds String[] @map("event_kinds")
+  /** Когда удобно звонить. */
+  callTime   String?  @map("call_time")
+  /** Редакция текста согласия, на которую человек нажал. */
+  consentTextVersion String? @map("consent_text_version")
 
   status LeadStatus @default(new)
   /** Что с заявкой сделали: кому передали, о чём договорились. */

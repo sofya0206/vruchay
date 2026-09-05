@@ -17,6 +17,7 @@ import {
   updateRuleSetSchema,
   UpdateRuleSetDto,
 } from './awards.dto';
+import { PlanFeatureGuard, RequiresFeature } from '../plans/plan-feature.guard';
 
 const uuidParam = new ZodValidationPipe(uuidSchema);
 
@@ -26,7 +27,7 @@ const uuidParam = new ZodValidationPipe(uuidSchema);
  * следующему протоколу.
  */
 @Controller('award-rules')
-@UseGuards(AuthGuard)
+@UseGuards(AuthGuard, PlanFeatureGuard)
 export class AwardRulesController {
   constructor(private readonly awards: AwardsService) {}
 
@@ -46,6 +47,7 @@ export class AwardRulesController {
     return this.awards.get(user.orgId, id);
   }
 
+  @RequiresFeature('awards')
   @Post()
   create(
     @CurrentUser() user: SessionUser,
@@ -63,6 +65,7 @@ export class AwardRulesController {
     return this.awards.update(user.orgId, id, dto);
   }
 
+  @RequiresFeature('awards')
   @Post(':id/duplicate')
   duplicate(@CurrentUser() user: SessionUser, @Param('id', uuidParam) id: string) {
     return this.awards.duplicate(user.orgId, id);
@@ -76,10 +79,11 @@ export class AwardRulesController {
 
 /** Всё, что относится к конкретному соревнованию: привязка и раскладка. */
 @Controller('documents/:id/awards')
-@UseGuards(AuthGuard)
+@UseGuards(AuthGuard, PlanFeatureGuard)
 export class DocumentAwardsController {
   constructor(private readonly awards: AwardsService) {}
 
+  @RequiresFeature('awards')
   @Post('rule-set')
   attach(
     @CurrentUser() user: SessionUser,

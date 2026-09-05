@@ -28,11 +28,13 @@ import { ReviewsModule } from './reviews/reviews.module';
 import { SupportModule } from './support/support.module';
 import { OrgModule } from './org/org.module';
 import { OverviewModule } from './overview/overview.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 import { TokensModule } from './tokens/tokens.module';
 import { BackupModule } from './backup/backup.module';
 import { PlatformModule } from './platform/platform.module';
 import { ExpiryModule } from './expiry/expiry.module';
 import { PublicOrgModule } from './public-org/public-org.module';
+import { PlansModule } from './plans/plans.module';
 
 @Module({
   imports: [
@@ -63,11 +65,13 @@ import { PublicOrgModule } from './public-org/public-org.module';
     SupportModule,
     OrgModule,
     OverviewModule,
+    AnalyticsModule,
     TokensModule,
     BackupModule,
     PlatformModule,
     ExpiryModule,
     PublicOrgModule,
+    PlansModule,
   ],
   controllers: [HealthController],
 })

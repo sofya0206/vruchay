@@ -15,6 +15,7 @@ import {
   Send,
   SlidersHorizontal,
   Table2,
+  TriangleAlert,
   Undo2,
   ZoomIn,
 } from 'lucide-react';
@@ -139,7 +140,7 @@ export function EditorPage() {
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
-  const [saved, setSaved] = useState<'saved' | 'saving' | 'dirty'>('saved');
+  const [saved, setSaved] = useState<'saved' | 'saving' | 'dirty' | 'error'>('saved');
   const [viewMode, setViewMode] = useState<'placeholders' | 'data'>('placeholders');
   const [rowIndex, setRowIndex] = useState(0);
   const [showGrid, setShowGrid] = useState(false);
@@ -156,6 +157,17 @@ export function EditorPage() {
   const [panning, setPanning] = useState(false);
   const pan = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
   const [styleClipboard, setStyleClipboard] = useState<TextStylePatch | null>(null);
+  /*
+   * Номер последней правки, сделанной человеком.
+   *
+   * Нужен, чтобы ответ на устаревший запрос не показал «Сохранено».
+   * Автосохранение откладывается на полторы секунды, и за время полёта
+   * запроса человек успевает подвинуть блок ещё раз: ответ на первую
+   * правку приходит, когда вторая ещё ждёт своей очереди. Чип «Сохранено»
+   * в этот момент — неправда, а поверив ему и перезагрузив страницу,
+   * человек теряет вторую правку молча.
+   */
+  const latestVersion = useRef(0);
   /*
    * Что набрано в «О мероприятии» прямо сейчас, до сохранения.
    *
@@ -227,18 +239,50 @@ export function EditorPage() {
     enabled: Boolean(sheet?.backgroundFileId),
   });
 
+  /*
+   * Удавшийся запрос снимает прежнюю ошибку — но только её.
+   *
+   * Загрузка бланка и настройки мероприятия ходят на сервер своими
+   * запросами, и их успех значит, что связь есть. Держать после этого
+   * «Не удалось сохранить» незачем. А вот «Есть правки» и «Сохраняем»
+   * трогать нельзя: они говорят про макет, которого эти запросы
+   * не касались.
+   */
+  const clearSaveError = useCallback(
+    () => setSaved((state) => (state === 'error' ? 'saved' : state)),
+    [],
+  );
+
+  /**
+   * Отметку об успехе снимаем только с той правки, которая и уехала.
+   *
+   * Номер правки едет вместе с макетом и возвращается в `onSuccess`
+   * вторым аргументом. Если он отстал от `latestVersion`, значит человек
+   * успел поправить ещё раз: «Сохранено» показывать нельзя — пусть чип
+   * остаётся тем, что поставила новая правка («Есть правки» или
+   * «Сохраняем»), и сменится, когда доедет она.
+   */
   const save = useMutation({
-    mutationFn: (layout: unknown) => api.patch(`/documents/${id}/sheets/${sheet!.id}`, { layout }),
-    onSuccess: () => setSaved('saved'),
+    mutationFn: ({ layout }: { layout: unknown; version: number }) =>
+      api.patch(`/documents/${id}/sheets/${sheet!.id}`, { layout }),
+    onSuccess: (_data, sent) => {
+      if (sent.version === latestVersion.current) setSaved('saved');
+    },
+    // Без этого упавший запрос оставлял чип на «Сохраняем» навсегда:
+    // человек видел бесконечное сохранение и ни одного слова о том,
+    // что правка не уехала.
+    onError: () => setSaved('error'),
   });
 
   const uploadBackground = useMutation({
     mutationFn: (file: File) =>
       api.upload<{ fileId: string; url: string }>(`/documents/${id}/sheets/${sheet!.id}/background`, file),
     onSuccess: () => {
+      clearSaveError();
       void doc.refetch();
       void background.refetch();
     },
+    onError: () => setSaved('error'),
   });
 
   /** Что предложить, если бланк не тех пропорций, что лист. */
@@ -246,14 +290,25 @@ export function EditorPage() {
 
   const resizePage = useMutation({
     mutationFn: (size: { widthMm: number; heightMm: number }) =>
-      api.patch(`/documents/${id}`, { pageWidthMm: size.widthMm, pageHeightMm: size.heightMm }),
-    onSuccess: () => void doc.refetch(),
+      api.patch(`/documents/${id}`, {
+        pageWidthMm: size.widthMm,
+        pageHeightMm: size.heightMm,
+      }),
+    onSuccess: () => {
+      clearSaveError();
+      void doc.refetch();
+    },
+    onError: () => setSaved('error'),
   });
 
   /** Собственные настройки материала: мероприятие и проверка по QR. */
   const saveEvent = useMutation({
     mutationFn: (values: Record<string, unknown>) => api.patch(`/documents/${id}`, values),
-    onSuccess: () => void doc.refetch(),
+    onSuccess: () => {
+      clearSaveError();
+      void doc.refetch();
+    },
+    onError: () => setSaved('error'),
   });
 
   async function onPickBackground(file: File) {
@@ -298,10 +353,11 @@ export function EditorPage() {
   const { layout, version } = history;
   useEffect(() => {
     if (!sheet || version === 0) return;
+    latestVersion.current = version;
     setSaved('dirty');
     const timer = setTimeout(() => {
       setSaved('saving');
-      save.mutate(layout);
+      save.mutate({ layout, version });
     }, AUTOSAVE_DELAY_MS);
     return () => clearTimeout(timer);
     // Намеренно следим только за version и sheet: объект мутации пересоздаётся
@@ -961,7 +1017,17 @@ export function EditorPage() {
             </span>
           </div>
 
-          <StatusChip tone={saved === 'saved' ? 'done' : saved === 'saving' ? 'progress' : 'neutral'}>
+          <StatusChip
+            tone={
+              saved === 'saved'
+                ? 'done'
+                : saved === 'saving'
+                  ? 'progress'
+                  : saved === 'error'
+                    ? 'error'
+                    : 'neutral'
+            }
+          >
             {saved === 'saved' ? (
               <>
                 <Check size={13} /> Сохранено
@@ -969,6 +1035,10 @@ export function EditorPage() {
             ) : saved === 'saving' ? (
               <>
                 <LoaderCircle size={13} className="animate-spin" /> Сохраняем
+              </>
+            ) : saved === 'error' ? (
+              <>
+                <TriangleAlert size={13} /> Не удалось сохранить
               </>
             ) : (
               <>

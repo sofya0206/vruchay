@@ -85,6 +85,12 @@ interface PresetRow {
  * пару по полу получателя, а когда пол по имени не читается, печатает
  * «прошёл/прошла» — законная запись на бумаге, из-за которой выпуск
  * останавливать не за что.
+ *
+ * Падеж имени выбирает фраза, в которую оно встроено. «Награждается»
+ * и «Объявляется» требуют дательного — «Награждается Иванову», — поэтому
+ * там стоит `%name_dat`, который считается сам из колонки «ФИО»
+ * (см. `variables.ts`). А в сертификате имя стоит в придаточном —
+ * «подтверждает, что Иванов прошёл», — и там верен именительный.
  */
 const PRESETS: StarterPreset[] = [
   {
@@ -97,7 +103,7 @@ const PRESETS: StarterPreset[] = [
     rows: [
       { role: 'title', text: 'Грамота' },
       { role: 'label', text: 'Награждается' },
-      { role: 'name', text: '%name' },
+      { role: 'name', text: '%name_dat' },
       { role: 'main', text: 'за %place_word место' },
       { role: 'main', text: '%event', bold: true },
       { role: 'note', text: '%event_place · %event_date' },
@@ -113,7 +119,7 @@ const PRESETS: StarterPreset[] = [
     rows: [
       { role: 'title', text: 'Диплом' },
       { role: 'label', text: 'Награждается' },
-      { role: 'name', text: '%name' },
+      { role: 'name', text: '%name_dat' },
       { role: 'main', text: 'за участие в' },
       { role: 'main', text: '%event', bold: true },
       { role: 'note', text: '%event_place · %event_date' },
@@ -145,7 +151,7 @@ const PRESETS: StarterPreset[] = [
     rows: [
       { role: 'title', text: 'Благодарность' },
       { role: 'label', text: 'Объявляется' },
-      { role: 'name', text: '%name' },
+      { role: 'name', text: '%name_dat' },
       // Названия организации здесь нет: оно уже стоит в подвале, и второй
       // раз на том же листе читается как ошибка вёрстки.
       { role: 'main', text: 'за добросовестный труд и вклад в общее дело' },
@@ -169,6 +175,15 @@ export const SAMPLE_RECIPIENT: Record<string, string> = {
   name: 'Кузьмина-Караваева Анна',
   place: '1',
   place_word: 'первое',
+  /*
+   * Производные переменные лежат здесь готовыми, как и `place_word`.
+   *
+   * Витрина заготовок отдаёт этот образец прямо в `SheetRenderer`, минуя
+   * `mergeVariables`, — сама она ничего не вычисляет. Без готового
+   * значения на плашке стояло бы «Награждается» с пустотой вместо имени.
+   * В настоящем документе падеж считается из колонки «ФИО».
+   */
+  name_dat: 'Кузьминой-Караваевой Анне',
 };
 
 /**

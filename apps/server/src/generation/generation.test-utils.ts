@@ -1,6 +1,8 @@
 import { Readable } from 'node:stream';
 import { GenerationProcessor } from './generation.processor';
 import { GenerationService } from './generation.service';
+import { PlansService } from '../plans/plans.service';
+import type { PlanRecord } from '../plans/plan';
 
 /*
  * Стенд для проверок очереди генерации.
@@ -78,6 +80,8 @@ function matchValue(actual: unknown, expected: unknown): boolean {
     // Сравнение по времени: им сторож ищет задания, висящие дольше срока.
     if ('lt' in cond) return Number(actual) < Number(cond.lt);
     if ('gt' in cond) return Number(actual) > Number(cond.gt);
+    if ('gte' in cond) return Number(actual) >= Number(cond.gte);
+    if ('lte' in cond) return Number(actual) <= Number(cond.lte);
     return true;
   }
   return actual === expected;
@@ -191,6 +195,8 @@ export class World {
   readonly finished: string[] = [];
 
   plan: 'free' | 'paid';
+  /** Назначенные планы организации: условия как данные, а не как код. */
+  planRecords: PlanRecord[] = [];
   /** Убить процесс, когда воркер собрался записать этот прогресс. */
   crashAtDone: number | null = null;
   /** Ронять любую запись в базу: так выглядит недоступная база. */
@@ -199,6 +205,8 @@ export class World {
   readonly prisma: Record<string, unknown>;
   readonly processor: GenerationProcessor;
   readonly service: GenerationService;
+  /** Та же служба планов, у которой спрашивает остаток кабинет. */
+  readonly plans: PlansService;
 
   private nextFile = 1;
   private createAttempts = 0;
@@ -244,11 +252,12 @@ export class World {
       },
     };
 
-    this.service = new GenerationService(
+    this.plans = new PlansService(
       this.prisma as never,
       { bonusDocuments: async () => 0 } as never,
       config as never,
     );
+    this.service = new GenerationService(this.prisma as never, config as never, this.plans);
 
     this.processor = new GenerationProcessor(
       this.prisma as never,
@@ -535,6 +544,10 @@ export class World {
         },
       },
       organization: { findUnique: async () => ({ id: 'org-1', plan: this.plan }) },
+      plan: {
+        findMany: async () =>
+          [...this.planRecords].sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime()),
+      },
       $executeRaw: async () => 1,
       $transaction: async (work: (tx: unknown) => Promise<unknown>) => work(this.prisma),
     };
