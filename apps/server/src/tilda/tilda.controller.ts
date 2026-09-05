@@ -7,7 +7,12 @@ import { Roles, RolesGuard } from '../auth/roles.guard';
 import type { SessionUser } from '../auth/auth.service';
 import { uuidSchema } from '../documents/documents.dto';
 import { TildaService } from './tilda.service';
-import { integrationSchema, IntegrationDto } from './tilda.dto';
+import {
+  integrationSchema,
+  integrationPatchSchema,
+  IntegrationDto,
+  IntegrationPatchDto,
+} from './tilda.dto';
 import { PlanFeatureGuard, RequiresFeature } from '../plans/plan-feature.guard';
 
 const uuidParam = new ZodValidationPipe(uuidSchema);
@@ -58,7 +63,7 @@ export class TildaController {
   update(
     @CurrentUser() user: SessionUser,
     @Param('id', uuidParam) id: string,
-    @Body(new ZodValidationPipe(integrationSchema.partial())) dto: Partial<IntegrationDto>,
+    @Body(new ZodValidationPipe(integrationPatchSchema)) dto: IntegrationPatchDto,
   ) {
     return this.tilda.updateIntegration(user.orgId, id, dto);
   }

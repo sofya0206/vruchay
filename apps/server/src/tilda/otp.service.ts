@@ -1,4 +1,4 @@
-import { createHash, randomInt, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import type IORedis from 'ioredis';
 import { InjectRedis } from '../common/redis.module';
@@ -30,10 +30,18 @@ export class OtpService {
     return createHash('sha256').update(code).digest('hex');
   }
 
-  /** Возвращает код для отправки на почту; в хранилище остаётся только хеш. */
-  async issue(requestId: string): Promise<string> {
+  /**
+   * Возвращает код для отправки на почту; в хранилище остаётся только хеш.
+   *
+   * Код короткий — человек набирает его руками. Для ссылки в письме
+   * (`long`) выдаётся длинный: набирать его не нужно, а перебрать
+   * шесть цифр за пять попыток нельзя, но за много писем — можно.
+   */
+  async issue(requestId: string, options: { long?: boolean } = {}): Promise<string> {
     // randomInt из crypto, а не Math.random: код должен быть непредсказуем.
-    const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
+    const code = options.long
+      ? randomBytes(24).toString('base64url')
+      : String(randomInt(0, 1_000_000)).padStart(6, '0');
     await this.redis
       .multi()
       .hset(this.key(requestId), { hash: OtpService.hash(code), attempts: '0' })

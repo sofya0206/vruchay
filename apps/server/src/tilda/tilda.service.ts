@@ -46,6 +46,14 @@ export interface SubmitContext {
   referer?: string;
   ip?: string;
   userAgent?: string;
+  /**
+   * Заявка пришла прямо на адрес приёма, а не через наш скрипт на странице.
+   *
+   * Такую отправку Тильда умеет делать со своей стороны, и тогда заголовков
+   * источника в запросе нет вовсе. Отсутствие источника само по себе поводом
+   * для отказа тут не служит — вместо него требуется другая проверка участника.
+   */
+  directPost?: boolean;
 }
 
 export type SubmitResult =
@@ -104,8 +112,27 @@ export class TildaService {
       return { status: 'processing', requestId: crypto.randomUUID() };
     }
 
-    if (!isOriginAllowed(ctx.origin, ctx.referer, integration.allowedDomains)) {
-      this.reject(`источник «${ctx.origin ?? ctx.referer ?? 'не указан'}» не разрешён`);
+    if (ctx.origin ?? ctx.referer) {
+      if (!isOriginAllowed(ctx.origin, ctx.referer, integration.allowedDomains)) {
+        this.reject(`источник «${ctx.origin ?? ctx.referer ?? 'не указан'}» не разрешён`);
+      }
+    } else if (!ctx.directPost) {
+      // Скрипт на странице источник передаёт всегда: его отсутствие означает
+      // не «Тильда прислала со своей стороны», а обращение мимо формы.
+      this.reject('источник не указан');
+    } else if (integration.authMode !== 'email_code' && !integration.checkList) {
+      /*
+       * Прямая отправка приходит без источника, и белый список доменов её
+       * не удерживает: токен интеграции лежит открытым текстом в разметке
+       * страницы, а значит виден любому посетителю. Единственное, что тогда
+       * отделяет участника от постороннего, — подтверждение адреса кодом
+       * или сверка со списком. Без обеих проверок такая интеграция раздавала
+       * бы документы всем подряд, поэтому заявку не принимаем.
+       */
+      this.reject(
+        `прямая отправка по интеграции ${integration.id} без подтверждения адреса и без сверки со списком`,
+        'Форма настроена неверно: обратитесь к организатору',
+      );
     }
 
     if (!integration.documentIds.includes(dto.documentId)) {
@@ -117,6 +144,22 @@ export class TildaService {
       select: { id: true },
     });
     if (!document) this.reject('документ не найден или удалён');
+
+    if (integration.requireAccount && !dto.accountEmail) {
+      this.reject(
+        `интеграция ${integration.id} принимает только из личного кабинета, адрес учётной записи не передан`,
+        'Войдите в личный кабинет, чтобы получить документ',
+      );
+    }
+
+    if (integration.checkList && !(await this.isInRecipientList(dto))) {
+      // Сообщаем прямо: человек должен понять, что дело в списке, а не
+      // в опечатке в адресе, — иначе он будет пробовать снова и снова.
+      this.reject(
+        `адрес ${maskEmail(dto.email)} не найден в реестре документа ${dto.documentId}`,
+        'Этого адреса нет в списке участников. Проверьте адрес или напишите организатору',
+      );
+    }
 
     await this.assertDailyLimit(integration);
 
@@ -162,6 +205,14 @@ export class TildaService {
     await this.recordConsents(dto, request.id, integration.orgId, ctx);
 
     if (needsCode) {
+      if (ctx.directPost) {
+        // Окно для ввода кода рисует наш скрипт на странице, а при прямой
+        // отправке его там нет. Вместо кода — ссылка: одно нажатие в письме.
+        const code = await this.otp.issue(request.id, { long: true });
+        const url = `${this.publicUrl()}/api/v1/tilda/confirm/${request.id}/${code}`;
+        await this.mail.sendConfirmLink(integration.orgId, dto.email, url);
+        return { status: 'need_code', requestId: request.id };
+      }
       const code = await this.otp.issue(request.id);
       await this.mail.sendCode(integration.orgId, dto.email, code);
       return { status: 'need_code', requestId: request.id };
@@ -421,6 +472,47 @@ export class TildaService {
       filename: file.originalName || 'Документ.pdf',
       mime: file.mime,
     };
+  }
+
+  /**
+   * Есть ли адрес в реестре получателей документа.
+   *
+   * Реестр хранит значения по именам колонок, поэтому сначала надо понять,
+   * в какой колонке лежит адрес: у одного документа она названа `email`,
+   * у другого — `mail` или `user_email`.
+   *
+   * Сравниваем и адрес доставки, и адрес учётной записи: в реестре у
+   * организатора записан рабочий адрес участника, а прислать документ
+   * человек может попросить на любой другой.
+   */
+  private async isInRecipientList(dto: SubmitDto): Promise<boolean> {
+    const columns = await this.prisma.recipientColumn.findMany({
+      where: { documentId: dto.documentId },
+      select: { name: true },
+    });
+    const column =
+      columns.find((c) => c.name.toLowerCase() === 'email')?.name ??
+      columns.find((c) => c.name.toLowerCase().includes('mail'))?.name;
+
+    if (!column) {
+      // Сверять не с чем. Пропускать всех при включённой проверке нельзя:
+      // организатор считает, что список работает.
+      this.logger.warn(
+        `Сверка со списком включена, но у документа ${dto.documentId} нет колонки с адресом`,
+      );
+      return false;
+    }
+
+    const account = dto.accountEmail ?? dto.email;
+    // Тегированный шаблон, а не склейка строк: имя колонки приходит из базы,
+    // но адреса — из формы, и подставлять их в текст запроса нельзя.
+    const rows = await this.prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM recipient_rows
+      WHERE document_id = ${dto.documentId}::uuid
+        AND lower(trim(data->>${column})) IN (${dto.email}, ${account})
+      LIMIT 1
+    `;
+    return rows.length > 0;
   }
 
   /**

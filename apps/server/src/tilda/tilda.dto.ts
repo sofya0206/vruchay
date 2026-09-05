@@ -52,6 +52,29 @@ export const confirmSchema = z.object({
 });
 export type ConfirmDto = z.infer<typeof confirmSchema>;
 
+/** Запрос списка «мои документы». */
+export const myListSchema = z.object({
+  token: z.string().uuid('Некорректный токен интеграции'),
+  email: z.string().trim().toLowerCase().email('Проверьте адрес электронной почты').max(254),
+  accountEmail: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .max(254)
+    .optional()
+    .transform((v) => (v && z.string().email().safeParse(v).success ? v : undefined)),
+});
+export type MyListDto = z.infer<typeof myListSchema>;
+
+export const myConfirmSchema = z.object({
+  listId: z.string().uuid(),
+  code: z.string().trim().regex(/^\d{6}$/, 'Код состоит из шести цифр'),
+});
+export type MyConfirmDto = z.infer<typeof myConfirmSchema>;
+
+/** Код из ссылки в письме — длинный, набирать его не нужно. */
+export const linkCodeSchema = z.string().regex(/^[A-Za-z0-9_-]{32}$/);
+
 /** Настройки интеграции, которые задаёт клиент в личном кабинете. */
 export const integrationSchema = z.object({
   name: z.string().trim().min(1, 'Введите название').max(100),
@@ -61,6 +84,10 @@ export const integrationSchema = z.object({
     .max(20),
   documentIds: z.array(z.string().uuid()).min(1, 'Выберите хотя бы один документ').max(50),
   authMode: z.enum(['none', 'email_code']).default('email_code'),
+  /** Сверять адрес с реестром получателей документа до всего остального. */
+  checkList: z.boolean().default(false),
+  /** Принимать заявку только изнутри личного кабинета площадки. */
+  requireAccount: z.boolean().default(false),
   singleFilePerEmail: z.boolean().default(true),
   dailyLimit: z.coerce.number().int().min(1).max(10_000).default(500),
   successMessage: z.string().trim().max(300).default('Спасибо! Документ отправлен на вашу почту'),
@@ -70,3 +97,29 @@ export const integrationSchema = z.object({
   active: z.boolean().default(true),
 });
 export type IntegrationDto = z.infer<typeof integrationSchema>;
+
+/**
+ * Схема правки настроек.
+ *
+ * Не `integrationSchema.partial()`: `.partial()` делает поля необязательными,
+ * но значения по умолчанию оставляет — и Zod подставляет их вместо
+ * отсутствующих. Правка одного переключателя приходила бы на сервер вместе
+ * со всеми остальными полями в значениях по умолчанию и молча их сбрасывала:
+ * суточный предел возвращался к 500, своё сообщение об успехе стиралось,
+ * а включённая сверка со списком выключалась.
+ *
+ * Поэтому у каждого поля значение по умолчанию снимается, и до базы доходит
+ * ровно то, что человек изменил.
+ */
+type Strip<T> = T extends z.ZodDefault<infer Inner> ? Inner : T;
+type PatchShape = { [K in keyof typeof integrationSchema.shape]: z.ZodOptional<Strip<(typeof integrationSchema.shape)[K]>> };
+
+export const integrationPatchSchema = z.object(
+  Object.fromEntries(
+    Object.entries(integrationSchema.shape).map(([key, field]) => [
+      key,
+      (field instanceof z.ZodDefault ? field.unwrap() : field).optional(),
+    ]),
+  ) as PatchShape,
+);
+export type IntegrationPatchDto = z.infer<typeof integrationPatchSchema>;

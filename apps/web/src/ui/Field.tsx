@@ -49,3 +49,51 @@ export function StatusChip({
     </span>
   );
 }
+
+/**
+ * Переключатель настройки.
+ *
+ * Подпись — часть кнопки, а не текст рядом: попасть по самому ползунку
+ * с телефона трудно, а промах по настройке безопасности стоит дорого.
+ */
+export function Toggle({
+  checked,
+  onChange,
+  label,
+  hint,
+  disabled,
+}: {
+  checked: boolean;
+  onChange: (value: boolean) => void;
+  label: ReactNode;
+  hint?: ReactNode;
+  disabled?: boolean;
+}) {
+  return (
+    <div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        disabled={disabled}
+        onClick={() => onChange(!checked)}
+        className="flex w-full items-start gap-3 text-left disabled:opacity-50"
+      >
+        <span
+          aria-hidden
+          className={`mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors ${
+            checked ? 'bg-[var(--accent)]' : 'bg-[var(--line-strong)]'
+          }`}
+        >
+          <span
+            className={`h-4 w-4 rounded-full bg-white transition-transform ${
+              checked ? 'translate-x-4' : ''
+            }`}
+          />
+        </span>
+        <span className="text-sm">{label}</span>
+      </button>
+      {hint && <p className="mt-1 pl-12 text-xs text-[var(--text-muted)]">{hint}</p>}
+    </div>
+  );
+}
