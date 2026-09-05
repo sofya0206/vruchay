@@ -119,11 +119,10 @@ export async function startApp(options: AppOptions = {}): Promise<IntegrationApp
   const registryActions = new RegistryActionsService(
     prisma,
     replacement,
-    referral,
+    plans,
     processor,
     mail,
     mailProcessor,
-    config,
   );
 
   const render = new RenderController(prisma, asStorage, config);
