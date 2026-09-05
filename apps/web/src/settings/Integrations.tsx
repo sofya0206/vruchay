@@ -6,8 +6,9 @@ import { ApiError } from '../api/client';
 import type { DocumentList } from '../api/types';
 import { api } from '../api/client';
 import { Button } from '../ui/Button';
-import { Input, Label, Select, StatusChip } from '../ui/Field';
+import { Input, Label, Select, StatusChip, Toggle } from '../ui/Field';
 import { EmbedCode } from './EmbedCode';
+import { TildaGuide } from './TildaGuide';
 
 /**
  * Формы на сайте.
@@ -182,11 +183,19 @@ function IntegrationCard({
 
       <DocumentIds ids={integration.documentIds} titles={titles} />
 
+      <Rules integration={integration} onChanged={onChanged} />
+
       <EmbedCode
         origin={location.origin}
         token={integration.token}
         documentIds={integration.documentIds}
         titles={titles}
+      />
+
+      <TildaGuide
+        origin={location.origin}
+        token={integration.token}
+        documentId={integration.documentIds[0] ?? ''}
       />
 
       <Button
@@ -232,6 +241,65 @@ function IntegrationCard({
         </div>
       )}
     </article>
+  );
+}
+
+/**
+ * Кому выдавать документ.
+ *
+ * Все четыре настройки на виду и без «дополнительно»: каждая расширяет
+ * или сужает круг получателей, а такое не прячут — организатор должен
+ * видеть, кому его документы достанутся, не открывая ничего лишнего.
+ */
+function Rules({
+  integration,
+  onChanged,
+}: {
+  integration: Integration;
+  onChanged: () => void;
+}) {
+  const save = useMutation({
+    mutationFn: (patch: Partial<Integration>) =>
+      settingsApi.updateIntegration(integration.id, patch),
+    onSuccess: onChanged,
+  });
+
+  return (
+    <div className="mt-3 space-y-3 rounded-lg bg-[var(--surface-sunken)] p-3">
+      <p className="text-xs text-[var(--text-muted)]">Кому выдавать документ</p>
+
+      <Toggle
+        checked={integration.authMode === 'email_code'}
+        disabled={save.isPending}
+        onChange={(v) => save.mutate({ authMode: v ? 'email_code' : 'none' })}
+        label="Подтверждать почту кодом"
+        hint="Участнику придёт код письмом. Без кода документ не создастся."
+      />
+
+      <Toggle
+        checked={integration.checkList}
+        disabled={save.isPending}
+        onChange={(v) => save.mutate({ checkList: v })}
+        label="Только участникам из списка"
+        hint="Адрес сверяется с таблицей получателей документа. Кого нет в таблице — тому откажем."
+      />
+
+      <Toggle
+        checked={integration.requireAccount}
+        disabled={save.isPending}
+        onChange={(v) => save.mutate({ requireAccount: v })}
+        label="Только из личного кабинета сайта"
+        hint="Заявка принимается, если человек вошёл в кабинет на вашем сайте."
+      />
+
+      <Toggle
+        checked={integration.singleFilePerEmail}
+        disabled={save.isPending}
+        onChange={(v) => save.mutate({ singleFilePerEmail: v })}
+        label="Один документ на человека"
+        hint="Повторная заявка отдаст уже выданный файл, а не сделает новый."
+      />
+    </div>
   );
 }
 

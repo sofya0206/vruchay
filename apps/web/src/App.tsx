@@ -150,6 +150,8 @@ export function App() {
           <Route key={s.path} path={s.path} element={s.element} />
         ))}
       </Route>
+      {/* Старый адрес страницы форм: настройки теперь по разделам. */}
+      <Route path="/integrations" element={<Navigate to="/settings/integrations" replace />} />
       <Route path="/invoices" element={<InvoicesPage />} />
       <Route path="/login" element={<Navigate to="/" replace />} />
       {/* Вошедшему на этих страницах делать нечего: адрес уже подтверждён,

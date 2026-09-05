@@ -36,6 +36,10 @@ export interface Integration {
   allowedDomains: string[];
   documentIds: string[];
   authMode: 'none' | 'email_code';
+  /** Сверять адрес с реестром получателей документа. */
+  checkList: boolean;
+  /** Принимать только изнутри личного кабинета площадки. */
+  requireAccount: boolean;
   singleFilePerEmail: boolean;
   dailyLimit: number;
   successMessage: string;
