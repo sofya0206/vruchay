@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Prisma, type DateFormat, type UiDensity, type UiTheme } from '@prisma/client';
 import type { Env } from '../config/env';
 import { PrismaService } from '../prisma/prisma.service';
+import { PlansService } from '../plans/plans.service';
 import { ReferralService } from '../referral/referral.service';
 import { StorageService } from '../storage/storage.service';
 import { buildS3Key } from '../storage/s3-key';
@@ -46,6 +47,7 @@ export class OrgService {
     private readonly referral: ReferralService,
     private readonly config: ConfigService<Env, true>,
     private readonly storage: StorageService,
+    private readonly plans: PlansService,
   ) {}
 
   async publicProfile(orgId: string) {
@@ -160,35 +162,31 @@ export class OrgService {
    * Сколько документов уже выпущено и сколько осталось.
    *
    * Показывается в кабинете постоянно, а не только в отказе. Узнать
-   * о конце пробы на сорок седьмом документе из пятидесяти — это уже
-   * испорченное награждение: человек не успевает ни доплатить,
-   * ни разделить список.
+   * о конце квоты на сорок седьмом документе из пятидесяти — это уже
+   * испорченное награждение: человек не успевает ни договориться
+   * о продолжении, ни разделить список.
    *
-   * Считаем по файлам, а не отдельным счётчиком, — тем же способом,
-   * каким проверяется сам лимит. Иначе цифра в кабинете и решение
-   * о допуске к выпуску однажды разошлись бы.
+   * Считает не сама, а спрашивает у PlansService — тот же ответ, что
+   * получит выпуск. Иначе цифра в кабинете и решение о допуске к выпуску
+   * однажды разошлись бы, и разошлись бы в самый неподходящий момент.
    */
   async usage(orgId: string) {
-    const org = await this.prisma.organization.findUnique({
-      where: { id: orgId },
-      select: { plan: true },
-    });
-
-    const used = await this.prisma.file.count({ where: { orgId, kind: 'generated' } });
-    if (org?.plan === 'paid') {
-      return { plan: 'paid' as const, used, limit: null, left: null, bonus: 0 };
-    }
-
-    const base = this.config.get('FREE_DOCUMENT_LIMIT', { infer: true });
-    const bonus = await this.referral.bonusDocuments(orgId);
-    const limit = base + bonus;
-
+    const quota = await this.plans.quota(orgId);
     return {
-      plan: 'free' as const,
-      used,
-      limit,
-      left: Math.max(0, limit - used),
-      bonus,
+      /** Что говорить человеку про его условия. */
+      plan: quota.source === 'trial' ? ('free' as const) : ('paid' as const),
+      planName: quota.name,
+      source: quota.source,
+      used: quota.used,
+      limit: quota.limit,
+      left: quota.left,
+      bonus: quota.bonus,
+      /** «Осталось меньше двадцати процентов» и «меньше десяти». */
+      warn: quota.warn,
+      endsAt: quota.endsAt,
+      expired: quota.expired,
+      neverExpires: quota.neverExpires,
+      features: quota.features,
     };
   }
 

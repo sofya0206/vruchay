@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BadRequestException } from '@nestjs/common';
 import { GenerationService } from './generation.service';
+import { PlansService } from '../plans/plans.service';
 import { testConfig } from '../config/env.test-utils';
 
 /*
@@ -25,16 +26,19 @@ function serviceWith({ plan, used, bonus = 0 }: Stub): GenerationService {
   const prisma = {
     organization: { findUnique: async () => ({ id: 'org', plan }) },
     file: { count: async () => used },
+    // Планов у организации нет: проверяем именно пробу.
+    plan: { findMany: async () => [] },
   };
   const referral = { bonusDocuments: async () => bonus };
   // Предел пробы служба берёт из проверенной схемы настроек, а не из окружения.
   const config = testConfig({ FREE_DOCUMENT_LIMIT: String(LIMIT) });
-  return new GenerationService(prisma as never, referral as never, config as never);
+  const plans = new PlansService(prisma as never, referral as never, config as never);
+  return new GenerationService(prisma as never, config as never, plans);
 }
 
 /** Проверка приватная — вызываем через тот же путь, что и приложение. */
 function check(svc: GenerationService, adding: number): Promise<void> {
-  return (svc as unknown as { checkFreeLimit(o: string, n: number): Promise<void> }).checkFreeLimit(
+  return (svc as unknown as { checkQuota(o: string, n: number): Promise<void> }).checkQuota(
     'org',
     adding,
   );

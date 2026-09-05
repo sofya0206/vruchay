@@ -69,6 +69,27 @@ export class StorageService {
     return newest;
   }
 
+  /**
+   * Перечисляет объекты приложения постранично, по приставке ключа.
+   *
+   * Отдаёт по одному, а не списком: в бакете лежат все выданные документы
+   * организаций, и складывать весь перечень в память ради ночной сверки
+   * незачем. Страницу за страницей забирает сам вызывающий.
+   */
+  async *listObjects(prefix: string): AsyncGenerator<{ key: string; lastModified: Date }> {
+    let token: string | undefined;
+    do {
+      const res = await this.client.send(
+        new ListObjectsV2Command({ Bucket: this.bucket, Prefix: prefix, ContinuationToken: token }),
+      );
+      for (const obj of res.Contents ?? []) {
+        if (!obj.Key || !obj.LastModified) continue;
+        yield { key: obj.Key, lastModified: obj.LastModified };
+      }
+      token = res.IsTruncated ? res.NextContinuationToken : undefined;
+    } while (token);
+  }
+
   async put(key: string, body: Buffer | Readable, mime: string): Promise<void> {
     await this.client.send(
       new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: body, ContentType: mime }),
@@ -94,7 +115,8 @@ export class StorageService {
       await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
     } catch (err) {
       // Удаление файла не должно ронять пользовательскую операцию:
-      // осиротевшие объекты подчистит фоновая задача cleanup.
+      // объект, оставшийся без записи в базе, заберёт ночная сверка
+      // хранилища с таблицей файлов (RetentionService.purgeOrphanObjects).
       this.logger.warn(`Не удалось удалить объект ${key}: ${String(err)}`);
     }
   }

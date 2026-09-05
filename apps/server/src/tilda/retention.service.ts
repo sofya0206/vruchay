@@ -5,6 +5,7 @@ import IORedis from 'ioredis';
 import { TRASH_DAYS } from '@gramota/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { DocumentsService } from '../documents/documents.service';
+import { StorageService } from '../storage/storage.service';
 import type { Env } from '../config/env';
 
 export const RETENTION_QUEUE = 'retention';
@@ -28,6 +29,12 @@ export const RETENTION_QUEUE = 'retention';
  * Сюда же попали корзина документов и журнал писем: цель у них та же — не
  * хранить дольше, чем нужно, — и отдельное ночное задание ради каждого
  * заводить незачем.
+ *
+ * И последним — сверка хранилища с таблицей файлов. Она уже не про закон,
+ * а про то, что удалять брошенные объекты больше некому: их ключ знала
+ * только та запись `File`, которой не появилось. Расписание и очередь
+ * у неё те же, что у сроков хранения, — второго ночного задания ради
+ * одного обхода бакета заводить незачем.
  */
 const ANONYMIZE_AFTER_DAYS = 90;
 const DROP_UNFINISHED_AFTER_DAYS = 30;
@@ -51,6 +58,44 @@ const ANONYMIZE_EMAILS_AFTER_DAYS = 365;
 /** Пустой адрес значит «уже обезличено»: повторно такие письма не трогаем. */
 const ANONYMIZED_ADDRESS = '';
 
+/**
+ * Через сколько объект в хранилище без записи в базе считается брошенным.
+ *
+ * Записи и байты пишутся не одним действием: сперва байты в хранилище,
+ * потом строка в `File` (или наоборот — при загрузке бланка). Упавшая
+ * посередине генерация или оборванная загрузка оставляют объект, на
+ * который уже никто никогда не сошлётся, и удалить его больше некому:
+ * ключ известен только той строке, которой не появилось.
+ *
+ * Сутки — это запас на операцию, идущую прямо сейчас. Свежий объект
+ * может быть половиной ещё не завершённой загрузки, и удалить его
+ * значило бы сломать работу, которая идёт нормально.
+ */
+const DROP_ORPHAN_OBJECTS_AFTER_DAYS = 1;
+
+/**
+ * Приставка ключей, которые вообще принадлежат приложению.
+ *
+ * Сверяем только их. Копии базы кладутся под `db/` и в отдельный бакет,
+ * но бакет задаётся переменной окружения — и если однажды его укажут
+ * тем же, сверка не должна принять копии за мусор: записи в `File` у них
+ * нет и быть не может.
+ */
+const ORPHAN_PREFIX = 'org/';
+
+/** Сколько ключей проверяем в базе одним запросом. */
+const ORPHAN_BATCH = 500;
+
+/**
+ * Предохранитель на случай, когда база не та.
+ *
+ * Восстановленная из старой копии база «не знает» о недавних файлах —
+ * и сверка честно посчитает мусором всё, что выдано после копии.
+ * Упереться в потолок и написать об этом в журнал лучше, чем за одну
+ * ночь стереть выданные документы.
+ */
+const MAX_ORPHANS_PER_RUN = 1000;
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 @Injectable()
@@ -64,6 +109,7 @@ export class RetentionService implements OnModuleInit, OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService<Env, true>,
     private readonly documents: DocumentsService,
+    private readonly storage: StorageService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -101,6 +147,53 @@ export class RetentionService implements OnModuleInit, OnModuleDestroy {
     this.connection?.disconnect();
   }
 
+  /**
+   * Объекты хранилища, на которые не ссылается ни одна запись `File`.
+   *
+   * Сверяем в обе стороны неравноправно: строка без байтов — это ошибка,
+   * которую видно в кабинете, а байты без строки не видит никто. Поэтому
+   * ходим от хранилища к базе, а не наоборот.
+   *
+   * Ключ ищем среди всех записей `File`, включая помеченные удалёнными:
+   * до вывоза корзины их файлы обязаны лежать на месте, иначе документ
+   * не восстановить.
+   */
+  private async purgeOrphanObjects(before: Date): Promise<number> {
+    let removed = 0;
+    let batch: string[] = [];
+
+    const flush = async () => {
+      if (batch.length === 0) return;
+      const known = await this.prisma.file.findMany({
+        where: { s3Key: { in: batch } },
+        select: { s3Key: true },
+      });
+      const alive = new Set(known.map((file) => file.s3Key));
+      for (const key of batch) {
+        if (alive.has(key) || removed >= MAX_ORPHANS_PER_RUN) continue;
+        await this.storage.remove(key);
+        removed++;
+      }
+      batch = [];
+    };
+
+    for await (const object of this.storage.listObjects(ORPHAN_PREFIX)) {
+      if (object.lastModified >= before) continue;
+      batch.push(object.key);
+      if (batch.length >= ORPHAN_BATCH) await flush();
+      if (removed >= MAX_ORPHANS_PER_RUN) break;
+    }
+    await flush();
+
+    if (removed >= MAX_ORPHANS_PER_RUN) {
+      this.logger.error(
+        `Сверка хранилища упёрлась в потолок ${MAX_ORPHANS_PER_RUN} объектов за ночь. ` +
+          'Столько мусора сразу не появляется — проверьте, та ли база подключена.',
+      );
+    }
+    return removed;
+  }
+
   /** Вынесено отдельно от расписания, чтобы можно было запустить руками. */
   async run(): Promise<{
     anonymized: number;
@@ -109,6 +202,7 @@ export class RetentionService implements OnModuleInit, OnModuleDestroy {
     requests: number;
     consents: number;
     trashed: number;
+    orphans: number;
   }> {
     const now = Date.now();
     const before = (days: number) => new Date(now - days * DAY_MS);
@@ -157,6 +251,22 @@ export class RetentionService implements OnModuleInit, OnModuleDestroy {
     // Корзина: документы вместе с выданными файлами и записями о них.
     const trashed = await this.documents.purgeExpired(before(TRASH_DAYS));
 
+    /*
+     * Сверка хранилища — последней и своим try.
+     *
+     * Она ходит наружу, в S3, и её отказ не должен отменять уже сделанную
+     * работу по срокам хранения: та выполняется в базе и отвечает перед
+     * законом, а брошенные байты подождут до следующей ночи.
+     */
+    let orphans = 0;
+    try {
+      orphans = await this.purgeOrphanObjects(before(DROP_ORPHAN_OBJECTS_AFTER_DAYS));
+    } catch (err) {
+      this.logger.error(
+        `Сверка хранилища не удалась: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+
     const result = {
       anonymized: anonymized.count,
       emails: emails.count,
@@ -164,12 +274,14 @@ export class RetentionService implements OnModuleInit, OnModuleDestroy {
       requests: requests.count,
       consents: consents.count,
       trashed,
+      orphans,
     };
     if (Object.values(result).some((n) => n > 0)) {
       this.logger.log(
         `Сроки хранения: обезличено заявок ${result.anonymized}, писем ${result.emails}, ` +
           `удалено незавершённых ${result.unfinished}, заявок ${result.requests}, ` +
-          `согласий ${result.consents}, документов из корзины ${result.trashed}`,
+          `согласий ${result.consents}, документов из корзины ${result.trashed}, ` +
+          `брошенных объектов хранилища ${result.orphans}`,
       );
     }
     return result;

@@ -12,6 +12,7 @@ import { MailService } from '../../../src/mail/mail.service';
 import { SmtpProvider } from '../../../src/mail/smtp.provider';
 import { MailingService } from '../../../src/mailing/mailing.service';
 import { OrgService } from '../../../src/org/org.service';
+import { PlansService } from '../../../src/plans/plans.service';
 import { RecipientsService } from '../../../src/recipients/recipients.service';
 import { ReferralService } from '../../../src/referral/referral.service';
 import { RegistryActionsService } from '../../../src/registry/registry-actions.service';
@@ -98,9 +99,12 @@ export async function startApp(options: AppOptions = {}): Promise<IntegrationApp
   const asStorage = storage as unknown as StorageService;
 
   const referral = new ReferralService(prisma, config);
-  const org = new OrgService(prisma, referral, config, asStorage);
+  // Единственное место, знающее квоту организации: выпуск и кабинет
+  // спрашивают у него, а не считают остаток каждый по-своему.
+  const plans = new PlansService(prisma, referral, config);
+  const org = new OrgService(prisma, referral, config, asStorage, plans);
   const renderer = new PdfRenderer(config);
-  const generation = new GenerationService(prisma, referral, config);
+  const generation = new GenerationService(prisma, config, plans);
   const processor = new GenerationProcessor(
     prisma,
     asStorage,
@@ -115,11 +119,10 @@ export async function startApp(options: AppOptions = {}): Promise<IntegrationApp
   const registryActions = new RegistryActionsService(
     prisma,
     replacement,
-    referral,
+    plans,
     processor,
     mail,
     mailProcessor,
-    config,
   );
 
   const render = new RenderController(prisma, asStorage, config);

@@ -2,7 +2,8 @@ import { createHash } from 'node:crypto';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
-import { ReferralService } from '../referral/referral.service';
+import { PlansService } from '../plans/plans.service';
+import { refusal } from '../plans/plan';
 import type { Env } from '../config/env';
 
 /** Задания, которые ещё займут воркер, — они же держат часть квоты. */
@@ -65,8 +66,8 @@ export interface StartedJob {
 export class GenerationService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly referral: ReferralService,
     private readonly config: ConfigService<Env, true>,
+    private readonly plans: PlansService,
   ) {}
 
   /** Создаёт задание на отмеченные строки. Сама генерация идёт в воркере. */
@@ -120,7 +121,7 @@ export class GenerationService {
       }
 
       await this.checkOrgJobs(orgId, tx);
-      await this.checkFreeLimit(orgId, rows.length, await this.reserved(orgId, tx), tx);
+      await this.checkQuota(orgId, rows.length, await this.reserved(orgId, tx), tx);
 
       const job = await tx.generationJob.create({
         data: { orgId, documentId, format, total: rows.length },
@@ -198,7 +199,7 @@ export class GenerationService {
       await this.checkOrgJobs(orgId, tx, jobId);
       // Незаконченные строки этого задания в брони не числятся: задание
       // не активно. Поэтому проверяем их так же, как новый выпуск.
-      await this.checkFreeLimit(orgId, todo.length, await this.reserved(orgId, tx, jobId), tx);
+      await this.checkQuota(orgId, todo.length, await this.reserved(orgId, tx, jobId), tx);
 
       /*
        * Прежние причины неудач убираем целиком.
@@ -302,59 +303,43 @@ export class GenerationService {
   }
 
   /**
-   * Бесплатная проба: не больше FREE_DOCUMENT_LIMIT выпущенных документов
-   * на организацию. Ровно это число обещано на посадочной странице.
+   * Хватает ли квоты на этот выпуск.
    *
-   * Выпущенное считаем по файлам, а не отдельным счётчиком: счётчик пришлось
-   * бы держать в согласии с реальностью при каждой ошибке, отмене и удалении,
-   * а файлы и есть то, что человек получил. Запрос идёт один раз на задание,
-   * а не на документ, поэтому на наших объёмах он ничего не стоит.
+   * Что положено организации, знает PlansService — здесь нет ни одного
+   * `if` про название тарифа: условия у каждого клиента свои и меняются
+   * разговором, а не релизом.
    *
-   * К выпущенному прибавляется бронь — строки уже принятых заданий, которые
-   * воркер ещё не напечатал. Без неё два пакета по тридцать строк на остатке
-   * в двадцать документов прошли бы оба: файлов на момент проверки нет ни
-   * у одного. Бронь тоже считается по фактам, а не счётчиком, и исчезает
-   * вместе с заданием — завершённым, упавшим или отменённым.
+   * Проверяем до постановки задания и только здесь: узнать об исчерпанной
+   * квоте на сорок седьмом документе из пятидесяти — это уже испорченное
+   * награждение. Поэтому же воркер квоту не проверяет вовсе: принятый
+   * пакет доходит до конца, даже если за это время условия кончились.
    *
-   * Проверяем до постановки задания: узнать об исчерпанном лимите на сорок
-   * седьмом документе из пятидесяти — это уже испорченное награждение.
+   * К израсходованному прибавляется бронь — строки уже принятых заданий,
+   * которые воркер ещё не напечатал. Без неё два пакета по тридцать строк
+   * на остатке в двадцать документов прошли бы оба: файлов на момент
+   * проверки нет ни у одного. Бронь тоже считается по фактам, а не
+   * счётчиком, и исчезает вместе с заданием — завершённым, упавшим
+   * или отменённым.
    */
-  private async checkFreeLimit(
+  private async checkQuota(
     orgId: string,
     adding: number,
     reserved = 0,
     tx: TxClient = this.prisma,
   ): Promise<void> {
-    const org = await tx.organization.findUnique({ where: { id: orgId } });
-    if (!org || org.plan !== 'free') return;
+    const quota = await this.plans.quota(orgId, tx);
 
-    const base = this.config.get('FREE_DOCUMENT_LIMIT', { infer: true });
-    // Заработанное приглашениями прибавляется к пробе. Считается по фактам,
-    // а не по счётчику, — см. ReferralService. Читает через ту же транзакцию:
-    // мы под замком, и заглядывать мимо него незачем.
-    const bonus = await this.referral.bonusDocuments(orgId, tx);
-    const limit = base + bonus;
-    const issued = await tx.file.count({ where: { orgId, kind: 'generated' } });
-    const used = issued + reserved;
+    // Срок вышел — новый выпуск не начинаем. Выданное при этом остаётся
+    // действительным, и страница проверки продолжает работать: документ
+    // на руках у участника не может протухнуть от того, что у нас
+    // кончился договор.
+    if (quota.expired) {
+      throw new BadRequestException(refusal({ quota, adding, reserved }));
+    }
+    if (quota.limit === null) return;
 
-    if (used + adding > limit) {
-      const left = Math.max(0, limit - used);
-      // Про приглашения говорим только тем, у кого проба на исходе: раньше
-      // это выглядело бы навязыванием, а здесь это ответ на их вопрос
-      // «что делать дальше».
-      const hint =
-        ` Или пригласите коллегу в разделе «Пригласить друга» — за каждого, ` +
-        `кто начнёт работать, добавим ещё документов.`;
-      // Про бронь говорим отдельно: «выпущено 45 из 50» при пустом списке
-      // файлов выглядит ошибкой сервиса, а не занятым местом.
-      const held = reserved > 0 ? ` (из них ${reserved} держит незаконченный выпуск)` : '';
-      throw new BadRequestException(
-        left === 0
-          ? `Бесплатная проба закончилась: выпущено ${used} документов из ${limit}${held}. ` +
-            `Чтобы продолжить, выберите тариф на vruchay.ru.${hint}`
-          : `На бесплатной пробе осталось ${left} документов из ${limit}${held}, ` +
-            `а отмечено ${adding}. Снимите лишние отметки или выберите тариф.${hint}`,
-      );
+    if (quota.used + reserved + adding > quota.limit) {
+      throw new BadRequestException(refusal({ quota, adding, reserved }));
     }
   }
 
@@ -490,7 +475,7 @@ function resumable(job: StuckCheckable): boolean {
 /** Часть клиента Prisma, которой хватает и транзакции, и обычному вызову. */
 type TxClient = Pick<
   PrismaService,
-  'organization' | 'file' | 'generationJob' | 'recipientRow' | 'generationRowFailure'
+  'organization' | 'file' | 'plan' | 'generationJob' | 'recipientRow' | 'generationRowFailure'
 >;
 
 /**

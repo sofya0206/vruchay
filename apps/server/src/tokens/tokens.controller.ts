@@ -10,6 +10,7 @@ import { uuidSchema } from '../documents/documents.dto';
 import { AuditActor } from '../audit/actor.decorator';
 import { AuditService, type Actor } from '../audit/audit.service';
 import { TokensService } from './tokens.service';
+import { PlanFeatureGuard, RequiresFeature } from '../plans/plan-feature.guard';
 
 const uuidParam = new ZodValidationPipe(uuidSchema);
 
@@ -26,7 +27,7 @@ const createSchema = z.object({
  * который нельзя отозвать, потому что он тут же выдаст себе следующий.
  */
 @Controller('tokens')
-@UseGuards(AuthGuard, HumansOnlyGuard, RolesGuard)
+@UseGuards(AuthGuard, HumansOnlyGuard, RolesGuard, PlanFeatureGuard)
 export class TokensController {
   constructor(
     private readonly tokens: TokensService,
@@ -39,6 +40,7 @@ export class TokensController {
     return this.tokens.list(user.orgId);
   }
 
+  @RequiresFeature('api')
   @Post()
   @Roles('owner', 'admin')
   async create(

@@ -38,10 +38,22 @@ function serviceWith() {
         return { count: 2 };
       },
     },
+    file: { findMany: async () => [] },
   };
   const documents = { purgeExpired: async () => 0 };
+  // Сверка хранилища ходит в S3 и к сроками хранения отношения не имеет:
+  // здесь она пустая, а её собственные проверки — в retention-orphans.
+  const storage = {
+    listObjects: async function* () {},
+    remove: async () => {},
+  };
   return {
-    service: new RetentionService(prisma as never, testConfig() as never, documents as never),
+    service: new RetentionService(
+      prisma as never,
+      testConfig() as never,
+      documents as never,
+      storage as never,
+    ),
     emailUpdates,
   };
 }

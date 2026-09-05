@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
-import { Link } from 'react-router-dom';
 import { CalendarDays, FileCheck2, Gift, Mail } from 'lucide-react';
 import type { Overview } from '../api/overview';
+import { DiscussTermsLink } from '../billing/DiscussTermsLink';
 import { plural } from './format';
 
 /**
@@ -14,9 +14,14 @@ import { plural } from './format';
 export function Metrics({ data }: { data: Overview }) {
   const { usage } = data;
   const unlimited = usage.limit === null || usage.left === null;
-  // Предупреждаем заранее, а не по факту: на десяти оставшихся документах
-  // ещё можно что-то предпринять, на нуле — уже нет.
-  const low = !unlimited && (usage.left ?? 0) <= 10;
+  /*
+   * Предупреждаем заранее, а не по факту: на двадцати процентах остатка
+   * ещё можно разделить награждение или договориться, на нуле — уже нет.
+   * Порог считает сервер — тот же, который решает, пускать ли к выпуску,
+   * иначе цифра на экране и решение о допуске однажды разойдутся.
+   */
+  const low = usage.warn === 'critical' || usage.warn === 'exhausted' || usage.warn === 'expired';
+  const soon = usage.warn === 'low';
 
   return (
     <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -34,22 +39,31 @@ export function Metrics({ data }: { data: Overview }) {
       />
       <Metric
         icon={<Gift size={16} />}
-        label="Осталось на пробе"
+        label={usage.source === 'trial' ? 'Осталось на пробе' : 'Осталось по плану'}
         value={unlimited ? '∞' : (usage.left ?? 0)}
         tone={low ? 'danger' : 'normal'}
         hint={
           unlimited ? (
-            'Тариф без ограничений'
+            'Без ограничения по документам'
+          ) : usage.expired ? (
+            <>
+              Срок плана закончился · выданные документы остаются действительными ·{' '}
+              <DiscussTermsLink>обсудим продление</DiscussTermsLink>
+            </>
           ) : (
             <>
               из {usage.limit}
+              {usage.source !== 'trial' && <> · {usage.planName}</>}
               {usage.bonus > 0 && <> · +{usage.bonus} за приглашённых</>}
-              {low && (
+              {/*
+                * Ссылки на страницу тарифов нет: публичных цен больше нет,
+                * а вести человека на заглушку хуже, чем сказать словами.
+                * Ведём на форму «Обсудить условия» — единственный путь дальше.
+                */}
+              {(low || soon) && (
                 <>
                   {' · '}
-                  <Link to="/billing" className="underline underline-offset-2">
-                    выбрать тариф
-                  </Link>
+                  <DiscussTermsLink>напишите нам, добавим документов</DiscussTermsLink>
                 </>
               )}
             </>

@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { pickPlan, type PlanRecord } from '../plans/plan';
 
 @Injectable()
 export class PlatformService {
@@ -32,6 +33,9 @@ export class PlatformService {
           take: 1,
           select: { user: { select: { email: true, name: true } } },
         },
+        // Планы тянем связью, а не запросом на организацию: список
+        // на сто клиентов иначе стоил бы сто запросов.
+        plans: { orderBy: { startsAt: 'desc' } },
       },
     });
     if (orgs.length === 0) return [];
@@ -45,21 +49,37 @@ export class PlatformService {
     });
     const counts = new Map(issued.map((i) => [i.orgId, i._count._all]));
 
-    return orgs.map((o) => ({
-      id: o.id,
-      name: o.name,
-      plan: o.plan,
-      createdAt: o.createdAt,
-      // Что нужно, чтобы решить о значке: адрес страницы и ИНН, которые
-      // организация назвала сама, и текущее состояние значка.
-      slug: o.slug,
-      inn: o.inn,
-      verifiedIssuer: o.verifiedIssuer,
-      publicPageEnabled: o.publicPageEnabled,
-      ownerEmail: o.members[0]?.user.email ?? '',
-      ownerName: o.members[0]?.user.name ?? '',
-      issued: counts.get(o.id) ?? 0,
-    }));
+    const now = new Date();
+    return orgs.map((o) => {
+      const current = pickPlan(o.plans as PlanRecord[], now);
+      return {
+        id: o.id,
+        name: o.name,
+        plan: o.plan,
+        createdAt: o.createdAt,
+        // Что нужно, чтобы решить о значке: адрес страницы и ИНН, которые
+        // организация назвала сама, и текущее состояние значка.
+        slug: o.slug,
+        inn: o.inn,
+        verifiedIssuer: o.verifiedIssuer,
+        publicPageEnabled: o.publicPageEnabled,
+        ownerEmail: o.members[0]?.user.email ?? '',
+        ownerName: o.members[0]?.user.name ?? '',
+        issued: counts.get(o.id) ?? 0,
+        /** Действующий план — то, о чём с этим клиентом договорились. */
+        currentPlan: current
+          ? {
+              id: current.id,
+              name: current.name,
+              documentLimit: current.documentLimit,
+              period: current.period,
+              startsAt: current.startsAt,
+              endsAt: current.endsAt,
+              neverExpires: current.neverExpires,
+            }
+          : null,
+      };
+    });
   }
 
   async setVerified(orgId: string, verified: boolean) {
