@@ -143,7 +143,9 @@ export function App() {
         <Route path="/mailing/:id" element={<DocumentWorkspacePage />} />
         <Route path="/registry" element={<RegistryPage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
-        <Route path="/integrations" element={<SectionStub path="/integrations" />} />
+        {/* Готовая страница интеграций (формы на сайте, Тильда) живёт в
+            настройках — здесь только заглушка снята, чтобы редиректом ниже
+            туда и попадать, а не показывать «раздел в работе» поверх неё. */}
         <Route path="/billing" element={<SectionStub path="/billing" />} />
         {/* ───────── КОНЕЦ МАРШРУТОВ РАЗДЕЛОВ БЛОКА 1 ───────── */}
       </Route>
