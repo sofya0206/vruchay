@@ -81,6 +81,15 @@ export function LoginPage() {
                   autoComplete="current-password"
                 />
               </label>
+
+              <p className="text-right text-sm">
+                <Link
+                  to="/forgot"
+                  className="text-[var(--text-muted)] underline underline-offset-2 hover:text-[var(--text)]"
+                >
+                  Забыли пароль?
+                </Link>
+              </p>
             </>
           )}
 
