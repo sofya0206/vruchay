@@ -7,7 +7,6 @@ import {
   Globe,
   LifeBuoy,
   Palette,
-  Plug,
   ShieldCheck,
   UserRound,
   Users,
@@ -33,7 +32,6 @@ import { InviteFriend } from './InviteFriend';
 import { Support } from './Support';
 import { Roadmap } from './Roadmap';
 import { Review } from './Review';
-import { Integrations } from './Integrations';
 
 export interface SettingsSection {
   /** Часть адреса после /settings/ — она же ключ раздела. */
@@ -141,7 +139,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
       </Stack>
     ),
   },
-  // Формы на сайте — тоже настройка организации, но своего адреса
-  // в задании у неё нет; кладём последней, чтобы не потерялась.
-  { path: 'integrations', title: 'Формы на сайте', icon: Plug, element: <Integrations /> },
+  // Формы на сайте здесь больше нет: у интеграций свой раздел кабинета,
+  // и пока страница жила в обоих местах, два раздела показывали одно
+  // и то же. Старый адрес /settings/integrations уводит туда — в App.tsx.
 ];

@@ -12,6 +12,8 @@ import { EditorPage } from './pages/EditorPage';
 import { RenderPage } from './pages/RenderPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { SETTINGS_SECTIONS } from './settings/sections';
+import { INTEGRATION_SECTIONS } from './integrations/sections';
+import { IntegrationsPage } from './integrations/IntegrationsPage';
 import { ThemeSync } from './settings/ThemeSync';
 import { MailingPage } from './mailing/MailingPage';
 import { DocumentWorkspacePage } from './mailing/DocumentWorkspacePage';
@@ -143,9 +145,16 @@ export function App() {
         <Route path="/mailing/:id" element={<DocumentWorkspacePage />} />
         <Route path="/registry" element={<RegistryPage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
-        {/* Готовая страница интеграций (формы на сайте, Тильда) живёт в
-            настройках — здесь только заглушка снята, чтобы редиректом ниже
-            туда и попадать, а не показывать «раздел в работе» поверх неё. */}
+        {/* Интеграции: свой раздел кабинета со списком площадок слева.
+            Раньше это был редирект в настройки, из-за чего два раздела
+            показывали одно и то же. Список площадок — в
+            integrations/sections.tsx. */}
+        <Route path="/integrations" element={<IntegrationsPage />}>
+          <Route index element={<Navigate to="/integrations/info" replace />} />
+          {INTEGRATION_SECTIONS.map((s) => (
+            <Route key={s.path} path={s.path} element={s.element} />
+          ))}
+        </Route>
         <Route path="/billing" element={<SectionStub path="/billing" />} />
         {/* ───────── КОНЕЦ МАРШРУТОВ РАЗДЕЛОВ БЛОКА 1 ───────── */}
       </Route>
@@ -159,8 +168,11 @@ export function App() {
           <Route key={s.path} path={s.path} element={s.element} />
         ))}
       </Route>
-      {/* Старый адрес страницы форм: настройки теперь по разделам. */}
-      <Route path="/integrations" element={<Navigate to="/settings/integrations" replace />} />
+      {/* Старый адрес формы на сайте: она переехала в свой раздел. */}
+      <Route
+        path="/settings/integrations"
+        element={<Navigate to="/integrations/tilda" replace />}
+      />
       <Route path="/invoices" element={<InvoicesPage />} />
       <Route path="/login" element={<Navigate to="/" replace />} />
       {/* Вошедшему на этих страницах делать нечего: адрес уже подтверждён,
