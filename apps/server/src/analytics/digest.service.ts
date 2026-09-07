@@ -295,7 +295,9 @@ export function digestLetter(params: {
   return {
     subject: `Вручай: итоги за ${numbers.title}`,
     html:
-      `<div style="font:15px/1.6 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#1c2420">` +
+      // Jost первым, дальше системный запас: почтовые клиенты веб-шрифты
+      // почти поголовно вырезают, подключать его файлом здесь бессмысленно.
+      `<div style="font:15px/1.6 Jost,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#1c2420">` +
       `<p>Что происходило у организации «${e(params.orgName)}» за ${e(numbers.title)}.</p>` +
       `<table style="border-collapse:collapse;margin:16px 0">${table}</table>` +
       `<p style="color:#5f6b64">Проверка по QR — единственное свидетельство, что выданный ` +
