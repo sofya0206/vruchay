@@ -1,9 +1,8 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
 import { ArrowRight, Building2, Check, FileCheck2, Scale, ShieldCheck } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { EditorMock, FilesMock, LettersMock, TableMock } from '../landing/Mocks';
+import { HowItWorks } from '../landing/HowItWorks';
 import { Meta } from '../seo/Meta';
 import { LANDING_JSON_LD } from '../seo/landing-schema';
 
@@ -17,41 +16,6 @@ import { LANDING_JSON_LD } from '../seo/landing-schema';
  * Главная картинка страницы — сам продукт: каждый шаг показывает настоящий
  * фрагмент кабинета в рамке браузера, а не абстрактную иллюстрацию.
  */
-
-const TABS = [
-  {
-    id: 'doc',
-    label: 'Документ',
-    title: 'Соберите документ',
-    text: 'Загрузите свой бланк, поставьте поля — фамилия, место, дистанция, дата. Текст сам уменьшится, если фамилия окажется длинной: имя не вылезет за поле и не обрежется.',
-    note: 'Автомасштабирование текста в поле',
-    Mock: EditorMock,
-  },
-  {
-    id: 'table',
-    label: 'Таблица',
-    title: 'Загрузите список',
-    text: 'Excel, CSV или протокол соревнований. Колонки становятся полями бланка сами — сверять руками нечего. Места и группы сервис распознаёт из протокола.',
-    note: 'Импорт протоколов соревнований',
-    Mock: TableMock,
-  },
-  {
-    id: 'files',
-    label: 'Файлы',
-    title: 'Получите файлы пачкой',
-    text: 'Документы создаются сразу на весь список, каждому своё. Готовые PDF лежат в реестре: их можно скачать архивом, перевыпустить или отозвать.',
-    note: 'Реестр выданного с поиском по фамилии',
-    Mock: FilesMock,
-  },
-  {
-    id: 'mail',
-    label: 'Письма',
-    title: 'Разошлите письма',
-    text: 'Письма уходят с вашего домена, а не от неизвестного сервиса. В журнале видно судьбу каждого: доставлено, открыто, ящик не существует.',
-    note: 'Отправка с домена организации',
-    Mock: LettersMock,
-  },
-];
 
 const FACTS = [
   'Данные и серверы — в России, 152-ФЗ',
@@ -136,41 +100,6 @@ function Hero() {
         <p className="mt-4 text-sm text-[var(--text-muted)]">
           Первые 50 документов — бесплатно и без водяных знаков
         </p>
-      </div>
-    </section>
-  );
-}
-
-/** Путь из четырёх шагов: закладки соединены стрелками, под ними — экран продукта. */
-function HowItWorks() {
-  const [tab, setTab] = useState(TABS[0].id);
-  const active = TABS.find((t) => t.id === tab) ?? TABS[0];
-  const Mock = active.Mock;
-
-  return (
-    <section id="kak" className="mx-auto max-w-[var(--width-page)] scroll-mt-16 px-6 pt-20 pb-16">
-      <div className="vru-tabbar" role="tablist">
-        {TABS.map((t, i) => (
-          <div key={t.id} className="contents">
-            {i > 0 && (
-              <span className="vru-tabbar__arrow" aria-hidden="true">
-                <ArrowRight size={16} />
-              </span>
-            )}
-            <button role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)}>
-              {t.label}
-            </button>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-8 grid items-center gap-8 lg:grid-cols-[1fr_1.35fr]">
-        <div>
-          <h3>{active.title}</h3>
-          <p className="mt-4 text-[var(--text-muted)]">{active.text}</p>
-          <p className="vru-tag mt-6 text-[var(--text)]">{active.note}</p>
-        </div>
-        <Mock />
       </div>
     </section>
   );

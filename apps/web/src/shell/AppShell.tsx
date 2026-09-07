@@ -102,7 +102,10 @@ export function AppShell() {
         </nav>
       </header>
 
-      <div className="flex-1">
+      {/* Колонка, а не просто блок: страница, которой нужна вся высота окна
+          (входное обучение), берёт её через flex-1. Остальным это ничего
+          не меняет — без flex-1 высота по-прежнему по содержимому. */}
+      <div className="flex flex-1 flex-col">
         <Outlet />
       </div>
 
