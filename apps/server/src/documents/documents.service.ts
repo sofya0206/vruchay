@@ -4,6 +4,7 @@ import {
   buildStarterLayout,
   CURRENT_LAYOUT_SCHEMA_VERSION,
   findStarterPreset,
+  sheetLayout,
   SheetLayout,
 } from '@gramota/shared';
 import { PrismaService } from '../prisma/prisma.service';
@@ -12,6 +13,21 @@ import { buildS3Key } from '../storage/s3-key';
 import { AllowedImage } from '../common/image-type';
 import { DEFAULT_COLUMNS } from '../recipients/recipients.service';
 import { CreateDocumentDto, ListDocumentsDto, UpdateDocumentDto } from './documents.dto';
+
+/**
+ * Макет для превью в списке.
+ *
+ * В базе лежат листы обеих версий: у первой текст хранится строкой
+ * в `props.text`, у второй — деревом в `props.doc`. Превращение делает
+ * схема при разборе, поэтому сырой JSON из базы отдавать нельзя: холст
+ * читает только `doc` и на старом материале падал вместе со всем списком.
+ * Разбор мягкий — испорченный макет стоит пустого превью, а не пустой
+ * страницы библиотеки.
+ */
+function previewLayout(layout: unknown): SheetLayout {
+  const parsed = sheetLayout.safeParse(layout ?? []);
+  return parsed.success ? parsed.data : [];
+}
 
 /**
  * Порядок выдачи библиотеки. Названия сортируем без учёта регистра —
@@ -104,7 +120,7 @@ export class DocumentsService {
               ? { id: sourceDocument.id, title: sourceDocument.title }
               : null,
           preview: {
-            layout: sheet?.layout ?? [],
+            layout: previewLayout(sheet?.layout),
             // Ошибка подписи ссылки не должна ронять весь список:
             // документ без фона показать всё равно лучше, чем ничего.
             backgroundUrl: sheet?.backgroundFileId

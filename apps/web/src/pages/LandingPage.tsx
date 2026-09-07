@@ -1,252 +1,315 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  CheckCircle2,
-  FileText,
-  Globe,
-  Mail,
-  QrCode,
-  ShieldCheck,
-  Table2,
-} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { ArrowRight, Building2, Check, FileCheck2, Scale, ShieldCheck } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { Reviews } from '../landing/Reviews';
-import { Faq } from '../landing/Faq';
-import { Pricing } from '../landing/Pricing';
-import { ForBusiness } from '../landing/ForBusiness';
-import { Certificate } from '../landing/Certificate';
-import { Scope } from '../landing/Scope';
-import { SiteFooter, SiteHeader } from '../landing/Chrome';
+import { EditorMock, FilesMock, LettersMock, TableMock } from '../landing/Mocks';
 import { Meta } from '../seo/Meta';
 import { LANDING_JSON_LD } from '../seo/landing-schema';
 
 /**
- * Посадочная страница.
+ * Посадочная страница до входа.
  *
- * Тексты держатся на проверяемых утверждениях, а не на прилагательных:
- * каждое несёт либо число, либо факт, который читатель может проверить сам.
- * «Удобный сервис» подписал бы любой конкурент — такие строки здесь не живут.
+ * Делает одно: рассказывает о сервисе. Цен здесь нет намеренно — разговор
+ * о деньгах начинается на отдельной странице, когда человек уже понял,
+ * что именно покупает.
  *
- * Движение выдержано в правилах скила emil-design-eng: собственные кривые
- * вместо встроенных, появление через @starting-style, длительность
- * интерфейсных переходов до 300 мс, полное отключение при
- * prefers-reduced-motion.
+ * Главная картинка страницы — сам продукт: каждый шаг показывает настоящий
+ * фрагмент кабинета в рамке браузера, а не абстрактную иллюстрацию.
  */
 
-const STEPS = [
+const TABS = [
   {
-    icon: FileText,
-    title: 'Соберите макет',
-    text: 'Загрузите фон, расставьте блоки, укажите переменные — фамилию, дистанцию, место, дату. Как в конструкторе, без вёрстки.',
+    id: 'doc',
+    label: 'Документ',
+    title: 'Соберите документ',
+    text: 'Загрузите свой бланк, поставьте поля — фамилия, место, дистанция, дата. Текст сам уменьшится, если фамилия окажется длинной: имя не вылезет за поле и не обрежется.',
+    note: 'Автомасштабирование текста в поле',
+    Mock: EditorMock,
   },
   {
-    icon: Table2,
+    id: 'table',
+    label: 'Таблица',
     title: 'Загрузите список',
-    text: 'Excel или CSV — колонки сами станут переменными. Отметьте, кому создавать документы.',
+    text: 'Excel, CSV или протокол соревнований. Колонки становятся полями бланка сами — сверять руками нечего. Места и группы сервис распознаёт из протокола.',
+    note: 'Импорт протоколов соревнований',
+    Mock: TableMock,
   },
   {
-    icon: Mail,
-    title: 'Отправьте',
-    text: 'Файлы создаются пачкой и уходят письмами с вашего адреса. В журнале видно, кому доставлено.',
+    id: 'files',
+    label: 'Файлы',
+    title: 'Получите файлы пачкой',
+    text: 'Документы создаются сразу на весь список, каждому своё. Готовые PDF лежат в реестре: их можно скачать архивом, перевыпустить или отозвать.',
+    note: 'Реестр выданного с поиском по фамилии',
+    Mock: FilesMock,
   },
+  {
+    id: 'mail',
+    label: 'Письма',
+    title: 'Разошлите письма',
+    text: 'Письма уходят с вашего домена, а не от неизвестного сервиса. В журнале видно судьбу каждого: доставлено, открыто, ящик не существует.',
+    note: 'Отправка с домена организации',
+    Mock: LettersMock,
+  },
+];
+
+const FACTS = [
+  'Данные и серверы — в России, 152-ФЗ',
+  'Договор-поручение — по требованию юридического отдела',
+  'Уведомление оператора подано в Роскомнадзор',
+  'Служебные сведения стираются через 90 дней',
+  'Счёт, акт и договор для бухгалтерии',
 ];
 
 export function LandingPage() {
   return (
-    <div className="min-h-full bg-[var(--ground)]">
+    <div className="vru-landing relative isolate bg-[var(--ground)]">
       <Meta
         title="Вручай — подписать грамоты списком и разослать"
         description="Загрузите свой бланк грамоты и список участников: сервис впишет имена и разошлёт по адресам. Данные остаются в России. Первые 50 документов бесплатно."
         path="/"
         jsonLd={LANDING_JSON_LD}
       />
-      <SiteHeader
-        links={[
-          { href: '#kak', label: 'Как это работает' },
-          { href: '#ceny', label: 'Цены', compact: true },
-        ]}
-      />
+
+      {/* Аура одна на всю страницу: лежит за содержимым и потому не обрезается
+          границами секций. Из-за этого ни одна секция ниже не имеет своего
+          фона — иначе вместо свечения получилась бы жёсткая полоса. */}
+      <div className="vru-aura" aria-hidden="true">
+        <span className="vru-aura__blob vru-aura__blob--a" />
+        <span className="vru-aura__blob vru-aura__blob--b" />
+        <span className="vru-aura__blob vru-aura__blob--c" />
+      </div>
+
+      <SiteHeader />
       <Hero />
       <HowItWorks />
-      <Scope />
-      <Difference />
-      <ForBusiness />
-      {/* Отзывы до юридического блока: сперва «этим уже пользуются»,
-          потом «и это законно». Раздел сам исчезает, пока отзывов нет. */}
-      <Reviews />
-      <Legal />
-      <Pricing />
-      <Faq />
+      <ForOrganisations />
+      <CheckYourself />
       <FinalCta />
       <SiteFooter />
     </div>
   );
 }
 
+function SiteHeader() {
+  return (
+    <header className="absolute inset-x-0 top-0 z-20">
+      <div className="mx-auto flex max-w-[var(--width-page)] items-center px-6 py-2">
+        <Link to="/" className="inline-flex items-center gap-2 text-[var(--text)] no-underline">
+          <span className="text-lg font-semibold">Вручай</span>
+        </Link>
+        <div className="ml-auto flex items-center gap-2">
+          <Link to="/login">
+            <Button variant="secondary">Войти</Button>
+          </Link>
+          <Link to="/register">
+            <Button variant="primary">Зарегистрироваться</Button>
+          </Link>
+        </div>
+      </div>
+    </header>
+  );
+}
+
 function Hero() {
   return (
-    <section className="mx-auto max-w-5xl px-6 pt-16 pb-12 sm:pt-24">
-      <div className="grid items-center gap-12 lg:grid-cols-[1.1fr_1fr]">
-        <div className="vru-enter">
-          <p className="mb-4 inline-flex items-center gap-2 rounded-full bg-[var(--accent-soft)] px-3 py-1 text-xs font-medium text-[var(--accent)]">
-            <ShieldCheck size={13} /> Данные участников остаются в России
-          </p>
-          {/* Акцент на подписывании, а не на создании: бланк у организатора
-              обычно уже есть — свой, утверждённый, с гербом и подписями.
-              Обещать «сделаем красиво» значит спорить с тем, что человеку
-              и так нравится. Работа, которой он тяготится, — надписать
-              триста грамот именами и разослать. */}
-          <h1 className="font-serif text-4xl leading-[1.1] sm:text-5xl">
-            Ваш бланк грамоты —{' '}
-            <span className="text-[var(--accent)]">подписан всему списку</span>
-          </h1>
-          <p className="mt-5 max-w-lg text-lg leading-relaxed text-[var(--text-muted)]">
-            Загрузите свой бланк и список участников. Сервис впишет имена, места
-            и достижения — каждому своё — и разошлёт по адресам. Не по одному
-            в Word, не вечером перед награждением.
-          </p>
-          <div className="mt-8 flex flex-wrap items-center gap-3">
-            <Link to="/register">
-              <Button variant="primary">Попробовать бесплатно</Button>
-            </Link>
-            <a href="#kak">
-              <Button variant="secondary">Посмотреть, как это работает</Button>
-            </a>
-          </div>
-          <p className="mt-4 text-sm text-[var(--text-muted)]">
-            Первые 50 документов — бесплатно и без водяных знаков.
-          </p>
-
-          {/* Два пути названы сразу: иначе организатор одного турнира решит,
-              что сервис только для организаций с договорами, и уйдёт. */}
-          <dl className="mt-8 grid gap-4 border-t border-[var(--line)] pt-6 sm:grid-cols-2">
-            <div>
-              <dt className="text-sm font-medium">Организациям</dt>
-              <dd className="mt-1 text-sm text-[var(--text-muted)]">
-                Подписка на год, счёт и договор. Федерации, школы, вузы, клубы.
-              </dd>
-            </div>
-            <div>
-              <dt className="text-sm font-medium">Одному мероприятию</dt>
-              <dd className="mt-1 text-sm text-[var(--text-muted)]">
-                3 ₽ за документ, оплата картой. Без договоров и переговоров.
-              </dd>
-            </div>
-          </dl>
-        </div>
-
-        <Certificate />
-      </div>
-    </section>
-  );
-}
-
-function HowItWorks() {
-  return (
-    <section id="kak" className="scroll-mt-16 border-y border-[var(--line)] bg-[var(--surface)]">
-      <div className="mx-auto max-w-5xl px-6 py-16">
-        <h2 className="font-serif text-3xl">Три шага</h2>
-        <p className="mt-2 max-w-xl text-[var(--text-muted)]">
-          От пустого листа до писем в почтовых ящиках участников.
+    <section className="relative pt-14">
+      <div className="mx-auto max-w-[var(--width-page)] px-6 pt-16 text-center">
+        <p className="vru-eyebrow vru-enter">
+          <ShieldCheck size={14} /> Данные участников остаются в России
         </p>
-        <ol className="mt-10 grid gap-8 sm:grid-cols-3">
-          {STEPS.map((step, n) => (
-            <li key={step.title}>
-              <span className="grid h-10 w-10 place-items-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]">
-                <step.icon size={19} strokeWidth={1.75} />
-              </span>
-              <h3 className="mt-4 font-medium">
-                <span className="mr-2 text-[var(--text-muted)]">{n + 1}.</span>
-                {step.title}
-              </h3>
-              <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">{step.text}</p>
-            </li>
-          ))}
-        </ol>
+        <h1 className="vru-display vru-enter mx-auto mt-6 max-w-[900px]">
+          Сервис массовой выдачи документов
+        </h1>
+        <p className="vru-enter vru-delay mx-auto mt-5 max-w-[640px] text-[length:var(--text-subheading)] leading-[var(--leading-subheading)] text-[var(--text-muted)]">
+          Сопровождаем весь процесс от создания документов до отправки адресантам и контроля
+          верификации
+        </p>
+        <div className="vru-enter vru-delay mt-8 flex flex-wrap justify-center gap-3">
+          <Link to="/register">
+            <Button variant="primary">Попробовать бесплатно</Button>
+          </Link>
+          <a href="#kak">
+            <Button variant="secondary">Посмотреть, как это работает</Button>
+          </a>
+        </div>
+        <p className="mt-4 text-sm text-[var(--text-muted)]">
+          Первые 50 документов — бесплатно и без водяных знаков
+        </p>
       </div>
     </section>
   );
 }
 
-function Difference() {
-  const items = [
-    {
-      icon: Globe,
-      title: 'Письма с вашего домена',
-      text: 'Участник получает письмо от вашей федерации, а не от неизвестного сервиса. Подключение — три записи в DNS, проверка нажатием кнопки.',
-    },
-    {
-      icon: QrCode,
-      title: 'Проверка подлинности по QR',
-      text: 'На документе — код, ведущий на страницу проверки. Работодатель или судейская коллегия видит, что документ настоящий, и кем он выдан.',
-    },
-    {
-      icon: FileText,
-      title: 'Форма на вашем сайте',
-      text: 'Участник заполняет форму и получает документ сам — без вашего участия. Работает с Тильдой и с обычной формой.',
-    },
-    {
-      icon: ShieldCheck,
-      title: 'Российское размещение',
-      text: 'Серверы, база и резервные копии — в дата-центрах на территории России, в облаке с аттестацией ФСТЭК.',
-    },
-  ];
+/** Путь из четырёх шагов: закладки соединены стрелками, под ними — экран продукта. */
+function HowItWorks() {
+  const [tab, setTab] = useState(TABS[0].id);
+  const active = TABS.find((t) => t.id === tab) ?? TABS[0];
+  const Mock = active.Mock;
 
   return (
-    <section className="mx-auto max-w-5xl px-6 py-16">
-      <h2 className="font-serif text-3xl">Чем отличается</h2>
-      <div className="mt-10 grid gap-x-10 gap-y-8 sm:grid-cols-2">
-        {items.map((item) => (
-          <div key={item.title} className="flex gap-4">
-            <span className="mt-0.5 shrink-0 text-[var(--accent)]">
-              <item.icon size={20} strokeWidth={1.75} />
-            </span>
-            <div>
-              <h3 className="font-medium">{item.title}</h3>
-              <p className="mt-1.5 text-sm leading-relaxed text-[var(--text-muted)]">{item.text}</p>
-            </div>
+    <section id="kak" className="mx-auto max-w-[var(--width-page)] scroll-mt-16 px-6 pt-20 pb-16">
+      <div className="vru-tabbar" role="tablist">
+        {TABS.map((t, i) => (
+          <div key={t.id} className="contents">
+            {i > 0 && (
+              <span className="vru-tabbar__arrow" aria-hidden="true">
+                <ArrowRight size={16} />
+              </span>
+            )}
+            <button role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)}>
+              {t.label}
+            </button>
           </div>
         ))}
+      </div>
+
+      <div className="mt-8 grid items-center gap-8 lg:grid-cols-[1fr_1.35fr]">
+        <div>
+          <h3>{active.title}</h3>
+          <p className="mt-4 text-[var(--text-muted)]">{active.text}</p>
+          <p className="vru-tag mt-6 text-[var(--text)]">{active.note}</p>
+        </div>
+        <Mock />
+      </div>
+    </section>
+  );
+}
+
+function ForOrganisations() {
+  return (
+    <section className="mx-auto max-w-[var(--width-page)] px-6 py-16">
+      <h2 className="vru-h2">Для организаций</h2>
+      <p className="mt-4 text-[var(--text-muted)]">
+        Закон, договор и подключение — всё готово до первого награждения.
+      </p>
+      {/* items-start обязателен: иначе карточки тянутся до высоты раскрытой
+          соседки, и на наведение по одной кажется, будто открылись все три. */}
+      <div className="mt-8 grid items-start gap-5 md:grid-cols-3">
+        <ExpandCard
+          icon={Scale}
+          title="Юристу"
+          lead="152-ФЗ и договор-поручение"
+          items={[
+            'Данные в России — ч. 5 ст. 18 152-ФЗ',
+            'Договор-поручение приложением к договору',
+            'Оператор в реестре Роскомнадзора',
+            'Служебные сведения стираются через 90 дней',
+          ]}
+        />
+        <ExpandCard
+          icon={FileCheck2}
+          title="Бухгалтерии"
+          lead="Закрывающие документы"
+          items={[
+            'Договор, счёт, акт',
+            'Безналичный расчёт, аванс',
+            'Без НДС — УСН',
+            'Договор с российским ИП',
+          ]}
+        />
+        <ExpandCard
+          icon={Building2}
+          title="Разработчику"
+          lead="Документация и API"
+          items={[
+            'Документация по продукту',
+            'API-документация с примерами',
+            'Форма на сайте и Тильда',
+            'Импорт протоколов соревнований',
+          ]}
+          links={[
+            ['Документация', '/docs'],
+            ['API', '/docs/api'],
+          ]}
+        />
       </div>
     </section>
   );
 }
 
 /**
- * Раздел о законе. Формулировки только про себя и проверяемые: сравнивать
- * себя с конкурентами по имени — отдельный риск по закону о рекламе,
- * а предложение проверить любой сервис работает лучше любого сравнения.
+ * Карточка свёрнута до заголовка и одной строки, список раскрывается
+ * на наведение и на фокус с клавиатуры — иначе содержимое было бы
+ * недоступно тому, кто не пользуется мышью.
  */
-function Legal() {
+function ExpandCard({
+  icon: Icon,
+  title,
+  lead,
+  items,
+  links,
+}: {
+  icon: LucideIcon;
+  title: string;
+  lead: string;
+  items: string[];
+  links?: [string, string][];
+}) {
   return (
-    <section className="border-y border-[var(--line)] bg-[var(--surface)]">
-      <div className="mx-auto grid max-w-5xl gap-10 px-6 py-16 lg:grid-cols-[1fr_1fr]">
+    <div className="vru-expand" tabIndex={0}>
+      <span className="vru-feature__icon">
+        <Icon size={20} strokeWidth={1.75} />
+      </span>
+      <h3 className="mt-4">{title}</h3>
+      <p className="mt-1 text-sm text-[var(--text-muted)]">{lead}</p>
+      <div className="vru-expand__body">
         <div>
-          <h2 className="font-serif text-3xl">Проверьте, куда уходят фамилии участников</h2>
-          <p className="mt-4 leading-relaxed text-[var(--text-muted)]">
-            Сервис рассылки писем видит фамилии, адреса и достижения ваших спортсменов.
-            Закон требует, чтобы персональные данные граждан России хранились в России
-            (часть 5 статьи 18 152-ФЗ), — а многие сервисы рассылки размещены за рубежом,
-            и по внешнему виду это не определить.
+          <ul className="mt-4 grid gap-2">
+            {items.map((it) => (
+              <li key={it} className="flex gap-2 text-sm">
+                <span className="mt-px shrink-0 text-[var(--accent-line)]">
+                  <Check size={16} />
+                </span>
+                {it}
+              </li>
+            ))}
+          </ul>
+          {links && (
+            <div className="mt-4 flex gap-4">
+              {links.map(([label, href]) => (
+                <Link
+                  key={label}
+                  to={href}
+                  className="inline-flex items-center gap-1 text-sm font-medium text-[var(--accent)]"
+                >
+                  {label} <ArrowRight size={14} />
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Утверждения только о себе и только проверяемые: сравнивать конкурентов
+ * по имени — риск по закону о рекламе, а предложение проверить любой сервис,
+ * включая наш, работает лучше любого сравнения.
+ */
+function CheckYourself() {
+  return (
+    <section className="relative">
+      <div className="mx-auto grid max-w-[var(--width-page)] items-center gap-12 px-6 py-16 lg:grid-cols-2">
+        <div>
+          <h2 className="vru-h2">Проверьте, куда уходят фамилии участников</h2>
+          <p className="mt-5 text-[var(--text-muted)]">
+            Многие сервисы рассылки стоят за рубежом, и по виду это не определить. Проверьте
+            за десять секунд — у любого, включая наш:
           </p>
-          <p className="mt-4 leading-relaxed text-[var(--text-muted)]">
-            Проверить можно за десять секунд, у любого сервиса — включая наш. Домен
-            отправителя расскажет, чей почтовый шлюз стоит за письмами:
-          </p>
-          <pre className="mt-4 overflow-x-auto rounded-lg bg-[var(--surface-sunken)] p-4 font-mono text-xs">
+          <pre className="mt-5 overflow-x-auto rounded-[var(--radius-control)] bg-[var(--surface)] p-4 font-mono text-sm shadow-[var(--ring-line)]">
             dig TXT vruchay.ru +short
           </pre>
         </div>
-
-        <ul className="space-y-4 self-center">
-          {[
-            'Договор-поручение на обработку персональных данных — по требованию юридического отдела',
-            'Уведомление оператора персональных данных подано в Роскомнадзор',
-            'Сроки хранения ограничены: служебные сведения стираются через 90 дней',
-            'Закрывающие документы для бухгалтерии: счёт, акт, договор с российским ИП',
-          ].map((line) => (
-            <li key={line} className="flex gap-3">
-              <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-[var(--accent)]" />
-              <span className="text-sm leading-relaxed">{line}</span>
+        <ul className="grid gap-4">
+          {FACTS.map((line) => (
+            <li key={line} className="flex items-start gap-3">
+              <span className="mt-0.5 shrink-0 text-[var(--accent-line)]">
+                <Check size={18} />
+              </span>
+              <span>{line}</span>
             </li>
           ))}
         </ul>
@@ -257,17 +320,42 @@ function Legal() {
 
 function FinalCta() {
   return (
-    <section className="border-t border-[var(--line)] bg-[var(--surface)]">
-      <div className="mx-auto max-w-5xl px-6 py-16 text-center">
-        <h2 className="font-serif text-3xl">Ближайшее награждение — уже спокойное</h2>
-        <p className="mx-auto mt-3 max-w-md text-[var(--text-muted)]">
-          Соберите макет, загрузите список, отправьте. Пятьдесят документов на пробу
-          не стоят ничего.
-        </p>
-        <Link to="/register" className="mt-7 inline-block">
+    <section className="mx-auto max-w-[var(--width-page)] px-6 py-16 text-center">
+      <h2 className="vru-h2">Ближайшее награждение — уже спокойное</h2>
+      <p className="mx-auto mt-5 max-w-[520px] text-[var(--text-muted)]">
+        Соберите документ, загрузите список, отправьте. Пятьдесят документов на пробу не
+        стоят ничего.
+      </p>
+      <div className="mt-8 flex flex-wrap justify-center gap-3">
+        <Link to="/register">
           <Button variant="primary">Попробовать бесплатно</Button>
+        </Link>
+        <Link to="/obsudit">
+          <Button variant="secondary">Написать нам</Button>
         </Link>
       </div>
     </section>
+  );
+}
+
+function SiteFooter() {
+  return (
+    <footer className="border-t border-[var(--line)]">
+      <div className="mx-auto grid max-w-[var(--width-page)] gap-5 px-6 py-8 text-sm text-[var(--text-muted)]">
+        <div className="flex flex-wrap items-center gap-5">
+          <span className="mr-auto text-[var(--text)]">Вручай</span>
+          <Link to="/privacy" className="text-inherit">
+            Политика обработки данных
+          </Link>
+          <Link to="/oferta" className="text-inherit">
+            Лицензионный договор
+          </Link>
+          <Link to="/dpa" className="text-inherit">
+            Договор-поручение
+          </Link>
+        </div>
+        <p>© 2026 · Данные участников хранятся в России</p>
+      </div>
+    </footer>
   );
 }
