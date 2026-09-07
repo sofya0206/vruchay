@@ -8,106 +8,135 @@
 @import './fonts.css';
 
 /*
- * Палитра взята из предметной области, а не из стандартной SaaS-темы:
- * лавр — цвет наградного венка, латунь — цвет медали и печати,
- * нейтрали уведены в тёплую бумагу, потому что продукт про документы.
- * Стилизуем только через токены: тогда тёмная тема получается переопределением
- * значений, а не дублированием правил.
+ * Палитра дизайн-системы. Стилизуем только через токены: смена темы —
+ * это переопределение значений, а не дублирование правил.
+ *
+ * Трекинг положительный и растёт с кеглем (0.004em в тексте → 0.018em
+ * в дисплейном) — это подпись гарнитуры в системе: крупные заголовки
+ * выглядят разрежённо и архитектурно, а не плотно, как в типовом SaaS.
  */
 @theme {
-  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-serif: Georgia, 'Iowan Old Style', 'Palatino Linotype', 'Times New Roman', serif;
   --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
 
-  --color-laurel-50: #eef6f1;
-  --color-laurel-100: #d6ebdf;
-  --color-laurel-300: #7cb99a;
-  --color-laurel-600: #1f5d3f;
-  --color-laurel-700: #17492f;
-  --color-brass-100: #f6ecd9;
-  --color-brass-600: #b08341;
-  --color-brass-700: #8e6733;
+  --color-midnight-ink: #091135;
+  --color-electric-blue: #0f77ff;
+  --color-cobalt-surface: #127ee3;
+  --color-slate: #36394a;
+  --color-frost-border: #e1e9f0;
+  --color-mist: #b1bbcd;
+  --color-lavender-wash: #f5f3ff;
+
+  --text-sm: 14px;
+  --text-sm--line-height: 1.43;
+  --text-sm--letter-spacing: 0.004em;
+  --text-base: 16px;
+  --text-base--line-height: 1.5;
+  --text-base--letter-spacing: 0.008em;
+  --text-lg: 18px;
+  --text-lg--line-height: 1.5;
+  --text-lg--letter-spacing: 0.014em;
+  --text-3xl: 32px;
+  --text-3xl--line-height: 1.25;
+  --text-3xl--letter-spacing: 0.016em;
+  --text-5xl: 56px;
+  --text-5xl--line-height: 1.25;
+  --text-5xl--letter-spacing: 0.018em;
+  --text-6xl: 64px;
+  --text-6xl--line-height: 1.25;
+  --text-6xl--letter-spacing: 0.018em;
+
+  --shadow-subtle:
+    0 0 0 1px var(--color-electric-blue), 0 1px 2px 0 rgba(12, 43, 100, 0.32),
+    0 6px 16px 0 rgba(12, 43, 100, 0.32);
 }
 
 :root {
-  --ground: #fbfaf7;
+  --ground: #ffffff;
   --surface: #ffffff;
-  --surface-sunken: #f2f1ec;
-  --line: #e3e1da;
-  --line-strong: #cfccc2;
-  --text: #16211c;
-  --text-muted: #5f6b64;
-  --accent: #1f5d3f;
-  --accent-hover: #17492f;
-  --accent-soft: #eef6f1;
+  --surface-sunken: #f5f3ff;
+  --line: #e1e9f0;
+  --line-strong: #b1bbcd;
+  --text: #091135;
+  --text-muted: #36394a;
+  --accent: #127ee3;
+  --accent-hover: #0f6ac1;
+  --accent-soft: #eaf3fe;
   --accent-contrast: #ffffff;
-  --award: #b08341;
-  --award-soft: #f6ecd9;
-  --danger: #a3302a;
-  --danger-soft: #fbeceb;
-  --focus: #2e8257;
+  /*
+   * Латуни и красного в дизайн-системе нет, а статусы и ошибки без них
+   * не выражаются. Выведены из той же холодной гаммы: «в работе» — синий
+   * контурный акцент, ошибка — красный, подобранный к кобальту по светлоте.
+   */
+  --award: #0f77ff;
+  --award-soft: #e7f1ff;
+  --danger: #d92d3f;
+  --danger-soft: #fdecee;
+  --focus: #0f77ff;
+  --accent-line: #0f77ff;
+  --surface-blue: #eef5ff;
+  --scrim: rgba(9, 17, 53, 0.28);
+
+  /*
+   * Бумага наградного листа. Отдельные токены, а не интерфейсные: документ
+   * печатают на белом, и он не должен меняться вместе с темой интерфейса.
+   * Латунь живёт только здесь — в самом листе, никогда вокруг него.
+   */
+  --sheet-paper: #ffffff;
+  --sheet-ink: #091135;
+  --sheet-ink-muted: #36394a;
+  --sheet-line: #e1e9f0;
+  --sheet-accent: #0f77ff;
+
+  --radius-control: 8px;
+  --radius-card: 12px;
+  --radius-pill: 9999px;
+
+  /* Теней в покое нет: глубина даётся подложкой и волосяной линией. */
+  --ring-line: inset 0 0 0 1px var(--line);
+  --shadow-lg: 0 1px 2px 0 rgba(12, 43, 100, 0.12), 0 6px 16px 0 rgba(12, 43, 100, 0.12);
+  --shadow-sheet: 0 1px 2px 0 rgba(12, 43, 100, 0.1), 0 12px 32px 0 rgba(12, 43, 100, 0.12);
+  --shadow-focus:
+    0 0 0 1px rgb(15, 119, 255), 0 1px 2px 0 rgba(12, 43, 100, 0.32),
+    0 6px 16px 0 rgba(12, 43, 100, 0.32);
+
+  --text-caption: 14px;
+  --leading-caption: 1.43;
+  --tracking-caption: 0.004em;
+  --text-body: 16px;
+  --leading-body: 1.5;
+  --tracking-body: 0.008em;
+  --text-subheading: 18px;
+  --leading-subheading: 1.5;
+  --tracking-subheading: 0.014em;
+  --text-heading-sm: 32px;
+  --leading-heading-sm: 1.25;
+  --tracking-heading-sm: 0.016em;
+  --text-display: 64px;
+  --leading-display: 1.25;
+  --tracking-display: 0.018em;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-fast: 150ms;
+  --duration-base: 300ms;
+  --duration-rise: 520ms;
+
+  --width-page: 1200px;
+  --width-text: 640px;
+  --page-max-width: 1200px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --ground: #10150f;
-    --surface: #182018;
-    --surface-sunken: #0b0f0a;
-    --line: #2a352b;
-    --line-strong: #3d4b3e;
-    --text: #e9ece7;
-    --text-muted: #97a399;
-    --accent: #4fa97a;
-    --accent-hover: #63bd8d;
-    --accent-soft: #17291f;
-    --accent-contrast: #0b120c;
-    --award: #d0a45f;
-    --award-soft: #2a2216;
-    --danger: #e08a83;
-    --danger-soft: #2c1917;
-    --focus: #63bd8d;
-  }
-}
-
-/* Ручное переключение темы должно перебивать системную настройку в обе стороны. */
-:root[data-theme='light'] {
+/*
+ * Тёмная тема временно снята: в дизайн-системе тёмной палитры нет, а старая
+ * зелёная рядом с новой синей читалась бы как другой продукт. Переключатель
+ * в настройках оставлен и продолжает выставлять data-theme — сюда вернутся
+ * значения, когда тёмную отрисуют.
+ */
+:root {
   color-scheme: light;
-  --ground: #fbfaf7;
-  --surface: #ffffff;
-  --surface-sunken: #f2f1ec;
-  --line: #e3e1da;
-  --line-strong: #cfccc2;
-  --text: #16211c;
-  --text-muted: #5f6b64;
-  --accent: #1f5d3f;
-  --accent-hover: #17492f;
-  --accent-soft: #eef6f1;
-  --accent-contrast: #ffffff;
-  --award: #b08341;
-  --award-soft: #f6ecd9;
-  --danger: #a3302a;
-  --danger-soft: #fbeceb;
-  --focus: #2e8257;
-}
-
-:root[data-theme='dark'] {
-  color-scheme: dark;
-  --ground: #10150f;
-  --surface: #182018;
-  --surface-sunken: #0b0f0a;
-  --line: #2a352b;
-  --line-strong: #3d4b3e;
-  --text: #e9ece7;
-  --text-muted: #97a399;
-  --accent: #4fa97a;
-  --accent-hover: #63bd8d;
-  --accent-soft: #17291f;
-  --accent-contrast: #0b120c;
-  --award: #d0a45f;
-  --award-soft: #2a2216;
-  --danger: #e08a83;
-  --danger-soft: #2c1917;
-  --focus: #63bd8d;
 }
 
 html,
@@ -336,4 +365,285 @@ h2 {
 
 :root[data-density='compact'] main {
   --density-gap: 0.75rem;
+}
+
+/*
+ * Посадочная страница. Заголовки здесь набраны Inter, а не антиквой: лист
+ * «Вручай» и рассказ о нём должны читаться как современный цифровой документ,
+ * а не как отсканированный бланк. В кабинете антиква остаётся.
+ */
+.vru-landing :is(h1, h2, h3) {
+  font-family: var(--font-sans);
+}
+
+.vru-landing h3 {
+  font-size: var(--text-subheading);
+  line-height: var(--leading-subheading);
+  letter-spacing: var(--tracking-subheading);
+  font-weight: var(--weight-semibold);
+}
+
+.vru-display {
+  font-size: var(--text-display);
+  line-height: var(--leading-display);
+  letter-spacing: var(--tracking-display);
+  font-weight: var(--weight-semibold);
+  text-wrap: balance;
+}
+
+/* Дисплейный кегль рассчитан на широкий экран: на телефоне 64px не помещаются. */
+@media (max-width: 640px) {
+  .vru-display {
+    font-size: 40px;
+  }
+  .vru-h2 {
+    font-size: 26px;
+  }
+}
+
+.vru-h2 {
+  font-size: var(--text-heading-sm);
+  line-height: var(--leading-heading-sm);
+  letter-spacing: var(--tracking-heading-sm);
+  font-weight: var(--weight-semibold);
+  text-wrap: balance;
+}
+
+.vru-eyebrow,
+.vru-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunken);
+  padding: 8px 16px;
+  font-size: var(--text-caption);
+}
+.vru-eyebrow {
+  font-weight: var(--weight-medium);
+  color: var(--text);
+}
+.vru-tag {
+  color: var(--text-muted);
+}
+
+/*
+ * Аура: один слой на всю страницу, закреплён за вьюпортом и лежит за
+ * содержимым. Секциям нельзя давать сплошной фон или overflow: hidden —
+ * иначе размытие обрежется по границе секции и вместо свечения выйдет полоса.
+ */
+.vru-aura {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+}
+.vru-aura__blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(90px);
+  will-change: transform;
+}
+.vru-aura__blob--a {
+  width: 52vw;
+  height: 52vw;
+  max-width: 760px;
+  max-height: 760px;
+  left: 4%;
+  top: 4%;
+  background: radial-gradient(circle, rgba(15, 119, 255, 0.26), rgba(15, 119, 255, 0) 70%);
+  animation: vru-drift-a 24s ease-in-out infinite alternate;
+}
+.vru-aura__blob--b {
+  width: 44vw;
+  height: 44vw;
+  max-width: 640px;
+  max-height: 640px;
+  right: 2%;
+  top: 12%;
+  background: radial-gradient(circle, rgba(176, 131, 65, 0.16), rgba(176, 131, 65, 0) 70%);
+  animation: vru-drift-b 28s ease-in-out infinite alternate;
+}
+.vru-aura__blob--c {
+  width: 48vw;
+  height: 48vw;
+  max-width: 700px;
+  max-height: 700px;
+  left: 30%;
+  bottom: -10%;
+  background: radial-gradient(circle, rgba(197, 180, 255, 0.45), rgba(197, 180, 255, 0) 70%);
+  animation: vru-drift-c 32s ease-in-out infinite alternate;
+}
+@keyframes vru-drift-a {
+  from {
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    transform: translate(10%, 16%) scale(1.1);
+  }
+}
+@keyframes vru-drift-b {
+  from {
+    transform: translate(0, 0) scale(1.05);
+  }
+  to {
+    transform: translate(-14%, 18%) scale(0.95);
+  }
+}
+@keyframes vru-drift-c {
+  from {
+    transform: translate(0, 0) scale(0.95);
+  }
+  to {
+    transform: translate(-10%, -14%) scale(1.1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vru-aura__blob {
+    animation: none;
+  }
+}
+
+/* Закладки как путь: между шагами стрелка, активный — синий с линией. */
+.vru-tabbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+}
+.vru-tabbar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: none;
+  padding: 0 0 12px;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+  font-family: inherit;
+  font-size: var(--text-subheading);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-subheading);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--duration-fast);
+}
+.vru-tabbar button:hover {
+  color: var(--text);
+}
+.vru-tabbar button[aria-selected='true'] {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.vru-tabbar__arrow {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  color: var(--line-strong);
+}
+
+/*
+ * Карточка «Для организаций». Список раскрывается сеткой 0fr → 1fr:
+ * так высота анимируется без height: auto, который анимировать нельзя.
+ */
+.vru-expand {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--ring-line);
+  padding: 24px;
+  transition:
+    box-shadow var(--duration-base) var(--ease-out-quint),
+    transform var(--duration-base) var(--ease-out-quint);
+}
+.vru-expand:hover,
+.vru-expand:focus-within {
+  box-shadow: inset 0 0 0 1px var(--accent-line), var(--shadow-lg);
+  transform: translateY(-4px);
+}
+.vru-expand__body {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  overflow: hidden;
+  transition:
+    grid-template-rows var(--duration-rise) var(--ease-out-quint),
+    opacity var(--duration-base) var(--ease-out-quint);
+}
+.vru-expand__body > * {
+  min-height: 0;
+}
+.vru-expand:hover .vru-expand__body,
+.vru-expand:focus-within .vru-expand__body {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .vru-expand:hover,
+  .vru-expand:focus-within {
+    transform: none;
+  }
+}
+
+.vru-feature__icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-control);
+  background: var(--surface-sunken);
+  color: var(--accent-line);
+}
+
+/* Рамка браузера: продукт и есть главная картинка страницы. */
+.vru-frame {
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--ring-line), var(--shadow-sheet);
+  overflow: hidden;
+}
+.vru-frame__bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+  padding: 12px 16px;
+}
+.vru-frame__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: var(--line);
+}
+.vru-frame__url {
+  margin: 0 auto;
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunken);
+  padding: 2px 16px;
+  font-size: var(--text-caption);
+  color: var(--text-muted);
+}
+
+.vru-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-pill);
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+.vru-chip--ok {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.vru-chip--wait {
+  background: var(--award-soft);
+  color: var(--award);
+}
+.vru-chip--bad {
+  background: var(--danger-soft);
+  color: var(--danger);
 }

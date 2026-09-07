@@ -3,12 +3,12 @@ import { cn } from './cn';
 
 const control =
   'w-full rounded-lg bg-[var(--surface)] px-3 py-2 text-[var(--text)] ' +
-  'ring-1 ring-[var(--line-strong)] transition-colors outline-none ' +
+  'ring-1 ring-[var(--line)] transition-colors outline-none ' +
   'placeholder:text-[var(--text-muted)] focus:ring-2 focus:ring-[var(--focus)]';
 
 export function Label({ children, hint }: { children: ReactNode; hint?: ReactNode }) {
   return (
-    <span className="mb-1.5 block text-xs font-medium tracking-wide text-[var(--text-muted)] uppercase">
+    <span className="mb-1.5 block text-sm font-medium text-[var(--text-muted)]">
       {children}
       {hint}
     </span>

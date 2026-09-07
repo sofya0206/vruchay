@@ -19,10 +19,9 @@ const sizes: Record<Size, string> = {
 };
 
 const variants: Record<Variant, string> = {
-  primary:
-    'bg-[var(--accent)] text-[var(--accent-contrast)] hover:bg-[var(--accent-hover)]',
+  primary: 'bg-[var(--accent)] text-[var(--accent-contrast)] hover:bg-[var(--accent-hover)]',
   secondary:
-    'bg-[var(--surface)] text-[var(--text)] ring-1 ring-[var(--line-strong)] hover:bg-[var(--surface-sunken)]',
+    'bg-[var(--surface)] text-[var(--text)] ring-1 ring-[var(--line)] hover:bg-[var(--surface-sunken)]',
   ghost: 'text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]',
   danger: 'text-[var(--danger)] ring-1 ring-[var(--danger)]/40 hover:bg-[var(--danger-soft)]',
 };
