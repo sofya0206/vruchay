@@ -1,8 +1,27 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarPlus, CornerUpLeft, FileText, MoreVertical, Pencil, RotateCcw, Trash2 } from 'lucide-react';
-import { daysLeftInTrash, DOCUMENT_CATEGORIES, TRASH_DAYS } from '@gramota/shared';
+import {
+  CalendarPlus,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  CornerUpLeft,
+  FileText,
+  Folder,
+  FolderMinus,
+  MoreVertical,
+  Pencil,
+  RotateCcw,
+  Trash2,
+} from 'lucide-react';
+import {
+  daysLeftInTrash,
+  DOCUMENT_CATEGORIES,
+  TRASH_DAYS,
+  type DocumentCategory,
+} from '@gramota/shared';
 import type { DocumentSummary } from '../api/types';
+import { formatWhen } from '../overview/format';
 import { SheetRenderer } from '../render/SheetRenderer';
 import { SheetThumbnail } from './SheetThumbnail';
 
@@ -16,10 +35,16 @@ import { SheetThumbnail } from './SheetThumbnail';
  * Картинки-миниатюры не делаем намеренно: их пришлось бы где-то хранить,
  * пересоздавать после каждой правки макета и ловить рассогласование, когда
  * пересоздать не вышло. Браузер рисует лист сам, и он всегда свежий.
+ *
+ * Подпись под листом — название и когда правили, по центру и в две строки.
+ * Раздел и размер листа отсюда убраны: размер виден по самой миниатюре,
+ * а третья строка мелкого текста под каждой карточкой превращала ровную
+ * сетку в кашу из подписей.
  */
 export function DocumentCard({
   doc,
   onRename,
+  onMove,
   onDuplicate,
   onDelete,
   onRestore,
@@ -27,6 +52,8 @@ export function DocumentCard({
 }: {
   doc: DocumentSummary;
   onRename: (doc: DocumentSummary) => void;
+  /** Переложить в папку раздела; `null` — вынуть из папок совсем. */
+  onMove: (doc: DocumentSummary, category: DocumentCategory | null) => void;
   onDuplicate: (doc: DocumentSummary) => void;
   onDelete: (doc: DocumentSummary) => void;
   /** Заданы только в корзине: там карточка ведёт себя иначе. */
@@ -49,7 +76,7 @@ export function DocumentCard({
   }
 
   return (
-    <li className="group relative overflow-hidden rounded-2xl bg-[var(--surface)] ring-1 ring-[var(--line)] transition-shadow hover:shadow-md">
+    <li className="group relative overflow-hidden rounded-xl bg-[var(--surface)] ring-1 ring-[var(--line)] transition-shadow hover:shadow-md">
       <Link to={`/documents/${doc.id}`} className="block">
         {/* Рамка одинаковая у всех карточек, а лист вписывается внутрь.
             Пропорции самого документа задавать рамке нельзя: A5 книжная
@@ -63,18 +90,17 @@ export function DocumentCard({
           ) : (
             <Preview doc={doc} />
           )}
+          {/* Слева внизу: справа вверху стоит меню действий. */}
           {(doc.sheetCount ?? 1) > 1 && (
-            <span className="absolute right-2 top-2 rounded-md bg-[var(--surface)]/90 px-1.5 py-0.5 text-xs text-[var(--text-muted)]">
+            <span className="absolute bottom-2 left-2 rounded-md bg-[var(--surface)]/90 px-1.5 py-0.5 text-xs text-[var(--text-muted)]">
               {doc.sheetCount} листа
             </span>
           )}
         </div>
-        <div className="p-4 pr-12">
-          <h2 className="truncate font-sans text-base font-medium">{doc.title}</h2>
-          <p className="tabular mt-1 text-sm text-[var(--text-muted)]">
-            {categoryTitle(doc) ? `${categoryTitle(doc)} · ` : ''}
-            {Math.round(doc.pageWidthMm)}×{Math.round(doc.pageHeightMm)} мм ·{' '}
-            {new Date(doc.updatedAt).toLocaleDateString('ru-RU')}
+        <div className="px-3 py-3 text-center">
+          <h3 className="truncate font-sans text-base font-medium">{doc.title}</h3>
+          <p className="tabular mt-0.5 text-sm text-[var(--text-muted)]">
+            {formatWhen(doc.updatedAt)}
           </p>
         </div>
       </Link>
@@ -82,7 +108,7 @@ export function DocumentCard({
       {/* Связь с исходным бланком — вне ссылки на сам материал: это отдельный
           переход, и вложенные ссылки браузер всё равно не разрешает. */}
       {doc.source && (
-        <div className="px-4 pb-4 pr-12 -mt-1">
+        <div className="-mt-1 px-3 pb-3 text-center">
           <Link
             to={`/documents/${doc.source.id}`}
             className="inline-flex max-w-full items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--text)]"
@@ -95,7 +121,9 @@ export function DocumentCard({
 
       <ActionsMenu
         title={doc.title}
+        category={doc.category ?? null}
         onRename={() => onRename(doc)}
+        onMove={(to) => onMove(doc, to)}
         onDuplicate={() => onDuplicate(doc)}
         onDelete={() => onDelete(doc)}
       />
@@ -127,7 +155,7 @@ function TrashedCard({
   const left = doc.deletedAt ? daysLeftInTrash(doc.deletedAt) : TRASH_DAYS;
 
   return (
-    <li className="overflow-hidden rounded-2xl bg-[var(--surface)] ring-1 ring-[var(--line)]">
+    <li className="overflow-hidden rounded-xl bg-[var(--surface)] ring-1 ring-[var(--line)]">
       <div className="relative aspect-[4/3] overflow-hidden border-b border-[var(--line)] bg-[var(--surface-sunken)] opacity-45">
         {empty ? (
           <div className="grid h-full place-items-center">
@@ -138,13 +166,13 @@ function TrashedCard({
         )}
       </div>
 
-      <div className="p-4">
-        <h2 className="truncate font-sans text-base font-medium">{doc.title}</h2>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
+      <div className="px-3 py-3 text-center">
+        <h3 className="truncate font-sans text-base font-medium">{doc.title}</h3>
+        <p className="mt-0.5 text-sm text-[var(--text-muted)]">
           {left === 0 ? 'Будет стёрт сегодня ночью' : `Будет стёрт через ${left} ${dayWord(left)}`}
         </p>
 
-        <div className="mt-3 flex gap-2">
+        <div className="mt-3 flex justify-center gap-2">
           <button
             type="button"
             onClick={onRestore}
@@ -203,24 +231,27 @@ function Preview({ doc }: { doc: DocumentSummary }) {
   );
 }
 
-/** Название раздела для подписи под миниатюрой. */
-function categoryTitle(doc: DocumentSummary): string | null {
-  return DOCUMENT_CATEGORIES.find((c) => c.id === doc.category)?.title ?? null;
-}
-
 /** Меню действий — то же, что человек привык видеть в проводнике и на диске. */
 function ActionsMenu({
   title,
+  category,
   onRename,
+  onMove,
   onDuplicate,
   onDelete,
 }: {
   title: string;
+  category: DocumentCategory | null;
   onRename: () => void;
+  onMove: (category: DocumentCategory | null) => void;
   onDuplicate: () => void;
   onDelete: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  /* Список папок открывается вместо меню, а не рядом с ним: папок шесть,
+     и вложенное меню сбоку на карточке шириной в лист попросту не помещается
+     на экран. */
+  const [moving, setMoving] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -237,25 +268,85 @@ function ActionsMenu({
     };
   }, [open]);
 
+  // Закрытое меню всегда открывается со своего начала, а не со списка папок.
+  useEffect(() => {
+    if (!open) setMoving(false);
+  }, [open]);
+
   const item =
     'flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-[var(--surface-sunken)] [&>svg]:shrink-0';
 
   return (
-    <div ref={wrap} className="absolute bottom-3 right-3">
+    <div ref={wrap} className="absolute top-2 right-2">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-label={`Действия с документом «${title}»`}
         aria-expanded={open}
-        className="grid h-8 w-8 place-items-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
+        /* На мыши кнопка проступает при наведении, чтобы не спорить с самим
+           листом; на телефоне наведения нет — там она видна всегда, иначе
+           до действий не добраться вовсе. Открытое меню держит кнопку
+           видимой: иначе уведённая мышь прячет кнопку из-под своего же меню. */
+        className={
+          'grid h-8 w-8 place-items-center rounded-lg bg-[var(--surface)]/90 text-[var(--text-muted)] ' +
+          'ring-1 ring-[var(--line)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--text)] ' +
+          (open ? '' : 'md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100')
+        }
       >
         <MoreVertical size={16} />
       </button>
 
-      {open && (
+      {open && moving && (
         <div
           role="menu"
-          className="absolute bottom-9 right-0 z-10 w-64 overflow-hidden rounded-xl bg-[var(--surface)] py-1 shadow-lg ring-1 ring-[var(--line)]"
+          className="absolute top-9 right-0 z-10 w-64 overflow-hidden rounded-xl bg-[var(--surface)] py-1 shadow-lg ring-1 ring-[var(--line)]"
+        >
+          <button
+            type="button"
+            role="menuitem"
+            className={`${item} text-[var(--text-muted)]`}
+            onClick={() => setMoving(false)}
+          >
+            <ChevronLeft size={14} /> Назад
+          </button>
+          <div className="my-1 border-t border-[var(--line)]" />
+          {DOCUMENT_CATEGORIES.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              role="menuitem"
+              className={item}
+              onClick={() => {
+                setOpen(false);
+                onMove(c.id);
+              }}
+            >
+              <Folder size={14} />
+              <span className="flex-1 truncate">{c.title}</span>
+              {category === c.id && <Check size={14} className="text-[var(--accent)]" />}
+            </button>
+          ))}
+          <div className="my-1 border-t border-[var(--line)]" />
+          <button
+            type="button"
+            role="menuitem"
+            className={item}
+            onClick={() => {
+              setOpen(false);
+              onMove(null);
+            }}
+          >
+            <FolderMinus size={14} />
+            <span className="flex-1">Вне папок</span>
+            {category === null && <Check size={14} className="text-[var(--accent)]" />}
+          </button>
+        </div>
+      )}
+
+      {open && !moving && (
+        <div
+          role="menu"
+          className="absolute top-9 right-0 z-10 w-64 overflow-hidden rounded-xl bg-[var(--surface)] py-1 shadow-lg ring-1 ring-[var(--line)]"
         >
           {/*
             Первым пунктом, и глаголом.
@@ -267,17 +358,44 @@ function ActionsMenu({
             а список получателей и сведения о мероприятии — чистые.
             «Сделать копию» обещало бы копию целиком.
           */}
-          <button type="button" role="menuitem" className={item} onClick={() => { setOpen(false); onDuplicate(); }}>
+          <button
+            type="button"
+            role="menuitem"
+            className={item}
+            onClick={() => {
+              setOpen(false);
+              onDuplicate();
+            }}
+          >
             <CalendarPlus size={14} /> Скопировать под новое мероприятие
           </button>
-          <button type="button" role="menuitem" className={item} onClick={() => { setOpen(false); onRename(); }}>
+          <button
+            type="button"
+            role="menuitem"
+            className={item}
+            onClick={() => {
+              setOpen(false);
+              onRename();
+            }}
+          >
             <Pencil size={14} /> Переименовать
+          </button>
+          {/* Папка материала — здесь же, где переименование: и то и другое
+              про то, где его потом искать. Открывает список папок вместо
+              меню, поэтому окно не закрываем. */}
+          <button type="button" role="menuitem" className={item} onClick={() => setMoving(true)}>
+            <Folder size={14} />
+            <span className="flex-1">Переложить в папку</span>
+            <ChevronRight size={14} className="text-[var(--text-muted)]" />
           </button>
           <button
             type="button"
             role="menuitem"
             className={`${item} text-[var(--danger)]`}
-            onClick={() => { setOpen(false); onDelete(); }}
+            onClick={() => {
+              setOpen(false);
+              onDelete();
+            }}
           >
             <Trash2 size={14} /> В корзину
           </button>

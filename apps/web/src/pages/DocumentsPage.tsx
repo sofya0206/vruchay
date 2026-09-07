@@ -1,14 +1,14 @@
-import { FormEvent, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { FormEvent, useEffect, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Archive, FileText, Plus, Search } from 'lucide-react';
 import { UsageBar } from '../documents/UsageBar';
 import { LibraryLayout } from '../documents/LibraryNav';
 import {
   DOCUMENT_CATEGORIES,
+  isDocumentCategory,
   TRASH_DAYS,
   type DocumentCategory,
-  type StarterPreset,
 } from '@gramota/shared';
 import { api } from '../api/client';
 import type { DocumentDetail, DocumentList, DocumentSummary } from '../api/types';
@@ -16,16 +16,16 @@ import { Button } from '../ui/Button';
 import { Input, Select } from '../ui/Field';
 import { DocumentCard } from '../documents/DocumentCard';
 import { PageSizePicker, type PageSizeValue } from '../documents/PageSizePicker';
-import { PresetGallery } from '../documents/PresetGallery';
-import { LibraryFilters, type LibrarySort } from '../documents/LibraryFilters';
+import { LibrarySortSelect, type LibrarySort } from '../documents/LibraryFilters';
 
 /**
  * Библиотека материалов.
  *
- * До неё здесь был плоский список: человек входил в сервис, видел пустоту
- * и не знал, с чего начать. Теперь первое, что он видит, — готовые заготовки,
- * из которых материал делается в одно нажатие, а свои материалы разложены
- * по разделам и ищутся поиском.
+ * Устроена как файловый менеджер: списки и создание — слева, название
+ * списка и поиск — сверху, сколько всего лежит и в каком порядке — снизу.
+ * В середине только свои материалы: готовые бланки живут в своей вкладке
+ * слева, и витрине под списком делать нечего — она отодвигала вниз то,
+ * ради чего сюда и приходят.
  *
  * Рабочие и архив — одна страница с двумя адресами, а не переключатель:
  * колонка слева показывает оба списка сразу, и удалённое больше не нужно
@@ -34,17 +34,39 @@ import { LibraryFilters, type LibrarySort } from '../documents/LibraryFilters';
 export function DocumentsPage({ archived = false }: { archived?: boolean }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
   const [search, setSearch] = useState('');
-  const [category, setCategory] = useState<DocumentCategory | null>(null);
   const [sort, setSort] = useState<LibrarySort>('updated');
   const [title, setTitle] = useState('');
-  const [newCategory, setNewCategory] = useState<DocumentCategory | ''>('');
+  /** `null` — человек ещё не трогал выбор: тогда берём открытую папку. */
+  const [newCategory, setNewCategory] = useState<DocumentCategory | '' | null>(null);
   // A4 альбомная — то, на чём печатают грамоты чаще всего.
   const [size, setSize] = useState<PageSizeValue>({ widthMm: 297, heightMm: 210 });
-  const [scratch, setScratch] = useState(false);
 
   // Какой список смотрим — решает адрес, а не состояние страницы.
   const trash = archived;
+
+  /*
+   * Открытая папка и форма «с чистого листа» живут в адресе, а не в состоянии
+   * страницы: папки — ссылки в колонке слева, кнопка «Создать» стоит в двух
+   * местах рамки раздела. Иначе на папку нельзя было бы сослаться, а создание
+   * открывалось бы только с той страницы, где нарисована сама форма.
+   *
+   * Чужое значение в `?category=` — не ошибка, а испорченная ссылка: молча
+   * показываем все рабочие, а не пустой список по несуществующей папке.
+   */
+  const raw = params.get('category');
+  const category: DocumentCategory | null =
+    !trash && raw && isDocumentCategory(raw) ? (raw as DocumentCategory) : null;
+  const folder = DOCUMENT_CATEGORIES.find((c) => c.id === category) ?? null;
+
+  const scratch = !trash && params.get('new') === '1';
+  /** Форму закрываем, папку оставляем: человек вернётся в тот же список. */
+  const closeScratch = () => {
+    const next = new URLSearchParams(params);
+    next.delete('new');
+    setParams(next, { replace: true });
+  };
 
   const documents = useQuery({
     queryKey: ['documents', search, trash, category, sort],
@@ -65,27 +87,18 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
   });
 
   const create = useMutation({
-    mutationFn: (v: { title: string; category?: DocumentCategory; presetId?: string }) =>
+    mutationFn: (v: { title: string; category?: DocumentCategory }) =>
       api.post<DocumentDetail>('/documents', {
         title: v.title,
         pageWidthMm: size.widthMm,
         pageHeightMm: size.heightMm,
         ...(v.category ? { category: v.category } : {}),
-        ...(v.presetId ? { presetId: v.presetId } : {}),
       }),
-    onSuccess: (doc, variables) => {
+    onSuccess: () => {
       setTitle('');
-      setScratch(false);
+      setNewCategory(null);
+      closeScratch();
       void qc.invalidateQueries({ queryKey: ['documents'] });
-      /*
-       * Материал из заготовки открываем сразу.
-       *
-       * Раньше нажатие на заготовку молча добавляло материал в список ниже:
-       * ничего видимого не происходило, и человек нажимал ещё раз — отсюда
-       * три «Грамоты за место» подряд. Заготовку выбирают, чтобы её править,
-       * поэтому переход в редактор и есть ответ на нажатие.
-       */
-      if (variables.presetId) navigate(`/documents/${doc.id}`);
     },
   });
 
@@ -121,47 +134,73 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['documents'] }),
   });
 
+  /** Переложить материал в другую папку. `null` — вынуть из папок совсем. */
+  const move = useMutation({
+    mutationFn: (v: { id: string; category: DocumentCategory | null }) =>
+      api.patch<DocumentDetail>(`/documents/${v.id}`, { category: v.category }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['documents'] }),
+  });
+
   function onRename(doc: DocumentSummary) {
     const title = window.prompt('Новое название документа', doc.title)?.trim();
     if (title && title !== doc.title) rename.mutate({ id: doc.id, title });
   }
 
+  /** Что стоит в выборе папки: тронутое человеком или открытая папка. */
+  const formCategory = newCategory ?? category ?? '';
+
+  /*
+   * Esc — шаг назад по уровням: сначала снимается поиск, потом закрывается
+   * форма создания, потом закрывается папка. Клавиша делает ровно то же,
+   * что стрелка «назад», но не требует тянуться к ней мышью — а в списке
+   * из полусотни материалов из папки выходят по многу раз за сеанс.
+   *
+   * Меню карточки закрывает себя само: если бы Esc срабатывал и здесь,
+   * одно нажатие закрывало бы меню и вместе с ним выкидывало из папки.
+   */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || document.querySelector('[role="menu"]')) return;
+      if (search) {
+        setSearch('');
+        return;
+      }
+      if (scratch) {
+        closeScratch();
+        return;
+      }
+      if (category) navigate('/documents');
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  });
+
   function onCreate(e: FormEvent) {
     e.preventDefault();
     if (title.trim()) {
-      create.mutate({ title: title.trim(), category: newCategory || undefined });
+      create.mutate({ title: title.trim(), category: formCategory || undefined });
     }
-  }
-
-  function onPickPreset(preset: StarterPreset) {
-    create.mutate({ title: preset.documentTitle, presetId: preset.id });
   }
 
   const items = documents.data?.items ?? [];
   const nothingFound = documents.data?.items.length === 0;
-  // Заготовки — вход по умолчанию. Форма с пустым названием открывается
-  // только по явной просьбе: в ней нечего показать, кроме поля ввода.
-  const showGallery = !trash && !scratch;
 
   return (
-    <LibraryLayout archiveCount={trashCount.data}>
-      {/* Остаток пробы — до всего остального: человек должен знать,
-            сколько у него есть, ещё до того как начнёт награждение,
-            а не упереться в предел на сорок седьмом документе. */}
-      {!trash && <UsageBar />}
-
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">{trash ? 'Архив' : 'Рабочие'}</h1>
-          <p className="mt-1 text-sm text-[var(--text-muted)]">
-            {trash ? (
-              <>Удалённое хранится {TRASH_DAYS} дней, потом стирается насовсем</>
-            ) : (
-              <>Грамоты, дипломы, сертификаты, благодарности — что угодно на бланке</>
-            )}
-            {documents.data ? ` · ${documents.data.total}` : ''}
-          </p>
+    <LibraryLayout
+      archiveCount={trashCount.data}
+      head={
+        <div className="flex min-w-0 items-baseline gap-2">
+          {/* Открытая папка стоит в заголовке: иначе на половине списка
+              непонятно, почему материалов пять, когда их пятьдесят. */}
+          <h1 className="truncate text-lg font-medium">
+            {trash ? 'Архив' : (folder?.title ?? 'Рабочие')}
+          </h1>
+          {documents.data && (
+            <span className="tabular text-sm text-[var(--text-muted)]">{documents.data.total}</span>
+          )}
         </div>
+      }
+      tools={
         <div className="relative">
           <Search
             size={16}
@@ -171,59 +210,42 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Поиск по названию"
-            className="w-56 pl-9"
+            aria-label="Поиск по названию"
+            className="w-40 py-1.5 pl-9 text-sm sm:w-56"
           />
         </div>
-      </div>
-
-      {!trash && (
-        <LibraryFilters category={category} onCategory={setCategory} sort={sort} onSort={setSort} />
-      )}
-
-      {showGallery && (
-        <section className="mb-8">
-          <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="font-medium">Начните с заготовки</h2>
-            <p className="text-sm text-[var(--text-muted)]">
-              Текст уже расставлен по листу — останется поправить слова
-            </p>
+      }
+      bar={
+        <>
+          <span className="tabular text-[var(--text-muted)]">
+            {trash ? 'В архиве' : 'Документов'}: {documents.data?.total ?? 0}
+          </span>
+          <div className="ml-auto">
+            <LibrarySortSelect sort={sort} onSort={setSort} />
           </div>
-          <PresetGallery
-            category={category}
-            size={size}
-            busyId={
-              create.isPending && create.variables?.presetId ? create.variables.presetId : null
-            }
-            onPick={onPickPreset}
-          />
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            <PageSizePicker value={size} onChange={setSize} />
-            <button
-              type="button"
-              onClick={() => setScratch(true)}
-              className="text-sm text-[var(--text-muted)] underline underline-offset-4 hover:text-[var(--text)]"
-            >
-              Или с чистого листа
-            </button>
-          </div>
-        </section>
-      )}
+        </>
+      }
+    >
+      {/* Остаток пробы — до всего остального: человек должен знать,
+            сколько у него есть, ещё до того как начнёт награждение,
+            а не упереться в предел на сорок седьмом документе. */}
+      {!trash && <UsageBar />}
 
       {/* Размер выбирается до создания, а не после: поменять его у документа,
           на котором уже расставлен текст, значит сдвинуть весь макет. */}
-      {!trash && scratch && (
+      {scratch && (
         <form
           onSubmit={onCreate}
-          className="mb-6 space-y-3 rounded-2xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]"
+          className="mb-6 space-y-3 rounded-xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]"
         >
           <div className="flex items-baseline justify-between gap-2">
             <h2 className="font-medium">Материал с чистого листа</h2>
             <button
               type="button"
-              onClick={() => setScratch(false)}
+              onClick={closeScratch}
               className="text-sm text-[var(--text-muted)] underline underline-offset-4 hover:text-[var(--text)]"
             >
-              Вернуться к заготовкам
+              Вернуться к списку
             </button>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -234,13 +256,16 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
               className="min-w-64 flex-1"
               autoFocus
             />
+            {/* Внутри папки она и подставлена: человек нажал «Создать»,
+                стоя в «Спортивных соревнованиях», — материал ждут там же.
+                Выбрать другую или «Вне папок» по-прежнему можно. */}
             <Select
-              value={newCategory}
+              value={formCategory}
               onChange={(e) => setNewCategory(e.target.value as DocumentCategory | '')}
-              aria-label="Раздел нового материала"
+              aria-label="Папка нового материала"
               className="w-56"
             >
-              <option value="">Без раздела</option>
+              <option value="">Вне папок</option>
               {DOCUMENT_CATEGORIES.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.title}
@@ -260,69 +285,102 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
         </form>
       )}
 
-      {documents.isPending && <p className="text-[var(--text-muted)]">Загрузка…</p>}
-
-      {nothingFound && (
-        <div className="rounded-2xl border border-dashed border-[var(--line-strong)] px-6 py-12 text-center">
-          {trash ? (
-            <>
-              <Archive
-                size={28}
-                className="mx-auto mb-3 text-[var(--text-muted)]"
-                strokeWidth={1.5}
-              />
-              <p className="font-medium">Архив пуст</p>
-              <p className="mt-1 text-sm text-[var(--text-muted)]">
-                Удалённые материалы лежат здесь {TRASH_DAYS} дней — успеете передумать
-              </p>
-            </>
-          ) : (
-            <>
-              <FileText
-                size={28}
-                className="mx-auto mb-3 text-[var(--text-muted)]"
-                strokeWidth={1.5}
-              />
-              <p className="font-medium">
-                {search || category ? 'Ничего не нашлось' : 'Здесь пока пусто'}
-              </p>
-              {search || category ? (
-                <p className="mt-1 text-sm text-[var(--text-muted)]">
-                  Попробуйте изменить запрос или выбрать другой раздел
-                </p>
-              ) : (
-                /* Не пересказываем инструкцию, а показываем на заготовки,
-                   которые стоят прямо над этой рамкой: новичок на пустом
-                   экране ищет, куда нажать, а не что почитать. */
-                <div className="mt-1 text-sm text-[var(--text-muted)]">
-                  <p>
-                    Начните сверху: выберите заготовку — текст уже расставлен по листу, останется
-                    поправить слова.
-                  </p>
-                  <p className="mt-2">
-                    Дальше загрузите свой бланк и подгоните поля: фамилию, место, дату. Ничего
-                    страшного не произойдёт — пока вы не выпустили файлы, ничего не расходуется.
-                  </p>
-                </div>
-              )}
-            </>
-          )}
+      <section>
+        <div className="mb-3">
+          <h2 className="font-medium">{trash ? 'Удалённые' : 'Документы'}</h2>
+          <p className="mt-0.5 text-sm text-[var(--text-muted)]">
+            {trash ? (
+              <>Удалённое хранится {TRASH_DAYS} дней, потом стирается насовсем</>
+            ) : folder ? (
+              folder.hint
+            ) : (
+              <>Грамоты, дипломы, сертификаты, благодарности — что угодно на бланке</>
+            )}
+          </p>
         </div>
-      )}
 
-      <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {items.map((doc) => (
-          <DocumentCard
-            key={doc.id}
-            doc={doc}
-            onRename={onRename}
-            onDuplicate={(d) => duplicate.mutate(d.id)}
-            onDelete={(d) => remove.mutate(d.id)}
-            onRestore={(d) => restore.mutate(d.id)}
-            onPurge={(d) => purge.mutate(d.id)}
-          />
-        ))}
-      </ul>
+        {documents.isPending && <p className="text-[var(--text-muted)]">Загрузка…</p>}
+
+        {nothingFound && (
+          <div className="rounded-xl border border-dashed border-[var(--line-strong)] px-6 py-12 text-center">
+            {trash ? (
+              <>
+                <Archive
+                  size={28}
+                  className="mx-auto mb-3 text-[var(--text-muted)]"
+                  strokeWidth={1.5}
+                />
+                <p className="font-medium">Архив пуст</p>
+                <p className="mt-1 text-sm text-[var(--text-muted)]">
+                  Удалённые материалы лежат здесь {TRASH_DAYS} дней — успеете передумать
+                </p>
+              </>
+            ) : (
+              <>
+                <FileText
+                  size={28}
+                  className="mx-auto mb-3 text-[var(--text-muted)]"
+                  strokeWidth={1.5}
+                />
+                <p className="font-medium">
+                  {search ? 'Ничего не нашлось' : folder ? 'Папка пуста' : 'Здесь пока пусто'}
+                </p>
+                {search ? (
+                  <p className="mt-1 text-sm text-[var(--text-muted)]">
+                    Попробуйте изменить запрос или открыть другую папку
+                  </p>
+                ) : folder ? (
+                  /* Говорим, как сюда что-то положить: папка, в которую нельзя
+                     ничего переложить, выглядит сломанной, а не пустой. */
+                  <p className="mt-1 text-sm text-[var(--text-muted)]">
+                    Переложить сюда материал можно из меню карточки в{' '}
+                    <Link to="/documents" className="underline underline-offset-4">
+                      рабочих
+                    </Link>{' '}
+                    — «Переложить в папку». Новый материал кладётся в папку при создании.
+                  </p>
+                ) : (
+                  /* Не пересказываем инструкцию, а показываем дорогу: новичок
+                     на пустом экране ищет, куда нажать, а не что почитать.
+                     Готовые бланки лежат во вкладке «Шаблоны» слева — ссылкой,
+                     потому что искать их глазами по колонке он не станет. */
+                  <div className="mt-1 text-sm text-[var(--text-muted)]">
+                    <p>
+                      Начните с{' '}
+                      <Link to="/templates" className="underline underline-offset-4">
+                        готового шаблона
+                      </Link>
+                      : текст уже расставлен по листу, останется поправить слова.
+                    </p>
+                    <p className="mt-2">
+                      Дальше загрузите свой бланк и подгоните поля: фамилию, место, дату. Ничего
+                      страшного не произойдёт — пока вы не выпустили файлы, ничего не расходуется.
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Карточки одного размера, сколько влезет в строку: колонка слева
+            съедает ширину, и жёсткие «три в ряд» оставляли бы на широком
+            экране пустую половину, а на среднем — сплюснутые листы. */}
+        <ul className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
+          {items.map((doc) => (
+            <DocumentCard
+              key={doc.id}
+              doc={doc}
+              onRename={onRename}
+              onMove={(d, to) => move.mutate({ id: d.id, category: to })}
+              onDuplicate={(d) => duplicate.mutate(d.id)}
+              onDelete={(d) => remove.mutate(d.id)}
+              onRestore={(d) => restore.mutate(d.id)}
+              onPurge={(d) => purge.mutate(d.id)}
+            />
+          ))}
+        </ul>
+      </section>
     </LibraryLayout>
   );
 }
