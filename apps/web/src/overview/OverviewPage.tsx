@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { useOverview } from '../api/overview';
 import { useMe } from '../auth/useAuth';
 import { Loading } from '../ui/Loading';
+import { DocsLinks } from './DocsLinks';
 import { Metrics } from './Metrics';
 import { QuickActions } from './QuickActions';
-import { RecentActivity } from './RecentActivity';
+import { SectionNav } from './SectionNav';
 import { Welcome } from './Welcome';
 import { markWelcomeSeen, welcomeSeen } from './welcome-seen';
 
@@ -63,20 +64,23 @@ export function OverviewPage() {
     );
   }
 
+  // Во всю ширину окна, как шапка: колонка по центру отодвигала цифры
+  // и плитки от левого края, тогда как кнопка «Главная» стояла у самого
+  // края, — и первая строка страницы не сходилась с шапкой над ней.
   return (
-    <main className="mx-auto max-w-5xl space-y-8 px-6 py-8">
-      <div>
-        <h1 className="text-2xl font-semibold">
-          {me.data?.name ? `Здравствуйте, ${me.data.name}` : 'Рабочий стол'}
-        </h1>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Продолжить награждение или начать новое
-        </p>
-      </div>
-
-      <QuickActions data={data} />
-      <Metrics data={data} />
-      <RecentActivity data={data} />
-    </main>
+    <>
+      <main className="space-y-10 px-6 py-8">
+        {/* Цифры стоят первыми и вместо приветствия: верхняя строка экрана
+            должна что-то сообщать, а «Здравствуйте» не сообщает ничего. */}
+        <Metrics data={data} />
+        <QuickActions data={data} />
+        {/* Разделы кабинета: главная и есть навигация по сервису, поэтому
+            они стоят на ней целиком, а не лентой в шапке. */}
+        <SectionNav data={data} />
+      </main>
+      {/* Снаружи `main`: подвал должен прижиматься к низу окна, а внутри
+          страницы он прижимался бы к концу текста. */}
+      <DocsLinks />
+    </>
   );
 }

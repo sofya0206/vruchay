@@ -5,6 +5,7 @@ import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { ConfirmEmailPage } from './pages/ConfirmEmailPage';
 import { DocumentsPage } from './pages/DocumentsPage';
+import { TemplatesPage } from './templates/TemplatesPage';
 import { AppShell } from './shell/AppShell';
 import { SectionStub } from './shell/SectionStub';
 import { OverviewPage } from './overview/OverviewPage';
@@ -129,6 +130,13 @@ export function App() {
       <Route element={<AppShell />}>
         <Route path="/" element={<OverviewPage />} />
         <Route path="/documents" element={<DocumentsPage />} />
+        {/* Архив — свой адрес, а не переключатель внутри списка: на него
+            можно сослаться, а «Назад» возвращает к рабочим. Статический
+            сегмент стоит выше `/documents/:id` в разборе адреса, поэтому
+            редактор материала он не перехватывает. */}
+        <Route path="/documents/archive" element={<DocumentsPage archived />} />
+        <Route path="/templates" element={<TemplatesPage />} />
+        <Route path="/templates/my" element={<TemplatesPage mine />} />
 
         {/* ─────────── МАРШРУТЫ РАЗДЕЛОВ БЛОКА 1 ───────────
             Ветка, которая делает свой раздел, заменяет ЗДЕСЬ одну строку
