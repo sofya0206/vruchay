@@ -1,15 +1,14 @@
-import type { ReactNode } from 'react';
-import { CalendarDays, FileCheck2, Gift, Mail } from 'lucide-react';
 import type { Overview } from '../api/overview';
 import { DiscussTermsLink } from '../billing/DiscussTermsLink';
-import { plural } from './format';
 
 /**
- * Четыре цифры о награждениях.
+ * Четыре цифры о награждениях — первое, что видно на главной.
  *
- * Не витрина достижений: каждая отвечает на вопрос, который человек
- * задаёт себе перед работой. Сколько всего выдано, сколько за месяц,
- * хватит ли остатка на ближайшее награждение и дошли ли письма.
+ * Стоят вместо приветствия: «Здравствуйте, Соня» занимало верхнюю строку
+ * экрана и ничего не сообщало. Раньше это были четыре карточки, каждая
+ * с абзацем пояснения, — экран занимали объяснения, а не цифры. Осталось
+ * число и слово под ним, без рамок и подложки; всё, что нужно объяснить,
+ * объясняется только когда это важно — когда документы заканчиваются.
  */
 export function Metrics({ data }: { data: Overview }) {
   const { usage } = data;
@@ -21,92 +20,60 @@ export function Metrics({ data }: { data: Overview }) {
    * иначе цифра на экране и решение о допуске однажды разойдутся.
    */
   const low = usage.warn === 'critical' || usage.warn === 'exhausted' || usage.warn === 'expired';
-  const soon = usage.warn === 'low';
 
   return (
-    <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      <Metric
-        icon={<FileCheck2 size={16} />}
-        label="Выпущено всего"
-        value={data.issuedTotal}
-        hint={`${plural(data.issuedTotal, 'документ', 'документа', 'документов')} за всё время`}
-      />
-      <Metric
-        icon={<CalendarDays size={16} />}
-        label="В этом месяце"
-        value={data.issuedMonth}
-        hint={data.issuedMonth === 0 ? 'В этом месяце пока ничего' : 'С первого числа'}
-      />
-      <Metric
-        icon={<Gift size={16} />}
-        label={usage.source === 'trial' ? 'Осталось на пробе' : 'Осталось по плану'}
-        value={unlimited ? '∞' : (usage.left ?? 0)}
-        tone={low ? 'danger' : 'normal'}
-        hint={
-          unlimited ? (
-            'Без ограничения по документам'
-          ) : usage.expired ? (
-            <>
-              Срок плана закончился · выданные документы остаются действительными ·{' '}
-              <DiscussTermsLink>обсудим продление</DiscussTermsLink>
-            </>
-          ) : (
-            <>
-              из {usage.limit}
-              {usage.source !== 'trial' && <> · {usage.planName}</>}
-              {usage.bonus > 0 && <> · +{usage.bonus} за приглашённых</>}
-              {/*
-                * Ссылки на страницу тарифов нет: публичных цен больше нет,
-                * а вести человека на заглушку хуже, чем сказать словами.
-                * Ведём на форму «Обсудить условия» — единственный путь дальше.
-                */}
-              {(low || soon) && (
-                <>
-                  {' · '}
-                  <DiscussTermsLink>напишите нам, добавим документов</DiscussTermsLink>
-                </>
-              )}
-            </>
-          )
-        }
-      />
-      <Metric
-        icon={<Mail size={16} />}
-        label="Писем отправлено"
-        value={data.emailsSent}
-        hint={data.emailsSent === 0 ? 'Рассылка ещё не запускалась' : 'Ушло участникам'}
-      />
-    </ul>
+    <div>
+      <ul className="grid grid-cols-2 gap-x-8 gap-y-5 sm:grid-cols-4">
+        <Metric label="Выпущено" value={data.issuedTotal} />
+        <Metric label="За месяц" value={data.issuedMonth} />
+        <Metric
+          label={usage.source === 'trial' ? 'Осталось на пробе' : 'Осталось по плану'}
+          value={unlimited ? '∞' : (usage.left ?? 0)}
+          tone={low ? 'danger' : 'normal'}
+        />
+        <Metric label="Писем" value={data.emailsSent} />
+      </ul>
+
+      {/* Единственная строка, которая здесь осталась: срок плана кончился.
+          Про кончающийся остаток словами больше не пишем — о нём говорит
+          сама цифра, красная. А вот про истёкший срок цифра не скажет:
+          «осталось 380» при мёртвом плане читается как «всё в порядке».
+          Первый вопрос при этом — не пропали ли уже выданные документы,
+          и ответ на него не должен зависеть от того, дозвонились ли до нас. */}
+      {usage.expired && (
+        <p className="mt-4 text-sm text-[var(--text-muted)]">
+          Срок плана закончился · выданные документы остаются действительными ·{' '}
+          {/*
+           * Ссылки на страницу тарифов нет: публичных цен больше нет,
+           * а вести человека на заглушку хуже, чем сказать словами.
+           * Ведём на форму «Обсудить условия» — единственный путь дальше.
+           */}
+          <DiscussTermsLink>обсудим продление</DiscussTermsLink>
+        </p>
+      )}
+    </div>
   );
 }
 
 function Metric({
-  icon,
   label,
   value,
-  hint,
   tone = 'normal',
 }: {
-  icon: ReactNode;
   label: string;
   value: number | string;
-  hint: ReactNode;
   tone?: 'normal' | 'danger';
 }) {
   return (
-    <li className="rounded-2xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]">
-      <span className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
-        {icon}
-        {label}
-      </span>
+    <li>
       <p
-        className={`mt-2 text-3xl font-semibold tabular-nums ${
+        className={`text-3xl font-semibold tabular-nums ${
           tone === 'danger' ? 'text-[var(--danger)]' : ''
         }`}
       >
         {value}
       </p>
-      <p className="mt-1 text-sm text-[var(--text-muted)]">{hint}</p>
+      <p className="mt-0.5 text-sm text-[var(--text-muted)]">{label}</p>
     </li>
   );
 }

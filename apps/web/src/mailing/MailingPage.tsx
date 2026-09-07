@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Send } from 'lucide-react';
+import { ChevronRight, Send } from 'lucide-react';
 import { api } from '../api/client';
-import type { DocumentList } from '../api/types';
+import type { DocumentList, DocumentSummary } from '../api/types';
 import { Button } from '../ui/Button';
 import { Loading } from '../ui/Loading';
 import { LetterCard } from './LetterCard';
 import { MailingLogTable } from './MailingLogTable';
 import { Dialog } from './Dialog';
 import { documentLine } from './document-line';
+import { workspacePath } from './workspace-tabs';
 import {
   useAudience,
   useSendMailing,
@@ -20,17 +21,19 @@ import {
 } from './api';
 
 /**
- * Раздел «Рассылка».
+ * Раздел «Рассылка»: списки получателей и письма в одном месте.
  *
  * Отдельно от редактора материала: файлы почти всегда делают заранее,
  * а рассылают в день награждения, и человеку, пришедшему разослать,
  * незачем идти через макет.
  *
- * Шапка своя. Общей оболочки в кабинете пока нет — её делает соседняя
- * задача, и до её приезда каждая страница рисует себя сама.
+ * Списки и письма разводить по разным разделам нельзя: это одна работа
+ * одного дня — собрать людей, выпустить им документы, отправить письма.
+ * Разведи их, и список пришлось бы собирать здесь, а отправлять его
+ * где-то ещё. Поэтому первая вкладка — списки, за ней письма и журнал.
  */
 export function MailingPage() {
-  const [tab, setTab] = useState<'new' | 'log'>('new');
+  const [tab, setTab] = useState<'lists' | 'new' | 'log'>('lists');
   const [kind, setKind] = useState<LetterKind>('transactional');
   const [selected, setSelected] = useState<string[]>([]);
   const [source, setSource] = useState<RecipientSource>('table');
@@ -95,6 +98,9 @@ export function MailingPage() {
   return (
     <main className="mx-auto max-w-5xl px-6 py-6">
       <div className="mb-6 flex gap-1">
+        <TabButton active={tab === 'lists'} onClick={() => setTab('lists')}>
+          Списки получателей
+        </TabButton>
         <TabButton active={tab === 'new'} onClick={() => setTab('new')}>
           Новая рассылка
         </TabButton>
@@ -103,7 +109,9 @@ export function MailingPage() {
         </TabButton>
       </div>
 
-      {tab === 'log' ? (
+      {tab === 'lists' ? (
+        <Lists documents={items} />
+      ) : tab === 'log' ? (
         <MailingLogTable documents={items} />
       ) : (
         <div className="space-y-8">
@@ -251,6 +259,49 @@ export function MailingPage() {
         </Dialog>
       )}
     </main>
+  );
+}
+
+/**
+ * Списки получателей — вход в работу со списком материала.
+ *
+ * Отсюда открывается рабочее место: таблица участников, проверка, выпуск
+ * файлов и выгрузка. Раньше попасть туда можно было только с главной или
+ * по прямой ссылке — в самой «Рассылке» списка материалов не было, и работа
+ * со списком выглядела чем-то, что живёт где-то в другом месте.
+ */
+function Lists({ documents }: { documents: DocumentSummary[] }) {
+  if (documents.length === 0) {
+    return (
+      <p className="text-sm text-[var(--text-muted)]">
+        Материалов пока нет.{' '}
+        <Link to="/documents" className="text-[var(--accent)] hover:underline">
+          Создайте первый
+        </Link>
+        .
+      </p>
+    );
+  }
+
+  return (
+    <ul className="divide-y divide-[var(--line)] overflow-hidden rounded-2xl bg-[var(--surface)] ring-1 ring-[var(--line)]">
+      {documents.map((doc) => (
+        <li key={doc.id}>
+          <Link
+            to={workspacePath(doc.id)}
+            className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-[var(--surface-sunken)]"
+          >
+            <span className="min-w-0 flex-1">
+              <span className="block truncate">{doc.title}</span>
+              <span className="mt-0.5 block text-sm text-[var(--text-muted)]">
+                {documentLine(doc)}
+              </span>
+            </span>
+            <ChevronRight size={16} className="shrink-0 text-[var(--text-muted)]" />
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
 }
 

@@ -1,8 +1,9 @@
 import { FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { FileText, Plus, Search, Trash2 } from 'lucide-react';
+import { Archive, FileText, Plus, Search } from 'lucide-react';
 import { UsageBar } from '../documents/UsageBar';
+import { LibraryLayout } from '../documents/LibraryNav';
 import {
   DOCUMENT_CATEGORIES,
   TRASH_DAYS,
@@ -25,8 +26,12 @@ import { LibraryFilters, type LibrarySort } from '../documents/LibraryFilters';
  * и не знал, с чего начать. Теперь первое, что он видит, — готовые заготовки,
  * из которых материал делается в одно нажатие, а свои материалы разложены
  * по разделам и ищутся поиском.
+ *
+ * Рабочие и архив — одна страница с двумя адресами, а не переключатель:
+ * колонка слева показывает оба списка сразу, и удалённое больше не нужно
+ * помнить, чтобы найти.
  */
-export function DocumentsPage() {
+export function DocumentsPage({ archived = false }: { archived?: boolean }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
@@ -38,7 +43,8 @@ export function DocumentsPage() {
   const [size, setSize] = useState<PageSizeValue>({ widthMm: 297, heightMm: 210 });
   const [scratch, setScratch] = useState(false);
 
-  const [trash, setTrash] = useState(false);
+  // Какой список смотрим — решает адрес, а не состояние страницы.
+  const trash = archived;
 
   const documents = useQuery({
     queryKey: ['documents', search, trash, category, sort],
@@ -50,7 +56,7 @@ export function DocumentsPage() {
       ),
   });
 
-  // Счётчик корзины нужен и когда мы её не смотрим: иначе про удалённое
+  // Счётчик архива нужен и когда мы его не смотрим: иначе про удалённое
   // просто забывают, а оно через неделю исчезает насовсем.
   const trashCount = useQuery({
     queryKey: ['documents-trash-count'],
@@ -83,7 +89,7 @@ export function DocumentsPage() {
     },
   });
 
-  /** После любого действия обновляем и список, и счётчик корзины. */
+  /** После любого действия обновляем и список, и счётчик архива. */
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ['documents'] });
     void qc.invalidateQueries({ queryKey: ['documents-trash-count'] });
@@ -138,7 +144,7 @@ export function DocumentsPage() {
   const showGallery = !trash && !scratch;
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-8">
+    <LibraryLayout archiveCount={trashCount.data}>
       {/* Остаток пробы — до всего остального: человек должен знать,
             сколько у него есть, ещё до того как начнёт награждение,
             а не упереться в предел на сорок седьмом документе. */}
@@ -146,7 +152,7 @@ export function DocumentsPage() {
 
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">{trash ? 'Корзина' : 'Материалы'}</h1>
+          <h1 className="text-2xl font-semibold">{trash ? 'Архив' : 'Рабочие'}</h1>
           <p className="mt-1 text-sm text-[var(--text-muted)]">
             {trash ? (
               <>Удалённое хранится {TRASH_DAYS} дней, потом стирается насовсем</>
@@ -169,23 +175,6 @@ export function DocumentsPage() {
           />
         </div>
       </div>
-
-      {/* Переключатель, а не отдельная страница: корзина — тот же список,
-            и человеку не надо гадать, где искать выброшенное. Показываем
-            только когда в ней что-то есть, чтобы не занимать место зря. */}
-      {(trash || (trashCount.data ?? 0) > 0) && (
-        <div className="mb-4 flex gap-1 rounded-lg bg-[var(--surface-sunken)] p-0.5">
-          <ListTab active={!trash} onClick={() => setTrash(false)}>
-            Материалы
-          </ListTab>
-          <ListTab active={trash} onClick={() => setTrash(true)}>
-            <Trash2 size={14} /> Корзина
-            {(trashCount.data ?? 0) > 0 && (
-              <span className="tabular text-[var(--text-muted)]">{trashCount.data}</span>
-            )}
-          </ListTab>
-        </div>
-      )}
 
       {!trash && (
         <LibraryFilters category={category} onCategory={setCategory} sort={sort} onSort={setSort} />
@@ -277,12 +266,12 @@ export function DocumentsPage() {
         <div className="rounded-2xl border border-dashed border-[var(--line-strong)] px-6 py-12 text-center">
           {trash ? (
             <>
-              <Trash2
+              <Archive
                 size={28}
                 className="mx-auto mb-3 text-[var(--text-muted)]"
                 strokeWidth={1.5}
               />
-              <p className="font-medium">Корзина пуста</p>
+              <p className="font-medium">Архив пуст</p>
               <p className="mt-1 text-sm text-[var(--text-muted)]">
                 Удалённые материалы лежат здесь {TRASH_DAYS} дней — успеете передумать
               </p>
@@ -334,32 +323,6 @@ export function DocumentsPage() {
           />
         ))}
       </ul>
-    </main>
-  );
-}
-
-/** Переключатель «Материалы / Корзина». */
-function ListTab({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors ${
-        active
-          ? 'bg-[var(--surface)] font-medium shadow-sm'
-          : 'text-[var(--text-muted)] hover:text-[var(--text)]'
-      }`}
-    >
-      {children}
-    </button>
+    </LibraryLayout>
   );
 }

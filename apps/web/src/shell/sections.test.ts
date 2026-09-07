@@ -8,8 +8,8 @@ import { SECTIONS, activeSection } from './sections';
  */
 
 describe('открытый раздел', () => {
-  it('«Главное» подсвечивается только на самой главной', () => {
-    expect(activeSection('/')).toBe('/');
+  it('главная не считается разделом: она и есть навигация', () => {
+    expect(activeSection('/')).toBeNull();
     expect(activeSection('/documents')).toBe('/documents');
     expect(activeSection('/registry')).toBe('/registry');
     expect(activeSection('/analytics')).toBe('/analytics');
@@ -31,11 +31,12 @@ describe('открытый раздел', () => {
 });
 
 describe('состав навигации', () => {
-  it('семь разделов, настроек среди них нет', () => {
+  it('пять разделов, настроек среди них нет', () => {
+    // Рассылки здесь нет намеренно: в неё ведёт быстрое действие
+    // на главной, и вторая дорога к тому же экрану только раздваивала бы
+    // выбор. Шаблоны — часть «Документов», а не свой раздел.
     expect(SECTIONS.map((s) => s.label)).toEqual([
-      'Главное',
-      'Документы',
-      'Рассылка',
+      'Документы и шаблоны',
       'Реестр',
       'Аналитика',
       'Интеграции',

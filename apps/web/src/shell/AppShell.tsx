@@ -1,39 +1,63 @@
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { Award, LogOut, Receipt, Settings } from 'lucide-react';
+import { Link, Outlet } from 'react-router-dom';
+import { Award, LogOut, PenLine, Receipt, Settings } from 'lucide-react';
 import { useLogout, useMe } from '../auth/useAuth';
+import { useOverview } from '../api/overview';
 import { Button } from '../ui/Button';
 import { InstallHint } from '../ui/InstallHint';
-import { SECTIONS, activeSection } from './sections';
 
 /**
- * Оболочка кабинета: шапка и разделы.
+ * Оболочка кабинета: шапка и возврат на главную.
  *
- * Стоит маршрутом-родителем, а не блоком внутри каждой страницы. Так шапка
- * и навигация не перерисовываются при переходе между разделами — раньше
- * каждая страница рисовала свою шапку, и переход выглядел как перезагрузка.
+ * Разделов в шапке больше нет — они живут на главной. Лента из семи подписей
+ * дублировала главную и при этом ничего о разделах не говорила: на узком
+ * экране она уезжала вбок, и «Реестр» от «Аналитики» отличался только словом.
  *
- * Редактор материала и настройки сюда не входят: у редактора вся высота
- * экрана занята листом, а настройки — отдельная страница со ссылкой назад.
+ * В шапке ровно две группы и обе прижаты к краям окна: возврат на главную
+ * слева, работа с учётной записью справа. Ни хлебных крошек, ни названия
+ * раздела: у разделов есть свои заголовки, и повтор давал третью полосу
+ * подписей подряд.
  */
 export function AppShell() {
   const me = useMe();
   const logout = useLogout();
-  const { pathname } = useLocation();
-  const active = activeSection(pathname);
+
+  // Куда ведёт «Редактор». Правят почти всегда последний материал — тот же,
+  // что открыт в работе. Материалов нет — ведём в «Документы», там создают.
+  const overview = useOverview();
+  const latest = overview.data?.documents[0];
+  const editorPath = latest ? `/documents/${latest.id}` : '/documents';
 
   return (
     <div className="flex min-h-full flex-col">
       <header className="sticky top-0 z-20 border-b border-[var(--line)] bg-[var(--surface)]">
-        <div className="mx-auto flex max-w-5xl items-center gap-3 px-6 py-3">
-          <Link to="/" className="flex items-center gap-3" aria-label="Вручай, рабочий стол">
+        {/* Во всю ширину окна, а не колонкой по центру: шапка — рама экрана,
+            и на ноутбуке её края должны совпадать с краями экрана. */}
+        <div className="flex items-center gap-3 px-6 py-3">
+          {/* Возврат на главную — левый верхний угол, кнопкой. */}
+          <Link
+            to="/"
+            className="flex items-center gap-2.5 rounded-lg py-1 pr-3 pl-1 transition-colors hover:bg-[var(--surface-sunken)]"
+          >
             <span className="grid h-8 w-8 place-items-center rounded-lg bg-[var(--accent)] text-[var(--accent-contrast)]">
               <Award size={17} strokeWidth={1.75} />
             </span>
-            <span className="font-serif text-lg">Вручай</span>
+            <span className="font-medium">Главная</span>
           </Link>
 
           <div className="ml-auto flex items-center gap-3">
-            <span className="hidden text-sm text-[var(--text-muted)] sm:inline">
+            {/* Редактирование остаётся наверху: к листу возвращаются
+                из любого места и по многу раз за день. */}
+            <Link
+              to={editorPath}
+              title="Редактор макета"
+              aria-label="Редактор макета"
+              className="inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
+            >
+              <PenLine size={15} />
+              <span className="hidden sm:inline">Редактор</span>
+            </Link>
+
+            <span className="hidden text-sm text-[var(--text-muted)] lg:inline">
               {me.data?.email}
             </span>
             {/* Счета и заявки — наша собственная бухгалтерия. Клиенту эта
@@ -72,34 +96,6 @@ export function AppShell() {
             </Button>
           </div>
         </div>
-
-        {/* Разделы прокручиваются вбок, а не сжимаются и не прячутся
-            в меню: на телефоне все шесть подписей всё равно не помещаются,
-            а спрятанная навигация на рабочем экране — лишнее нажатие
-            перед каждым переходом. */}
-        <nav
-          aria-label="Разделы кабинета"
-          className="mx-auto max-w-5xl overflow-x-auto px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        >
-          <ul className="flex min-w-max gap-1">
-            {SECTIONS.map((section) => (
-              <li key={section.path}>
-                <NavLink
-                  to={section.path}
-                  aria-current={active === section.path ? 'page' : undefined}
-                  className={`-mb-px flex items-center gap-2 border-b-2 px-3 py-2.5 text-sm transition-colors ${
-                    active === section.path
-                      ? 'border-[var(--accent)] font-medium text-[var(--text)]'
-                      : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text)]'
-                  }`}
-                >
-                  <section.icon size={15} strokeWidth={1.75} />
-                  {section.label}
-                </NavLink>
-              </li>
-            ))}
-          </ul>
-        </nav>
       </header>
 
       {/* Колонка, а не просто блок: страница, которой нужна вся высота окна
