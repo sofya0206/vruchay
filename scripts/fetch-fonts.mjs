@@ -35,6 +35,11 @@ const KEEP_SUBSETS = new Set(['cyrillic', 'cyrillic-ext', 'latin', 'latin-ext'])
  * и их курсивы (в схеме листа есть bold и italic). У рукописных курсива нет —
  * для них запрашиваем только то, что существует, иначе Google Fonts отвечает
  * 400 на весь запрос и семейство пропадает целиком.
+ *
+ * Jost стоит особняком: это шрифт интерфейса, а не макета. Ему нужны
+ * промежуточные насыщенности (500 и 600 — ими набраны кнопки, подписи
+ * и заголовки), и показывать его нужно с подменой, а не с ожиданием, —
+ * см. `display` ниже.
  */
 const FAMILIES = [
   { name: 'PT Sans', query: 'ital,wght@0,400;0,700;1,400;1,700' },
@@ -45,7 +50,23 @@ const FAMILIES = [
   { name: 'Playfair Display', query: 'ital,wght@0,400;0,700;1,400;1,700' },
   { name: 'Caveat', query: 'wght@400;700' },
   { name: 'Marck Script', query: '' },
+  {
+    name: 'Jost',
+    query: 'ital,wght@0,400;0,500;0,600;0,700;1,400',
+    display: 'swap',
+    standalone: true,
+  },
 ];
+
+/*
+ * Отдельный файл с правилами для интерфейсного шрифта — для страниц, которые
+ * сервер отдаёт своей разметкой, минуя сборку кабинета: отписка от рассылки,
+ * подтверждение заявки с чужого сайта. Лежит в корне public, а не в /fonts:
+ * Caddy держит /fonts вечно и с пометкой immutable, что верно для файлов
+ * с хешем в имени, но не для этого — его имя постоянно, а содержимое меняется
+ * вместе со списком начертаний.
+ */
+const STANDALONE_CSS_PATH = join(ROOT, 'apps/web/public/interface-font.css');
 
 /*
  * Google Fonts отдаёт woff2 только современным браузерам — по User-Agent.
@@ -91,12 +112,16 @@ await rm(OUT_DIR, { recursive: true, force: true });
 await mkdir(OUT_DIR, { recursive: true });
 
 const blocks = [];
+// Те же правила, что и в общем файле, но только для семейств с пометкой
+// standalone: их подключают страницы вне сборки кабинета.
+const standaloneBlocks = [];
 let files = 0;
 let bytes = 0;
 
 for (const family of FAMILIES) {
+  const display = family.display ?? 'block';
   const spec = family.query ? `${family.name.replace(/ /g, '+')}:${family.query}` : family.name.replace(/ /g, '+');
-  const css = await get(`https://fonts.googleapis.com/css2?family=${spec}&display=block`);
+  const css = await get(`https://fonts.googleapis.com/css2?family=${spec}&display=${display}`);
   const faces = parseFaces(css).filter((f) => KEEP_SUBSETS.has(f.subset));
 
   if (!faces.length) throw new Error(`Для «${family.name}» не нашлось ни одного подходящего начертания`);
@@ -115,42 +140,61 @@ for (const family of FAMILIES) {
     files += 1;
     bytes += data.length;
 
-    blocks.push(
-      [
-        '@font-face {',
-        `  font-family: '${family.name}';`,
-        `  font-style: ${f.style};`,
-        `  font-weight: ${f.weight};`,
-        /*
-         * block, а не swap: при печати подмена шрифта — это брак в готовом
-         * документе, который никто уже не заметит. Пусть Chromium лучше
-         * подождёт шрифт, чем напечатает не тем.
-         */
-        '  font-display: block;',
-        `  src: url('/fonts/${name}') format('woff2');`,
-        f.unicodeRange ? `  unicode-range: ${f.unicodeRange};` : null,
-        '}',
-      ]
-        .filter(Boolean)
-        .join('\n'),
-    );
+    const block = [
+      '@font-face {',
+      `  font-family: '${family.name}';`,
+      `  font-style: ${f.style};`,
+      `  font-weight: ${f.weight};`,
+      /*
+       * У шрифтов макета block, а не swap: при печати подмена шрифта — это
+       * брак в готовом документе, который никто уже не заметит. Пусть Chromium
+       * лучше подождёт шрифт, чем напечатает не тем. У интерфейсного шрифта
+       * наоборот: печатать нечего, а невидимый текст в кабинете — это пустой
+       * экран на медленной связи.
+       */
+      `  font-display: ${display};`,
+      `  src: url('/fonts/${name}') format('woff2');`,
+      f.unicodeRange ? `  unicode-range: ${f.unicodeRange};` : null,
+      '}',
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    blocks.push(block);
+    if (family.standalone) standaloneBlocks.push(block);
   }
   console.log(`  ✓ ${family.name} — ${faces.length} начертаний`);
 }
 
 const header = `/*
- * Шрифты редактора и печати. Файл создан scripts/fetch-fonts.mjs — правки
- * руками потеряются при следующем запуске, меняйте список в скрипте.
+ * Шрифты интерфейса, редактора и печати. Файл создан scripts/fetch-fonts.mjs —
+ * правки руками потеряются при следующем запуске, меняйте список в скрипте.
  *
  * Подключён из index.css, поэтому действует и в редакторе, и в предпросмотре,
  * и на странице /render, которую открывает Chromium при печати. Одни и те же
  * правила для всех трёх — иначе PDF отличался бы от того, что видел человек.
+ *
+ * Jost здесь — единственный интерфейсный: им набран весь кабинет и посадочная
+ * страница (см. --font-sans в index.css). Остальные семейства выбирает человек
+ * для самого наградного листа.
  *
  * Все семейства — SIL Open Font License 1.1, текст лицензии в OFL.txt.
  */
 `;
 
 await writeFile(CSS_PATH, `${header}\n${blocks.join('\n\n')}\n`);
+
+const standaloneHeader = `/*
+ * Интерфейсный шрифт для страниц вне сборки кабинета — их сервер отдаёт
+ * своей разметкой (отписка от рассылки, подтверждение заявки с чужого сайта).
+ * Файл создан scripts/fetch-fonts.mjs, правки руками потеряются.
+ *
+ * Имя постоянное, без хеша, — поэтому файл лежит в корне public, а не
+ * в /fonts: там Caddy держит содержимое год и с пометкой immutable.
+ */
+`;
+
+await writeFile(STANDALONE_CSS_PATH, `${standaloneHeader}\n${standaloneBlocks.join('\n\n')}\n`);
 
 const license = await get('https://raw.githubusercontent.com/google/fonts/main/ofl/ptsans/OFL.txt').catch(
   () => null,
@@ -159,4 +203,5 @@ if (license) await writeFile(join(OUT_DIR, 'OFL.txt'), license);
 
 console.log(`\n✓ ${files} файлов, ${(bytes / 1024 / 1024).toFixed(1)} МБ → apps/web/public/fonts/`);
 console.log(`✓ правила → apps/web/src/fonts.css`);
+console.log(`✓ правила интерфейсного шрифта → apps/web/public/interface-font.css`);
 if (!license) console.log('⚠ текст лицензии скачать не удалось — положите OFL.txt рядом вручную');

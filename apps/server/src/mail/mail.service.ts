@@ -1038,7 +1038,7 @@ export class MailService {
       from: { email: sender.email, name: sender.displayName },
       to,
       subject,
-      html: `<pre style="font:14px/1.5 system-ui;white-space:pre-wrap">${escapeHtml(body)}</pre>`,
+      html: `<pre style="font:14px/1.5 Jost,system-ui;white-space:pre-wrap">${escapeHtml(body)}</pre>`,
     });
   }
 

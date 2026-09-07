@@ -45,10 +45,15 @@
         place-items: center;
         animation: splash-beat 1.8s ease-in-out infinite;
       }
+      /*
+        Гарнитура та же, что и во всём интерфейсе, но с системным запасным
+        вариантом: заставка рисуется до того, как приложение подключит свои
+        стили, и на первой отрисовке Jost может быть ещё не загружен.
+      */
       #splash .word {
         margin-top: 18px;
         text-align: center;
-        font: 500 15px/1.4 ui-sans-serif, system-ui, -apple-system, sans-serif;
+        font: 500 15px/1.4 'Jost', ui-sans-serif, system-ui, -apple-system, sans-serif;
         color: #5f6b64;
       }
       @keyframes splash-in {

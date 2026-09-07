@@ -86,9 +86,12 @@ function page(title: string, body: string): string {
     '<meta name="viewport" content="width=device-width, initial-scale=1">' +
     '<meta name="robots" content="noindex">' +
     `<title>${escapeHtml(title)} — Вручай</title>` +
+    // Шрифт интерфейса. Файл собирает scripts/fetch-fonts.mjs и раздаёт тот же
+    // домен, что и кабинет: страница живёт под /api, а не на стороннем адресе.
+    '<link rel="stylesheet" href="/interface-font.css">' +
     '<style>' +
     'body{margin:0;padding:48px 20px;background:#f6f5f1;color:#1a1a1a;' +
-    "font:16px/1.6 system-ui,-apple-system,'Segoe UI',sans-serif}" +
+    "font:16px/1.6 'Jost',system-ui,-apple-system,'Segoe UI',sans-serif}" +
     'main{max-width:32rem;margin:0 auto;background:#fff;border-radius:16px;padding:32px}' +
     'h1{font-size:22px;margin:0 0 16px}' +
     'p{margin:0 0 12px}' +

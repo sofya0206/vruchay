@@ -46,8 +46,9 @@ const submitBody = new ZodValidationPipe(submitSchema);
 function linkPage(title: string, text: string): string {
   return `<!doctype html><html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title>
+<link rel="stylesheet" href="/interface-font.css">
 <style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#fbfaf7;
-font-family:system-ui,-apple-system,sans-serif;color:#16211c}
+font-family:'Jost',system-ui,-apple-system,sans-serif;color:#16211c}
 .c{max-width:380px;padding:28px;text-align:center}h1{font-size:20px;margin:0 0 8px}
 p{font-size:15px;color:#5f6b64;line-height:1.45;margin:0}</style></head>
 <body><div class="c"><h1>${title}</h1><p>${text}</p></div></body></html>`;
