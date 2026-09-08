@@ -27,10 +27,11 @@ export function QuickActions() {
   return (
     <section>
       <GroupTitle>Мои документы</GroupTitle>
-      {/* Три плитки в одной рамке, а не три отдельные карточки: это один
-          путь из трёх шагов, и разрезать его на три коробки значит
-          показать три несвязанных предложения. */}
-      <ul className="grid overflow-hidden rounded-[var(--radius-card)] bg-[var(--surface)] shadow-[var(--ring-line)] sm:grid-cols-3">
+      {/* Три плитки на одной подложке, а не три отдельные карточки: это
+          один путь из трёх шагов, и разрезать его на три коробки значит
+          показать три несвязанных предложения. Обводки у подложки нет —
+          её держит сама плоскость, а линия делала из блока коробку. */}
+      <ul className="grid overflow-hidden rounded-[var(--radius-card)] bg-[var(--surface)] sm:grid-cols-3">
         <BigTile
           icon={Plus}
           num="1"

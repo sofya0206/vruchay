@@ -7,7 +7,20 @@
     <meta name="theme-color" content="#10150F" media="(prefers-color-scheme: dark)" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Вручай" />
-    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <!--
+      Значка во вкладке нет: там остаётся одно слово.
+
+      Пустой `data:` вместо простого отсутствия ссылки — не причуда.
+      Без ссылки браузер идёт за `/favicon.ico` сам и, не найдя его,
+      достаёт из кеша прежний значок; пустая ссылка говорит «значка нет»
+      прямо и перебивает кеш.
+
+      Иконка приложения при этом на месте: она объявлена в манифесте
+      (vite.config.ts) и показывается на домашнем экране и в списке
+      установленных — там значок нужен, это единственное, чем приложение
+      себя называет.
+    -->
+    <link rel="icon" href="data:," />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>Вручай</title>
 

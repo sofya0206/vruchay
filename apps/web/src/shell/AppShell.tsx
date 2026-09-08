@@ -5,7 +5,6 @@ import { useLogout, useMe } from '../auth/useAuth';
 import { useOverview } from '../api/overview';
 import { Button } from '../ui/Button';
 import { InstallHint } from '../ui/InstallHint';
-import { MedalMark } from '../ui/MedalMark';
 
 /**
  * Оболочка кабинета: шапка и возврат на главную.
@@ -72,15 +71,14 @@ export function AppShell() {
         {/* Во всю ширину окна, а не колонкой по центру: шапка — рама экрана,
             и на ноутбуке её края должны совпадать с краями экрана. */}
         <div className="flex items-center gap-3 px-6 py-3">
-          {/* Возврат на главную — левый верхний угол, кнопкой. */}
+          {/* Возврат на главную — левый верхний угол, одним словом.
+              Знака здесь нет: шапка не витрина марки, а рабочая полоса,
+              и синий квадрат рядом со словом читался как ещё одна кнопка. */}
           <Link
             to="/"
-            className="flex items-center gap-2.5 rounded-lg py-1 pr-3 pl-1 transition-colors hover:bg-[var(--surface-sunken)]"
+            className="rounded-lg px-2 py-1.5 font-medium transition-colors hover:bg-[var(--surface-sunken)]"
           >
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-[var(--accent)] text-[var(--accent-contrast)]">
-              <MedalMark size={18} />
-            </span>
-            <span className="font-medium">Главная</span>
+            Главная
           </Link>
 
           <div className="ml-auto flex items-center gap-3">
