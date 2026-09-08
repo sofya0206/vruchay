@@ -1,6 +1,6 @@
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, PenLine, ShieldCheck } from 'lucide-react';
+import { ChevronLeft, CircleHelp, Mail, ListChecks, ShieldCheck, Sparkles, Table2 } from 'lucide-react';
 import { api } from '../api/client';
 import type { DocumentDetail } from '../api/types';
 import { Loading } from '../ui/Loading';
@@ -9,6 +9,9 @@ import { RulesTab } from '../awards/RulesTab';
 import { ValidationScreen } from '../validation/ValidationScreen';
 import { EmailTemplateEditor } from '../mail/EmailTemplateEditor';
 import { VerifyPanel } from '../verify/VerifyPanel';
+import { DocumentChrome } from '../editor/DocumentChrome';
+import { useDocumentFileMenu } from '../editor/DocumentFileMenu';
+import type { MenuDef } from '../editor/MenuBar';
 import { WORKSPACE_TABS, workspaceTab, type WorkspaceTab } from './workspace-tabs';
 
 /**
@@ -23,6 +26,11 @@ import { WORKSPACE_TABS, workspaceTab, type WorkspaceTab } from './workspace-tab
  * Реестра здесь нет намеренно: выданное ищется в общем «Реестре» отбором
  * по материалу, а не отдельной таблицей внутри каждого материала — иначе
  * «найдите грамоту Ивановой» опять означает обойти материалы по очереди.
+ *
+ * Ленты закладок над экраном больше нет: у материала две стороны — лист
+ * и таблица, и переключатель между ними стоит в рамке страницы. Правила,
+ * проверка, письмо и подлинность — не третья и не четвёртая сторона,
+ * а настройки выпуска, и живут они в меню «Данные» над таблицей.
  */
 export function DocumentWorkspacePage() {
   const { id = '' } = useParams();
@@ -34,6 +42,8 @@ export function DocumentWorkspacePage() {
     queryKey: ['document', id],
     queryFn: () => api.get<DocumentDetail>(`/documents/${id}`),
   });
+
+  const fileMenu = useDocumentFileMenu(doc.data);
 
   /*
    * Вкладку держим в адресе, а не в состоянии.
@@ -51,59 +61,70 @@ export function DocumentWorkspacePage() {
 
   const page = doc.data;
 
+  if (tab === 'table') {
+    return (
+      <RecipientsTable
+        doc={page}
+        onOpen={open}
+        onGoToRegistry={() => navigate(`/registry?documentId=${encodeURIComponent(id)}`)}
+      />
+    );
+  }
+
+  /* Настройки выпуска: у каждой своя страница, рамка у всех одна. */
+  const menus: MenuDef[] = [
+    { id: 'file', label: 'Файл', entries: fileMenu.entries },
+    {
+      id: 'data',
+      label: 'Данные',
+      entries: [
+        { icon: <Table2 size={16} />, label: 'Вернуться к таблице', onSelect: () => open('table') },
+        { separator: true },
+        { icon: <Sparkles size={16} />, label: 'Правила награждения', onSelect: () => open('rules') },
+        { icon: <ListChecks size={16} />, label: 'Проверить строки', onSelect: () => open('check') },
+        { icon: <Mail size={16} />, label: 'Письмо участнику', onSelect: () => open('mail') },
+        {
+          icon: <ShieldCheck size={16} />,
+          label: 'Подлинность документа',
+          onSelect: () => open('verify'),
+        },
+      ],
+    },
+    {
+      id: 'help',
+      label: 'Справка',
+      entries: [
+        {
+          icon: <CircleHelp size={16} />,
+          label: 'Показать справку',
+          onSelect: () => navigate('/docs'),
+        },
+      ],
+    },
+  ];
+
+  const title = WORKSPACE_TABS.find((t) => t.id === tab)?.label ?? '';
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <header className="border-b border-[var(--line)] bg-[var(--surface)] px-6 py-3">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-3">
-          <Link
-            to="/mailing"
-            className="flex items-center gap-1.5 text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--text)]"
-          >
-            <ChevronLeft size={16} />
-            Рассылка
-          </Link>
+    <div className="flex h-full min-h-0 flex-col">
+      <DocumentChrome documentId={id} title={page.title} menus={menus} view="table" />
 
-          <h1 className="font-serif text-lg">{page.title}</h1>
-
-          <div className="ml-auto flex items-center gap-2">
-            {/* Обратная дорога к листу. Нужна ровно тогда, когда проверка
-                показала, что фамилия не влезает в блок: чинится это
-                в макете, а не в таблице. */}
-            <Link
-              to={`/documents/${id}`}
-              className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
-            >
-              <PenLine size={15} />
-              Правка макета
-            </Link>
-            <Link
-              to={`/registry?documentId=${encodeURIComponent(id)}`}
-              className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
-            >
-              <ShieldCheck size={15} />
-              Выданное
-            </Link>
-          </div>
-        </div>
-
-        <div className="mx-auto mt-2 flex max-w-5xl gap-1">
-          {WORKSPACE_TABS.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => open(item.id)}
-              aria-current={tab === item.id}
-              className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${
-                tab === item.id
-                  ? 'bg-[var(--accent-soft)] font-medium text-[var(--accent)]'
-                  : 'text-[var(--text-muted)] hover:bg-[var(--surface-sunken)]'
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-      </header>
+      {/* Где человек находится и как вернуться — одной строкой. Заменяет
+          ленту закладок: у настроек выпуска один вход, из таблицы. */}
+      <div className="flex shrink-0 items-center gap-2 border-b border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-sm">
+        <button
+          type="button"
+          onClick={() => open('table')}
+          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
+        >
+          <ChevronLeft size={15} />
+          Таблица
+        </button>
+        <span aria-hidden className="text-[var(--line-strong)]">
+          /
+        </span>
+        <span className="font-medium">{title}</span>
+      </div>
 
       {tab === 'rules' ? (
         <RulesTab documentId={id} ruleSetId={page.ruleSetId ?? null} />
@@ -113,18 +134,13 @@ export function DocumentWorkspacePage() {
         <div className="min-h-0 flex-1 overflow-auto">
           <EmailTemplateEditor documentId={id} />
         </div>
-      ) : tab === 'verify' ? (
+      ) : (
         <div className="min-h-0 flex-1 overflow-auto">
           <VerifyPanel doc={page} />
         </div>
-      ) : (
-        <RecipientsTable
-          documentId={id}
-          onGoToMail={() => open('mail')}
-          onGoToCheck={() => open('check')}
-          onGoToRegistry={() => navigate(`/registry?documentId=${encodeURIComponent(id)}`)}
-        />
       )}
+
+      {fileMenu.dialogs}
     </div>
   );
 }

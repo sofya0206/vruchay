@@ -1,17 +1,28 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Ban,
+  CheckCheck,
+  CheckCircle2,
+  CircleHelp,
+  Columns3,
   Download,
   Eye,
+  FileSpreadsheet,
   FileUp,
   ListChecks,
+  ListX,
   LoaderCircle,
+  Mail,
   Play,
   Plus,
+  Rows3,
+  ShieldCheck,
   Sparkles,
+  Table2,
   Trash2,
   X,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import {
   useGeneration,
   useJobFailures,
@@ -25,24 +36,40 @@ import {
 } from '../api/recipients';
 import { PreviewDialog } from './PreviewDialog';
 import { Button } from '../ui/Button';
-import { Input, StatusChip } from '../ui/Field';
+import { Input, Label, StatusChip } from '../ui/Field';
 import { ImportDialog } from './ImportDialog';
 import { planPaste } from './clipboard';
 import { GenerateDialog, type GenerateMode } from './GenerateDialog';
 import { DownloadDialog } from './DownloadDialog';
 import { InviteNudge } from '../referral/InviteNudge';
+import { DocumentChrome, ToolButton, ToolDivider } from '../editor/DocumentChrome';
+import { useDocumentFileMenu } from '../editor/DocumentFileMenu';
+import type { MenuDef } from '../editor/MenuBar';
+import { Dialog } from '../mailing/Dialog';
+import type { DocumentDetail } from '../api/types';
+import type { WorkspaceTab } from '../mailing/workspace-tabs';
 
+/**
+ * Таблица получателей — вторая сторона материала.
+ *
+ * Рамку рисует сама: название, меню и переключатель «Редактор — Таблица»
+ * должны стоять на том же месте, что и над листом, иначе переход между
+ * ними читается как уход в другой раздел. Всё, что относится к списку —
+ * загрузка файла, отметки, выпуск, — живёт в её меню и на её панели.
+ */
 export function RecipientsTable({
-  documentId,
-  onGoToMail,
+  doc,
+  onOpen,
   onGoToRegistry,
-  onGoToCheck,
 }: {
-  documentId: string;
-  onGoToMail: () => void;
+  doc: DocumentDetail;
+  /** Переход к соседнему экрану материала: правила, проверка, письмо. */
+  onOpen: (tab: WorkspaceTab) => void;
   onGoToRegistry: () => void;
-  onGoToCheck: () => void;
 }) {
+  const documentId = doc.id;
+  const navigate = useNavigate();
+  const fileMenu = useDocumentFileMenu(doc);
   const table = useRecipients(documentId);
   const m = useRecipientMutations(documentId);
   const [jobId, setJobId] = useState<string | null>(null);
@@ -61,6 +88,8 @@ export function RecipientsTable({
    */
   const [manualNames, setManualNames] = useState<Record<string, string>>({});
   const [newColumn, setNewColumn] = useState('');
+  /** Открыто ли окно новой колонки: поле переехало из панели в меню «Вставка». */
+  const [addingColumn, setAddingColumn] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState(false);
   const [asking, setAsking] = useState(false);
@@ -96,6 +125,12 @@ export function RecipientsTable({
    * из буфера второй раз не попросишь.
    */
   const parseSource = useRef<File | null>(null);
+
+  /*
+   * Выбор файла спрятан и живёт отдельно от меню: меню закрывается
+   * по нажатию, а системное окно выбора должно открыться уже после этого.
+   */
+  const xlsInput = useRef<HTMLInputElement>(null);
 
   const pendingSaves = useRef<Promise<unknown>>(Promise.resolve());
   const trackSave = (promise: Promise<unknown>) => {
@@ -148,8 +183,16 @@ export function RecipientsTable({
   // другая, а одинаковая шапка там может значить другое.
   useEffect(() => setManualNames({}), [documentId]);
 
-  if (table.isPending) return <p className="p-6 text-[var(--text-muted)]">Загрузка таблицы…</p>;
-  if (!table.data) return <p className="p-6 text-[var(--text-muted)]">Таблица недоступна</p>;
+  /* Во всю высоту: страница рисуется без оболочки кабинета, и короткая
+     строчка на пустом экране читается как сломанная страница. */
+  if (table.isPending)
+    return (
+      <div className="grid h-full place-items-center text-[var(--text-muted)]">Загрузка таблицы…</div>
+    );
+  if (!table.data)
+    return (
+      <div className="grid h-full place-items-center text-[var(--text-muted)]">Таблица недоступна</div>
+    );
 
   const { columns, rows, checkedCount } = table.data;
   const allChecked = rows.length > 0 && rows.every((r) => r.checked);
@@ -232,141 +275,248 @@ export function RecipientsTable({
     }
   }
 
+  /*
+   * Строка меню таблицы.
+   *
+   * «Правка» и «Вид» из настольных редакторов здесь не заведены: отменять
+   * в таблице нечего — ячейка пишется на сервер по уходу из неё, а прятать
+   * колонки сервис не умеет. Пункт, за которым нет действия, хуже
+   * отсутствующего.
+   */
+  const menus: MenuDef[] = [
+    { id: 'file', label: 'Файл', entries: fileMenu.entries },
+    {
+      id: 'insert',
+      label: 'Вставка',
+      entries: [
+        {
+          icon: <Rows3 size={16} />,
+          label: 'Добавить строку',
+          disabled: m.addRow.isPending,
+          onSelect: () => m.addRow.mutate(),
+        },
+        {
+          icon: <Columns3 size={16} />,
+          label: 'Добавить колонку',
+          onSelect: () => setAddingColumn(true),
+        },
+      ],
+    },
+    {
+      id: 'data',
+      label: 'Данные',
+      entries: [
+        {
+          icon: <FileSpreadsheet size={16} />,
+          label: m.parseFile.isPending ? 'Читаем файл…' : 'Загрузить файл XLS',
+          disabled: m.parseFile.isPending,
+          onSelect: () => xlsInput.current?.click(),
+        },
+        { separator: true },
+        {
+          icon: <CheckCircle2 size={16} />,
+          label: 'Отметить все строки',
+          disabled: rows.length === 0,
+          onSelect: () => m.setChecked.mutate({ checked: true }),
+        },
+        {
+          icon: <ListX size={16} />,
+          label: 'Снять отметку со всех строк',
+          disabled: rows.length === 0,
+          onSelect: () => m.setChecked.mutate({ checked: false }),
+        },
+        { separator: true },
+        {
+          icon: <ListChecks size={16} />,
+          label: 'Проверить строки',
+          disabled: checkedCount === 0,
+          onSelect: () => onOpen('check'),
+        },
+        {
+          icon: <Sparkles size={16} />,
+          label: 'Правила награждения',
+          onSelect: () => onOpen('rules'),
+        },
+        {
+          icon: <Mail size={16} />,
+          label: 'Письмо участнику',
+          onSelect: () => onOpen('mail'),
+        },
+        {
+          icon: <ShieldCheck size={16} />,
+          label: 'Подлинность документа',
+          onSelect: () => onOpen('verify'),
+        },
+        { separator: true },
+        {
+          icon: <Table2 size={16} />,
+          label: 'Выданное по материалу',
+          onSelect: onGoToRegistry,
+        },
+      ],
+    },
+    {
+      id: 'help',
+      label: 'Справка',
+      entries: [
+        {
+          icon: <CircleHelp size={16} />,
+          label: 'Показать справку',
+          onSelect: () => navigate('/docs'),
+        },
+      ],
+    },
+  ];
+
+  /*
+   * Панель значков под меню: то, чем пользуются каждый раз, — файл, строка,
+   * колонка, взгляд на будущий документ. Остальное живёт в меню, а справа
+   * стоит состояние выпуска: сколько отмечено и что с пакетом.
+   */
+  const toolbar = (
+    <>
+      <ToolButton
+        title={m.parseFile.isPending ? 'Читаем файл…' : 'Загрузить список из файла'}
+        disabled={m.parseFile.isPending}
+        onClick={() => xlsInput.current?.click()}
+      >
+        {m.parseFile.isPending ? (
+          <LoaderCircle size={16} className="animate-spin" />
+        ) : (
+          <FileUp size={16} />
+        )}
+      </ToolButton>
+      <ToolButton
+        title="Добавить строку"
+        disabled={m.addRow.isPending}
+        onClick={() => m.addRow.mutate()}
+      >
+        <Plus size={16} />
+      </ToolButton>
+      <ToolButton title="Добавить колонку" onClick={() => setAddingColumn(true)}>
+        <Columns3 size={16} />
+      </ToolButton>
+
+      <ToolDivider />
+
+      {/* Посмотреть до выпуска: опечатка в макете, найденная после
+          рассылки пятисот грамот, стоит несравнимо дороже. */}
+      <ToolButton
+        title="Посмотреть будущий документ"
+        disabled={checkedCount === 0}
+        onClick={() => setPreview(true)}
+      >
+        <Eye size={16} />
+      </ToolButton>
+      {/* «Посмотреть» показывает одну грамоту, а бед в списке на триста
+          человек глазами не увидеть: они прячутся в отдельных строках. */}
+      <ToolButton
+        title="Проверить строки"
+        disabled={checkedCount === 0}
+        onClick={() => onOpen('check')}
+      >
+        <ListChecks size={16} />
+      </ToolButton>
+
+      <div className="ml-auto flex items-center gap-2">
+        <span className="tabular text-sm text-[var(--text-muted)]">
+          отмечено {checkedCount} из {rows.length}
+        </span>
+
+        {job && (
+          <StatusChip tone={running ? 'progress' : job.failed || stuck ? 'neutral' : 'done'}>
+            {running ? (
+              <>
+                <LoaderCircle size={13} className="animate-spin" />
+                {job.done} из {job.total}
+              </>
+            ) : stuck ? (
+              <>Выпуск не начался</>
+            ) : job.status === 'canceled' ? (
+              <>Остановлено на {job.done}</>
+            ) : (
+              <>
+                Готово {job.done}
+                {job.failed > 0 && `, ошибок ${job.failed}`}
+              </>
+            )}
+          </StatusChip>
+        )}
+
+        {/* Отменить можно, пока идёт. Пакет на тысячу строк печатается
+            больше часа, и увидеть опечатку в макете на второй минуте —
+            обычное дело: до сих пор оставалось только ждать. */}
+        {running && (
+          <Button
+            size="sm"
+            variant="danger"
+            icon={<Ban size={15} />}
+            disabled={cancel.isPending}
+            onClick={() => void onCancel()}
+          >
+            {cancel.isPending ? 'Останавливаем…' : 'Отменить'}
+          </Button>
+        )}
+
+        {/* Прерванный выпуск доделывается, а не начинается заново:
+            иначе за уже созданные документы пришлось бы платить второй раз. */}
+        {canResume && (
+          <Button
+            size="sm"
+            variant="primary"
+            icon={<Play size={15} />}
+            disabled={resume.isPending}
+            onClick={() => void onResume()}
+          >
+            {resume.isPending ? 'Продолжаем…' : 'Продолжить'}
+          </Button>
+        )}
+
+        {job && job.done > 0 && job.status !== 'queued' && job.status !== 'running' && (
+          <Button size="sm" icon={<Download size={15} />} onClick={() => setDownloading(true)}>
+            Скачать
+          </Button>
+        )}
+      </div>
+    </>
+  );
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex flex-wrap items-center gap-2 border-b border-[var(--line)] bg-[var(--surface)] px-4 py-2.5">
-        <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-[var(--surface)] px-2.5 py-1.5 text-sm ring-1 ring-[var(--line-strong)] transition-colors hover:bg-[var(--surface-sunken)]">
-          <FileUp size={15} />
-          {m.parseFile.isPending ? 'Читаем файл…' : 'Загрузить список'}
-          <input
-            type="file"
-            accept=".xlsx,.csv,.txt,.tsv"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) void parseInto(file, 'file');
-              e.target.value = '';
-            }}
-          />
-        </label>
-
-        <Button size="sm" icon={<Plus size={15} />} onClick={() => m.addRow.mutate()}>
-          Строка
-        </Button>
-
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (newColumn.trim()) {
-              m.addColumn.mutate(newColumn.trim(), { onSuccess: () => setNewColumn('') });
-            }
-          }}
-          className="flex gap-1"
-        >
-          <Input
-            value={newColumn}
-            onChange={(e) => setNewColumn(e.target.value)}
-            placeholder="новая колонка"
-            className="w-40 font-mono text-sm"
-          />
-          <Button size="sm" type="submit" disabled={!newColumn.trim()}>
-            Добавить
-          </Button>
-        </form>
-
-        <div className="ml-auto flex items-center gap-3">
-          <span className="tabular text-sm text-[var(--text-muted)]">
-            отмечено {checkedCount} из {rows.length}
-          </span>
-
-          {job && (
-            <StatusChip tone={running ? 'progress' : job.failed || stuck ? 'neutral' : 'done'}>
-              {running ? (
-                <>
-                  <LoaderCircle size={13} className="animate-spin" />
-                  {job.done} из {job.total}
-                </>
-              ) : stuck ? (
-                <>Выпуск не начался</>
-              ) : job.status === 'canceled' ? (
-                <>Остановлено на {job.done}</>
-              ) : (
-                <>
-                  Готово {job.done}
-                  {job.failed > 0 && `, ошибок ${job.failed}`}
-                </>
-              )}
-            </StatusChip>
-          )}
-
-          {/* Отменить можно, пока идёт. Пакет на тысячу строк печатается
-              больше часа, и увидеть опечатку в макете на второй минуте —
-              обычное дело: до сих пор оставалось только ждать. */}
-          {running && (
-            <Button
-              size="sm"
-              variant="danger"
-              icon={<Ban size={15} />}
-              disabled={cancel.isPending}
-              onClick={() => void onCancel()}
-            >
-              {cancel.isPending ? 'Останавливаем…' : 'Отменить'}
-            </Button>
-          )}
-
-          {/* Прерванный выпуск доделывается, а не начинается заново:
-              иначе за уже созданные документы пришлось бы платить второй раз. */}
-          {canResume && (
-            <Button
-              size="sm"
-              variant="primary"
-              icon={<Play size={15} />}
-              disabled={resume.isPending}
-              onClick={() => void onResume()}
-            >
-              {resume.isPending ? 'Продолжаем…' : 'Продолжить'}
-            </Button>
-          )}
-
-          {job && job.done > 0 && job.status !== 'queued' && job.status !== 'running' && (
-            <Button size="sm" icon={<Download size={15} />} onClick={() => setDownloading(true)}>
-              Скачать
-            </Button>
-          )}
-
-          {/* Посмотреть до выпуска: опечатка в макете, найденная после
-              рассылки пятисот грамот, стоит несравнимо дороже. */}
-          <Button
-            size="sm"
-            icon={<Eye size={15} />}
-            disabled={checkedCount === 0}
-            onClick={() => setPreview(true)}
-          >
-            Посмотреть
-          </Button>
-
-          {/* «Посмотреть» показывает одну грамоту, а бед в списке на триста
-              человек глазами не увидеть: они прячутся в отдельных строках. */}
-          <Button
-            size="sm"
-            icon={<ListChecks size={15} />}
-            disabled={checkedCount === 0}
-            onClick={onGoToCheck}
-          >
-            Проверить строки
-          </Button>
-
+    /* Во всю высоту окна: страница таблицы рисуется сама по себе, без
+       оболочки кабинета, и высоту ей задать больше некому. */
+    <div className="flex h-full min-h-0 flex-col">
+      <DocumentChrome
+        documentId={documentId}
+        title={doc.title}
+        menus={menus}
+        view="table"
+        toolbar={toolbar}
+        action={
           <Button
             variant="primary"
             size="sm"
-            icon={running ? <LoaderCircle size={15} className="animate-spin" /> : <Sparkles size={15} />}
+            icon={
+              running ? <LoaderCircle size={15} className="animate-spin" /> : <CheckCheck size={15} />
+            }
             disabled={running || checkedCount === 0}
             onClick={() => setAsking(true)}
           >
             {running ? 'Создаём' : `Создать документы ${checkedCount || ''}`}
           </Button>
-        </div>
-      </div>
+        }
+      />
+
+      <input
+        ref={xlsInput}
+        type="file"
+        accept=".xlsx,.csv,.txt,.tsv"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void parseInto(file, 'file');
+          e.target.value = '';
+        }}
+      />
 
       {/* Итог. Формулировка зависит от того, что человек выбрал: сказать
           «созданы, никому не отправлены» тому, кто только что нажал
@@ -518,13 +668,28 @@ export function RecipientsTable({
                 шапку и лишние строки сервис распознает сам. Или скопируйте таблицу
                 в Excel и вставьте сюда через Ctrl+V.
               </p>
+              {/* Кнопка здесь обязательна: на панели значок без подписи,
+                  и на пустом экране по нему не догадаться. */}
+              <div className="mt-4 flex justify-center gap-2">
+                <Button
+                  variant="primary"
+                  icon={<FileSpreadsheet size={15} />}
+                  disabled={m.parseFile.isPending}
+                  onClick={() => xlsInput.current?.click()}
+                >
+                  {m.parseFile.isPending ? 'Читаем файл…' : 'Загрузить файл'}
+                </Button>
+                <Button icon={<Plus size={15} />} onClick={() => m.addRow.mutate()}>
+                  Добавить строку
+                </Button>
+              </div>
             </div>
           </div>
         ) : (
           <table className="w-full border-collapse text-sm">
             <thead className="sticky top-0 z-10 bg-[var(--surface-sunken)]">
               <tr>
-                <th className="w-10 border-b border-[var(--line)] px-3 py-2">
+                <th className="w-10 border-r border-b border-[var(--line)] px-3 py-2">
                   <input
                     type="checkbox"
                     checked={allChecked}
@@ -532,6 +697,12 @@ export function RecipientsTable({
                     aria-label="Отметить все"
                     className="accent-[var(--accent)]"
                   />
+                </th>
+                {/* Номер строки — как в любой таблице: по нему называют место
+                    ошибки («в двенадцатой опечатка»), и без него сверять
+                    список с бумажным протоколом нечем. */}
+                <th className="w-12 border-r border-b border-[var(--line)] px-2 py-2 text-right text-xs font-normal text-[var(--text-muted)]">
+                  №
                 </th>
                 {/* Заголовок — по-человечески, переменная под ним мелким.
                     Раньше колонки назывались «%name» и «%email»: для
@@ -541,7 +712,7 @@ export function RecipientsTable({
                 {columns.map((col) => (
                   <th
                     key={col.id}
-                    className="group border-b border-[var(--line)] px-3 py-2 text-left text-sm font-medium"
+                    className="group border-r border-b border-[var(--line)] px-3 py-2 text-left text-sm font-medium"
                   >
                     <span className="inline-flex items-center gap-1.5">
                       {columnTitle(col)}
@@ -562,9 +733,9 @@ export function RecipientsTable({
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
+              {rows.map((row, index) => (
                 <tr key={row.id} className="group hover:bg-[var(--surface-sunken)]/60">
-                  <td className="border-b border-[var(--line)] px-3 py-1 text-center">
+                  <td className="border-r border-b border-[var(--line)] px-3 py-1 text-center">
                     <input
                       type="checkbox"
                       checked={row.checked}
@@ -575,8 +746,11 @@ export function RecipientsTable({
                       className="accent-[var(--accent)]"
                     />
                   </td>
+                  <td className="tabular border-r border-b border-[var(--line)] px-2 py-1 text-right text-xs text-[var(--text-muted)]">
+                    {index + 1}
+                  </td>
                   {columns.map((col) => (
-                    <td key={col.id} className="border-b border-[var(--line)] p-0">
+                    <td key={col.id} className="border-r border-b border-[var(--line)] p-0">
                       <input
                         defaultValue={row.data[col.name] ?? ''}
                         onBlur={(e) => {
@@ -661,10 +835,65 @@ export function RecipientsTable({
           onConfirm={(mode) => void onGenerate(mode)}
           onGoToMail={() => {
             setAsking(false);
-            onGoToMail();
+            onOpen('mail');
           }}
         />
       )}
+
+      {/* Новая колонка — окном, а не полем на панели: панель под меню
+          рассчитана на значки одного размера, и поле ввода в ней ломало
+          строку каждый раз, когда название было длиннее слова. */}
+      {addingColumn && (
+        <Dialog
+          title="Добавить колонку"
+          onClose={() => setAddingColumn(false)}
+          footer={
+            <>
+              <Button
+                variant="primary"
+                disabled={!newColumn.trim() || m.addColumn.isPending}
+                onClick={() =>
+                  m.addColumn.mutate(newColumn.trim(), {
+                    onSuccess: () => {
+                      setNewColumn('');
+                      setAddingColumn(false);
+                    },
+                  })
+                }
+              >
+                {m.addColumn.isPending ? 'Добавляем…' : 'Добавить'}
+              </Button>
+              <Button variant="ghost" onClick={() => setAddingColumn(false)}>
+                Отмена
+              </Button>
+            </>
+          }
+        >
+          <Label>Имя переменной</Label>
+          <Input
+            autoFocus
+            value={newColumn}
+            onChange={(e) => setNewColumn(e.target.value)}
+            placeholder="team"
+            className="font-mono"
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter' || !newColumn.trim()) return;
+              m.addColumn.mutate(newColumn.trim(), {
+                onSuccess: () => {
+                  setNewColumn('');
+                  setAddingColumn(false);
+                },
+              });
+            }}
+          />
+          <p className="mt-2 text-sm text-[var(--text-muted)]">
+            Так колонка будет называться в макете: напишете на листе %{newColumn.trim() || 'team'} —
+            подставится её значение.
+          </p>
+        </Dialog>
+      )}
+
+      {fileMenu.dialogs}
     </div>
   );
 }
