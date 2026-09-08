@@ -1,22 +1,36 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   Check,
   ChevronLeft,
   ChevronRight,
+  Circle,
+  CircleHelp,
+  CopyPlus,
   Dot,
   Grid3x3,
+  Image as ImageIcon,
+  ImageUp,
   Layers,
+  Link2,
   LoaderCircle,
   Magnet,
+  Minus,
+  Paintbrush,
   Printer,
+  QrCode,
   Redo2,
-  Send,
   SlidersHorizontal,
+  Square,
+  SquareDashed,
   Table2,
+  Trash2,
   TriangleAlert,
+  Type,
   Undo2,
+  Variable,
+  X,
   ZoomIn,
 } from 'lucide-react';
 import type { Editor } from '@tiptap/core';
@@ -31,7 +45,10 @@ import {
   type TextProps,
 } from '@gramota/shared';
 import { InsertMenu, type InsertKind } from '../editor/InsertMenu';
-import { Button } from '../ui/Button';
+import { DocumentChrome, ToolButton, ToolDivider } from '../editor/DocumentChrome';
+import { useDocumentFileMenu } from '../editor/DocumentFileMenu';
+import { SheetTabs } from '../editor/SheetTabs';
+import type { MenuDef } from '../editor/MenuBar';
 import { StatusChip } from '../ui/Field';
 import { api } from '../api/client';
 import { useOrgProfile } from '../api/org';
@@ -116,6 +133,7 @@ type Gesture =
   | (GestureBase & { kind: 'rotate'; id: string; center: { x: number; y: number } })
   | (GestureBase & { kind: 'marquee'; additive: boolean; base: ReadonlySet<string> });
 
+/** Открытая панель справа. `null` — панели нет, лист занимает весь экран. */
 type Panel = 'props' | 'layers' | 'fields';
 
 /**
@@ -137,6 +155,7 @@ type Panel = 'props' | 'layers' | 'fields';
  */
 export function EditorPage() {
   const { id = '' } = useParams();
+  const navigate = useNavigate();
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
@@ -147,7 +166,15 @@ export function EditorPage() {
   const [snapping, setSnapping] = useState(true);
   const [guides, setGuides] = useState<SnapLine[]>([]);
   const [marquee, setMarquee] = useState<Rect | null>(null);
-  const [panel, setPanel] = useState<Panel>('props');
+  /*
+   * Панель справа закрыта, пока не за чем следить.
+   *
+   * На пустом холсте она показывала «Ничего не выбрано» и отъедала треть
+   * ширины у листа — того единственного, ради чего сюда приходят. Открывается
+   * сама, как только выбран блок, и значком на панели — когда нужны поля
+   * или слои.
+   */
+  const [panel, setPanel] = useState<Panel | null>(null);
   const [showSafeArea, setShowSafeArea] = useState(false);
   /** Смена размера листа, ожидающая ответа «что делать с блоками». */
   const [resizeTo, setResizeTo] = useState<{ widthMm: number; heightMm: number } | null>(null);
@@ -192,8 +219,18 @@ export function EditorPage() {
     queryFn: () => api.get<DocumentDetail>(`/documents/${id}`),
   });
 
-  const sheet = doc.data?.sheets[0];
-  useEffect(() => setEventDraft(null), [id]);
+  /*
+   * Какой лист правим. Держим по идентификатору, а не по номеру: после
+   * удаления соседнего листа номер съезжает, и правка ушла бы не в тот лист.
+   * Пока выбора не было — первый; исчезнувший лист тоже откатывает к первому.
+   */
+  const [activeSheetId, setActiveSheetId] = useState<string | null>(null);
+  const sheets = useMemo(() => doc.data?.sheets ?? [], [doc.data]);
+  const sheet = sheets.find((s) => s.id === activeSheetId) ?? sheets[0];
+  useEffect(() => {
+    setEventDraft(null);
+    setActiveSheetId(null);
+  }, [id]);
   const history = useLayoutHistory([]);
   const { reset, beginGesture, endGesture } = history;
 
@@ -263,8 +300,11 @@ export function EditorPage() {
    * «Сохраняем»), и сменится, когда доедет она.
    */
   const save = useMutation({
-    mutationFn: ({ layout }: { layout: unknown; version: number }) =>
-      api.patch(`/documents/${id}/sheets/${sheet!.id}`, { layout }),
+    /* Лист записываем тот, с которого правка снята: пока идентификатор брался
+       из открытого сейчас, отложенное сохранение после перехода на соседний
+       лист записывало бы в него чужой макет. */
+    mutationFn: ({ sheetId, layout }: { sheetId: string; layout: unknown; version: number }) =>
+      api.patch(`/documents/${id}/sheets/${sheetId}`, { layout }),
     onSuccess: (_data, sent) => {
       if (sent.version === latestVersion.current) setSaved('saved');
     },
@@ -310,6 +350,32 @@ export function EditorPage() {
     },
     onError: () => setSaved('error'),
   });
+
+  /* Новый лист сразу открывается: его затем и добавляют, чтобы рисовать. */
+  const addSheet = useMutation({
+    mutationFn: () => api.post<{ id: string }>(`/documents/${id}/sheets`, {}),
+    onSuccess: async (created) => {
+      clearSaveError();
+      await doc.refetch();
+      setSelected(new Set());
+      setActiveSheetId(created.id);
+    },
+    onError: () => setSaved('error'),
+  });
+
+  const deleteSheet = useMutation({
+    mutationFn: (sheetId: string) => api.delete<{ ok: true }>(`/documents/${id}/sheets/${sheetId}`),
+    onSuccess: () => {
+      clearSaveError();
+      setSelected(new Set());
+      setActiveSheetId(null);
+      void doc.refetch();
+    },
+    onError: () => setSaved('error'),
+  });
+
+  /* Действия над материалом целиком — те же, что и над таблицей. */
+  const fileMenu = useDocumentFileMenu(doc.data);
 
   async function onPickBackground(file: File) {
     const size = await readImageSize(file).catch(() => null);
@@ -357,7 +423,7 @@ export function EditorPage() {
     setSaved('dirty');
     const timer = setTimeout(() => {
       setSaved('saving');
-      save.mutate({ layout, version });
+      save.mutate({ sheetId: sheet.id, layout, version });
     }, AUTOSAVE_DELAY_MS);
     return () => clearTimeout(timer);
     // Намеренно следим только за version и sheet: объект мутации пересоздаётся
@@ -412,6 +478,18 @@ export function EditorPage() {
     }
     if (editingId && !ids.has(editingId)) setEditingId(null);
   }, [layout, selected, editingId]);
+
+  /*
+   * Панель свойств открывается сама на первом выделенном блоке — и только
+   * на первом. Закрыл её и щёлкнул по соседнему блоку — она остаётся
+   * закрытой: раз человек её убрал, значит сейчас смотрит на лист.
+   */
+  const hadSelection = useRef(false);
+  useEffect(() => {
+    const has = selected.size > 0;
+    if (has && !hadSelection.current) setPanel((current) => current ?? 'props');
+    hadSelection.current = has;
+  }, [selected]);
 
   const selectedElements = useMemo(
     () => layout.filter((el) => selected.has(el.id)),
@@ -895,57 +973,280 @@ export function EditorPage() {
   const px = (mm: number) => mm * PX_PER_MM * zoom;
   const dataMode = viewMode === 'data';
 
-  return (
-    <div className="flex h-full flex-col">
-      <header className="flex flex-wrap items-center gap-3 border-b border-[var(--line)] bg-[var(--surface)] px-4 py-2.5">
-        <Link
-          to="/documents"
-          className="flex items-center gap-1.5 text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--text)]"
-        >
-          <ChevronLeft size={16} />
-          {/* Именно «Материалы», как называется страница, куда ведёт ссылка. */}
-          Материалы
-        </Link>
+  /** Значок панели работает переключателем: второе нажатие её закрывает. */
+  const togglePanel = (next: Panel) => setPanel((current) => (current === next ? null : next));
 
-        <h1 className="font-serif text-lg">{page.title}</h1>
+  const hasBackground = Boolean(sheet.backgroundFileId);
+  const pickBackground = () => backgroundInput.current?.click();
 
-        <InsertMenu
-          onInsert={addElement}
-          fields={fields}
-          onBackground={() => backgroundInput.current?.click()}
-          backgroundLoading={uploadBackground.isPending}
-          hasBackground={Boolean(sheet.backgroundFileId)}
-        />
+  /*
+   * Строка меню листа.
+   *
+   * Набор тот же, что у любого редактора документов: файл, правка, вставка,
+   * данные, справка. Ничего сверх того, что редактор действительно умеет:
+   * пункт, за которым нет действия, хуже отсутствующего — по нему нажимают
+   * и решают, что сломалось.
+   */
+  const menus: MenuDef[] = [
+    { id: 'file', label: 'Файл', entries: fileMenu.entries },
+    {
+      id: 'edit',
+      label: 'Правка',
+      entries: [
+        {
+          icon: <Undo2 size={16} />,
+          label: 'Отменить',
+          shortcut: 'Ctrl+Z',
+          disabled: !history.canUndo,
+          onSelect: history.undo,
+        },
+        {
+          icon: <Redo2 size={16} />,
+          label: 'Вернуть',
+          shortcut: 'Ctrl+Shift+Z',
+          disabled: !history.canRedo,
+          onSelect: history.redo,
+        },
+        { separator: true },
+        {
+          icon: <SquareDashed size={16} />,
+          label: 'Выделить все блоки',
+          shortcut: 'Ctrl+A',
+          onSelect: () => setSelected(new Set(selectableIds(layout))),
+        },
+        {
+          icon: <CopyPlus size={16} />,
+          label: 'Дублировать блок',
+          shortcut: 'Ctrl+D',
+          disabled: selectedElements.length === 0,
+          onSelect: () => cloneInto(selectedElements),
+        },
+        { separator: true },
+        {
+          icon: <Paintbrush size={16} />,
+          label: 'Скопировать оформление',
+          disabled: !selectedElements.some((el) => el.type === 'text'),
+          onSelect: () => {
+            const source = selectedElements.find((el): el is TextElement => el.type === 'text');
+            if (source) setStyleClipboard(pickTextStyle(source.props));
+          },
+        },
+        {
+          icon: <Paintbrush size={16} />,
+          label: 'Применить оформление',
+          disabled: styleClipboard === null || selected.size === 0,
+          onSelect: () => styleClipboard && patchTextProps(styleClipboard),
+        },
+        { separator: true },
+        {
+          icon: <Trash2 size={16} />,
+          label: 'Удалить блок',
+          shortcut: 'Delete',
+          danger: true,
+          disabled: selected.size === 0,
+          onSelect: removeSelected,
+        },
+      ],
+    },
+    {
+      id: 'insert',
+      label: 'Вставка',
+      entries: [
+        {
+          icon: <ImageIcon size={16} />,
+          label: hasBackground ? 'Заменить бланк' : 'Загрузить бланк',
+          disabled: uploadBackground.isPending,
+          onSelect: pickBackground,
+        },
+        { separator: true },
+        {
+          icon: <Type size={16} />,
+          label: 'Добавить текстовый блок',
+          onSelect: () => addElement({ type: 'text' }),
+        },
+        {
+          icon: <QrCode size={16} />,
+          label: 'Добавить QR-код',
+          onSelect: () => addElement({ type: 'qr' }),
+        },
+        {
+          icon: <Link2 size={16} />,
+          label: 'Добавить ссылку',
+          onSelect: () => addElement({ type: 'link' }),
+        },
+        { separator: true },
+        {
+          icon: <Minus size={16} />,
+          label: 'Добавить линию',
+          onSelect: () => addElement({ type: 'shape', kind: 'line' }),
+        },
+        {
+          icon: <Square size={16} />,
+          label: 'Добавить прямоугольник',
+          onSelect: () => addElement({ type: 'shape', kind: 'rect' }),
+        },
+        {
+          icon: <Circle size={16} />,
+          label: 'Добавить овал',
+          onSelect: () => addElement({ type: 'shape', kind: 'ellipse' }),
+        },
+      ],
+    },
+    {
+      id: 'data',
+      label: 'Данные',
+      entries: [
+        {
+          icon: <Table2 size={16} />,
+          label: 'Открыть таблицу',
+          onSelect: () => navigate(workspacePath(id)),
+        },
+        {
+          icon: <Variable size={16} />,
+          label: 'Поля подстановки',
+          onSelect: () => setPanel('fields'),
+        },
+      ],
+    },
+    {
+      id: 'help',
+      label: 'Справка',
+      entries: [
+        {
+          icon: <CircleHelp size={16} />,
+          label: 'Показать справку',
+          onSelect: () => navigate('/docs'),
+        },
+      ],
+    },
+  ];
 
-        {/* Поле выбора файла спрятано и живёт отдельно от меню: меню
-            закрывается по нажатию, а системное окно выбора должно открыться
-            уже после этого — иначе оно закрылось бы вместе с меню. */}
+  /*
+   * Панель значков под меню — только то, чем пользуются постоянно: отмена,
+   * вставка, панели справа, помощь при расстановке и масштаб. Всё остальное
+   * живёт в меню, где у действия есть слово.
+   */
+  const toolbar = (
+    <>
+      <ToolButton title="Отменить (Ctrl+Z)" onClick={history.undo} disabled={!history.canUndo}>
+        <Undo2 size={16} />
+      </ToolButton>
+      <ToolButton title="Вернуть (Ctrl+Shift+Z)" onClick={history.redo} disabled={!history.canRedo}>
+        <Redo2 size={16} />
+      </ToolButton>
+
+      <ToolDivider />
+
+      <InsertMenu
+        iconOnly
+        onInsert={addElement}
+        fields={fields}
+        onBackground={pickBackground}
+        backgroundLoading={uploadBackground.isPending}
+        hasBackground={hasBackground}
+      />
+      <ToolButton
+        title="Поля подстановки"
+        active={panel === 'fields'}
+        onClick={() => togglePanel('fields')}
+      >
+        <Variable size={16} />
+      </ToolButton>
+      <ToolButton
+        title={hasBackground ? 'Заменить бланк' : 'Загрузить бланк'}
+        onClick={pickBackground}
+        disabled={uploadBackground.isPending}
+      >
+        <ImageUp size={16} />
+      </ToolButton>
+
+      <ToolDivider />
+
+      <ToolButton
+        title="Свойства блока"
+        active={panel === 'props'}
+        onClick={() => togglePanel('props')}
+      >
+        <SlidersHorizontal size={16} />
+      </ToolButton>
+      <ToolButton title="Слои" active={panel === 'layers'} onClick={() => togglePanel('layers')}>
+        <Layers size={16} />
+      </ToolButton>
+
+      <ToolDivider />
+
+      <ToolButton
+        title="Сетка 5 мм и прилипание к ней"
+        active={showGrid}
+        onClick={() => setShowGrid((v) => !v)}
+      >
+        <Grid3x3 size={16} />
+      </ToolButton>
+      <ToolButton
+        title="Прилипание к краям и центрам (Alt — временно выключить)"
+        active={snapping}
+        onClick={() => setSnapping((v) => !v)}
+      >
+        <Magnet size={16} />
+      </ToolButton>
+      <ToolButton
+        title="Безопасные поля печати: обрез 3 мм, поле принтера 5 мм"
+        active={showSafeArea}
+        onClick={() => setShowSafeArea((v) => !v)}
+      >
+        <Printer size={16} />
+      </ToolButton>
+
+      <ToolDivider />
+
+      <div className="flex items-center gap-2 rounded-lg px-2 py-0.5 ring-1 ring-[var(--line)]">
+        <ZoomIn size={15} className="text-[var(--text-muted)]" />
         <input
-          ref={backgroundInput}
-          type="file"
-          accept="image/png,image/jpeg"
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) void onPickBackground(file);
-            e.target.value = '';
-          }}
+          type="range"
+          min={25}
+          max={400}
+          value={Math.round(zoom * 100)}
+          onChange={(e) => setZoom(clamp(Number(e.target.value) / 100, 0.25, 4))}
+          aria-label="Масштаб"
+          className="w-24 accent-[var(--accent)]"
         />
+        <button
+          type="button"
+          onClick={() => zoomTo('fit')}
+          title="Вписать лист в окно. Ещё: Ctrl+колёсико — масштаб, пробел — перетаскивание холста"
+          className="tabular w-11 text-right text-sm text-[var(--text-muted)] hover:text-[var(--text)]"
+        >
+          {Math.round(zoom * 100)}%
+        </button>
+        <span className="flex gap-0.5 text-xs text-[var(--text-muted)]">
+          <button
+            type="button"
+            onClick={() => zoomTo('width')}
+            className="rounded px-1 hover:bg-[var(--surface-sunken)]"
+            title="По ширине"
+          >
+            Ш
+          </button>
+          <button
+            type="button"
+            onClick={() => zoomTo('height')}
+            className="rounded px-1 hover:bg-[var(--surface-sunken)]"
+            title="По высоте"
+          >
+            В
+          </button>
+          <button
+            type="button"
+            onClick={() => zoomTo('actual')}
+            className="rounded px-1 hover:bg-[var(--surface-sunken)]"
+            title="Натуральная величина"
+          >
+            1:1
+          </button>
+        </span>
+      </div>
 
-        {uploadBackground.isError && (
-          <span role="alert" className="text-sm text-[var(--danger)]">
-            {(uploadBackground.error as Error).message}
-          </span>
-        )}
-        {backgroundNote && (
-          <span role="status" className="text-sm text-[var(--text-muted)]">
-            {backgroundNote}{' '}
-            <button type="button" onClick={() => setBackgroundNote(null)} className="underline">
-              понятно
-            </button>
-          </span>
-        )}
-
+      <div className="ml-auto flex items-center gap-2">
         {/* Два взгляда на лист: заготовка с фишками полей и настоящая строка
             таблицы. Второй — чтобы увидеть, как ляжет длинная фамилия, не
             выпуская ничего. */}
@@ -953,108 +1254,117 @@ export function EditorPage() {
           <Segment active={!dataMode} onClick={() => setViewMode('placeholders')}>
             Заготовка
           </Segment>
-          <Segment active={dataMode} onClick={() => setViewMode('data')} disabled={rowCount === 0} title={rowCount === 0 ? 'Список пока пустой' : undefined}>
+          <Segment
+            active={dataMode}
+            onClick={() => setViewMode('data')}
+            disabled={rowCount === 0}
+            title={rowCount === 0 ? 'Список пока пустой' : undefined}
+          >
             Данные строки
           </Segment>
           {dataMode && rowCount > 0 && (
             <span className="tabular flex items-center gap-0.5 pl-1 text-sm text-[var(--text-muted)]">
-              <button type="button" aria-label="Предыдущая строка" onClick={() => setRowIndex((i) => Math.max(0, i - 1))} className="rounded p-0.5 hover:bg-[var(--surface-sunken)]">
+              <button
+                type="button"
+                aria-label="Предыдущая строка"
+                onClick={() => setRowIndex((i) => Math.max(0, i - 1))}
+                className="rounded p-0.5 hover:bg-[var(--surface-sunken)]"
+              >
                 <ChevronLeft size={14} />
               </button>
               {safeRow + 1} / {rowCount}
-              <button type="button" aria-label="Следующая строка" onClick={() => setRowIndex((i) => Math.min(rowCount - 1, i + 1))} className="rounded p-0.5 hover:bg-[var(--surface-sunken)]">
+              <button
+                type="button"
+                aria-label="Следующая строка"
+                onClick={() => setRowIndex((i) => Math.min(rowCount - 1, i + 1))}
+                className="rounded p-0.5 hover:bg-[var(--surface-sunken)]"
+              >
                 <ChevronRight size={14} />
               </button>
             </span>
           )}
         </div>
 
-        <div className="ml-auto flex items-center gap-2">
-          <Button size="sm" variant="ghost" icon={<Undo2 size={15} />} onClick={history.undo} disabled={!history.canUndo} title="Отменить (Ctrl+Z)">
-            Отменить
-          </Button>
-          <Button size="sm" variant="ghost" icon={<Redo2 size={15} />} onClick={history.redo} disabled={!history.canRedo} title="Вернуть (Ctrl+Shift+Z)" aria-label="Вернуть" />
+        <StatusChip
+          tone={
+            saved === 'saved'
+              ? 'done'
+              : saved === 'saving'
+                ? 'progress'
+                : saved === 'error'
+                  ? 'error'
+                  : 'neutral'
+          }
+        >
+          {saved === 'saved' ? (
+            <>
+              <Check size={13} /> Сохранено
+            </>
+          ) : saved === 'saving' ? (
+            <>
+              <LoaderCircle size={13} className="animate-spin" /> Сохраняем
+            </>
+          ) : saved === 'error' ? (
+            <>
+              <TriangleAlert size={13} /> Не удалось сохранить
+            </>
+          ) : (
+            <>
+              <Dot size={13} /> Есть правки
+            </>
+          )}
+        </StatusChip>
+      </div>
+    </>
+  );
 
-          <IconButton active={showGrid} onClick={() => setShowGrid((v) => !v)} title="Сетка 5 мм и прилипание к ней">
-            <Grid3x3 size={15} />
-          </IconButton>
-          <IconButton active={snapping} onClick={() => setSnapping((v) => !v)} title="Прилипание к краям и центрам (Alt — временно выключить)">
-            <Magnet size={15} />
-          </IconButton>
-          <IconButton active={showSafeArea} onClick={() => setShowSafeArea((v) => !v)} title="Безопасные поля печати: обрез 3 мм, поле принтера 5 мм">
-            <Printer size={15} />
-          </IconButton>
+  return (
+    <div className="flex h-full flex-col">
+      <DocumentChrome
+        documentId={id}
+        title={page.title}
+        menus={menus}
+        view="editor"
+        toolbar={toolbar}
+      />
 
-          <div className="flex items-center gap-2 rounded-lg px-2 py-1 ring-1 ring-[var(--line)]">
-            <ZoomIn size={15} className="text-[var(--text-muted)]" />
-            <input
-              type="range"
-              min={25}
-              max={400}
-              value={Math.round(zoom * 100)}
-              onChange={(e) => setZoom(clamp(Number(e.target.value) / 100, 0.25, 4))}
-              aria-label="Масштаб"
-              className="w-24 accent-[var(--accent)]"
-            />
-            <button
-              type="button"
-              onClick={() => zoomTo('fit')}
-              title="Вписать лист в окно. Ещё: Ctrl+колёсико — масштаб, пробел — перетаскивание холста"
-              className="tabular w-11 text-right text-sm text-[var(--text-muted)] hover:text-[var(--text)]"
-            >
-              {Math.round(zoom * 100)}%
-            </button>
-            <span className="flex gap-0.5 text-xs text-[var(--text-muted)]">
-              <button type="button" onClick={() => zoomTo('width')} className="rounded px-1 hover:bg-[var(--surface-sunken)]" title="По ширине">
-                Ш
-              </button>
-              <button type="button" onClick={() => zoomTo('height')} className="rounded px-1 hover:bg-[var(--surface-sunken)]" title="По высоте">
-                В
-              </button>
-              <button type="button" onClick={() => zoomTo('actual')} className="rounded px-1 hover:bg-[var(--surface-sunken)]" title="Натуральная величина">
-                1:1
-              </button>
-            </span>
-          </div>
+      {/* Поле выбора файла спрятано и живёт отдельно от меню: меню
+          закрывается по нажатию, а системное окно выбора должно открыться
+          уже после этого — иначе оно закрылось бы вместе с меню. */}
+      <input
+        ref={backgroundInput}
+        type="file"
+        accept="image/png,image/jpeg"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void onPickBackground(file);
+          e.target.value = '';
+        }}
+      />
 
-          <StatusChip
-            tone={
-              saved === 'saved'
-                ? 'done'
-                : saved === 'saving'
-                  ? 'progress'
-                  : saved === 'error'
-                    ? 'error'
-                    : 'neutral'
-            }
-          >
-            {saved === 'saved' ? (
-              <>
-                <Check size={13} /> Сохранено
-              </>
-            ) : saved === 'saving' ? (
-              <>
-                <LoaderCircle size={13} className="animate-spin" /> Сохраняем
-              </>
-            ) : saved === 'error' ? (
-              <>
-                <TriangleAlert size={13} /> Не удалось сохранить
-              </>
-            ) : (
-              <>
-                <Dot size={13} /> Есть правки
-              </>
-            )}
-          </StatusChip>
-
-          {/* Выход из редактора в работу со списком — одной кнопкой. */}
-          <Link to={workspacePath(id)}>
-            <Button size="sm" variant="primary" icon={<Send size={15} />}>
-              Готово → к рассылке
-            </Button>
-          </Link>
-        </div>
-      </header>
+      {/* Разговор про бланк — строкой под панелью, а не в самой панели:
+          в ряду значков длинная фраза ломала строку и сдвигала всё
+          остальное. */}
+      {uploadBackground.isError && (
+        <p
+          role="alert"
+          className="shrink-0 border-b border-[var(--line)] bg-[var(--danger-soft)] px-4 py-2 text-sm text-[var(--danger)]"
+        >
+          {(uploadBackground.error as Error).message}
+        </p>
+      )}
+      {backgroundNote && (
+        <p
+          role="status"
+          className="shrink-0 border-b border-[var(--line)] bg-[var(--surface-sunken)] px-4 py-2 text-sm text-[var(--text-muted)]"
+        >
+          {backgroundNote}{' '}
+          <button type="button" onClick={() => setBackgroundNote(null)} className="underline">
+            понятно
+          </button>
+        </p>
+      )}
 
       <div className="flex min-h-0 flex-1">
         <div
@@ -1084,7 +1394,7 @@ export function EditorPage() {
                 <p className="font-medium">Лист пока пустой</p>
                 <p className="mt-1 text-sm text-[var(--text-muted)]">
                   Выберите заготовку, чтобы оформить документ, — текст на ней уже расставлен
-                  по листу. Или соберите лист сами: «Вставить» → «Бланк», потом текст.
+                  по листу. Или соберите лист сами: «Вставка» → «Загрузить бланк», потом текст.
                 </p>
                 <Link
                   to="/documents"
@@ -1098,7 +1408,7 @@ export function EditorPage() {
           {sheet.backgroundFileId && layout.length === 0 && (
             <div className="pointer-events-none absolute inset-x-0 top-6 z-10 flex justify-center">
               <p className="rounded-full bg-[var(--surface)] px-4 py-2 text-sm text-[var(--text-muted)] shadow-sm ring-1 ring-[var(--line)]">
-                Бланк на месте. Теперь «Вставить» → «Текст» — и выберите, что подставлять.
+                Бланк на месте. Теперь «Вставка» → «Добавить текстовый блок».
               </p>
             </div>
           )}
@@ -1318,75 +1628,105 @@ export function EditorPage() {
           </div>
         </div>
 
-        <aside className="flex w-80 shrink-0 flex-col border-l border-[var(--line)] bg-[var(--surface)]">
-          <div className="flex border-b border-[var(--line)]">
-            <Tab active={panel === 'props'} onClick={() => setPanel('props')} icon={<SlidersHorizontal size={14} />}>
-              Свойства
-            </Tab>
-            <Tab active={panel === 'fields'} onClick={() => setPanel('fields')} icon={<Table2 size={14} />} badge={matches.length || undefined}>
-              Поля
-            </Tab>
-            <Tab active={panel === 'layers'} onClick={() => setPanel('layers')} icon={<Layers size={14} />}>
-              Слои
-            </Tab>
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-4">
-            {panel === 'props' && (
-              <PropertiesPanel
-                elements={selectedElements}
-                page={pageBox}
-                doc={doc.data}
-                onSaveEvent={(values) => saveEvent.mutate(values)}
-                onEventDraft={setEventDraft}
-                onResizePage={(size) => setResizeTo(size)}
-                onTextProps={patchTextProps}
-                onShapeProps={patchShapeProps}
-                onElement={(patch, commit) => patchElements(selected, (el) => ({ ...el, ...patch }) as SheetElement, commit)}
-                onBox={(elementId, box) => {
-                  const safe = { ...box, w: Math.max(box.w, 5), h: Math.max(box.h, 5) };
-                  updateBoxes({ [elementId]: moveBox(safe, 0, 0, pageBox.w, pageBox.h) }, true);
-                }}
-                onAlign={align}
-                onDistribute={distribute}
-                onGroup={() => {
-                  const groupId = crypto.randomUUID();
-                  patchElements(selected, (el) => ({ ...el, groupId }));
-                }}
-                onUngroup={() => patchElements(selected, (el) => ({ ...el, groupId: null }))}
-                onLayer={(where) => {
-                  let next = layout;
-                  for (const elementId of selected) next = moveLayer(next, elementId, where);
-                  history.setLayout(next);
-                }}
-                onApplyStyleToAll={applyStyleToAll}
-                onCopyStyle={() => {
-                  const source = selectedElements.find((el): el is TextElement => el.type === 'text');
-                  if (source) setStyleClipboard(pickTextStyle(source.props));
-                }}
-                onPasteStyle={() => styleClipboard && patchTextProps(styleClipboard)}
-                hasStyleClipboard={styleClipboard !== null}
-                onDelete={removeSelected}
-              />
-            )}
-            {panel === 'fields' && (
-              <FieldsPanel
-                fields={fields}
-                matches={matches}
-                onInsert={insertField}
-                onAutoMatch={() => history.setLayout(applyMatches(layout, matches))}
-              />
-            )}
-            {panel === 'layers' && (
-              <LayersPanel
-                layout={layout}
-                selected={selected}
-                onSelect={(elementId, additive) => select(elementId, additive)}
-                onChange={(next: SheetLayout) => history.setLayout(next)}
-              />
-            )}
-          </div>
-        </aside>
+        {/* Панели справа нет, пока она не нужна: лист занимает весь экран,
+            как в любом редакторе документов. Открывают её значком на панели
+            или первым выделенным блоком. */}
+        {panel && (
+          <aside className="flex w-80 shrink-0 flex-col border-l border-[var(--line)] bg-[var(--surface)]">
+            <div className="flex border-b border-[var(--line)]">
+              <Tab active={panel === 'props'} onClick={() => setPanel('props')} icon={<SlidersHorizontal size={14} />}>
+                Свойства
+              </Tab>
+              <Tab active={panel === 'fields'} onClick={() => setPanel('fields')} icon={<Table2 size={14} />} badge={matches.length || undefined}>
+                Поля
+              </Tab>
+              <Tab active={panel === 'layers'} onClick={() => setPanel('layers')} icon={<Layers size={14} />}>
+                Слои
+              </Tab>
+              <button
+                type="button"
+                title="Закрыть панель"
+                aria-label="Закрыть панель"
+                onClick={() => setPanel(null)}
+                className="grid w-9 shrink-0 place-items-center border-b-2 border-transparent text-[var(--text-muted)] transition-colors hover:text-[var(--text)]"
+              >
+                <X size={15} />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              {panel === 'props' && (
+                <PropertiesPanel
+                  elements={selectedElements}
+                  page={pageBox}
+                  doc={doc.data}
+                  onSaveEvent={(values) => saveEvent.mutate(values)}
+                  onEventDraft={setEventDraft}
+                  onResizePage={(size) => setResizeTo(size)}
+                  onTextProps={patchTextProps}
+                  onShapeProps={patchShapeProps}
+                  onElement={(patch, commit) => patchElements(selected, (el) => ({ ...el, ...patch }) as SheetElement, commit)}
+                  onBox={(elementId, box) => {
+                    const safe = { ...box, w: Math.max(box.w, 5), h: Math.max(box.h, 5) };
+                    updateBoxes({ [elementId]: moveBox(safe, 0, 0, pageBox.w, pageBox.h) }, true);
+                  }}
+                  onAlign={align}
+                  onDistribute={distribute}
+                  onGroup={() => {
+                    const groupId = crypto.randomUUID();
+                    patchElements(selected, (el) => ({ ...el, groupId }));
+                  }}
+                  onUngroup={() => patchElements(selected, (el) => ({ ...el, groupId: null }))}
+                  onLayer={(where) => {
+                    let next = layout;
+                    for (const elementId of selected) next = moveLayer(next, elementId, where);
+                    history.setLayout(next);
+                  }}
+                  onApplyStyleToAll={applyStyleToAll}
+                  onCopyStyle={() => {
+                    const source = selectedElements.find((el): el is TextElement => el.type === 'text');
+                    if (source) setStyleClipboard(pickTextStyle(source.props));
+                  }}
+                  onPasteStyle={() => styleClipboard && patchTextProps(styleClipboard)}
+                  hasStyleClipboard={styleClipboard !== null}
+                  onDelete={removeSelected}
+                />
+              )}
+              {panel === 'fields' && (
+                <FieldsPanel
+                  fields={fields}
+                  matches={matches}
+                  onInsert={insertField}
+                  onAutoMatch={() => history.setLayout(applyMatches(layout, matches))}
+                />
+              )}
+              {panel === 'layers' && (
+                <LayersPanel
+                  layout={layout}
+                  selected={selected}
+                  onSelect={(elementId, additive) => select(elementId, additive)}
+                  onChange={(next: SheetLayout) => history.setLayout(next)}
+                />
+              )}
+            </div>
+          </aside>
+        )}
       </div>
+
+      {/* Закладки листов — внизу, как в любом редакторе страниц. */}
+      <SheetTabs
+        sheets={sheets}
+        activeId={sheet.id}
+        onSelect={(sheetId) => {
+          setSelected(new Set());
+          setEditingId(null);
+          setActiveSheetId(sheetId);
+        }}
+        onAdd={() => addSheet.mutate()}
+        onDelete={(sheetId) => deleteSheet.mutate(sheetId)}
+        adding={addSheet.isPending}
+      />
+
+      {fileMenu.dialogs}
 
       {resizeTo && (
         <ResizeDialog
@@ -1493,33 +1833,6 @@ function Segment({
       aria-pressed={active}
       className={`rounded-md px-2.5 py-1 text-sm transition-colors disabled:opacity-50 ${
         active ? 'bg-[var(--accent-soft)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text)]'
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function IconButton({
-  active,
-  onClick,
-  title,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      aria-label={title}
-      aria-pressed={active}
-      className={`grid h-8 w-8 place-items-center rounded-lg ring-1 transition-colors ${
-        active ? 'bg-[var(--accent-soft)] text-[var(--accent)] ring-[var(--accent)]/40' : 'text-[var(--text-muted)] ring-[var(--line)] hover:bg-[var(--surface-sunken)]'
       }`}
     >
       {children}

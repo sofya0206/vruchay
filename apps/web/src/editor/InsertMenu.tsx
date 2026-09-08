@@ -33,6 +33,7 @@ export function InsertMenu({
   onBackground,
   backgroundLoading = false,
   hasBackground = false,
+  iconOnly = false,
 }: {
   onInsert: (what: InsertKind) => void;
   /** Что можно подставить: колонки таблицы и то, что подставляет сервис. */
@@ -43,6 +44,13 @@ export function InsertMenu({
   backgroundLoading?: boolean;
   /** Есть ли уже бланк: от этого зависит подсказка первого шага. */
   hasBackground?: boolean;
+  /**
+   * Значком без подписи — для панели под меню.
+   *
+   * Подпись там лишняя: слово «Вставить» уже стоит в строке меню, а панель
+   * рассчитана на значки одного размера.
+   */
+  iconOnly?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [submenu, setSubmenu] = useState<'text' | 'shape' | null>(null);
@@ -87,11 +95,25 @@ export function InsertMenu({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="inline-flex items-center gap-2 rounded-lg bg-[var(--accent)] px-2.5 py-1.5 text-sm text-white transition-opacity hover:opacity-90"
+        title={iconOnly ? 'Вставить блок' : undefined}
+        aria-label={iconOnly ? 'Вставить блок' : undefined}
+        className={
+          iconOnly
+            ? `grid h-8 w-8 place-items-center rounded-lg transition-colors ${
+                open
+                  ? 'bg-[var(--accent-soft)] text-[var(--accent)]'
+                  : 'text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]'
+              }`
+            : 'inline-flex items-center gap-2 rounded-lg bg-[var(--accent)] px-2.5 py-1.5 text-sm text-white transition-opacity hover:opacity-90'
+        }
       >
-        <Plus size={15} />
-        Вставить
-        <ChevronDown size={14} />
+        <Plus size={iconOnly ? 16 : 15} />
+        {!iconOnly && (
+          <>
+            Вставить
+            <ChevronDown size={14} />
+          </>
+        )}
       </button>
 
       {open && (
@@ -99,7 +121,7 @@ export function InsertMenu({
           role="menu"
           // Без overflow-hidden: подменю выезжает вправо за границу меню,
           // и обрезка съедала бы его целиком.
-          className="absolute left-0 top-10 z-20 w-72 rounded-xl bg-[var(--surface)] py-1 shadow-lg ring-1 ring-[var(--line)]"
+          className="absolute left-0 top-full z-20 mt-1 w-72 rounded-xl bg-[var(--surface)] py-1 shadow-lg ring-1 ring-[var(--line)]"
         >
           {/* Бланк первым: это первый шаг работы. */}
           <Item
