@@ -1,87 +1,119 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { ListChecks, Mail, Plus } from 'lucide-react';
-import type { Overview } from '../api/overview';
-import { workspacePath } from '../mailing/workspace-tabs';
+import { FileText, Mail, Plus, type LucideIcon } from 'lucide-react';
+import { protocolTitle } from './format';
+import { useCreateMaterial } from './useCreateMaterial';
+import { CreateVisual, LibraryVisual, MailVisual } from './visuals';
 
 /**
- * Три действия, ради которых сюда заходят.
+ * «Мои документы» — три двери, за которыми вся работа.
  *
- * Каждое ведёт прямо к работе, а не в раздел, откуда до неё ещё идти.
- * Раньше от входа до списка участников было четыре нажатия и одно
- * из них — угадать, что список живёт внутри материала.
+ * Каждая плитка показывает, что внутри, картинкой: лист с подставляемым
+ * именем, полка готовых бланков, журнал писем. Подпись под картинкой
+ * объясняет ровно одну строку — остальное человек уже увидел.
  *
- * Блоков было четыре смысла на три плитки: «загрузить протокол» и «создать
- * материал» заводили один и тот же новый материал и отличались только
- * названием. Осталось создание одно, а освободившееся место занял вход
- * в рассылку — вторая половина дня награждения.
+ * Номера у названий не украшение: это порядок, в котором работу делают
+ * впервые. Собрал документ → нашёл его среди своих → разослал.
  */
-export function QuickActions({ data }: { data: Overview }) {
-  const latest = data.documents[0];
+export function QuickActions() {
+  /*
+   * «Создать документ» заводит материал и открывает лист — то же, что
+   * делает «Редактор» в шапке. Ссылкой на список эта плитка вела туда же,
+   * куда соседняя «Документы и шаблоны», и первая дверь открывалась
+   * в ту же комнату, что вторая.
+   */
+  const create = useCreateMaterial();
 
   return (
-    <ul className="grid gap-4 sm:grid-cols-3">
-      {/* Продолжить последнее: обычно человек возвращается к тому же
-          награждению, что и вчера, — оно и стоит первым. */}
-      <Action
-        to={latest ? workspacePath(latest.id) : '/documents'}
-        icon={<ListChecks size={18} />}
-        title="Выпустить документы по списку"
-        about={
-          latest ? (
-            <>Список участников материала «{latest.title}»: проверить и выпустить</>
-          ) : (
-            'Загрузить участников в материал и выпустить документы'
-          )
-        }
-      />
+    <section>
+      <GroupTitle>Мои документы</GroupTitle>
+      {/* Три плитки в одной рамке, а не три отдельные карточки: это один
+          путь из трёх шагов, и разрезать его на три коробки значит
+          показать три несвязанных предложения. */}
+      <ul className="grid overflow-hidden rounded-[var(--radius-card)] bg-[var(--surface)] shadow-[var(--ring-line)] sm:grid-cols-3">
+        <BigTile
+          icon={Plus}
+          num="1"
+          title="Создать документ"
+          about="Соберите ваш документ, добавьте выгрузку данных из ваших протоколов участников"
+          visual={<CreateVisual />}
+          onClick={() => create.mutate(protocolTitle())}
+          disabled={create.isPending}
+        />
+        <BigTile
+          to="/documents"
+          icon={FileText}
+          num="2"
+          title="Документы и шаблоны"
+          about="Ваши рабочие макеты, архив и шаблоны"
+          visual={<LibraryVisual />}
+        />
+        <BigTile
+          to="/mailing"
+          icon={Mail}
+          num="3"
+          title="Письма"
+          about="Отправьте письма по загруженному списку и отслеживайте статус письма"
+          visual={<MailVisual />}
+        />
+      </ul>
 
-      <Action
-        to="/mailing"
-        icon={<Mail size={18} />}
-        title="Разослать документы"
-        about="Списки получателей и письма"
-      />
-
-      <Action
-        to="/documents"
-        icon={<Plus size={18} />}
-        title="Создать материал"
-        about="Свой бланк, поля и размер листа"
-      />
-    </ul>
+      {create.isError && (
+        <p role="alert" className="mt-3 text-sm text-[var(--danger)]">
+          Не удалось создать документ. Попробуйте ещё раз или начните с «Документов и шаблонов».
+        </p>
+      )}
+    </section>
   );
 }
 
-function Action({
+/** Подпись группы: та же на «Моих документах» и на разделах ниже. */
+export function GroupTitle({ children }: { children: ReactNode }) {
+  return (
+    <h2 className="mb-3 text-[length:var(--text-caption)] font-medium tracking-[.06em] text-[var(--text-muted)] uppercase">
+      {children}
+    </h2>
+  );
+}
+
+function BigTile({
   to,
   onClick,
   disabled,
-  icon,
+  icon: Icon,
+  num,
   title,
   about,
+  visual,
 }: {
   to?: string;
   onClick?: () => void;
   disabled?: boolean;
-  icon: ReactNode;
+  icon: LucideIcon;
+  num: string;
   title: string;
-  about: ReactNode;
+  about: string;
+  visual: ReactNode;
 }) {
   const look =
-    'flex h-full w-full flex-col items-start gap-3 rounded-2xl bg-[var(--surface)] p-6 text-left ' +
-    'ring-1 ring-[var(--line)] transition-colors hover:bg-[var(--accent-soft)] ' +
-    'hover:ring-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-60';
+    'flex h-full w-full flex-col items-start gap-4 p-4 text-left text-[var(--text)] ' +
+    'transition-colors hover:bg-[var(--accent-soft)] disabled:cursor-not-allowed disabled:opacity-60';
 
   const inside = (
     <>
-      <span className="grid h-11 w-11 place-items-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">
-        {icon}
+      <span className="grid h-[236px] w-full place-items-center overflow-hidden rounded-[var(--radius-control)] bg-[var(--surface-sunken)] p-3.5">
+        {visual}
       </span>
-      {/* Подпись прижата к низу плитки: у трёх действий текст разной длины,
-          и без этого заголовки стояли на разной высоте. */}
-      <span className="mt-auto text-lg font-medium">{title}</span>
-      <span className="text-sm text-[var(--text-muted)]">{about}</span>
+      <span className="flex w-full items-center gap-2.5 px-1">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] bg-[var(--accent-soft)] text-[var(--accent)]">
+          <Icon size={16} />
+        </span>
+        <span className="text-[17px] font-medium">{title}</span>
+        <span className="ml-auto grid h-6 w-6 shrink-0 place-items-center rounded-full text-[length:var(--text-caption)] font-medium tabular-nums text-[var(--text-muted)] shadow-[inset_0_0_0_1px_var(--line)]">
+          {num}
+        </span>
+      </span>
+      <span className="px-1 pb-1 text-sm text-[var(--text-muted)]">{about}</span>
     </>
   );
 
