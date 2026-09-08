@@ -1,10 +1,11 @@
 import { useEffect } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Award, LogOut, PenLine, Receipt, Settings } from 'lucide-react';
+import { LogOut, PenLine, Receipt, Settings } from 'lucide-react';
 import { useLogout, useMe } from '../auth/useAuth';
 import { useOverview } from '../api/overview';
 import { Button } from '../ui/Button';
 import { InstallHint } from '../ui/InstallHint';
+import { MedalMark } from '../ui/MedalMark';
 
 /**
  * Оболочка кабинета: шапка и возврат на главную.
@@ -77,7 +78,7 @@ export function AppShell() {
             className="flex items-center gap-2.5 rounded-lg py-1 pr-3 pl-1 transition-colors hover:bg-[var(--surface-sunken)]"
           >
             <span className="grid h-8 w-8 place-items-center rounded-lg bg-[var(--accent)] text-[var(--accent-contrast)]">
-              <Award size={17} strokeWidth={1.75} />
+              <MedalMark size={18} />
             </span>
             <span className="font-medium">Главная</span>
           </Link>
