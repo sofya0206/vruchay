@@ -157,19 +157,30 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
    *
    * Меню карточки закрывает себя само: если бы Esc срабатывал и здесь,
    * одно нажатие закрывало бы меню и вместе с ним выкидывало из папки.
+   *
+   * Разобранное нажатие помечаем `preventDefault`: над разделом стоит
+   * оболочка кабинета, которая по Esc уводит на главную. Без пометки одно
+   * нажатие снимало бы поиск и тут же выбрасывало из раздела совсем.
+   * Когда разбирать нечего — не мешаем: Esc уходит наверх и закрывает
+   * раздел, как и в любом другом.
    */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || document.querySelector('[role="menu"]')) return;
       if (search) {
+        e.preventDefault();
         setSearch('');
         return;
       }
       if (scratch) {
+        e.preventDefault();
         closeScratch();
         return;
       }
-      if (category) navigate('/documents');
+      if (category) {
+        e.preventDefault();
+        navigate('/documents');
+      }
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);

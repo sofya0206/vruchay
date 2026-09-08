@@ -38,6 +38,24 @@
         "VITE_API_TARGET=http://localhost:3877 pnpm --filter @gramota/web exec vite --port 5175 --strictPort"
       ],
       "port": 5175
+    },
+    {
+      "name": "vruchay-wt2-api",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd apps/server && node dist/main.js"
+      ],
+      "port": 3878
+    },
+    {
+      "name": "vruchay-wt2",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "VITE_API_TARGET=http://localhost:3878 pnpm --filter @gramota/web exec vite --port 5176 --strictPort"
+      ],
+      "port": 5176
     }
   ]
 }
