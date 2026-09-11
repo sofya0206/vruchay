@@ -1324,7 +1324,7 @@ export function EditorPage() {
         documentId={id}
         title={page.title}
         menus={menus}
-        view="editor"
+        tab="sheet"
         toolbar={toolbar}
       />
 

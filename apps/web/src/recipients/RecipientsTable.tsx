@@ -489,7 +489,7 @@ export function RecipientsTable({
         documentId={documentId}
         title={doc.title}
         menus={menus}
-        view="table"
+        tab="table"
         toolbar={toolbar}
         action={
           <Button
@@ -501,7 +501,7 @@ export function RecipientsTable({
             disabled={running || checkedCount === 0}
             onClick={() => setAsking(true)}
           >
-            {running ? 'Создаём' : `Создать документы ${checkedCount || ''}`}
+            {running ? 'Выпускаем' : `Выпустить ${checkedCount || ''}`}
           </Button>
         }
       />

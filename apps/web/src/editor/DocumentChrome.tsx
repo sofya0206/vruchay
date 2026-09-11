@@ -1,19 +1,22 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, FileText, Table2 } from 'lucide-react';
-import { useMe } from '../auth/useAuth';
-import { workspacePath } from '../mailing/workspace-tabs';
+import { ArrowLeft, CheckCheck } from 'lucide-react';
+import { MATERIAL_TABS, materialTabPath, workspacePath, type MaterialTab } from '../mailing/workspace-tabs';
 import { MenuBar, type MenuDef } from './MenuBar';
 
 /**
- * Рамка страницы материала: название, строка меню, переключатель «Редактор —
- * Таблица» и панель значков.
+ * Рамка страницы материала: хребет из вкладок и строка меню под ним.
  *
- * Одна на оба экрана. Лист и таблица — две стороны одного материала, и человек
- * ходит между ними десятки раз за вечер: пока рамка у них была разная, каждый
- * переход выглядел уходом в другой раздел, а обратная дорога искалась заново.
- * Теперь при переключении меняется только содержимое под панелью, а название,
- * меню и переключатель стоят на месте.
+ * Одна на все стороны материала. Лист, список, правила, проверка, письмо
+ * и подлинность — не разные разделы, а один материал с разных сторон, и
+ * пока ленты не было, дорога от листа к письму шла через главную: три
+ * нажатия и ни одного очевидного. Теперь при переходе меняется только
+ * содержимое под рамкой.
+ *
+ * Верхний ряд — тонкий, 44 px: над ним стоит такая же по высоте общая
+ * полоса кабинета, и вдвоём они уже забирают у листа заметную часть
+ * экрана. Поэтому здесь нет ни учётной записи, ни значка справки — то и
+ * другое живёт в общей полосе, а справка ещё и в меню «Справка».
  *
  * Ширину не ограничиваем: обе страницы работают во весь экран, и колонка
  * по центру отняла бы у листа поля, а у таблицы — колонки.
@@ -22,26 +25,29 @@ export function DocumentChrome({
   documentId,
   title,
   menus,
-  view,
+  tab,
   toolbar,
   action,
 }: {
   documentId: string;
   title: string;
   menus: MenuDef[];
-  /** Какая сторона материала открыта — она подсвечена в переключателе. */
-  view: 'editor' | 'table';
+  /** Какая сторона материала открыта — она подсвечена в ленте вкладок. */
+  tab: MaterialTab;
   /** Панель значков под меню. Своя у листа и у таблицы. */
   toolbar?: ReactNode;
-  /** Главное действие страницы — справа, у самого края. */
+  /**
+   * Чем «Выпустить» занимается на этой вкладке.
+   *
+   * Выпускать можно только со списка — там отмечают, кому. На остальных
+   * вкладках кнопка остаётся на месте и ведёт к списку: место главного
+   * действия не должно переезжать от вкладки к вкладке.
+   */
   action?: ReactNode;
 }) {
-  const me = useMe();
-  const person = me.data?.name?.trim() || me.data?.email || '';
-
   return (
     <header className="shrink-0 border-b border-[var(--line)] bg-[var(--surface)]">
-      <div className="flex items-start gap-3 px-3 pt-2 pb-1.5">
+      <div className="flex h-11 items-center gap-1 border-b border-[var(--line)] px-2">
         {/* Возврат на главную — стрелкой в левом верхнем углу. Именно
             на главную, а не в список материалов: оттуда человек и пришёл,
             и оттуда же расходятся остальные разделы. */}
@@ -49,83 +55,84 @@ export function DocumentChrome({
           to="/"
           title="На главную"
           aria-label="На главную"
-          className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg text-[var(--accent)] transition-colors hover:bg-[var(--surface-sunken)]"
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[var(--accent)] transition-colors hover:bg-[var(--surface-sunken)]"
         >
-          <ArrowLeft size={19} />
+          <ArrowLeft size={18} />
         </Link>
 
-        <div className="min-w-0">
-          <h1 className="truncate text-xl leading-tight">{title}</h1>
-          <div className="-ml-2 mt-0.5">
-            <MenuBar menus={menus} />
-          </div>
-        </div>
+        {/* Название — коротко и с подсказкой: в ряду с шестью вкладками
+            крупному заголовку места нет, а материал всё равно надо назвать. */}
+        <h1 className="min-w-0 max-w-[26ch] shrink truncate px-1 text-sm font-medium" title={title}>
+          {title}
+        </h1>
 
-        <div className="ml-auto flex shrink-0 items-center gap-2">
-          <div className="flex items-center gap-1 rounded-xl bg-[var(--surface-sunken)] p-1">
-            <ViewLink to={`/documents/${documentId}`} active={view === 'editor'} icon={<FileText size={16} />}>
-              Редактор
-            </ViewLink>
-            <ViewLink to={workspacePath(documentId)} active={view === 'table'} icon={<Table2 size={16} />}>
-              Таблица
-            </ViewLink>
-          </div>
+        <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-[var(--line)]" />
 
-          {/* Справка — там же, где её ищут: у самого правого края, рядом
-              с учётной записью. */}
-          <Link
-            to="/docs"
-            title="Показать справку"
-            aria-label="Показать справку"
-            className="grid h-9 w-9 place-items-center rounded-full bg-[var(--award-soft)] text-sm font-medium text-[var(--award)] transition-opacity hover:opacity-80"
-          >
-            ?
-          </Link>
+        {/* Лента прокручивается внутри себя: страница вбок не едет даже
+            тогда, когда шесть вкладок в ширину не помещаются. */}
+        <nav
+          aria-label="Стороны материала"
+          className="flex min-w-0 flex-1 items-stretch gap-0.5 self-stretch overflow-x-auto"
+        >
+          {MATERIAL_TABS.map((item) => (
+            <SpineTab
+              key={item.id}
+              to={materialTabPath(documentId, item.id)}
+              active={item.id === tab}
+            >
+              {item.label}
+            </SpineTab>
+          ))}
+        </nav>
 
-          {action}
-
-          <Link
-            to="/settings"
-            title={person}
-            aria-label="Учётная запись"
-            className="grid h-9 w-9 place-items-center rounded-full bg-[var(--surface-sunken)] text-sm font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"
-          >
-            {person.slice(0, 1).toUpperCase() || '·'}
-          </Link>
+        <div className="shrink-0 pl-2">
+          {action ?? (
+            <Link
+              to={workspacePath(documentId)}
+              title="Отметить получателей и выпустить документы"
+              className="inline-flex items-center gap-2 rounded-lg bg-[var(--accent)] px-2.5 py-1.5 text-sm font-medium text-[var(--accent-contrast)] transition-colors hover:bg-[var(--accent-hover)]"
+            >
+              <CheckCheck size={15} />
+              Выпустить
+            </Link>
+          )}
         </div>
       </div>
 
-      {toolbar && (
-        <div className="flex flex-wrap items-center gap-1 px-3 pb-1.5" role="toolbar">
-          {toolbar}
-        </div>
-      )}
+      {/* Меню и панель значков — одной строкой, а не двумя: каждая лишняя
+          строка в рамке отнимается у листа. */}
+      <div className="flex flex-wrap items-center gap-1 px-2 py-1">
+        <MenuBar menus={menus} />
+        {toolbar && (
+          <>
+            <ToolDivider />
+            <div className="flex flex-1 flex-wrap items-center gap-1" role="toolbar">
+              {toolbar}
+            </div>
+          </>
+        )}
+      </div>
     </header>
   );
 }
 
-function ViewLink({
-  to,
-  active,
-  icon,
-  children,
-}: {
-  to: string;
-  active: boolean;
-  icon: ReactNode;
-  children: ReactNode;
-}) {
+/**
+ * Вкладка хребта.
+ *
+ * Ссылка, а не кнопка: у каждой стороны материала свой адрес, и его надо
+ * уметь открыть в соседней вкладке браузера и послать коллеге.
+ */
+function SpineTab({ to, active, children }: { to: string; active: boolean; children: ReactNode }) {
   return (
     <Link
       to={to}
       aria-current={active ? 'page' : undefined}
-      className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+      className={`-mb-px inline-flex shrink-0 items-center whitespace-nowrap border-b-2 px-2.5 text-sm transition-colors ${
         active
-          ? 'bg-[var(--accent)] text-[var(--accent-contrast)]'
-          : 'text-[var(--text-muted)] hover:bg-[var(--surface)] hover:text-[var(--text)]'
+          ? 'border-[var(--accent)] font-medium text-[var(--accent)]'
+          : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text)]'
       }`}
     >
-      {icon}
       {children}
     </Link>
   );
