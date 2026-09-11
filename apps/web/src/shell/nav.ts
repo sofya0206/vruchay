@@ -60,7 +60,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: ShieldCheck,
     children: [
       { to: '/registry', label: 'Все выданные' },
-      { to: '/analytics', label: 'Проверки по QR' },
+      { to: '/registry?tab=analytics', label: 'Аналитика' },
     ],
   },
   {

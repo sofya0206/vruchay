@@ -51,7 +51,7 @@ export function AccountMenu() {
         aria-label="Учётная запись"
         title={person}
         onClick={() => setOpen(!open)}
-        className="grid h-10 w-10 place-items-center rounded-full bg-[var(--surface-sunken)] text-base font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"
+        className="grid h-11 w-11 place-items-center rounded-full bg-[var(--surface-sunken)] text-base font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"
       >
         {person.slice(0, 1).toUpperCase() || '·'}
       </button>
@@ -69,7 +69,7 @@ export function AccountMenu() {
             <Settings size={17} strokeWidth={1.75} />
             Настройки
           </Link>
-          <Link role="menuitem" to="/analytics" className={item}>
+          <Link role="menuitem" to="/registry?tab=analytics" className={item}>
             <ChartNoAxesColumn size={17} strokeWidth={1.75} />
             Аналитика
           </Link>

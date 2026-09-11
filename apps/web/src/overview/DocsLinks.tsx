@@ -22,7 +22,7 @@ const LINKS: { to: string; label: string; external?: boolean }[] = [
    * обе ссылки отсюда убрать, иначе раздел будет назван дважды.
    */
   { to: '/billing', label: 'Оплата' },
-  { to: '/analytics', label: 'Аналитика' },
+  { to: '/registry?tab=analytics', label: 'Аналитика' },
   { to: '/docs', label: 'База знаний' },
   { to: '/docs/README', label: 'Документация API' },
   { to: '/settings/support', label: 'Поддержка' },

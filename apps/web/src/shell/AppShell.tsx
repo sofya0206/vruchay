@@ -8,7 +8,7 @@ import { BurgerMenu } from './BurgerMenu';
 import { TopNav } from './TopNav';
 
 /** Высота строки со стрелкой возврата; на главной строки нет. */
-const BACK_ROW = '40px';
+const BACK_ROW = '48px';
 
 /**
  * Оболочка кабинета: полоса разделов сверху — на каждом экране.
@@ -122,7 +122,7 @@ export function AppShell() {
             onClick={() => navigate(-1)}
             title="Назад (Esc)"
             aria-label="Назад"
-            className="grid h-9 w-9 place-items-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
+            className="grid h-11 w-11 place-items-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
           >
             <ArrowLeft size={20} />
           </button>
@@ -159,7 +159,7 @@ function RefreshButton() {
       title="Обновить"
       aria-label="Обновить"
       onClick={() => void qc.invalidateQueries()}
-      className="grid h-10 w-10 place-items-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
+      className="grid h-11 w-11 place-items-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
     >
       <RotateCw size={20} className={fetching ? 'animate-spin' : undefined} />
     </button>

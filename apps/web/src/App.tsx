@@ -19,7 +19,6 @@ import { MailingPage } from './mailing/MailingPage';
 import { DocumentWorkspacePage } from './mailing/DocumentWorkspacePage';
 import { InvoicesPage } from './pages/InvoicesPage';
 import { RegistryPage } from './registry/RegistryPage';
-import { AnalyticsPage } from './analytics/AnalyticsPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { PrivacyPage } from './pages/PrivacyPage';
 import { VerifyDocumentPage } from './pages/VerifyDocumentPage';
@@ -134,7 +133,7 @@ export function App() {
 
         {/* ─────────── МАРШРУТЫ РАЗДЕЛОВ БЛОКА 1 ───────────
             Ветка, которая делает свой раздел, заменяет ЗДЕСЬ одну строку
-            заглушки на свой экран и правит одну строку в shell/sections.ts.
+            заглушки на свой экран и убирает раздел из shell/sections.ts.
             Больше в этом файле менять нечего.
 
               1.3 «Рассылка»  → /mailing
@@ -143,7 +142,9 @@ export function App() {
             Интеграции и Оплата пока никем не заняты — оставлены как есть. */}
         <Route path="/mailing" element={<MailingPage />} />
         <Route path="/registry" element={<RegistryPage />} />
-        <Route path="/analytics" element={<AnalyticsPage />} />
+        {/* Аналитика живёт вкладкой реестра: два входа в одни цифры
+            путали. Старый адрес остаётся рабочим. */}
+        <Route path="/analytics" element={<Navigate to="/registry?tab=analytics" replace />} />
         {/* Интеграции: свой раздел кабинета со списком площадок слева.
             Раньше это был редирект в настройки, из-за чего два раздела
             показывали одно и то же. Список площадок — в
