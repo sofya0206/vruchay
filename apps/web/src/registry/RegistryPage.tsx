@@ -23,6 +23,7 @@ import { RegistryFilters } from './RegistryFilters';
 import { RegistryTable } from './RegistryTable';
 import { DocumentHistory } from './DocumentHistory';
 import { AnalyticsPanel } from './AnalyticsPanel';
+import { AnalyticsPage } from '../analytics/AnalyticsPage';
 import { plural } from './registry-format';
 
 const PAGE_SIZE = 50;
@@ -46,7 +47,24 @@ interface ActionResult {
  * означало открыть каждый материал по очереди и просмотреть глазами.
  */
 export function RegistryPage() {
-  const [tab, setTab] = useState<'registry' | 'analytics'>('registry');
+  /*
+   * Вкладка — в адресе: `?tab=analytics`. Аналитика — не спрятанная
+   * вкладка, а подстраница реестра со своим адресом: на неё ведут
+   * меню учётной записи и главная, а старый `/analytics` сюда
+   * перенаправляет. Отбор при переключении не сбрасывается.
+   */
+  const [search, setSearch] = useSearchParams();
+  const tab: 'registry' | 'analytics' = search.get('tab') === 'analytics' ? 'analytics' : 'registry';
+  const setTab = (next: 'registry' | 'analytics') =>
+    setSearch(
+      (prev) => {
+        const q = new URLSearchParams(prev);
+        if (next === 'analytics') q.set('tab', 'analytics');
+        else q.delete('tab');
+        return q;
+      },
+      { replace: true },
+    );
   /*
    * Отбор из адреса — только начальный.
    *
@@ -55,7 +73,6 @@ export function RegistryPage() {
    * все восемь тысяч выданных документов. Дальше отбор живёт своей
    * жизнью и адрес не трогает.
    */
-  const [search] = useSearchParams();
   const [filters, setFilters] = useState<Filters>(() => filtersFromQuery(search.toString()));
   const [offset, setOffset] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -168,8 +185,13 @@ export function RegistryPage() {
       )}
 
       {tab === 'analytics' ? (
-        <div className="mt-6">
+        <div className="mt-6 space-y-10">
+          {/* Сначала по текущему отбору — за этим сюда и приходят из
+              материала; ниже — по организации целиком: то, что раньше
+              жило отдельной страницей /analytics и было вторым входом
+              в те же цифры. */}
           <AnalyticsPanel filters={filters} active={tab === 'analytics'} />
+          <AnalyticsPage embedded />
         </div>
       ) : (
         <>

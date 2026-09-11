@@ -26,26 +26,33 @@ import { PlatformFunnel } from './PlatformFunnel';
  * устройства, мы не собираем — это перевело бы нас из обработчика
  * по поручению в самостоятельного оператора персональных данных.
  */
-export function AnalyticsPage() {
+export function AnalyticsPage({ embedded = false }: { embedded?: boolean }) {
   const me = useMe();
   const analytics = useOrgAnalytics();
+
+  // Встроенный вид — внутри вкладки реестра: без своей колонки и заголовка
+  // первого уровня, они там уже есть.
+  const Wrap = embedded ? 'section' : 'main';
+  const wrapClass = embedded ? 'space-y-8' : 'mx-auto max-w-5xl space-y-8 px-6 py-8';
+  const Title = embedded ? 'h2' : 'h1';
+  const titleClass = embedded ? 'font-serif text-lg' : 'text-2xl font-semibold';
 
   if (analytics.isPending) return <Loading label="Считаем" />;
   if (analytics.isError || !analytics.data) {
     return (
-      <main className="mx-auto max-w-5xl px-6 py-8">
-        <h1 className="text-2xl font-semibold">Аналитика</h1>
+      <Wrap className={wrapClass}>
+        <Title className={titleClass}>{embedded ? 'По организации' : 'Аналитика'}</Title>
         <p className="mt-2 text-sm text-[var(--text-muted)]">Цифры сейчас не посчитать.</p>
-      </main>
+      </Wrap>
     );
   }
 
   const data = analytics.data;
 
   return (
-    <main className="mx-auto max-w-5xl space-y-8 px-6 py-8">
+    <Wrap className={wrapClass}>
       <header>
-        <h1 className="text-2xl font-semibold">Аналитика</h1>
+        <Title className={titleClass}>{embedded ? 'По организации' : 'Аналитика'}</Title>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
           Что происходит с выданными документами и где спотыкается награждение
         </p>
@@ -57,7 +64,7 @@ export function AnalyticsPage() {
       <Months data={data} />
 
       {me.data?.isPlatform && <PlatformFunnel />}
-    </main>
+    </Wrap>
   );
 }
 

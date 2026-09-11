@@ -1,5 +1,4 @@
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { NavLink, Outlet } from 'react-router-dom';
 import { SETTINGS_SECTIONS } from '../settings/sections';
 
 /**
@@ -8,27 +7,13 @@ import { SETTINGS_SECTIONS } from '../settings/sections';
  * У каждого раздела свой адрес, поэтому ссылку на нужное место можно
  * дать коллеге, а браузер помнит, где человек был. На узком экране меню
  * превращается в ленту сверху — на телефоне колонка съела бы весь экран.
+ *
+ * Своей шапки нет: страница стоит под общей полосой кабинета, и вторая
+ * строка с «назад» над колонкой разделов только отнимала бы высоту.
  */
 export function SettingsPage() {
-  const { pathname } = useLocation();
-  const current = SETTINGS_SECTIONS.find((s) => pathname === `/settings/${s.path}`);
-
   return (
     <div className="min-h-full">
-      <header className="border-b border-[var(--line)] bg-[var(--surface)]">
-        <div className="mx-auto flex max-w-6xl items-center gap-3 px-6 py-3">
-          <Link
-            to="/documents"
-            className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)] hover:text-[var(--text)]"
-          >
-            <ArrowLeft size={16} />К материалам
-          </Link>
-          <span className="ml-auto font-serif text-lg">
-            Настройки{current ? ` · ${current.title}` : ''}
-          </span>
-        </div>
-      </header>
-
       <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-8 md:flex-row">
         <nav aria-label="Разделы настроек" className="md:w-56 md:shrink-0">
           <ul className="flex gap-1 overflow-x-auto md:flex-col md:overflow-visible">

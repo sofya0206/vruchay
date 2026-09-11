@@ -45,3 +45,31 @@ export function workspacePath(documentId: string, tab: WorkspaceTab = 'table'): 
   const base = `/mailing/${encodeURIComponent(documentId)}`;
   return tab === 'table' ? base : `${base}?tab=${tab}`;
 }
+
+/**
+ * Хребет материала — та же лента, но вместе с листом.
+ *
+ * Лист живёт по своему адресу `/documents/:id`, всё остальное — по
+ * `/mailing/:id`, и до сих пор это выглядело как два разных раздела:
+ * из редактора к письму приходилось возвращаться на главную. Одна лента
+ * над обоими экранами склеивает их обратно в один материал, а адреса
+ * остаются прежними — ссылки, разосланные до этого, никуда не ведут мимо.
+ */
+export type MaterialTab = 'sheet' | WorkspaceTab;
+
+export interface MaterialTabInfo {
+  id: MaterialTab;
+  label: string;
+}
+
+export const MATERIAL_TABS: MaterialTabInfo[] = [
+  { id: 'sheet', label: 'Лист' },
+  ...WORKSPACE_TABS,
+];
+
+/** Адрес вкладки материала. Лист — отдельный адрес, остальное — рабочее место. */
+export function materialTabPath(documentId: string, tab: MaterialTab): string {
+  return tab === 'sheet'
+    ? `/documents/${encodeURIComponent(documentId)}`
+    : workspacePath(documentId, tab);
+}
