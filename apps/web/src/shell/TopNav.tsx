@@ -24,7 +24,7 @@ export function TopNav() {
           to={item.to}
           aria-current={active === item.key ? 'page' : undefined}
           className={cn(
-            'inline-flex h-9 items-center rounded-lg px-3 text-[15px] transition-colors',
+            'inline-flex h-10 items-center rounded-lg px-3.5 text-base transition-colors',
             active === item.key
               ? 'bg-[var(--accent-soft)] font-medium text-[var(--accent)]'
               : 'text-[var(--text)] hover:bg-[var(--surface-sunken)]',

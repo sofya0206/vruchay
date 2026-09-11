@@ -44,16 +44,16 @@ export function Tilda() {
 
   return (
     <section className="space-y-4">
-      <h2 className="font-serif text-xl">Интеграция с Tilda</h2>
+      <h2 className="font-serif text-2xl">Интеграция с Tilda</h2>
 
       {!list.isLoading && items.length === 0 && !adding && (
         <>
-          <p className="max-w-2xl text-sm text-[var(--text-muted)]">
+          <p className="max-w-3xl text-[var(--text-muted)]">
             Кнопка «Получить документ» на вашей странице: участник проверяет свои
             данные и получает именной документ на почту. Внутри личного кабинета —
             курса, закрытого раздела — имя и почта подставляются сами.
           </p>
-          <Button variant="primary" onClick={() => setAdding(true)}>
+          <Button variant="primary" size="lg" onClick={() => setAdding(true)}>
             Создать интеграцию
           </Button>
         </>
@@ -81,7 +81,7 @@ export function Tilda() {
       )}
 
       {items.length > 0 && !adding && (
-        <Button icon={<Plus size={16} />} onClick={() => setAdding(true)}>
+        <Button size="lg" icon={<Plus size={18} />} onClick={() => setAdding(true)}>
           Добавить ещё одну интеграцию
         </Button>
       )}
@@ -122,7 +122,7 @@ function CreateForm({
 
   return (
     <Card>
-      <form onSubmit={onSubmit} className="grid gap-3 sm:grid-cols-2">
+      <form onSubmit={onSubmit} className="grid gap-4 sm:grid-cols-2">
         <div>
           <Label>Название</Label>
           <Input
@@ -149,19 +149,19 @@ function CreateForm({
             onChange={(e) => setDomains(e.target.value)}
             placeholder="sca-swimming.com, edu.sca-swimming.com"
           />
-          <p className="mt-1 text-xs text-[var(--text-muted)]">
+          <p className="mt-1.5 text-sm text-[var(--text-muted)]">
             Заявки с других сайтов отклоняются. Поддомены разрешаются вместе с доменом.
           </p>
         </div>
         <div className="flex gap-2 sm:col-span-2">
-          <Button type="submit" variant="primary" disabled={create.isPending}>
+          <Button type="submit" variant="primary" size="lg" disabled={create.isPending}>
             Создать интеграцию
           </Button>
-          <Button type="button" variant="ghost" onClick={onCancel}>
+          <Button type="button" variant="ghost" size="lg" onClick={onCancel}>
             Отмена
           </Button>
         </div>
-        {error && <p className="text-sm text-[var(--danger)] sm:col-span-2">{error}</p>}
+        {error && <p className="text-[var(--danger)] sm:col-span-2">{error}</p>}
       </form>
     </Card>
   );
@@ -202,6 +202,7 @@ function IntegrationBlock({
     <div className="space-y-3">
       <Card>
         <Toggle
+          size="lg"
           checked={integration.active}
           disabled={busy}
           onChange={(v) => save.mutate({ active: v })}
@@ -241,11 +242,11 @@ function IntegrationBlock({
       </FieldCard>
 
       <Card>
-        <div className="rounded-lg bg-[var(--surface-sunken)] px-3 py-2">
-          <span className="block text-xs text-[var(--text-muted)]">Токен</span>
-          <code className="font-mono text-base">{integration.token}</code>
+        <div className="rounded-lg bg-[var(--surface-sunken)] px-4 py-2.5">
+          <span className="block text-sm text-[var(--text-muted)]">Токен</span>
+          <code className="font-mono text-lg">{integration.token}</code>
         </div>
-        <div className="mt-2 flex flex-wrap items-center gap-3">
+        <div className="mt-2.5 flex flex-wrap items-center gap-3">
           <p className="text-sm text-[var(--text-muted)]">
             Токен, который обязательно должен присутствовать в форме.
           </p>
@@ -265,8 +266,8 @@ function IntegrationBlock({
       </FieldCard>
 
       <Card>
-        <h3 className="font-medium">Аутентификация</h3>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
+        <h3 className="text-lg font-medium">Аутентификация</h3>
+        <p className="mt-1.5 max-w-3xl text-sm text-[var(--text-muted)]">
           Форма может быть использована любым посетителем, либо только после
           проверки адреса электронной почты.
         </p>
@@ -293,6 +294,7 @@ function IntegrationBlock({
           {integration.authMode === 'email_code' && (
             <div className="pl-8">
               <Toggle
+                size="lg"
                 checked={integration.checkList}
                 disabled={busy}
                 onChange={(v) => save.mutate({ checkList: v })}
@@ -305,6 +307,7 @@ function IntegrationBlock({
 
         <div className="mt-4 border-t border-[var(--line)] pt-4">
           <Toggle
+            size="lg"
             checked={integration.singleFilePerEmail}
             disabled={busy}
             onChange={(v) => save.mutate({ singleFilePerEmail: v })}
@@ -316,6 +319,7 @@ function IntegrationBlock({
 
       <Card>
         <Toggle
+          size="lg"
           checked={integration.requireAccount}
           disabled={busy}
           onChange={(v) => save.mutate({ requireAccount: v })}
@@ -326,6 +330,7 @@ function IntegrationBlock({
 
       <Card>
         <Toggle
+          size="lg"
           checked={integration.showDownload}
           disabled={busy}
           onChange={(v) => save.mutate({ showDownload: v })}
@@ -336,6 +341,7 @@ function IntegrationBlock({
 
       <Card>
         <Toggle
+          size="lg"
           checked={integration.sendEmail}
           disabled={busy}
           onChange={(v) => save.mutate({ sendEmail: v })}
@@ -371,12 +377,12 @@ function IntegrationBlock({
       </FieldCard>
 
       <Card>
-        <p className="text-sm font-medium">Документы, которые выдаёт эта интеграция</p>
-        <ul className="mt-2 space-y-1.5">
+        <p className="font-medium">Документы, которые выдаёт эта интеграция</p>
+        <ul className="mt-2.5 space-y-2">
           {integration.documentIds.map((id) => (
-            <li key={id} className="flex flex-wrap items-center gap-2 text-sm">
+            <li key={id} className="flex flex-wrap items-center gap-2">
               <span className="text-[var(--text-muted)]">{titles.get(id) ?? 'Документ'}</span>
-              <code className="font-mono text-xs">{id}</code>
+              <code className="font-mono text-sm">{id}</code>
               <CopyButton value={id} label={`Скопировать код документа ${titles.get(id) ?? ''}`} />
             </li>
           ))}
@@ -406,14 +412,14 @@ function IntegrationBlock({
       </Card>
 
       <Card>
-        <p className="text-sm font-medium">Код на страницу с формой</p>
+        <p className="font-medium">Код на страницу с формой</p>
         <EmbedCode
           origin={location.origin}
           token={integration.token}
           documentIds={integration.documentIds}
           titles={titles}
         />
-        <p className="mt-2 text-sm text-[var(--text-muted)]">
+        <p className="mt-2.5 max-w-3xl text-sm text-[var(--text-muted)]">
           Полностью скопируйте код и вставьте на нужные страницы сайта — только
           на те, где есть форма запроса документа, а не на все подряд.
         </p>
@@ -425,28 +431,28 @@ function IntegrationBlock({
       </Card>
 
       <Card>
-        <Button size="sm" variant="ghost" onClick={() => setShowRequests((v) => !v)}>
+        <Button variant="ghost" onClick={() => setShowRequests((v) => !v)}>
           {showRequests ? 'Скрыть заявки' : `Показать заявки (${integration._count?.requests ?? 0})`}
         </Button>
 
         {showRequests && (
           <div className="mt-2 overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="text-xs uppercase text-[var(--text-muted)]">
+            <table className="w-full text-left">
+              <thead className="text-sm uppercase text-[var(--text-muted)]">
                 <tr>
-                  <th className="py-1.5 pr-4 font-medium">Участник</th>
-                  <th className="py-1.5 pr-4 font-medium">Адрес</th>
-                  <th className="py-1.5 pr-4 font-medium">Состояние</th>
-                  <th className="py-1.5 font-medium">Когда</th>
+                  <th className="py-2 pr-4 font-medium">Участник</th>
+                  <th className="py-2 pr-4 font-medium">Адрес</th>
+                  <th className="py-2 pr-4 font-medium">Состояние</th>
+                  <th className="py-2 font-medium">Когда</th>
                 </tr>
               </thead>
               <tbody>
                 {requests.data?.map((r) => (
                   <tr key={r.id} className="border-t border-[var(--line)]">
-                    <td className="py-1.5 pr-4">{r.fields.name ?? '—'}</td>
-                    <td className="py-1.5 pr-4">{r.email}</td>
-                    <td className="py-1.5 pr-4">{requestLabel(r.status)}</td>
-                    <td className="py-1.5 text-[var(--text-muted)]">
+                    <td className="py-2 pr-4">{r.fields.name ?? '—'}</td>
+                    <td className="py-2 pr-4">{r.email}</td>
+                    <td className="py-2 pr-4">{requestLabel(r.status)}</td>
+                    <td className="py-2 text-[var(--text-muted)]">
                       {new Date(r.createdAt).toLocaleString('ru-RU')}
                     </td>
                   </tr>
@@ -467,7 +473,8 @@ function IntegrationBlock({
       <Card>
         <Button
           variant="danger"
-          icon={<Trash2 size={16} />}
+          size="lg"
+          icon={<Trash2 size={18} />}
           onClick={() => remove.mutate()}
           aria-label={`Удалить интеграцию ${integration.name}`}
         >
@@ -543,11 +550,11 @@ function Radio({
         checked={checked}
         disabled={disabled}
         onChange={onSelect}
-        className="mt-1 size-4 shrink-0 accent-[var(--accent)]"
+        className="mt-0.5 size-5 shrink-0 accent-[var(--accent)]"
       />
-      <span>
-        <span className="text-sm">{label}</span>
-        <span className="mt-1 block text-xs text-[var(--text-muted)]">{hint}</span>
+      <span className="max-w-3xl">
+        <span className="block">{label}</span>
+        <span className="mt-1 block text-sm text-[var(--text-muted)]">{hint}</span>
       </span>
     </label>
   );
@@ -559,9 +566,8 @@ function CopyButton({ value, label }: { value: string; label: string }) {
 
   return (
     <Button
-      size="sm"
       variant="ghost"
-      icon={<Copy size={14} />}
+      icon={<Copy size={16} />}
       aria-label={label}
       onClick={() => {
         void navigator.clipboard.writeText(value).then(() => {

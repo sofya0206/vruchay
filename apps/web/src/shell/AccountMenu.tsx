@@ -51,7 +51,7 @@ export function AccountMenu() {
         aria-label="Учётная запись"
         title={person}
         onClick={() => setOpen(!open)}
-        className="grid h-9 w-9 place-items-center rounded-full bg-[var(--surface-sunken)] text-sm font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"
+        className="grid h-10 w-10 place-items-center rounded-full bg-[var(--surface-sunken)] text-base font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"
       >
         {person.slice(0, 1).toUpperCase() || '·'}
       </button>

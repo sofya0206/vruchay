@@ -35,7 +35,7 @@ export function BurgerMenu() {
         aria-label="Разделы"
         aria-expanded={open}
         onClick={() => setOpen(true)}
-        className="grid h-9 w-9 place-items-center rounded-lg text-[var(--text)] transition-colors hover:bg-[var(--surface-sunken)]"
+        className="grid h-10 w-10 place-items-center rounded-lg text-[var(--text)] transition-colors hover:bg-[var(--surface-sunken)]"
       >
         <Menu size={22} strokeWidth={1.75} />
       </button>

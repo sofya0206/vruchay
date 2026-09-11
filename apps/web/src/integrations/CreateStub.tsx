@@ -11,13 +11,13 @@ import { Button } from '../ui/Button';
 export function CreateStub({ title, about }: { title: string; about: string }) {
   return (
     <section>
-      <h2 className="font-serif text-xl">{title}</h2>
-      <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">{about}</p>
+      <h2 className="font-serif text-2xl">{title}</h2>
+      <p className="mt-2.5 max-w-3xl text-[var(--text-muted)]">{about}</p>
 
-      <Button variant="primary" className="mt-5" disabled>
+      <Button variant="primary" size="lg" className="mt-6" disabled>
         Создать интеграцию
       </Button>
-      <p className="mt-2 text-xs text-[var(--text-muted)]">Раздел готовится</p>
+      <p className="mt-2 text-sm text-[var(--text-muted)]">Раздел готовится</p>
     </section>
   );
 }
