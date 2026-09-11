@@ -1,32 +1,21 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import {
-  BookOpen,
-  ChartNoAxesColumn,
-  LogOut,
-  Menu,
-  Receipt,
-  Settings,
-  X,
-} from 'lucide-react';
-import { useLogout, useMe } from '../auth/useAuth';
+import { Menu, X } from 'lucide-react';
 import { cn } from '../ui/cn';
 import { NAV_ITEMS, activeNav } from './nav';
 
 /**
- * Бургер: полное дерево кабинета одним списком.
+ * Разделы на узком экране.
  *
- * На широком экране дублирует полосу — намеренно: сюда приходят те, кто
- * ищет, а не те, кто знает. На узком экране полоса скрыта, и бургер —
- * единственное меню. Служебное (настройки, аналитика, справка, выход)
- * живёт только здесь, чтобы не занимать место в полосе.
+ * Только там: на широком полоса стоит в шапке, и бургер рядом с ней был
+ * бы её зеркалом — два списка из одних и тех же пяти слов, между которыми
+ * человеку незачем выбирать. Служебное здесь тоже не живёт: оно в меню
+ * учётной записи, одинаково на любой ширине.
  */
 export function BurgerMenu() {
   const [open, setOpen] = useState(false);
   const { pathname } = useLocation();
   const active = activeNav(pathname);
-  const me = useMe();
-  const logout = useLogout();
 
   useEffect(() => setOpen(false), [pathname]);
 
@@ -39,64 +28,59 @@ export function BurgerMenu() {
     return () => document.removeEventListener('keydown', onKey);
   }, [open]);
 
-  const link =
-    'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-[var(--surface-sunken)]';
-
   return (
-    <>
+    <div className="md:hidden">
       <button
         type="button"
-        aria-label="Меню"
+        aria-label="Разделы"
         aria-expanded={open}
         onClick={() => setOpen(true)}
         className="grid h-9 w-9 place-items-center rounded-lg text-[var(--text)] transition-colors hover:bg-[var(--surface-sunken)]"
       >
-        <Menu size={20} strokeWidth={1.75} />
+        <Menu size={22} strokeWidth={1.75} />
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-40" role="dialog" aria-label="Меню кабинета">
+        <div className="fixed inset-0 z-40" role="dialog" aria-label="Разделы">
           <button
             type="button"
-            aria-label="Закрыть меню"
+            aria-label="Закрыть"
             onClick={() => setOpen(false)}
             className="absolute inset-0 bg-[var(--scrim)]"
           />
-          <aside className="absolute inset-y-0 right-0 flex w-80 max-w-[88vw] flex-col bg-[var(--surface)] shadow-[var(--shadow-subtle)]">
-            <div className="flex items-center gap-3 border-b border-[var(--line)] px-4 py-3">
-              <span className="min-w-0 flex-1 truncate text-sm text-[var(--text-muted)]">
-                {me.data?.email}
-              </span>
+          <aside className="absolute inset-y-0 left-0 flex w-80 max-w-[88vw] flex-col bg-[var(--surface)] shadow-[var(--shadow-subtle)]">
+            <div className="flex items-center justify-between border-b border-[var(--line)] px-4 py-3">
+              <span className="font-medium">Разделы</span>
               <button
                 type="button"
                 aria-label="Закрыть"
                 onClick={() => setOpen(false)}
                 className="grid h-9 w-9 place-items-center rounded-lg hover:bg-[var(--surface-sunken)]"
               >
-                <X size={18} />
+                <X size={20} />
               </button>
             </div>
 
             <nav className="flex-1 overflow-y-auto p-2">
-              <Group title="Работа">
+              <ul>
                 {NAV_ITEMS.map((item) => (
-                  <li key={item.key}>
+                  <li key={item.key} className="mb-1">
                     <Link
                       to={item.to}
                       className={cn(
-                        link,
+                        'flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-[15px] transition-colors hover:bg-[var(--surface-sunken)]',
                         active === item.key && 'bg-[var(--accent-soft)] font-medium text-[var(--accent)]',
                       )}
                     >
-                      <item.icon size={17} strokeWidth={1.75} />
+                      <item.icon size={18} strokeWidth={1.75} />
                       {item.label}
                     </Link>
-                    <ul className="mb-1 ml-8 border-l border-[var(--line)] pl-2">
+                    <ul className="ml-9 border-l border-[var(--line)] pl-2">
                       {item.children.map((c) => (
                         <li key={c.to}>
                           <Link
                             to={c.to}
-                            className="block rounded-md px-2 py-1 text-sm text-[var(--text-muted)] hover:text-[var(--text)]"
+                            className="block rounded-md px-2 py-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--text)]"
                           >
                             {c.label}
                           </Link>
@@ -105,62 +89,11 @@ export function BurgerMenu() {
                     </ul>
                   </li>
                 ))}
-              </Group>
-
-              <Group title="Служебное">
-                <li>
-                  <Link to="/settings" className={link}>
-                    <Settings size={17} strokeWidth={1.75} />
-                    Настройки
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/analytics" className={link}>
-                    <ChartNoAxesColumn size={17} strokeWidth={1.75} />
-                    Аналитика
-                  </Link>
-                </li>
-                {me.data?.isPlatform && (
-                  <li>
-                    <Link to="/invoices" className={link}>
-                      <Receipt size={17} strokeWidth={1.75} />
-                      Счета и заявки
-                    </Link>
-                  </li>
-                )}
-                <li>
-                  <Link to="/docs" className={link}>
-                    <BookOpen size={17} strokeWidth={1.75} />
-                    База знаний
-                  </Link>
-                </li>
-              </Group>
+              </ul>
             </nav>
-
-            <div className="border-t border-[var(--line)] p-2">
-              <button
-                type="button"
-                onClick={() => logout.mutate()}
-                className={cn(link, 'w-full text-[var(--text-muted)]')}
-              >
-                <LogOut size={17} strokeWidth={1.75} />
-                Выйти
-              </button>
-            </div>
           </aside>
         </div>
       )}
-    </>
-  );
-}
-
-function Group({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="mb-3">
-      <div className="px-3 pb-1 pt-2 text-[length:var(--text-caption)] font-medium uppercase tracking-[.06em] text-[var(--text-muted)]">
-        {title}
-      </div>
-      <ul>{children}</ul>
     </div>
   );
 }

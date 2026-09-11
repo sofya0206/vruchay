@@ -48,7 +48,7 @@ export function TopNav() {
             aria-current={active === item.key ? 'page' : undefined}
             onClick={() => setOpen(open === item.key ? null : item.key)}
             className={cn(
-              'inline-flex h-9 items-center gap-1 rounded-lg px-2.5 text-sm transition-colors',
+              'inline-flex h-9 items-center gap-1 rounded-lg px-3 text-[15px] transition-colors',
               active === item.key
                 ? 'bg-[var(--accent-soft)] font-medium text-[var(--accent)]'
                 : 'text-[var(--text)] hover:bg-[var(--surface-sunken)]',
@@ -74,7 +74,7 @@ function Dropdown({ item, pathname }: { item: NavItem; pathname: string }) {
   return (
     <div
       role="menu"
-      className="absolute left-0 top-full z-30 mt-1 min-w-52 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-1.5 shadow-[var(--shadow-subtle)]"
+      className="absolute left-0 top-full z-30 mt-1 min-w-56 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-1.5 shadow-[var(--shadow-subtle)]"
     >
       {children.map((c) => (
         <Link
@@ -82,7 +82,7 @@ function Dropdown({ item, pathname }: { item: NavItem; pathname: string }) {
           role="menuitem"
           to={c.to}
           className={cn(
-            'block rounded-lg px-2.5 py-1.5 text-sm transition-colors',
+            'block rounded-lg px-2.5 py-2 text-[15px] transition-colors',
             here === c.to
               ? 'bg-[var(--accent-soft)] text-[var(--accent)]'
               : 'text-[var(--text)] hover:bg-[var(--surface-sunken)]',
