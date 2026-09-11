@@ -23,8 +23,12 @@ import { TildaGuide } from './TildaGuide';
  * Правки сохраняются сами: переключатель — сразу, строка ввода — когда
  * из неё уходят. Кнопки «Сохранить» нет намеренно, иначе набранный домен
  * терялся бы при переходе к следующей настройке.
+ *
+ * Тот же экран целиком стоит блоком «Добавьте на свой сайт» на главной —
+ * не копией, а этим самым компонентом: разойдись они, настройка выдачи
+ * посторонним людям работала бы на главной иначе, чем в разделе.
  */
-export function Tilda() {
+export function Tilda({ heading = true }: { heading?: boolean }) {
   const qc = useQueryClient();
   const [adding, setAdding] = useState(false);
 
@@ -44,7 +48,10 @@ export function Tilda() {
 
   return (
     <section className="space-y-4">
-      <h2 className="font-serif text-2xl">Интеграция с Tilda</h2>
+      {/* Заголовок снимается, когда экран стоит блоком на главной: там
+          над ним уже написано, что это за блок, и два заголовка подряд
+          читаются как два разных раздела. */}
+      {heading && <h2 className="font-serif text-2xl">Интеграция с Tilda</h2>}
 
       {!list.isLoading && items.length === 0 && !adding && (
         <>
