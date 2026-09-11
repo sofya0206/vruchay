@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, CheckCheck } from 'lucide-react';
+import { CheckCheck } from 'lucide-react';
 import { MATERIAL_TABS, materialTabPath, workspacePath, type MaterialTab } from '../mailing/workspace-tabs';
 import { MenuBar, type MenuDef } from './MenuBar';
 
@@ -15,8 +15,10 @@ import { MenuBar, type MenuDef } from './MenuBar';
  *
  * Верхний ряд — тонкий, 44 px: над ним стоит такая же по высоте общая
  * полоса кабинета, и вдвоём они уже забирают у листа заметную часть
- * экрана. Поэтому здесь нет ни учётной записи, ни значка справки — то и
- * другое живёт в общей полосе, а справка ещё и в меню «Справка».
+ * экрана. Поэтому здесь нет ни учётной записи, ни значка справки, ни
+ * стрелки возврата — всё это живёт в общей полосе, а справка ещё и
+ * в меню «Справка». Своя стрелка встала бы прямо под чужой, и две
+ * одинаковые стрелки друг под другом вели бы в разные места.
  *
  * Ширину не ограничиваем: обе страницы работают во весь экран, и колонка
  * по центру отняла бы у листа поля, а у таблицы — колонки.
@@ -48,18 +50,6 @@ export function DocumentChrome({
   return (
     <header className="shrink-0 border-b border-[var(--line)] bg-[var(--surface)]">
       <div className="flex h-11 items-center gap-1 border-b border-[var(--line)] px-2">
-        {/* Возврат на главную — стрелкой в левом верхнем углу. Именно
-            на главную, а не в список материалов: оттуда человек и пришёл,
-            и оттуда же расходятся остальные разделы. */}
-        <Link
-          to="/"
-          title="На главную"
-          aria-label="На главную"
-          className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[var(--accent)] transition-colors hover:bg-[var(--surface-sunken)]"
-        >
-          <ArrowLeft size={18} />
-        </Link>
-
         {/* Название — коротко и с подсказкой: в ряду с шестью вкладками
             крупному заголовку места нет, а материал всё равно надо назвать. */}
         <h1 className="min-w-0 max-w-[26ch] shrink truncate px-1 text-sm font-medium" title={title}>
