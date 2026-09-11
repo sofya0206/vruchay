@@ -1,16 +1,25 @@
-import { useEffect, useState, type ReactNode } from 'react';
-import { Link, useLocation, useSearchParams } from 'react-router-dom';
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Archive,
   ChevronDown,
   FileText,
   Folder,
   FolderOpen,
-  LayoutTemplate,
+  FolderPlus,
+  MoreHorizontal,
+  Pencil,
   Plus,
-  User,
+  Trash2,
 } from 'lucide-react';
-import { DOCUMENT_CATEGORIES } from '@gramota/shared';
+import {
+  useCreateFolder,
+  useDeleteFolder,
+  useFolders,
+  useRenameFolder,
+  type Folder as FolderItem,
+} from '../api/folders';
 
 /**
  * Рамка раздела «Награждение»: колонка разделов слева, панель сверху,
@@ -32,7 +41,7 @@ import { DOCUMENT_CATEGORIES } from '@gramota/shared';
  * на архив можно сослаться, а «Назад» в браузере возвращает в рабочие.
  *
  * Слово «Архив», а не «Корзина»: удалённый материал не мусор — из него
- * заново выпускают через год, когда соревнование повторяется.
+ * заново выпускают через год, когда мероприятие повторяется.
  */
 interface Item {
   to: string;
@@ -44,7 +53,7 @@ interface Item {
   active: boolean;
   /** Сколько лежит внутри. Ноль не рисуем — пустое место честнее нуля. */
   count?: number | null;
-  /** Папка раздела — вложена в «Рабочие» и подписана мельче. */
+  /** Папка — вложена в «Мои документы» и подписана мельче. */
   nested?: boolean;
 }
 
@@ -73,26 +82,43 @@ function CreateLink({ label, className = '' }: { label: string; className?: stri
 }
 
 /**
- * Разделы материалов — папками в колонке, а не лентой кнопок над списком.
+ * Папки материалов — в колонке, а не лентой кнопок над списком.
  *
  * Лента съедала строку над каждым списком и всё равно читалась как фильтр,
- * который кто-то забыл выключить. В колонке те же разделы стоят там, где
- * человек ищет папки, и у каждой свой адрес: на «Спортивные соревнования»
- * можно дать ссылку, а «Назад» возвращает ко всем рабочим.
+ * который кто-то забыл выключить. В колонке папки стоят там, где человек
+ * их ищет, и у каждой свой адрес: на папку можно дать ссылку, а «Назад»
+ * возвращает ко всем материалам.
  *
- * Материал кладут в папку при создании или через меню карточки; лежащие
- * вне папок видны в «Рабочих» — там весь список целиком.
+ * Папки организация заводит себе сама: раньше здесь стоял зашитый в код
+ * список из пяти разделов, и тот, кто проводит семинары, читал «Спортивные
+ * соревнования» как чужой шаблон.
  *
- * «Рабочие» — корень дерева: нажатие на них открывает весь список и
- * складывает папки, как в любом проводнике. Раскрыть обратно — уголком
- * справа от строки; он же показывает, сложено дерево или нет.
+ * «Мои документы» — корень: нажатие открывает весь список и складывает
+ * папки, как в любом проводнике. Раскрыть обратно — уголком справа.
+ *
+ * Правая кнопка работает и на корне, и на папке: это то место, где её ищут,
+ * придя из проводника или с диска. У папки то же меню открывает «…»,
+ * а на сенсорном экране правую кнопку заменяет долгое нажатие.
  */
 export function LibraryNav({ archiveCount }: { archiveCount?: number | null }) {
   const { pathname } = useLocation();
   const [params] = useSearchParams();
-  const category = params.get('category');
+  const navigate = useNavigate();
+  const openFolderId = params.get('folder');
   const onDocuments = pathname === '/documents';
   const [expanded, setExpanded] = useState(true);
+  const [creating, setCreating] = useState(false);
+  /** Папка, имя которой правят прямо в строке. */
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  /** Где открыто меню и для какой папки. `folder: null` — меню корня. */
+  const [menu, setMenu] = useState<{ x: number; y: number; folder: FolderItem | null } | null>(
+    null,
+  );
+
+  const folders = useFolders();
+  const create = useCreateFolder();
+  const rename = useRenameFolder();
+  const remove = useDeleteFolder();
 
   /*
    * Открытая папка обязана быть видна, даже если дерево было сложено:
@@ -100,16 +126,23 @@ export function LibraryNav({ archiveCount }: { archiveCount?: number | null }) {
    * в папку, и подсвечивать нечего, когда строки нет на экране.
    */
   useEffect(() => {
-    if (category) setExpanded(true);
-  }, [category]);
+    if (openFolderId) setExpanded(true);
+  }, [openFolderId]);
 
-  const folders: Item[] = DOCUMENT_CATEGORIES.map((c) => ({
-    to: `/documents?category=${c.id}`,
-    label: c.title,
-    icon: Folder,
-    active: onDocuments && category === c.id,
-    nested: true,
-  }));
+  const openMenu = (e: MouseEvent<HTMLElement>, folder: FolderItem | null) => {
+    e.preventDefault();
+    setMenu({ x: e.clientX, y: e.clientY, folder });
+  };
+
+  const startFolder = () => {
+    setExpanded(true);
+    setCreating(true);
+  };
+
+  /** Новый материал заводится сразу в той папке, из которой вызвано меню. */
+  const startDocument = (folder: FolderItem | null) => {
+    navigate(`/documents?${folder ? `folder=${folder.id}&` : ''}new=1`);
+  };
 
   const archive: Item[] = [
     {
@@ -121,16 +154,6 @@ export function LibraryNav({ archiveCount }: { archiveCount?: number | null }) {
     },
   ];
 
-  const templates: Item[] = [
-    {
-      to: '/templates',
-      label: 'Шаблоны',
-      icon: LayoutTemplate,
-      active: pathname === '/templates',
-    },
-    { to: '/templates/my', label: 'Мои шаблоны', icon: User, active: pathname === '/templates/my' },
-  ];
-
   return (
     <nav aria-label="Разделы библиотеки" className="mt-3">
       {/* На узком экране колонка превратилась бы в две трети экрана телефона,
@@ -138,32 +161,335 @@ export function LibraryNav({ archiveCount }: { archiveCount?: number | null }) {
       <div className="flex gap-1 overflow-x-auto md:block md:overflow-visible">
         <ul className="flex gap-1 md:flex-col">
           <RootRow
-            active={onDocuments && !category}
+            active={onDocuments && !openFolderId}
             expanded={expanded}
             onCollapse={() => setExpanded(false)}
             onToggle={() => setExpanded((v) => !v)}
+            onMenu={(e) => openMenu(e, null)}
           />
-          {expanded && folders.map((item) => <Row key={item.to} item={item} />)}
+          {expanded &&
+            (folders.data ?? []).map((folder) =>
+              renamingId === folder.id ? (
+                <li key={folder.id}>
+                  <FolderNameForm
+                    initial={folder.name}
+                    busy={rename.isPending}
+                    error={rename.error?.message}
+                    onCancel={() => setRenamingId(null)}
+                    onSubmit={(name) =>
+                      rename.mutate(
+                        { id: folder.id, name },
+                        { onSuccess: () => setRenamingId(null) },
+                      )
+                    }
+                  />
+                </li>
+              ) : (
+                <FolderRow
+                  key={folder.id}
+                  folder={folder}
+                  active={onDocuments && openFolderId === folder.id}
+                  onMenu={(e) => openMenu(e, folder)}
+                />
+              ),
+            )}
+          {expanded && creating && (
+            <li>
+              <FolderNameForm
+                busy={create.isPending}
+                error={create.error?.message}
+                onCancel={() => setCreating(false)}
+                onSubmit={(name) => create.mutate(name, { onSuccess: () => setCreating(false) })}
+              />
+            </li>
+          )}
           {archive.map((item) => (
             <Row key={item.to} item={item} />
           ))}
         </ul>
-        {/* Волосяная линия вместо подписи группы: материалы и бланки —
-            разные списки, но подписывать их отдельно значит занять две
-            строки колонки ради двух слов. */}
-        <List items={templates} className="md:mt-2 md:border-t md:border-[var(--line)] md:pt-2" />
+
       </div>
+
+      {menu && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          folder={menu.folder}
+          onClose={() => setMenu(null)}
+          onNewDocument={() => startDocument(menu.folder)}
+          onNewFolder={startFolder}
+          onRename={() => menu.folder && setRenamingId(menu.folder.id)}
+          onDelete={() => menu.folder && remove.mutate(menu.folder.id)}
+        />
+      )}
     </nav>
   );
 }
 
-function List({ items, className = '' }: { items: Item[]; className?: string }) {
+/**
+ * Меню папки: то же самое по правой кнопке и по «…».
+ *
+ * Стоит по месту нажатия, а не под строкой: правой кнопкой вызывают там,
+ * где смотрят, и меню, всплывающее в другом углу, приходится искать глазами.
+ *
+ * Рисуется порталом в body, а не на месте в колонке. Колонка приклеена
+ * (`position: sticky`), а приклеенный блок заводит свой контекст наложения:
+ * внутри него `z-50` меню ничего не значит рядом с карточками материалов,
+ * которые лежат в соседней колонке и рисуются позже. Меню уходило под них
+ * нижней половиной — «Удалить папку» оказывалось под карточкой.
+ */
+function ContextMenu({
+  x,
+  y,
+  folder,
+  onClose,
+  onNewDocument,
+  onNewFolder,
+  onRename,
+  onDelete,
+}: {
+  x: number;
+  y: number;
+  folder: FolderItem | null;
+  onClose: () => void;
+  onNewDocument: () => void;
+  onNewFolder: () => void;
+  onRename: () => void;
+  onDelete: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const run = (fn: () => void) => () => {
+    onClose();
+    fn();
+  };
+
+  return createPortal(
+    <>
+      {/* Подложка ловит нажатие мимо меню и прокрутку под ним: меню стоит
+          по координатам курсора и вместе со страницей не едет. */}
+      <button
+        type="button"
+        aria-hidden
+        tabIndex={-1}
+        onClick={onClose}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          onClose();
+        }}
+        className="fixed inset-0 z-40 cursor-default"
+      />
+      <div
+        role="menu"
+        // Меню у правого или нижнего края уехало бы за экран, поэтому
+        // упираем его в край с небольшим полем.
+        style={{ left: Math.min(x, window.innerWidth - 240), top: Math.min(y, window.innerHeight - 200) }}
+        className="fixed z-50 w-56 overflow-hidden rounded-lg bg-[var(--surface)] py-1 shadow-lg ring-1 ring-[var(--line)]"
+      >
+        <p className="truncate px-3 pt-1 pb-2 text-xs text-[var(--text-muted)]">
+          {folder ? folder.name : 'Мои документы'}
+        </p>
+        <MenuItem icon={<FileText size={14} />} onClick={run(onNewDocument)}>
+          {folder ? 'Новый документ в папке' : 'Новый документ'}
+        </MenuItem>
+        {/* «Новая папка» — только в корне: папки плоские, вложенности нет,
+            и в меню самой папки этот пункт обещал бы подпапку, а заводил
+            бы соседнюю рядом с ней. */}
+        {!folder && (
+          <MenuItem icon={<FolderPlus size={14} />} onClick={run(onNewFolder)}>
+            Новая папка
+          </MenuItem>
+        )}
+        {folder && (
+          <>
+            <div className="my-1 border-t border-[var(--line)]" />
+            <MenuItem icon={<Pencil size={14} />} onClick={run(onRename)}>
+              Переименовать
+            </MenuItem>
+            <MenuItem icon={<Trash2 size={14} />} danger onClick={run(onDelete)}>
+              Удалить папку
+            </MenuItem>
+            {/* Сказано прямо: иначе «Удалить папку» читается как «удалить
+                вместе со всем, что внутри», и нажать на него страшно. */}
+            <p className="px-3 pt-1 pb-2 text-xs text-[var(--text-muted)]">
+              Материалы останутся — вернутся в «Мои документы»
+            </p>
+          </>
+        )}
+      </div>
+    </>,
+    document.body,
+  );
+}
+
+/** Строка папки: ссылка плюс «…», открывающее то же меню, что правая кнопка. */
+function FolderRow({
+  folder,
+  active,
+  onMenu,
+}: {
+  folder: FolderItem;
+  active: boolean;
+  onMenu: (e: MouseEvent<HTMLElement>) => void;
+}) {
   return (
-    <ul className={`flex gap-1 md:flex-col ${className}`}>
-      {items.map((item) => (
-        <Row key={item.to} item={item} />
-      ))}
-    </ul>
+    <li
+      className={`${rowClass(active, true)} group gap-0 px-0 md:pl-0`}
+      onContextMenu={onMenu}
+    >
+      <Link
+        to={`/documents?folder=${folder.id}`}
+        aria-current={active ? 'page' : undefined}
+        className="flex min-w-0 flex-1 items-center gap-2.5 py-2 pl-3 md:pl-8"
+      >
+        <Folder size={14} strokeWidth={1.75} className="shrink-0" />
+        <span className="min-w-0 md:flex-1 md:truncate">{folder.name}</span>
+        {folder.count ? (
+          <span className="tabular shrink-0 text-xs text-[var(--text-muted)]">{folder.count}</span>
+        ) : null}
+      </Link>
+
+      <button
+        type="button"
+        onClick={onMenu}
+        aria-label={`Меню папки «${folder.name}»`}
+        className="px-2 py-2 text-[var(--text-muted)] opacity-0 transition-opacity group-hover:opacity-100 hover:text-[var(--text)] focus-visible:opacity-100"
+      >
+        <MoreHorizontal size={15} strokeWidth={1.75} />
+      </button>
+    </li>
+  );
+}
+
+function MenuItem({
+  icon,
+  children,
+  danger = false,
+  onClick,
+}: {
+  icon: ReactNode;
+  children: ReactNode;
+  danger?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onClick}
+      className={
+        'flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--surface-sunken)] ' +
+        (danger ? 'text-[var(--danger)]' : 'text-[var(--text)]')
+      }
+    >
+      <span className="shrink-0 text-[var(--text-muted)]">{icon}</span>
+      {children}
+    </button>
+  );
+}
+
+/** Поле имени папки: и для новой, и для переименования — правила одни. */
+function FolderNameForm({
+  initial = '',
+  busy,
+  error,
+  onSubmit,
+  onCancel,
+}: {
+  initial?: string;
+  busy: boolean;
+  /** Сообщение сервера: чаще всего «Папка с таким названием уже есть». */
+  error?: string;
+  onSubmit: (name: string) => void;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState(initial);
+  const input = useRef<HTMLInputElement>(null);
+  /*
+   * Отправляем ровно один раз.
+   *
+   * На Enter поле блокируется на время запроса, блокировка снимает фокус,
+   * и `onBlur` отправлял то же имя вторым запросом: папка заводилась,
+   * а поле появлялось снова — уже с ошибкой «такое название уже есть».
+   * Уход фокуса после отправки — это её последствие, а не второе согласие.
+   *
+   * Снимается защита только правкой текста: одно введённое имя — одна
+   * попытка. После отказа сервера человек исправляет название, и поле
+   * снова отзывается.
+   */
+  const sent = useRef(false);
+
+  useEffect(() => {
+    input.current?.select();
+  }, []);
+
+  const submit = () => {
+    if (sent.current) return;
+    const value = name.trim();
+    if (!value) return;
+    sent.current = true;
+    onSubmit(value);
+  };
+
+  const cancel = () => {
+    sent.current = true;
+    onCancel();
+  };
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit();
+      }}
+      className="px-3 py-1 md:pl-8"
+    >
+      <input
+        ref={input}
+        value={name}
+        autoFocus
+        disabled={busy}
+        maxLength={100}
+        onChange={(e) => {
+          sent.current = false;
+          setName(e.target.value);
+        }}
+        // Esc отменяет, а уход мышью сохраняет: человек напечатал имя
+        // и нажал в список — это согласие, а не отказ.
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') cancel();
+          /*
+           * Enter обрабатываем сами, а не неявной отправкой формы: в форме
+           * одно поле и нет кнопки отправки, и браузеры расходятся в том,
+           * отправлять ли такую форму по Enter. Ошибиться тут нельзя —
+           * это единственный способ завести папку с клавиатуры.
+           */
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            submit();
+          }
+        }}
+        // Уход мышью сохраняет: человек напечатал имя и нажал в список —
+        // это согласие, а не отказ. Пустое поле закрывается молча.
+        onBlur={() => {
+          if (name.trim() && name.trim() !== initial) submit();
+          else cancel();
+        }}
+        aria-label="Название папки"
+        placeholder="Название папки"
+        className={
+          'w-full rounded-md bg-[var(--surface-sunken)] px-2 py-1.5 text-[13px] outline-none ring-1 ' +
+          (error ? 'ring-[var(--danger)]' : 'ring-[var(--accent)]')
+        }
+      />
+      {error && <p className="mt-1 text-xs text-[var(--danger)]">{error}</p>}
+    </form>
   );
 }
 
@@ -200,7 +526,7 @@ function Row({ item }: { item: Item }) {
 }
 
 /**
- * Корень дерева — «Рабочие».
+ * Корень дерева — «Мои документы».
  *
  * Нажатие на саму строку делает два дела сразу: открывает весь список
  * и складывает папки. Так ведёт себя папка верхнего уровня в проводнике,
@@ -215,14 +541,16 @@ function RootRow({
   expanded,
   onCollapse,
   onToggle,
+  onMenu,
 }: {
   active: boolean;
   expanded: boolean;
   onCollapse: () => void;
   onToggle: () => void;
+  onMenu: (e: MouseEvent<HTMLElement>) => void;
 }) {
   return (
-    <li className={`${rowClass(active)} gap-0 px-0`}>
+    <li className={`${rowClass(active)} gap-0 px-0`} onContextMenu={onMenu}>
       <Link
         to="/documents"
         onClick={onCollapse}
@@ -230,13 +558,13 @@ function RootRow({
         className="flex flex-1 items-center gap-2.5 px-3 py-2"
       >
         <FolderOpen size={16} strokeWidth={1.75} className="shrink-0" />
-        <span className="md:flex-1 md:truncate">Рабочие</span>
+        <span className="md:flex-1 md:truncate">Мои документы</span>
       </Link>
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={expanded}
-        aria-label={expanded ? 'Свернуть папки разделов' : 'Показать папки разделов'}
+        aria-label={expanded ? 'Свернуть папки' : 'Показать папки'}
         className="px-2 py-2 text-[var(--text-muted)] hover:text-[var(--text)]"
       >
         <ChevronDown

@@ -54,7 +54,14 @@
 - [POST /api/documents/{id}/restore — Вернуть документ из корзины](https://vruchay.ru/docs/endpoints/documents/post-documents-id-restore): Снимает пометку удаления с документа в корзине.
 - [POST /api/documents/{id}/sheets/{sheetId}/background — Загрузить фон листа](https://vruchay.ru/docs/endpoints/documents/post-documents-id-sheets-sheetId-background): Загружает картинку фона листа (бланк) и ставит её листу в backgroundFileId.
 - [POST /api/documents/{id}/sheets — Добавить лист](https://vruchay.ru/docs/endpoints/documents/post-documents-id-sheets): Добавляет в конец документа пустой лист (layout: [], schemaVersion: 2).
-- [POST /api/documents — Создать документ](https://vruchay.ru/docs/endpoints/documents/post-documents): Создаёт материал сразу с одним листом и колонками таблицы получателей.
+- [POST /api/documents — Создать документ](https://vruchay.ru/docs/endpoints/documents/post-documents): Создаёт материал сразу с одним листом и колонками таблицы получателей: лист пустой
+
+## Эндпоинты: folders
+
+- [DELETE /api/folders/{id} — Удалить папку](https://vruchay.ru/docs/endpoints/folders/delete-folders-id): Удаляет папку.
+- [GET /api/folders — Папки библиотеки](https://vruchay.ru/docs/endpoints/folders/get-folders): Папки организации в том порядке, в каком они стоят в колонке кабинета.
+- [PATCH /api/folders/{id} — Переименовать папку](https://vruchay.ru/docs/endpoints/folders/patch-folders-id): Меняет название папки.
+- [POST /api/folders — Завести папку](https://vruchay.ru/docs/endpoints/folders/post-folders): Заводит папку в конце списка.
 
 ## Эндпоинты: generation
 

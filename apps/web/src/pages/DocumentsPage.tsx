@@ -4,18 +4,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Archive, FileText, Plus, Search } from 'lucide-react';
 import { UsageBar } from '../documents/UsageBar';
 import { LibraryLayout } from '../documents/LibraryNav';
-import {
-  DOCUMENT_CATEGORIES,
-  isDocumentCategory,
-  TRASH_DAYS,
-  type DocumentCategory,
-} from '@gramota/shared';
+import { TRASH_DAYS } from '@gramota/shared';
 import { api } from '../api/client';
 import type { DocumentDetail, DocumentList, DocumentSummary } from '../api/types';
 import { Button } from '../ui/Button';
 import { Input, Select } from '../ui/Field';
 import { DocumentCard } from '../documents/DocumentCard';
 import { PageSizePicker, type PageSizeValue } from '../documents/PageSizePicker';
+import { useFolders } from '../api/folders';
 import { LibrarySortSelect, type LibrarySort } from '../documents/LibraryFilters';
 
 /**
@@ -23,9 +19,8 @@ import { LibrarySortSelect, type LibrarySort } from '../documents/LibraryFilters
  *
  * Устроена как файловый менеджер: списки и создание — слева, название
  * списка и поиск — сверху, сколько всего лежит и в каком порядке — снизу.
- * В середине только свои материалы: готовые бланки живут в своей вкладке
- * слева, и витрине под списком делать нечего — она отодвигала вниз то,
- * ради чего сюда и приходят.
+ * В середине только свои материалы: папки организация заводит себе сама,
+ * в колонке слева.
  *
  * Рабочие и архив — одна страница с двумя адресами, а не переключатель:
  * колонка слева показывает оба списка сразу, и удалённое больше не нужно
@@ -39,7 +34,7 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
   const [sort, setSort] = useState<LibrarySort>('updated');
   const [title, setTitle] = useState('');
   /** `null` — человек ещё не трогал выбор: тогда берём открытую папку. */
-  const [newCategory, setNewCategory] = useState<DocumentCategory | '' | null>(null);
+  const [newFolderId, setNewFolderId] = useState<string | '' | null>(null);
   // A4 альбомная — то, на чём печатают грамоты чаще всего.
   const [size, setSize] = useState<PageSizeValue>({ widthMm: 297, heightMm: 210 });
 
@@ -52,13 +47,13 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
    * местах рамки раздела. Иначе на папку нельзя было бы сослаться, а создание
    * открывалось бы только с той страницы, где нарисована сама форма.
    *
-   * Чужое значение в `?category=` — не ошибка, а испорченная ссылка: молча
-   * показываем все рабочие, а не пустой список по несуществующей папке.
+   * Чужой идентификатор в `?folder=` — не ошибка, а испорченная ссылка: молча
+   * показываем все материалы, а не пустой список по несуществующей папке.
    */
-  const raw = params.get('category');
-  const category: DocumentCategory | null =
-    !trash && raw && isDocumentCategory(raw) ? (raw as DocumentCategory) : null;
-  const folder = DOCUMENT_CATEGORIES.find((c) => c.id === category) ?? null;
+  const folders = useFolders();
+  const raw = !trash ? params.get('folder') : null;
+  const folder = (folders.data ?? []).find((f) => f.id === raw) ?? null;
+  const folderId = folder?.id ?? null;
 
   const scratch = !trash && params.get('new') === '1';
   /** Форму закрываем, папку оставляем: человек вернётся в тот же список. */
@@ -69,12 +64,12 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
   };
 
   const documents = useQuery({
-    queryKey: ['documents', search, trash, category, sort],
+    queryKey: ['documents', search, trash, folderId, sort],
     queryFn: () =>
       api.get<DocumentList>(
         `/documents?limit=50&trashed=${trash}&sort=${sort}` +
           (search ? `&search=${encodeURIComponent(search)}` : '') +
-          (category ? `&category=${category}` : ''),
+          (folderId ? `&folderId=${folderId}` : ''),
       ),
   });
 
@@ -87,16 +82,16 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
   });
 
   const create = useMutation({
-    mutationFn: (v: { title: string; category?: DocumentCategory }) =>
+    mutationFn: (v: { title: string; folderId?: string }) =>
       api.post<DocumentDetail>('/documents', {
         title: v.title,
         pageWidthMm: size.widthMm,
         pageHeightMm: size.heightMm,
-        ...(v.category ? { category: v.category } : {}),
+        ...(v.folderId ? { folderId: v.folderId } : {}),
       }),
     onSuccess: () => {
       setTitle('');
-      setNewCategory(null);
+      setNewFolderId(null);
       closeScratch();
       void qc.invalidateQueries({ queryKey: ['documents'] });
     },
@@ -136,8 +131,8 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
 
   /** Переложить материал в другую папку. `null` — вынуть из папок совсем. */
   const move = useMutation({
-    mutationFn: (v: { id: string; category: DocumentCategory | null }) =>
-      api.patch<DocumentDetail>(`/documents/${v.id}`, { category: v.category }),
+    mutationFn: (v: { id: string; folderId: string | null }) =>
+      api.patch<DocumentDetail>(`/documents/${v.id}`, { folderId: v.folderId }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['documents'] }),
   });
 
@@ -147,7 +142,7 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
   }
 
   /** Что стоит в выборе папки: тронутое человеком или открытая папка. */
-  const formCategory = newCategory ?? category ?? '';
+  const formFolderId = newFolderId ?? folderId ?? '';
 
   /*
    * Esc — шаг назад по уровням: сначала снимается поиск, потом закрывается
@@ -177,7 +172,7 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
         closeScratch();
         return;
       }
-      if (category) {
+      if (folderId) {
         e.preventDefault();
         navigate('/documents');
       }
@@ -189,7 +184,7 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
   function onCreate(e: FormEvent) {
     e.preventDefault();
     if (title.trim()) {
-      create.mutate({ title: title.trim(), category: formCategory || undefined });
+      create.mutate({ title: title.trim(), folderId: formFolderId || undefined });
     }
   }
 
@@ -204,7 +199,7 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
           {/* Открытая папка стоит в заголовке: иначе на половине списка
               непонятно, почему материалов пять, когда их пятьдесят. */}
           <h1 className="truncate text-lg font-medium">
-            {trash ? 'Архив' : (folder?.title ?? 'Рабочие')}
+            {trash ? 'Архив' : (folder?.name ?? 'Мои документы')}
           </h1>
           {documents.data && (
             <span className="tabular text-sm text-[var(--text-muted)]">{documents.data.total}</span>
@@ -268,21 +263,24 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
               autoFocus
             />
             {/* Внутри папки она и подставлена: человек нажал «Создать»,
-                стоя в «Спортивных соревнованиях», — материал ждут там же.
-                Выбрать другую или «Вне папок» по-прежнему можно. */}
-            <Select
-              value={formCategory}
-              onChange={(e) => setNewCategory(e.target.value as DocumentCategory | '')}
-              aria-label="Папка нового материала"
-              className="w-56"
-            >
-              <option value="">Вне папок</option>
-              {DOCUMENT_CATEGORIES.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.title}
-                </option>
-              ))}
-            </Select>
+                стоя в своей папке, — материал ждут там же. Выбрать другую
+                или «Вне папок» по-прежнему можно. Пока папок нет, выбирать
+                не из чего — тогда поля нет вовсе. */}
+            {(folders.data ?? []).length > 0 && (
+              <Select
+                value={formFolderId}
+                onChange={(e) => setNewFolderId(e.target.value)}
+                aria-label="Папка нового материала"
+                className="w-56"
+              >
+                <option value="">Вне папок</option>
+                {(folders.data ?? []).map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </Select>
+            )}
             <Button
               type="submit"
               variant="primary"
@@ -303,7 +301,7 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
             {trash ? (
               <>Удалённое хранится {TRASH_DAYS} дней, потом стирается насовсем</>
             ) : folder ? (
-              folder.hint
+              <>Материалы этой папки</>
             ) : (
               <>Грамоты, дипломы, сертификаты, благодарности — что угодно на бланке</>
             )}
@@ -352,20 +350,15 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
                   </p>
                 ) : (
                   /* Не пересказываем инструкцию, а показываем дорогу: новичок
-                     на пустом экране ищет, куда нажать, а не что почитать.
-                     Готовые бланки лежат во вкладке «Шаблоны» слева — ссылкой,
-                     потому что искать их глазами по колонке он не станет. */
+                     на пустом экране ищет, куда нажать, а не что почитать. */
                   <div className="mt-1 text-sm text-[var(--text-muted)]">
                     <p>
-                      Начните с{' '}
-                      <Link to="/templates" className="underline underline-offset-4">
-                        готового шаблона
-                      </Link>
-                      : текст уже расставлен по листу, останется поправить слова.
+                      Нажмите «Создать документ», загрузите свой бланк и подгоните поля: фамилию,
+                      место, дату.
                     </p>
                     <p className="mt-2">
-                      Дальше загрузите свой бланк и подгоните поля: фамилию, место, дату. Ничего
-                      страшного не произойдёт — пока вы не выпустили файлы, ничего не расходуется.
+                      Ничего страшного не произойдёт — пока вы не выпустили файлы, ничего
+                      не расходуется.
                     </p>
                   </div>
                 )}
@@ -383,7 +376,7 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
               key={doc.id}
               doc={doc}
               onRename={onRename}
-              onMove={(d, to) => move.mutate({ id: d.id, category: to })}
+              onMove={(d, to) => move.mutate({ id: d.id, folderId: to })}
               onDuplicate={(d) => duplicate.mutate(d.id)}
               onDelete={(d) => remove.mutate(d.id)}
               onRestore={(d) => restore.mutate(d.id)}

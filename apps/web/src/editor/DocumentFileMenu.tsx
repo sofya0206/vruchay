@@ -9,8 +9,9 @@ import {
   PencilLine,
   Trash2,
 } from 'lucide-react';
-import { DOCUMENT_CATEGORIES, TRASH_DAYS, type DocumentCategory } from '@gramota/shared';
+import { TRASH_DAYS } from '@gramota/shared';
 import { api } from '../api/client';
+import { useFolders } from '../api/folders';
 import type { DocumentDetail } from '../api/types';
 import { Button } from '../ui/Button';
 import { Input, Label, Select } from '../ui/Field';
@@ -39,7 +40,9 @@ export function useDocumentFileMenu(doc: DocumentDetail | undefined): {
   const [moving, setMoving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState<DocumentCategory | ''>('');
+  const [folderId, setFolderId] = useState<string | ''>('');
+
+  const folders = useFolders();
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ['document', doc?.id] });
@@ -56,8 +59,8 @@ export function useDocumentFileMenu(doc: DocumentDetail | undefined): {
   });
 
   const move = useMutation({
-    mutationFn: (value: DocumentCategory | null) =>
-      api.patch<DocumentDetail>(`/documents/${doc!.id}`, { category: value }),
+    mutationFn: (value: string | null) =>
+      api.patch<DocumentDetail>(`/documents/${doc!.id}`, { folderId: value }),
     onSuccess: () => {
       setMoving(false);
       refresh();
@@ -115,7 +118,7 @@ export function useDocumentFileMenu(doc: DocumentDetail | undefined): {
       label: 'Переместить',
       disabled: !doc,
       onSelect: () => {
-        setCategory(doc?.category ?? '');
+        setFolderId(doc?.folderId ?? '');
         setMoving(true);
       },
     },
@@ -176,7 +179,7 @@ export function useDocumentFileMenu(doc: DocumentDetail | undefined): {
               <Button
                 variant="primary"
                 disabled={move.isPending}
-                onClick={() => move.mutate(category === '' ? null : category)}
+                onClick={() => move.mutate(folderId === '' ? null : folderId)}
               >
                 {move.isPending ? 'Переносим…' : 'Переместить'}
               </Button>
@@ -186,15 +189,12 @@ export function useDocumentFileMenu(doc: DocumentDetail | undefined): {
             </>
           }
         >
-          <Label>Раздел библиотеки</Label>
-          <Select
-            value={category}
-            onChange={(e) => setCategory(e.target.value as DocumentCategory | '')}
-          >
-            <option value="">Без раздела</option>
-            {DOCUMENT_CATEGORIES.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.title}
+          <Label>Папка</Label>
+          <Select value={folderId} onChange={(e) => setFolderId(e.target.value)}>
+            <option value="">Вне папок</option>
+            {(folders.data ?? []).map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name}
               </option>
             ))}
           </Select>

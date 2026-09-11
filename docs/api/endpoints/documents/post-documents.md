@@ -10,10 +10,9 @@ rate_limit: none
 
 # POST /api/documents
 
-Создаёт материал сразу с одним листом и колонками таблицы получателей. Без `presetId`
-лист пустой (`layout: []`), колонки — `name` и `email`. С `presetId` сервер сам
-раскладывает по листу текст заготовки и заводит её колонки (у `sport-award` — ещё
-`place`); раздел берётся из заготовки, если `category` не передан.
+Создаёт материал сразу с одним листом и колонками таблицы получателей: лист пустой
+(`layout: []`), колонки — `name` и `email`. Раскладку человек собирает в редакторе
+или загружает свой бланк фоном.
 
 ## Запрос
 
@@ -24,15 +23,14 @@ rate_limit: none
 | `title` | string | да | 1–200 символов после обрезки пробелов. Ошибка: «Введите название» |
 | `pageWidthMm` | number | нет | 50…600, по умолчанию 297 |
 | `pageHeightMm` | number | нет | 50…600, по умолчанию 210 |
-| `category` | `sport` \| `contest` \| `education` \| `corporate` \| `accreditation` | нет | раздел библиотеки |
-| `presetId` | `sport-award` \| `contest-participant` \| `course-certificate` \| `corporate-thanks` | нет | заготовка макета |
+| `folderId` | string (UUID) | нет | папка из `GET /api/folders`; без неё материал ложится в корень |
 
 ```json
 {
   "title": "Грамота за место",
   "pageWidthMm": 297,
   "pageHeightMm": 210,
-  "presetId": "sport-award"
+  "folderId": "9f1c0c8e-0f3c-4a1a-9c1f-1f7d2a3b4c5d"
 }
 ```
 
@@ -52,7 +50,7 @@ rate_limit: none
 | `issueDate` | string \| null | дата выдачи; `null` — день выпуска |
 | `expiresIn` | string \| null | срок действия длительностью (`P1Y`) |
 | `expiresAt` | string \| null | срок действия фиксированной датой |
-| `category` | string \| null | |
+| `folderId` | string (UUID) \| null | |
 | `sourceDocumentId` | UUID \| null | исходник копии |
 | `ruleSetId` | UUID \| null | привязанный набор правил награждения |
 | `createdAt`, `updatedAt` | string | |
@@ -76,7 +74,7 @@ rate_limit: none
   "issueDate": null,
   "expiresIn": null,
   "expiresAt": null,
-  "category": "sport",
+  "folderId": "9f1c0c8e-0f3c-4a1a-9c1f-1f7d2a3b4c5d",
   "sourceDocumentId": null,
   "ruleSetId": null,
   "createdAt": "2026-09-03T09:00:00.000Z",
@@ -107,7 +105,7 @@ rate_limit: none
 
 | Код | Когда |
 |---|---|
-| 400 | «Введите название» — пустой `title`; `title` длиннее 200; размер листа вне 50…600; неизвестный `category` или `presetId` |
+| 400 | «Введите название» — пустой `title`; `title` длиннее 200; размер листа вне 50…600; `folderId` не UUID |
 | 401 | нет токена или сессии |
 | 413 | тело больше 1 МБ |
 
@@ -117,5 +115,5 @@ rate_limit: none
 curl -X POST "https://vruchay.ru/api/documents" \
   -H "Authorization: Bearer $VRUCHAY_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"title":"Грамота за место","presetId":"sport-award"}'
+  -d '{"title":"Грамота за место"}'
 ```

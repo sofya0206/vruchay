@@ -24,7 +24,7 @@ rate_limit: none
 | `limit` | integer | нет | 1…100, по умолчанию 50 |
 | `offset` | integer | нет | ≥ 0, по умолчанию 0 |
 | `search` | string | нет | до 200 символов; поиск по названию без учёта регистра (подстрока) |
-| `category` | `sport` \| `contest` \| `education` \| `corporate` \| `accreditation` | нет | фильтр по разделу |
+| `folderId` | string (UUID) | нет | фильтр по папке; папки берутся из `GET /api/folders` |
 | `sort` | `updated` \| `created` \| `title` | нет | `updated` — по правке (новые сверху), `created` — по созданию, `title` — по названию. По умолчанию `updated` |
 | `trashed` | `true` \| `false` | нет | `true` — только корзина, `false` (по умолчанию) — только живые |
 
@@ -41,7 +41,7 @@ rate_limit: none
 | `items[].title` | string | |
 | `items[].pageWidthMm`, `items[].pageHeightMm` | number | размер листа, мм |
 | `items[].updatedAt`, `items[].createdAt` | string (ISO 8601) | |
-| `items[].category` | string \| null | раздел |
+| `items[].folderId` | string (UUID) \| null | папка; `null` — материал лежит в корне |
 | `items[].eventName`, `items[].eventDate` | string | мероприятие (пустые строки, если не заполнены) |
 | `items[].deletedAt` | string \| null | когда отправлен в корзину; `null` у живых |
 | `items[].sheetCount` | integer | число листов |
@@ -62,7 +62,7 @@ rate_limit: none
       "pageHeightMm": 210,
       "updatedAt": "2026-08-30T10:12:44.000Z",
       "createdAt": "2026-08-01T08:00:00.000Z",
-      "category": "sport",
+      "folderId": "9f1c0c8e-0f3c-4a1a-9c1f-1f7d2a3b4c5d",
       "eventName": "Первенство области по плаванию",
       "eventDate": "17–19 июня 2026",
       "deletedAt": null,
@@ -85,12 +85,12 @@ rate_limit: none
 
 | Код | Когда |
 |---|---|
-| 400 | параметр не прошёл проверку: `limit` вне 1…100, `offset` < 0, `search` длиннее 200, неизвестный `category`/`sort`, `trashed` не `true`/`false` |
+| 400 | параметр не прошёл проверку: `limit` вне 1…100, `offset` < 0, `search` длиннее 200, `folderId` не UUID, неизвестный `sort`, `trashed` не `true`/`false` |
 | 401 | нет токена или сессии |
 
 ## Пример
 
 ```bash
-curl "https://vruchay.ru/api/documents?limit=20&category=sport&sort=title" \
+curl "https://vruchay.ru/api/documents?limit=20&folderId=$FOLDER_ID&sort=title" \
   -H "Authorization: Bearer $VRUCHAY_TOKEN"
 ```

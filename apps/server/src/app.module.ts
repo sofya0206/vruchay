@@ -8,6 +8,7 @@ import { RedisModule } from './common/redis.module';
 import { CommonModule } from './common/common.module';
 import { AuthModule } from './auth/auth.module';
 import { DocumentsModule } from './documents/documents.module';
+import { FoldersModule } from './folders/folders.module';
 import { RecipientsModule } from './recipients/recipients.module';
 import { AwardsModule } from './awards/awards.module';
 import { RenderModule } from './render/render.module';
@@ -45,6 +46,7 @@ import { PlansModule } from './plans/plans.module';
     StorageModule,
     AuthModule,
     DocumentsModule,
+    FoldersModule,
     RecipientsModule,
     AwardsModule,
     RenderModule,

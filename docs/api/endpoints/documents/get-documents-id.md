@@ -38,7 +38,7 @@ rate_limit: none
 | `issueDate` | string \| null | дата выдачи (день, в JSON — полночь UTC); `null` — день выпуска |
 | `expiresIn` | string \| null | срок действия от выдачи, ISO 8601 (`P1Y`) |
 | `expiresAt` | string \| null | срок действия фиксированной датой; если заданы оба, побеждает дата |
-| `category` | string \| null | раздел |
+| `folderId` | string (UUID) \| null | папка; `null` — материал лежит в корне |
 | `sourceDocumentId` | UUID \| null | исходник копии (сырое поле; для показа удобнее `source`) |
 | `source` | `{ id, title }` \| null | исходный бланк, если он не в корзине |
 | `ruleSetId` | UUID \| null | привязанный набор правил награждения |
@@ -62,7 +62,7 @@ rate_limit: none
   "issueDate": "2026-06-19T00:00:00.000Z",
   "expiresIn": null,
   "expiresAt": null,
-  "category": "sport",
+  "folderId": "9f1c0c8e-0f3c-4a1a-9c1f-1f7d2a3b4c5d",
   "sourceDocumentId": null,
   "source": null,
   "ruleSetId": "7c1f7d1e-2b5e-4c3a-9c1a-8d2f0a6b1e11",

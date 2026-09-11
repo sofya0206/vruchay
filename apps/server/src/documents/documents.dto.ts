@@ -1,32 +1,21 @@
 import { z } from 'zod';
-import { DOCUMENT_CATEGORY_IDS, sheetLayout, STARTER_PRESETS } from '@gramota/shared';
+import { sheetLayout } from '@gramota/shared';
 import { parseIsoDuration } from '../verify/expiry';
 
 /** Лист не меньше визитки и не больше A2 — защита от абсурдных значений в рендере. */
 const pageSizeMm = z.number().min(50).max(600);
 
-/*
- * Раздел и заготовка приходят от клиента строками, но допустимые значения
- * задаёт общий пакет: список один для интерфейса, сервера и проверки.
- * Список нельзя строить из строк на лету — тогда любая опечатка клиента
- * молча становилась бы новым разделом, по которому ничего не найти.
+/**
+ * Папка приходит идентификатором, а принадлежность организации проверяет
+ * служба: чужой идентификатор верного вида отличим только по базе.
  */
-const documentCategory = z.enum(DOCUMENT_CATEGORY_IDS as [string, ...string[]]);
-const starterPresetId = z.enum(
-  STARTER_PRESETS.map((p) => p.id) as [string, ...string[]],
-);
+const folderId = z.string().uuid('Некорректный идентификатор папки');
 
 export const createDocumentSchema = z.object({
   title: z.string().trim().min(1, 'Введите название').max(200),
   pageWidthMm: pageSizeMm.default(297),
   pageHeightMm: pageSizeMm.default(210),
-  category: documentCategory.optional(),
-  /**
-   * Заготовка: с ней материал создаётся сразу с расставленным текстом.
-   * Макет строит сервер, а не клиент, — по тем же правилам, что проверяет
-   * схема. Иначе клиент мог бы прислать что угодно под видом заготовки.
-   */
-  presetId: starterPresetId.optional(),
+  folderId: folderId.optional(),
 });
 export type CreateDocumentDto = z.infer<typeof createDocumentSchema>;
 
@@ -65,8 +54,8 @@ export const updateDocumentSchema = z
       .transform((v) => new Date(`${v}T00:00:00Z`))
       .nullable(),
 
-    /** null — убрать материал из разделов, а не «не менять». */
-    category: documentCategory.nullable(),
+    /** null — вынуть материал из папки в корень, а не «не менять». */
+    folderId: folderId.nullable(),
 
     /*
      * Срок действия: длительность от выдачи (`P1Y`) или фиксированная
@@ -104,7 +93,7 @@ export const listDocumentsSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
   offset: z.coerce.number().int().min(0).default(0),
   search: z.string().trim().max(200).optional(),
-  category: documentCategory.optional(),
+  folderId: folderId.optional(),
   sort: z.enum(DOCUMENT_SORTS).default('updated'),
   /** Корзина — тот же список, только из удалённого. */
   trashed: z

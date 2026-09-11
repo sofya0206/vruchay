@@ -46,7 +46,7 @@ rate_limit: none
   "issueDate": null,
   "expiresIn": null,
   "expiresAt": null,
-  "category": "sport",
+  "folderId": "9f1c0c8e-0f3c-4a1a-9c1f-1f7d2a3b4c5d",
   "sourceDocumentId": "6f1c3b2a-9d4e-4f5a-8b6c-7d8e9f0a1b2c",
   "ruleSetId": null,
   "createdAt": "2026-09-03T09:10:00.000Z",

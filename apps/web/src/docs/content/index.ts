@@ -163,6 +163,26 @@ export const INDEX: DocEntry[] = [
     meta: {"method":"POST","path":"/api/documents","title":"Создать документ","group":"documents","auth":"token","roles":"any","rate_limit":"none"},
   },
   {
+    slug: "endpoints/folders/delete-folders-id",
+    title: "Удалить папку",
+    meta: {"method":"DELETE","path":"/api/folders/{id}","title":"Удалить папку","group":"folders","auth":"token","roles":"any","rate_limit":"none"},
+  },
+  {
+    slug: "endpoints/folders/get-folders",
+    title: "Папки библиотеки",
+    meta: {"method":"GET","path":"/api/folders","title":"Папки библиотеки","group":"folders","auth":"token","roles":"any","rate_limit":"none"},
+  },
+  {
+    slug: "endpoints/folders/patch-folders-id",
+    title: "Переименовать папку",
+    meta: {"method":"PATCH","path":"/api/folders/{id}","title":"Переименовать папку","group":"folders","auth":"token","roles":"any","rate_limit":"none"},
+  },
+  {
+    slug: "endpoints/folders/post-folders",
+    title: "Завести папку",
+    meta: {"method":"POST","path":"/api/folders","title":"Завести папку","group":"folders","auth":"token","roles":"any","rate_limit":"none"},
+  },
+  {
     slug: "endpoints/generation/get-documents-id-jobs",
     title: "Выпуски по материалу",
     meta: {"method":"GET","path":"/api/documents/{id}/jobs","title":"Выпуски по материалу","group":"generation","auth":"token","roles":"any","rate_limit":"none"},
