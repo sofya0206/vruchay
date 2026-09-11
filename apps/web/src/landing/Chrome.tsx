@@ -16,7 +16,6 @@ export const AUDIENCE_PAGES = [
   { to: '/gov', label: 'Госучреждениям' },
   { to: '/business', label: 'Организациям' },
   { to: '/personal', label: 'Физлицам и самозанятым' },
-  { to: '/sport', label: 'Спорту и федерациям' },
   { to: '/education', label: 'Образованию и онлайн-школам' },
   { to: '/international', label: 'Международный контур' },
 ];

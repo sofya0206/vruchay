@@ -32,7 +32,7 @@ rate_limit: none
 ```json
 {
   "email": "",
-  "name": "Токен «выгрузка из СпортОрг»",
+  "name": "Токен «выгрузка из CRM»",
   "role": "member",
   "isPlatform": false
 }

@@ -65,10 +65,10 @@ export function OrgName() {
           value={orgName}
           onChange={(e) => setOrgName(e.target.value)}
           maxLength={200}
-          placeholder="Спортшкола «Дельфин»"
+          placeholder="Центр «Развитие»"
         />
         <p className="mt-1.5 text-sm text-[var(--text-muted)]">
-          Так и напишите, как принято у вас: «Федерация плавания области», «МБУ ДО СШОР №3».
+          Так и напишите, как принято у вас: «Учебный центр «Развитие»», «МБОУ СОШ №12».
         </p>
         <div className="mt-2 flex items-center gap-3">
           <Button

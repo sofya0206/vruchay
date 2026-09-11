@@ -128,7 +128,7 @@ function CreateForm({
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Семинар тренеров, октябрь"
+            placeholder="Семинар для наставников, октябрь"
           />
         </div>
         <div>

@@ -12,7 +12,7 @@ export interface RuleSetSummary {
   schemaVersion: number;
   updatedAt: string;
   ruleCount: number;
-  /** На скольких соревнованиях уже применён. */
+  /** На скольких мероприятиях уже применён. */
   documentCount: number;
 }
 

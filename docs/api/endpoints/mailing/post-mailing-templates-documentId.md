@@ -36,11 +36,11 @@ rate_limit: none
 ```json
 {
   "kind": "marketing",
-  "subject": "Соревнования сезона, {{name}}",
+  "subject": "Мероприятия сезона, {{name}}",
   "bodyHtml": "<p>Здравствуйте, {{name}}! Приглашаем на осенний старт.</p>",
   "attachGeneratedFile": false,
   "senderId": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
-  "advertiserName": "ООО «Федерация плавания»"
+  "advertiserName": "ООО «Развитие»"
 }
 ```
 
@@ -68,8 +68,8 @@ rate_limit: none
   "documentId": "9e8d7c6b-5a4f-4e3d-2c1b-0a9f8e7d6c5b",
   "senderId": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
   "kind": "marketing",
-  "advertiserName": "ООО «Федерация плавания»",
-  "subject": "Соревнования сезона, {{name}}",
+  "advertiserName": "ООО «Развитие»",
+  "subject": "Мероприятия сезона, {{name}}",
   "bodyHtml": "<p>Здравствуйте, {{name}}! Приглашаем на осенний старт.</p>",
   "attachGeneratedFile": false,
   "createdAt": "2026-08-21T10:00:00.000Z",
@@ -98,5 +98,5 @@ rate_limit: none
 curl -X POST "https://vruchay.ru/api/mailing/templates/$DOCUMENT_ID" \
   -H "Authorization: Bearer $VRUCHAY_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"kind":"marketing","subject":"Соревнования сезона, {{name}}","bodyHtml":"<p>Здравствуйте, {{name}}!</p>","attachGeneratedFile":false,"advertiserName":"ООО «Федерация плавания»"}'
+  -d '{"kind":"marketing","subject":"Мероприятия сезона, {{name}}","bodyHtml":"<p>Здравствуйте, {{name}}!</p>","attachGeneratedFile":false,"advertiserName":"ООО «Развитие»"}'
 ```

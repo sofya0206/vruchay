@@ -42,9 +42,9 @@ rate_limit: none
 
 ```json
 {
-  "name": "Федерация гимнастики Самарской области",
+  "name": "Учебный центр «Развитие»",
   "slug": "fgso",
-  "description": "Региональная федерация. Соревнования и аттестации с 2004 года.",
+  "description": "Учебный центр. Программы и аттестации с 2004 года.",
   "inn": "6316123456",
   "website": "https://fgso.example.org",
   "contactEmail": "info@fgso.example.org",

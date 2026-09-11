@@ -31,7 +31,7 @@ rate_limit: none
 
 ```json
 {
-  "orgName": "Федерация гимнастики Самарской области",
+  "orgName": "Учебный центр «Развитие»",
   "plan": "free",
   "userName": "Мария Иванова",
   "email": "maria@example.org"

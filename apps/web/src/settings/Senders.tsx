@@ -140,7 +140,7 @@ export function Senders() {
               <Input
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Ассоциация тренеров"
+                placeholder="Центр «Развитие»"
               />
             </div>
             <Button

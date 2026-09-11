@@ -5,7 +5,6 @@ import type { ReactElement } from 'react';
 import { GovPage } from '../pages/GovPage';
 import { BusinessPage } from '../pages/BusinessPage';
 import { PersonalPage } from '../pages/PersonalPage';
-import { SportPage } from '../pages/SportPage';
 import { EducationPage } from '../pages/EducationPage';
 import { InternationalPage } from '../pages/InternationalPage';
 import { PricingPage } from '../pages/PricingPage';
@@ -32,7 +31,6 @@ const PAGES: [string, ReactElement][] = [
   ['госучреждениям', <GovPage />],
   ['организациям', <BusinessPage />],
   ['физлицам', <PersonalPage />],
-  ['спорту', <SportPage />],
   ['образованию', <EducationPage />],
   ['международный контур', <InternationalPage />],
   ['тарифы', <PricingPage />],

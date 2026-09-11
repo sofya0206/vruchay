@@ -52,7 +52,7 @@ rate_limit: none
   {
     "id": "3f9a1b2c-4d5e-4f60-8a71-2b3c4d5e6f70",
     "orgId": "7b2a4c6e-1d3f-4e5a-9b8c-0d1e2f3a4b5c",
-    "name": "Форма на странице соревнований",
+    "name": "Форма на странице мероприятия",
     "token": "00000000-0000-4000-8000-0000000000ab",
     "allowedDomains": ["example.ru"],
     "documentIds": ["9e8d7c6b-5a4f-4e3d-2c1b-0a9f8e7d6c5b"],

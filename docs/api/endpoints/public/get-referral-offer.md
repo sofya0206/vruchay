@@ -47,7 +47,7 @@ rate_limit: «20 запросов за 5 минут с одного IP»
 ```json
 {
   "valid": true,
-  "invitedBy": "Федерация гимнастики Самарской области",
+  "invitedBy": "Учебный центр «Развитие»",
   "freeLimit": 50,
   "welcomeBonus": 50,
   "total": 100

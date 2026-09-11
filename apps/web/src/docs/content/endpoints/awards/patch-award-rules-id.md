@@ -45,7 +45,7 @@ rate_limit: none
       "action": "issue",
       "outputs": [
         { "templateDocumentId": "3a9e0c4d-3333-4c7d-8e1f-2a3b4c5d6e7f", "label": "Диплом победителя" },
-        { "templateDocumentId": "5c1e2f60-6666-4e9f-8a12-5d6e7f809123", "subjectColumn": "coach", "dedupeScope": "group", "label": "Благодарность тренеру" }
+        { "templateDocumentId": "5c1e2f60-6666-4e9f-8a12-5d6e7f809123", "subjectColumn": "coach", "dedupeScope": "group", "label": "Благодарность наставнику" }
       ]
     }
   ]

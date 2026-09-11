@@ -50,12 +50,12 @@ export function MiniSheet({
   kind = 'Сертификат',
   label = 'участника',
   name = 'Островская Анна',
-  main = 'за первое место на дистанции 200 м вольным стилем',
-  event = 'Первенство области по плаванию',
+  main = 'за первое место в номинации «Лучший проект»',
+  event = 'Конкурс «Мастер года»',
   foot = '17–19 июня 2026 · Челябинск',
-  signer = 'Президент федерации',
+  signer = 'Директор центра',
   signerName = 'А. В. Соколов',
-  org = 'Федерация плавания',
+  org = 'Центр «Развитие»',
   highlightName = false,
 }: SheetProps) {
   const u = 10 * scale;
@@ -264,14 +264,14 @@ export function EditorMock() {
 
 /** Таблица: колонки списка становятся полями бланка. */
 export function TableMock() {
-  const cols = ['ФИО', 'Почта', 'Место', 'Дистанция'];
+  const cols = ['ФИО', 'Почта', 'Место', 'Номинация'];
   const vars = ['%name', '%email', '%place', '%event'];
   const rows = [
-    ['Островская Анна', 'anna.k@mail.ru', '1', '200 м вольным стилем'],
-    ['Иванов Пётр', 'p.ivanov@yandex.ru', '2', '200 м вольным стилем'],
-    ['Смирнова Дарья', 'd.smirnova@gmail.com', '3', '100 м на спине'],
-    ['Ким Артём', 'a.kim@mail.ru', '4', '100 м на спине'],
-    ['Тарасов Илья', 'i.tarasov@mail.ru', '5', '400 м комплекс'],
+    ['Островская Анна', 'anna.k@mail.ru', '1', 'Лучший проект'],
+    ['Иванов Пётр', 'p.ivanov@yandex.ru', '2', 'Лучший проект'],
+    ['Смирнова Дарья', 'd.smirnova@gmail.com', '3', 'Лучшая команда'],
+    ['Ким Артём', 'a.kim@mail.ru', '4', 'Лучшая команда'],
+    ['Тарасов Илья', 'i.tarasov@mail.ru', '5', 'Приз зрителей'],
   ];
   return (
     <Frame url="vruchay.ru / список участников">
@@ -339,12 +339,12 @@ export function FilesMock() {
             alignContent: 'center',
           }}
         >
-          <MiniSheet kind="Грамота" label="" main="за первое место" event="" />
+          <MiniSheet kind="Сертификат" label="" main="за первое место" event="" />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           <div style={{ paddingBottom: 10, borderBottom: '1px solid var(--line)', fontSize: 14 }}>
             <p style={{ fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              Грамота за место
+              Сертификат за место
             </p>
             <p
               style={{
@@ -406,8 +406,8 @@ export function LettersMock() {
   return (
     <Frame url="vruchay.ru / рассылка">
       <div style={{ padding: 16, borderBottom: '1px solid var(--line)' }}>
-        <p style={{ fontSize: 14, color: 'var(--text-muted)' }}>От: Федерация плавания &lt;award@sport-fed.ru&gt;</p>
-        <p style={{ marginTop: 4, fontWeight: 500 }}>Ваша грамота за Первенство области по плаванию</p>
+        <p style={{ fontSize: 14, color: 'var(--text-muted)' }}>От: Центр «Развитие» &lt;award@example.ru&gt;</p>
+        <p style={{ marginTop: 4, fontWeight: 500 }}>Ваш сертификат за конкурс «Мастер года»</p>
       </div>
       {items.map(([mail, label, tone, when]) => (
         <div

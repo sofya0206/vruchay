@@ -63,7 +63,7 @@ export interface DocumentSummary {
 
 export interface DocumentDetail extends DocumentSummary {
   /**
-   * Набор правил награждения, привязанный к соревнованию. null — раскладка
+   * Набор правил награждения, привязанный к мероприятию. null — раскладка
    * не настроена: документы выпускаются по одному макету на всех.
    */
   ruleSetId: string | null;

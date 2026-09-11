@@ -22,7 +22,7 @@ rate_limit: none
 
 ```json
 {
-  "name": "Федерация гимнастики Самарской области"
+  "name": "Учебный центр «Развитие»"
 }
 ```
 
@@ -53,5 +53,5 @@ rate_limit: none
 curl -X PATCH "https://vruchay.ru/api/org" \
   -H "Authorization: Bearer $VRUCHAY_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"name":"Федерация гимнастики Самарской области"}'
+  -d '{"name":"Учебный центр «Развитие»"}'
 ```

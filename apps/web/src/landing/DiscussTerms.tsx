@@ -104,7 +104,7 @@ export function DiscussTerms() {
           <form onSubmit={submit} className="mt-8 grid gap-5 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <Label>Организация</Label>
-              <Input name="orgName" required maxLength={200} placeholder="Федерация лёгкой атлетики области" />
+              <Input name="orgName" required maxLength={200} placeholder="Учебный центр «Развитие»" />
             </div>
 
             <div>

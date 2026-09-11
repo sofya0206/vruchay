@@ -38,7 +38,6 @@ const ROUTES = [
   '/gov',
   '/business',
   '/personal',
-  '/sport',
   '/education',
   '/international',
   '/pricing',

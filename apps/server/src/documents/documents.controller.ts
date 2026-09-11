@@ -92,7 +92,7 @@ export class DocumentsController {
     return result;
   }
 
-  /** Тот же реестр таблицей: федерации ведут отчётность в Excel. */
+  /** Тот же реестр таблицей: организации ведут отчётность в Excel. */
   @Get(':id/registry.csv')
   async registryCsv(
     @CurrentUser() user: SessionUser,

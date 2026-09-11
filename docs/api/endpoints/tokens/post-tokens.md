@@ -29,7 +29,7 @@ rate_limit: none
 
 ```json
 {
-  "name": "выгрузка из СпортОрг",
+  "name": "выгрузка из CRM",
   "role": "member"
 }
 ```
@@ -47,7 +47,7 @@ rate_limit: none
 ```json
 {
   "id": "5f1c2e6a-9d0b-4c3e-8a7f-1b2c3d4e5f60",
-  "name": "выгрузка из СпортОрг",
+  "name": "выгрузка из CRM",
   "token": "vru_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 }
 ```
@@ -70,5 +70,5 @@ rate_limit: none
 curl -X POST "https://vruchay.ru/api/tokens" \
   -b cookies.txt \
   -H "Content-Type: application/json" \
-  -d '{"name":"выгрузка из СпортОрг","role":"member"}'
+  -d '{"name":"выгрузка из CRM","role":"member"}'
 ```

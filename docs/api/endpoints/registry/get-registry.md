@@ -61,7 +61,7 @@ rate_limit: none
       "email": "ivanova@example.com",
       "documentId": "b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e",
       "documentTitle": "Сертификат участника",
-      "eventName": "Открытый кубок города",
+      "eventName": "Городской конкурс «Мастер года»",
       "eventDate": "14.06.2026",
       "issuedAt": "2026-06-15T09:12:44.000Z",
       "expiresAt": null,

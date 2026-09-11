@@ -119,7 +119,7 @@ export function Billing() {
             value={form.name}
             onChange={(e) => set({ name: e.target.value })}
             maxLength={300}
-            placeholder={person ? 'ООО «Дельфин»' : 'Новикова Мария Сергеевна'}
+            placeholder={person ? 'ООО «Развитие»' : 'Новикова Мария Сергеевна'}
           />
         </div>
 

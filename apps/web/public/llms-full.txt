@@ -542,7 +542,7 @@ PDF (или JPEG) на человека, с подставленным имен�
     {
       "id": "913",
       "action": "token.create",
-      "summary": "Выдан токен доступа «выгрузка из СпортОрг»",
+      "summary": "Выдан токен доступа «выгрузка из CRM»",
       "actorName": "Мария Иванова",
       "actorEmail": "maria@example.org",
       "targetType": "token",
@@ -553,7 +553,7 @@ PDF (или JPEG) на человека, с подставленным имен�
       "id": "912",
       "action": "generation.start",
       "summary": "Выпуск документов: 12",
-      "actorName": "Токен «выгрузка из СпортОрг»",
+      "actorName": "Токен «выгрузка из CRM»",
       "actorEmail": "",
       "targetType": "document",
       "targetId": "0c9b7a65-4d3e-4f21-8b0a-1e2f3a4b5c6d",
@@ -607,7 +607,7 @@ curl "https://vruchay.ru/api/audit?limit=50&offset=0&action=generation.start" \
 ```json
 {
   "email": "",
-  "name": "Токен «выгрузка из СпортОрг»",
+  "name": "Токен «выгрузка из CRM»",
   "role": "member",
   "isPlatform": false
 }
@@ -633,7 +633,7 @@ curl "https://vruchay.ru/api/auth/me" \
 
 # DELETE /api/award-rules/{id}
 
-Убирает набор из списка. Удаление мягкое: запись остаётся в базе с отметкой времени удаления, а признак «по умолчанию» снимается. Так сделано ради реестра выданного — он должен уметь объяснить, по какому правилу выдан документ на прошлом соревновании, даже когда набором больше не пользуются.
+Убирает набор из списка. Удаление мягкое: запись остаётся в базе с отметкой времени удаления, а признак «по умолчанию» снимается. Так сделано ради реестра выданного — он должен уметь объяснить, по какому правилу выдан документ на прошлом мероприятии, даже когда набором больше не пользуются.
 
 После удаления набор перестаёт отдаваться где бы то ни было: `GET /api/award-rules/{id}` вернёт 404, привязать его к документу уже нельзя. Привязка у документов, где набор был выбран, при этом не снимается сама — `POST /api/documents/{id}/awards/preview` без тела на таком документе ответит 404 «Набор правил не найден», пока не привязать другой набор.
 
@@ -769,7 +769,7 @@ curl "https://vruchay.ru/api/award-rules/templates" \
 
 # GET /api/award-rules
 
-Наборы правил награждения организации. Набор описывает, кому какой документ полагается по данным таблицы получателей: «первое место — диплом победителя», «снятым не выдавать», «остальным грамота участника». Набор принадлежит организации, а не соревнованию, — федерация настраивает награждение один раз на сезон и применяет к каждому следующему протоколу привязкой `POST /api/documents/{id}/awards/rule-set`.
+Наборы правил награждения организации. Набор описывает, кому какой документ полагается по данным таблицы получателей: «первое место — диплом победителя», «снятым не выдавать», «остальным грамота участника». Набор принадлежит организации, а не мероприятию, — организация настраивает награждение один раз на сезон и применяет к каждому следующему протоколу привязкой `POST /api/documents/{id}/awards/rule-set`.
 
 Список короткий: сами правила здесь не отдаются, только их количество. Полный набор — `GET /api/award-rules/{id}`. Удалённые наборы (мягкое удаление) не показываются. Пагинации нет — отдаются все живые наборы организации.
 
@@ -789,7 +789,7 @@ curl "https://vruchay.ru/api/award-rules/templates" \
 | `name` | string | название набора |
 | `groupColumn` | string | колонка группировки, `""` — не выбрана |
 | `statusColumn` | string | колонка статуса, `""` — не выбрана |
-| `isDefault` | boolean | предлагать по умолчанию для нового соревнования; такой набор у организации один |
+| `isDefault` | boolean | предлагать по умолчанию для нового мероприятия; такой набор у организации один |
 | `schemaVersion` | integer | версия формата правил, сейчас 1 |
 | `updatedAt` | string (ISO 8601) | время последней правки |
 | `ruleCount` | integer | сколько правил в наборе |
@@ -866,7 +866,7 @@ curl "https://vruchay.ru/api/award-rules" \
       "action": "issue",
       "outputs": [
         { "templateDocumentId": "3a9e0c4d-3333-4c7d-8e1f-2a3b4c5d6e7f", "label": "Диплом победителя" },
-        { "templateDocumentId": "5c1e2f60-6666-4e9f-8a12-5d6e7f809123", "subjectColumn": "coach", "dedupeScope": "group", "label": "Благодарность тренеру" }
+        { "templateDocumentId": "5c1e2f60-6666-4e9f-8a12-5d6e7f809123", "subjectColumn": "coach", "dedupeScope": "group", "label": "Благодарность наставнику" }
       ]
     }
   ]
@@ -905,7 +905,7 @@ curl -X PATCH "https://vruchay.ru/api/award-rules/$RULE_SET_ID" \
 
 # POST /api/award-rules/{id}/duplicate
 
-Делает копию набора — «взять как на прошлом соревновании и поправить». Тела у запроса нет.
+Делает копию набора — «взять как на прошлом мероприятии и поправить». Тела у запроса нет.
 
 Что происходит с копией: название — исходное с припиской ` — копия`, обрезанное до 200 символов; колонки группы и статуса, версия формата, а также все правила с их условиями, выходами и порядком переносятся как есть; признак «по умолчанию» у копии всегда `false`. Идентификаторы правил выдаются новые: у копии своя жизнь, и снимки прошлых раскладок должны ссылаться на исходные правила, а не на копии.
 
@@ -1057,7 +1057,7 @@ curl -X POST "https://vruchay.ru/api/award-rules" \
 
 | Параметр | Тип | Обязателен | Описание |
 |---|---|---|---|
-| `id` | UUID (путь) | да | Идентификатор документа-соревнования |
+| `id` | UUID (путь) | да | Идентификатор документа-мероприятия |
 
 Тело:
 
@@ -1155,7 +1155,7 @@ curl -X POST "https://vruchay.ru/api/award-rules" \
 | Код | Когда |
 |---|---|
 | 400 | `Некорректный идентификатор` — `id` не UUID |
-| 400 | `К этому соревнованию не привязан набор правил — выберите его в разделе «Правила»` — тела с `ruleSet` нет и привязки у документа нет |
+| 400 | `К этому мероприятию не привязан набор правил — выберите его в разделе «Правила»` — тела с `ruleSet` нет и привязки у документа нет |
 | 400 | `Выбранный шаблон недоступен: он удалён или лежит в корзине` — в черновике ссылка на чужой или удалённый шаблон |
 | 400 | Сообщения схемы набора правил — как у `POST /api/award-rules` (`Введите название набора`, `Некорректное имя колонки`, `Выберите шаблон` и прочие) |
 | 401 | Нет токена или сессии |
@@ -1179,7 +1179,7 @@ curl -X POST "https://vruchay.ru/api/documents/$DOCUMENT_ID/awards/preview" \
 
 # POST /api/documents/{id}/awards/rule-set
 
-Выбирает, по какому набору правил награждается это соревнование. Сам набор принадлежит организации и живёт отдельно (`/api/award-rules`); здесь запоминается только ссылка на него у документа. Привязка ничего не считает и не выпускает — она нужна, чтобы `POST /api/documents/{id}/awards/preview` знал, какие правила брать, когда тело запроса пустое.
+Выбирает, по какому набору правил награждается это мероприятие. Сам набор принадлежит организации и живёт отдельно (`/api/award-rules`); здесь запоминается только ссылка на него у документа. Привязка ничего не считает и не выпускает — она нужна, чтобы `POST /api/documents/{id}/awards/preview` знал, какие правила брать, когда тело запроса пустое.
 
 Привязка одна: повторный вызов заменяет прежний набор. `ruleSetId: null` отвязывает набор от документа.
 
@@ -1189,7 +1189,7 @@ curl -X POST "https://vruchay.ru/api/documents/$DOCUMENT_ID/awards/preview" \
 
 | Параметр | Тип | Обязателен | Описание |
 |---|---|---|---|
-| `id` | UUID (путь) | да | Идентификатор документа-соревнования |
+| `id` | UUID (путь) | да | Идентификатор документа-мероприятия |
 
 Тело:
 
@@ -1261,7 +1261,7 @@ curl -X POST "https://vruchay.ru/api/documents/$DOCUMENT_ID/awards/rule-set" \
 
 | Параметр | Тип | Обязателен | Описание |
 |---|---|---|---|
-| `id` | UUID (путь) | да | Идентификатор документа-соревнования |
+| `id` | UUID (путь) | да | Идентификатор документа-мероприятия |
 
 Тело:
 
@@ -1272,7 +1272,7 @@ curl -X POST "https://vruchay.ru/api/documents/$DOCUMENT_ID/awards/rule-set" \
 Пустое тело `{}` — законный запрос.
 
 ```json
-{ "name": "Первенство области, весна" }
+{ "name": "Конкурс «Мастер года», весна" }
 ```
 
 ## Ответ
@@ -1282,7 +1282,7 @@ curl -X POST "https://vruchay.ru/api/documents/$DOCUMENT_ID/awards/rule-set" \
 ```json
 {
   "id": "b3f1c8a2-aaaa-4d10-9e45-1a2b3c4d5e6f",
-  "name": "Первенство области, весна",
+  "name": "Конкурс «Мастер года», весна",
   "schemaVersion": 1,
   "groupColumn": "category",
   "statusColumn": "status",
@@ -1347,7 +1347,7 @@ curl -X POST "https://vruchay.ru/api/documents/$DOCUMENT_ID/awards/rule-set" \
 curl -X POST "https://vruchay.ru/api/documents/$DOCUMENT_ID/awards/suggest" \
   -H "Authorization: Bearer $VRUCHAY_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"name":"Первенство области, весна"}'
+  -d '{"name":"Конкурс «Мастер года», весна"}'
 ```
 
 ---
@@ -1730,7 +1730,7 @@ curl "https://vruchay.ru/api/documents/$DOCUMENT_ID/registry" \
   "pageHeightMm": 210,
   "verifyEnabled": true,
   "verifyFields": ["name", "place"],
-  "eventName": "Первенство области по плаванию",
+  "eventName": "Конкурс «Мастер года»",
   "eventDate": "17–19 июня 2026",
   "eventPlace": "г. Челябинск",
   "eventHours": "",
@@ -1836,7 +1836,7 @@ curl "https://vruchay.ru/api/documents/$DOCUMENT_ID" \
       "updatedAt": "2026-08-30T10:12:44.000Z",
       "createdAt": "2026-08-01T08:00:00.000Z",
       "folderId": "9f1c0c8e-0f3c-4a1a-9c1f-1f7d2a3b4c5d",
-      "eventName": "Первенство области по плаванию",
+      "eventName": "Конкурс «Мастер года»",
       "eventDate": "17–19 июня 2026",
       "deletedAt": null,
       "sheetCount": 1,
@@ -2040,7 +2040,7 @@ curl -X PATCH "https://vruchay.ru/api/documents/$DOCUMENT_ID/sheets/$SHEET_ID" \
 
 ```json
 {
-  "eventName": "Первенство области по плаванию",
+  "eventName": "Конкурс «Мастер года»",
   "eventDate": "17–19 июня 2026",
   "eventPlace": "г. Челябинск",
   "issueDate": "2026-06-19",
@@ -2062,7 +2062,7 @@ curl -X PATCH "https://vruchay.ru/api/documents/$DOCUMENT_ID/sheets/$SHEET_ID" \
   "pageHeightMm": 210,
   "verifyEnabled": true,
   "verifyFields": ["name", "place"],
-  "eventName": "Первенство области по плаванию",
+  "eventName": "Конкурс «Мастер года»",
   "eventDate": "17–19 июня 2026",
   "eventPlace": "г. Челябинск",
   "eventHours": "",
@@ -2097,7 +2097,7 @@ curl -X PATCH "https://vruchay.ru/api/documents/$DOCUMENT_ID/sheets/$SHEET_ID" \
 curl -X PATCH "https://vruchay.ru/api/documents/$DOCUMENT_ID" \
   -H "Authorization: Bearer $VRUCHAY_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"eventName":"Первенство области по плаванию","issueDate":"2026-06-19","expiresIn":"P1Y"}'
+  -d '{"eventName":"Конкурс «Мастер года»","issueDate":"2026-06-19","expiresIn":"P1Y"}'
 ```
 
 ---
@@ -3449,7 +3449,7 @@ curl -X DELETE "https://vruchay.ru/api/integrations/tilda/$INTEGRATION_ID" \
 {
   "id": "3f9a1b2c-4d5e-4f60-8a71-2b3c4d5e6f70",
   "orgId": "7b2a4c6e-1d3f-4e5a-9b8c-0d1e2f3a4b5c",
-  "name": "Форма на странице соревнований",
+  "name": "Форма на странице мероприятия",
   "token": "00000000-0000-4000-8000-0000000000ab",
   "allowedDomains": ["example.ru"],
   "documentIds": ["9e8d7c6b-5a4f-4e3d-2c1b-0a9f8e7d6c5b"],
@@ -3601,7 +3601,7 @@ curl "https://vruchay.ru/api/integrations/tilda/requests?integrationId=$INTEGRAT
   {
     "id": "3f9a1b2c-4d5e-4f60-8a71-2b3c4d5e6f70",
     "orgId": "7b2a4c6e-1d3f-4e5a-9b8c-0d1e2f3a4b5c",
-    "name": "Форма на странице соревнований",
+    "name": "Форма на странице мероприятия",
     "token": "00000000-0000-4000-8000-0000000000ab",
     "allowedDomains": ["example.ru"],
     "documentIds": ["9e8d7c6b-5a4f-4e3d-2c1b-0a9f8e7d6c5b"],
@@ -3659,7 +3659,7 @@ curl "https://vruchay.ru/api/integrations/tilda" \
 
 ```json
 {
-  "name": "Форма на странице соревнований",
+  "name": "Форма на странице мероприятия",
   "allowedDomains": ["example.ru", "edu.example.ru"],
   "documentIds": ["9e8d7c6b-5a4f-4e3d-2c1b-0a9f8e7d6c5b"],
   "authMode": "none",
@@ -3681,7 +3681,7 @@ curl "https://vruchay.ru/api/integrations/tilda" \
 {
   "id": "3f9a1b2c-4d5e-4f60-8a71-2b3c4d5e6f70",
   "orgId": "7b2a4c6e-1d3f-4e5a-9b8c-0d1e2f3a4b5c",
-  "name": "Форма на странице соревнований",
+  "name": "Форма на странице мероприятия",
   "token": "00000000-0000-4000-8000-0000000000ab",
   "allowedDomains": ["example.ru", "edu.example.ru"],
   "documentIds": ["9e8d7c6b-5a4f-4e3d-2c1b-0a9f8e7d6c5b"],
@@ -3720,7 +3720,7 @@ curl "https://vruchay.ru/api/integrations/tilda" \
 curl -X PATCH "https://vruchay.ru/api/integrations/tilda/$INTEGRATION_ID" \
   -H "Authorization: Bearer $VRUCHAY_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"name":"Форма на странице соревнований","allowedDomains":["example.ru"],"documentIds":["'"$DOCUMENT_ID"'"],"active":false}'
+  -d '{"name":"Форма на странице мероприятия","allowedDomains":["example.ru"],"documentIds":["'"$DOCUMENT_ID"'"],"active":false}'
 ```
 
 ---
@@ -3756,8 +3756,8 @@ curl -X PATCH "https://vruchay.ru/api/integrations/tilda/$INTEGRATION_ID" \
 
 ```json
 {
-  "name": "Форма на странице соревнований",
-  "allowedDomains": ["https://www.example.ru/sport"],
+  "name": "Форма на странице мероприятия",
+  "allowedDomains": ["https://www.example.ru/events"],
   "documentIds": ["9e8d7c6b-5a4f-4e3d-2c1b-0a9f8e7d6c5b"],
   "authMode": "email_code",
   "singleFilePerEmail": true,
@@ -3778,7 +3778,7 @@ curl -X PATCH "https://vruchay.ru/api/integrations/tilda/$INTEGRATION_ID" \
 {
   "id": "3f9a1b2c-4d5e-4f60-8a71-2b3c4d5e6f70",
   "orgId": "7b2a4c6e-1d3f-4e5a-9b8c-0d1e2f3a4b5c",
-  "name": "Форма на странице соревнований",
+  "name": "Форма на странице мероприятия",
   "token": "00000000-0000-4000-8000-0000000000ab",
   "allowedDomains": ["example.ru"],
   "documentIds": ["9e8d7c6b-5a4f-4e3d-2c1b-0a9f8e7d6c5b"],
@@ -3819,7 +3819,7 @@ curl -X PATCH "https://vruchay.ru/api/integrations/tilda/$INTEGRATION_ID" \
 curl -X POST "https://vruchay.ru/api/integrations/tilda" \
   -H "Authorization: Bearer $VRUCHAY_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"name":"Форма на странице соревнований","allowedDomains":["example.ru"],"documentIds":["'"$DOCUMENT_ID"'"]}'
+  -d '{"name":"Форма на странице мероприятия","allowedDomains":["example.ru"],"documentIds":["'"$DOCUMENT_ID"'"]}'
 ```
 
 ---
@@ -3929,7 +3929,7 @@ curl -X DELETE "https://vruchay.ru/api/mail/domains/$DOMAIN_ID" \
         "orgId": "7b2a4c6e-1d3f-4e5a-9b8c-0d1e2f3a4b5c",
         "domainId": "0f6d1e3a-9c1b-4a4e-8b6a-2f1a5c7d9e01",
         "email": "awards@example.ru",
-        "displayName": "Федерация плавания",
+        "displayName": "Центр «Развитие»",
         "isDefault": false,
         "createdAt": "2026-08-20T09:20:00.000Z"
       }
@@ -4086,7 +4086,7 @@ curl "https://vruchay.ru/api/mail/emails?documentId=$DOCUMENT_ID" \
     "orgId": "7b2a4c6e-1d3f-4e5a-9b8c-0d1e2f3a4b5c",
     "domainId": "0f6d1e3a-9c1b-4a4e-8b6a-2f1a5c7d9e01",
     "email": "awards@example.ru",
-    "displayName": "Федерация плавания",
+    "displayName": "Центр «Развитие»",
     "isDefault": false,
     "createdAt": "2026-08-20T09:20:00.000Z"
   }
@@ -4335,7 +4335,7 @@ curl -X POST "https://vruchay.ru/api/mail/send/$DOCUMENT_ID" \
 {
   "domainId": "0f6d1e3a-9c1b-4a4e-8b6a-2f1a5c7d9e01",
   "email": "awards@example.ru",
-  "displayName": "Федерация плавания"
+  "displayName": "Центр «Развитие»"
 }
 ```
 
@@ -4359,7 +4359,7 @@ curl -X POST "https://vruchay.ru/api/mail/send/$DOCUMENT_ID" \
   "orgId": "7b2a4c6e-1d3f-4e5a-9b8c-0d1e2f3a4b5c",
   "domainId": "0f6d1e3a-9c1b-4a4e-8b6a-2f1a5c7d9e01",
   "email": "awards@example.ru",
-  "displayName": "Федерация плавания",
+  "displayName": "Центр «Развитие»",
   "isDefault": false,
   "createdAt": "2026-08-20T09:20:00.000Z"
 }
@@ -4385,7 +4385,7 @@ curl -X POST "https://vruchay.ru/api/mail/send/$DOCUMENT_ID" \
 curl -X POST "https://vruchay.ru/api/mail/senders" \
   -H "Authorization: Bearer $VRUCHAY_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"domainId":"'"$DOMAIN_ID"'","email":"awards@example.ru","displayName":"Федерация плавания"}'
+  -d '{"domainId":"'"$DOMAIN_ID"'","email":"awards@example.ru","displayName":"Центр «Развитие»"}'
 ```
 
 ---
@@ -4609,8 +4609,8 @@ curl "https://vruchay.ru/api/mailing/log?documentId=$DOCUMENT_ID&problemsOnly=tr
   "documentId": "9e8d7c6b-5a4f-4e3d-2c1b-0a9f8e7d6c5b",
   "senderId": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
   "kind": "marketing",
-  "advertiserName": "ООО «Федерация плавания»",
-  "subject": "Соревнования сезона, {{name}}",
+  "advertiserName": "ООО «Развитие»",
+  "subject": "Мероприятия сезона, {{name}}",
   "bodyHtml": "<p>Здравствуйте, {{name}}!</p>",
   "attachGeneratedFile": false,
   "createdAt": "2026-08-21T10:00:00.000Z",
@@ -4620,7 +4620,7 @@ curl "https://vruchay.ru/api/mailing/log?documentId=$DOCUMENT_ID&problemsOnly=tr
     "orgId": "7b2a4c6e-1d3f-4e5a-9b8c-0d1e2f3a4b5c",
     "domainId": "0f6d1e3a-9c1b-4a4e-8b6a-2f1a5c7d9e01",
     "email": "awards@example.ru",
-    "displayName": "Федерация плавания",
+    "displayName": "Центр «Развитие»",
     "isDefault": false,
     "createdAt": "2026-08-20T09:20:00.000Z"
   }
@@ -4935,11 +4935,11 @@ curl -X POST "https://vruchay.ru/api/mailing/send" \
 ```json
 {
   "kind": "marketing",
-  "subject": "Соревнования сезона, {{name}}",
+  "subject": "Мероприятия сезона, {{name}}",
   "bodyHtml": "<p>Здравствуйте, {{name}}! Приглашаем на осенний старт.</p>",
   "attachGeneratedFile": false,
   "senderId": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
-  "advertiserName": "ООО «Федерация плавания»"
+  "advertiserName": "ООО «Развитие»"
 }
 ```
 
@@ -4967,8 +4967,8 @@ curl -X POST "https://vruchay.ru/api/mailing/send" \
   "documentId": "9e8d7c6b-5a4f-4e3d-2c1b-0a9f8e7d6c5b",
   "senderId": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
   "kind": "marketing",
-  "advertiserName": "ООО «Федерация плавания»",
-  "subject": "Соревнования сезона, {{name}}",
+  "advertiserName": "ООО «Развитие»",
+  "subject": "Мероприятия сезона, {{name}}",
   "bodyHtml": "<p>Здравствуйте, {{name}}! Приглашаем на осенний старт.</p>",
   "attachGeneratedFile": false,
   "createdAt": "2026-08-21T10:00:00.000Z",
@@ -4997,7 +4997,7 @@ curl -X POST "https://vruchay.ru/api/mailing/send" \
 curl -X POST "https://vruchay.ru/api/mailing/templates/$DOCUMENT_ID" \
   -H "Authorization: Bearer $VRUCHAY_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"kind":"marketing","subject":"Соревнования сезона, {{name}}","bodyHtml":"<p>Здравствуйте, {{name}}!</p>","attachGeneratedFile":false,"advertiserName":"ООО «Федерация плавания»"}'
+  -d '{"kind":"marketing","subject":"Мероприятия сезона, {{name}}","bodyHtml":"<p>Здравствуйте, {{name}}!</p>","attachGeneratedFile":false,"advertiserName":"ООО «Развитие»"}'
 ```
 
 ---
@@ -5109,9 +5109,9 @@ curl -X POST "https://vruchay.ru/api/mailing/test" \
 
 ```json
 {
-  "name": "Федерация гимнастики Самарской области",
+  "name": "Учебный центр «Развитие»",
   "slug": "fgso",
-  "description": "Региональная федерация. Соревнования и аттестации с 2004 года.",
+  "description": "Учебный центр. Программы и аттестации с 2004 года.",
   "inn": "6316123456",
   "website": "https://fgso.example.org",
   "contactEmail": "info@fgso.example.org",
@@ -5236,7 +5236,7 @@ curl "https://vruchay.ru/api/org/usage" \
 
 ```json
 {
-  "orgName": "Федерация гимнастики Самарской области",
+  "orgName": "Учебный центр «Развитие»",
   "plan": "free",
   "userName": "Мария Иванова",
   "email": "maria@example.org"
@@ -5359,7 +5359,7 @@ curl -X PATCH "https://vruchay.ru/api/org/me" \
 
 ```json
 {
-  "name": "Федерация гимнастики Самарской области",
+  "name": "Учебный центр «Развитие»",
   "slug": "fgso",
   "description": "",
   "inn": "",
@@ -5422,7 +5422,7 @@ curl -X PATCH "https://vruchay.ru/api/org/public-profile" \
 
 ```json
 {
-  "name": "Федерация гимнастики Самарской области"
+  "name": "Учебный центр «Развитие»"
 }
 ```
 
@@ -5453,7 +5453,7 @@ curl -X PATCH "https://vruchay.ru/api/org/public-profile" \
 curl -X PATCH "https://vruchay.ru/api/org" \
   -H "Authorization: Bearer $VRUCHAY_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"name":"Федерация гимнастики Самарской области"}'
+  -d '{"name":"Учебный центр «Развитие»"}'
 ```
 
 ---
@@ -5477,7 +5477,7 @@ curl -X PATCH "https://vruchay.ru/api/org" \
 
 ```json
 {
-  "name": "Федерация гимнастики Самарской области",
+  "name": "Учебный центр «Развитие»",
   "slug": "fgso",
   "description": "",
   "inn": "",
@@ -5566,7 +5566,7 @@ curl -X POST "https://vruchay.ru/api/org/public-profile/logo" \
     {
       "id": "0c9b7a65-4d3e-4f21-8b0a-1e2f3a4b5c6d",
       "title": "Грамоты первенства области",
-      "eventName": "Первенство Самарской области",
+      "eventName": "Конкурс «Мастер года»",
       "eventDate": "14 сентября 2026",
       "updatedAt": "2026-09-02T14:20:05.000Z"
     }
@@ -5643,7 +5643,7 @@ curl "https://vruchay.ru/api/overview" \
 ```json
 {
   "valid": true,
-  "invitedBy": "Федерация гимнастики Самарской области",
+  "invitedBy": "Учебный центр «Развитие»",
   "freeLimit": 50,
   "welcomeBonus": 50,
   "total": 100
@@ -5749,7 +5749,7 @@ curl "https://vruchay.ru/api/referral-offer?ref=k7m2qp"
       "path": "/c/K7M2-9QXR-4TVB",
       "name": "Иванова М. П.",
       "title": "Сертификат участника",
-      "eventName": "Открытый кубок города",
+      "eventName": "Городской конкурс «Мастер года»",
       "eventDate": "14.06.2026",
       "issuedAt": "2026-06-15T09:12:44.000Z",
       "state": "valid"
@@ -5850,9 +5850,9 @@ curl --get "https://vruchay.ru/api/v1/public/org/fgso/search" \
 
 ```json
 {
-  "name": "Федерация гимнастики Самарской области",
+  "name": "Учебный центр «Развитие»",
   "slug": "fgso",
-  "description": "Региональная федерация. Соревнования и аттестации с 2004 года.",
+  "description": "Учебный центр. Программы и аттестации с 2004 года.",
   "inn": "6316123456",
   "website": "https://fgso.example.org",
   "contactEmail": "info@fgso.example.org",
@@ -5866,7 +5866,7 @@ curl --get "https://vruchay.ru/api/v1/public/org/fgso/search" \
     {
       "id": "b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e",
       "title": "Сертификат участника",
-      "eventName": "Открытый кубок города",
+      "eventName": "Городской конкурс «Мастер года»",
       "eventDate": "14.06.2026",
       "issued": 248,
       "firstIssuedAt": "2026-06-15T09:12:44.000Z",
@@ -5943,8 +5943,8 @@ curl "https://vruchay.ru/api/v1/public/org/fgso"
   "items": [
     {
       "authorName": "Мария Петрова",
-      "authorRole": "Главный секретарь соревнований",
-      "orgName": "Федерация гимнастики Самарской области",
+      "authorRole": "Ответственный секретарь",
+      "orgName": "Учебный центр «Развитие»",
       "text": "Раньше на двести грамот уходило два дня: сверить фамилии, разложить по шаблону, разослать. Теперь загружаем таблицу и через полчаса рассылка уже ушла, а мы смотрим реестр — кто открыл письмо, кто нет.",
       "rating": 5,
       "publishedAt": "2026-05-20T10:03:00.000Z"
@@ -5973,7 +5973,7 @@ curl "https://vruchay.ru/api/v1/reviews?limit=6"
 # GET /api/v1/verify/{id}
 
 Страница проверки выданного документа. Открыта без входа намеренно: её открывает
-посторонний — работодатель, приёмная комиссия, судья на соревновании, — у которого
+посторонний — работодатель, приёмная комиссия, жюри конкурса, — у которого
 нет и не должно быть учётной записи. Заголовка `Authorization` здесь не нужно.
 
 Отвечает скупо: только то, что и так напечатано на бумаге, которую человек держит
@@ -6060,7 +6060,7 @@ stale-while-revalidate=60`; отозванный, заменённый и ист
   "revoked": false,
   "code": "K7M2-9QXR-4TVB",
   "title": "Сертификат участника",
-  "event": { "name": "Открытый кубок города", "date": "14.06.2026" },
+  "event": { "name": "Городской конкурс «Мастер года»", "date": "14.06.2026" },
   "issuedAt": "2026-06-15T09:12:44.000Z",
   "expiresAt": null,
   "fields": {
@@ -6069,7 +6069,7 @@ stale-while-revalidate=60`; отозванный, заменённый и ист
     "club": "СШОР «Олимп»"
   },
   "issuer": {
-    "name": "Федерация гимнастики Самарской области",
+    "name": "Учебный центр «Развитие»",
     "verified": true,
     "publicPath": "/org/fgso",
     "contactEmail": "info@fgso.example.org",
@@ -6096,12 +6096,12 @@ stale-while-revalidate=60`; отозванный, заменённый и ист
   "revoked": true,
   "code": "K7M2-9QXR-4TVB",
   "title": "Сертификат участника",
-  "event": { "name": "Открытый кубок города", "date": "14.06.2026" },
+  "event": { "name": "Городской конкурс «Мастер года»", "date": "14.06.2026" },
   "issuedAt": "2026-06-15T09:12:44.000Z",
   "expiresAt": null,
   "fields": {},
   "issuer": {
-    "name": "Федерация гимнастики Самарской области",
+    "name": "Учебный центр «Развитие»",
     "verified": true,
     "publicPath": "/org/fgso",
     "contactEmail": "info@fgso.example.org",
@@ -6647,7 +6647,7 @@ curl -X POST "https://vruchay.ru/api/documents/$DOCUMENT_ID/recipients/import" \
 
 Читает загруженный файл (Excel `.xlsx` или CSV) и возвращает, что в нём распознано: имя листа, строку с шапкой, колонки с подобранными латинскими именами переменных и сами строки. В базу ничего не записывается — это предварительный просмотр. Импорт подтверждается отдельным запросом `POST /api/documents/{id}/recipients/import`, в который клиент передаёт уже проверенные колонки и строки.
 
-Разбор берёт не больше 10 000 строк и 30 колонок; если строк больше, в `warnings` появится предупреждение «Взяты первые 10000 строк — остальные не поместились». Файл сначала пробуется прочитать как протокол соревнований (группы, места, двухуровневая шапка); если в нём нашлись графа места или группы, ответ содержит поле `protocol`. Если в файле фамилия, имя и отчество лежат отдельными колонками, а колонки `name` нет, разбор добавляет собранную колонку «ФИО» (`suggested: "name"`) в конец и сообщает об этом в `warnings`.
+Разбор берёт не больше 10 000 строк и 30 колонок; если строк больше, в `warnings` появится предупреждение «Взяты первые 10000 строк — остальные не поместились». Файл сначала пробуется прочитать как протокол мероприятия (группы, места, двухуровневая шапка); если в нём нашлись графа места или группы, ответ содержит поле `protocol`. Если в файле фамилия, имя и отчество лежат отдельными колонками, а колонки `name` нет, разбор добавляет собранную колонку «ФИО» (`suggested: "name"`) в конец и сообщает об этом в `warnings`.
 
 ## Запрос
 
@@ -6682,7 +6682,7 @@ curl -X POST "https://vruchay.ru/api/documents/$DOCUMENT_ID/recipients/import" \
 | `suggestions[].before`, `suggestions[].after` | string | Пример «было → стало» из первой затронутой ячейки |
 | `suggestions[].values` | string[] | Готовые значения колонки по строкам — можно подставить в `rows` как есть |
 | `warnings` | string[] | Предупреждения для человека (другой лист, обрезанные строки, собранное ФИО и т. п.) |
-| `protocol` | object \| отсутствует | Есть, только если файл прочитан как протокол соревнований |
+| `protocol` | object \| отсутствует | Есть, только если файл прочитан как протокол мероприятия |
 | `protocol.groupColumn` | string | Имя колонки, по которой строки делятся на группы; пусто — групп нет |
 | `protocol.groups` | array | Группы: `{ title: string, rowCount: number }` |
 | `protocol.headerRowCount` | number | Сколько строк заняла шапка: 1 или 2 |
@@ -6814,7 +6814,7 @@ curl -X POST "https://vruchay.ru/api/documents/$DOCUMENT_ID/recipients/rows" \
 готовая ссылка, готовый текст для мессенджера, список приглашённых и сколько
 бонусных документов уже заработано.
 
-Раздел открыт любому сотруднику организации: звать коллег из соседней федерации
+Раздел открыт любому сотруднику организации: звать коллег из соседней организации
 будет тот, кто с ними знаком, а не обязательно владелец учётной записи.
 
 Первый вызов имеет побочное действие: если у организации ещё нет кода
@@ -6864,7 +6864,7 @@ curl -X POST "https://vruchay.ru/api/documents/$DOCUMENT_ID/recipients/rows" \
 {
   "code": "k7m2qp",
   "link": "https://vruchay.ru/register?ref=k7m2qp",
-  "message": "Мы в «Федерация гимнастики Самарской области» выдаём грамоты и сертификаты через сервис «Вручай»: загружаешь список участников — он сам делает именные файлы и рассылает их по почте. Вручную это занимало два дня, теперь — полчаса.\n\nВот приглашение, по нему дают 100 бесплатных документов вместо 50:\nhttps://vruchay.ru/register?ref=k7m2qp",
+  "message": "Мы в «Учебный центр «Развитие»» выдаём грамоты и сертификаты через сервис «Вручай»: загружаешь список участников — он сам делает именные файлы и рассылает их по почте. Вручную это занимало два дня, теперь — полчаса.\n\nВот приглашение, по нему дают 100 бесплатных документов вместо 50:\nhttps://vruchay.ru/register?ref=k7m2qp",
   "invitedTotal": 3,
   "invitedWorking": 2,
   "bonusEarned": 100,
@@ -6979,7 +6979,7 @@ curl "https://vruchay.ru/api/referral" \
     {
       "documentId": "b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e",
       "title": "Сертификат участника",
-      "eventName": "Открытый кубок города",
+      "eventName": "Городской конкурс «Мастер года»",
       "issued": 640,
       "verifications": 1502
     }
@@ -7140,7 +7140,7 @@ curl "https://vruchay.ru/api/registry/archive?ids=$FILE_ID_1,$FILE_ID_2" \
 
 ```
 "№";"ФИО";"Адрес почты";"Материал";"Мероприятие";"Выдан";"Действителен до";"Проверочный код";"Состояние";"Письмо";"Проверок по QR";"Удаление по сроку"
-"1";"Иванова Мария Петровна";"ivanova@example.com";"Сертификат участника";"Открытый кубок города";"15.06.2026";"";"K7M2-9QXR-4TVB";"действителен";"доставлено";"3";""
+"1";"Иванова Мария Петровна";"ivanova@example.com";"Сертификат участника";"Городской конкурс «Мастер года»";"15.06.2026";"";"K7M2-9QXR-4TVB";"действителен";"доставлено";"3";""
 ```
 
 ## Ошибки
@@ -7196,12 +7196,12 @@ curl "https://vruchay.ru/api/registry/export.csv?documentId=$DOCUMENT_ID" \
     {
       "id": "b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e",
       "title": "Сертификат участника",
-      "eventName": "Открытый кубок города",
+      "eventName": "Городской конкурс «Мастер года»",
       "eventDate": "14.06.2026",
       "deletedAt": null
     }
   ],
-  "events": ["Открытый кубок города"],
+  "events": ["Городской конкурс «Мастер года»"],
   "trashDays": 7
 }
 ```
@@ -7415,7 +7415,7 @@ curl "https://vruchay.ru/api/registry/files/$FILE_ID" \
       "email": "ivanova@example.com",
       "documentId": "b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e",
       "documentTitle": "Сертификат участника",
-      "eventName": "Открытый кубок города",
+      "eventName": "Городской конкурс «Мастер года»",
       "eventDate": "14.06.2026",
       "issuedAt": "2026-06-15T09:12:44.000Z",
       "expiresAt": null,
@@ -7663,7 +7663,7 @@ curl -X POST "https://vruchay.ru/api/registry/resend" \
 | `filter` | object | либо оно, либо `fileIds` | Отбор реестра ([reference/registry-filter.md](../../reference/registry-filter.md)); должен содержать хотя бы одно из `documentId`, `event`, `from`, `to`. |
 
 ```json
-{ "filter": { "event": "Открытый кубок города", "from": "2026-06-01", "to": "2026-06-30" } }
+{ "filter": { "event": "Городской конкурс «Мастер года»", "from": "2026-06-01", "to": "2026-06-30" } }
 ```
 
 ## Ответ
@@ -7767,7 +7767,7 @@ curl -X POST "https://vruchay.ru/api/registry/revoke/preview" \
   "filter": { "documentId": "b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e" },
   "revoked": true,
   "expectedCount": 640,
-  "reasonPublic": "Протокол соревнований пересмотрен",
+  "reasonPublic": "Протокол мероприятия пересмотрен",
   "reasonInternal": "Ошибка судейской бригады, письмо от 20.06"
 }
 ```
@@ -7899,8 +7899,8 @@ curl -X DELETE "https://vruchay.ru/api/reviews/$REVIEW_ID" \
 {
   "id": "c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f",
   "authorName": "Мария Петрова",
-  "authorRole": "Главный секретарь соревнований",
-  "orgName": "Федерация гимнастики Самарской области",
+  "authorRole": "Ответственный секретарь",
+  "orgName": "Учебный центр «Развитие»",
   "text": "Раньше на двести грамот уходило два дня. Теперь загружаем таблицу и через полчаса рассылка уже ушла.",
   "rating": 5,
   "status": "published",
@@ -7958,8 +7958,8 @@ curl "https://vruchay.ru/api/reviews/mine" \
 ```json
 {
   "authorName": "Мария Петрова",
-  "authorRole": "Главный секретарь соревнований",
-  "orgName": "Федерация гимнастики Самарской области",
+  "authorRole": "Ответственный секретарь",
+  "orgName": "Учебный центр «Развитие»",
   "text": "Раньше на двести грамот уходило два дня: сверить фамилии, разложить по шаблону, разослать. Теперь загружаем таблицу и через полчаса рассылка уже ушла.",
   "rating": 5
 }
@@ -7993,8 +7993,8 @@ curl "https://vruchay.ru/api/reviews/mine" \
   "orgId": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
   "userId": "f0e1d2c3-b4a5-4968-9788-6a5b4c3d2e1f",
   "authorName": "Мария Петрова",
-  "authorRole": "Главный секретарь соревнований",
-  "orgName": "Федерация гимнастики Самарской области",
+  "authorRole": "Ответственный секретарь",
+  "orgName": "Учебный центр «Развитие»",
   "text": "Раньше на двести грамот уходило два дня: сверить фамилии, разложить по шаблону, разослать. Теперь загружаем таблицу и через полчаса рассылка уже ушла.",
   "rating": 5,
   "status": "pending",
@@ -8020,8 +8020,8 @@ curl -X PATCH "https://vruchay.ru/api/reviews/mine" \
   -H "Content-Type: application/json" \
   -d '{
     "authorName": "Мария Петрова",
-    "authorRole": "Главный секретарь соревнований",
-    "orgName": "Федерация гимнастики Самарской области",
+    "authorRole": "Ответственный секретарь",
+    "orgName": "Учебный центр «Развитие»",
     "text": "Раньше на двести грамот уходило два дня. Теперь загружаем таблицу и через полчаса рассылка уже ушла.",
     "rating": 5
   }'
@@ -8058,7 +8058,7 @@ curl -X PATCH "https://vruchay.ru/api/reviews/mine" \
 ```json
 {
   "ok": true,
-  "name": "выгрузка из СпортОрг"
+  "name": "выгрузка из CRM"
 }
 ```
 
@@ -8111,7 +8111,7 @@ curl -X DELETE "https://vruchay.ru/api/tokens/$TOKEN_ID" \
 [
   {
     "id": "5f1c2e6a-9d0b-4c3e-8a7f-1b2c3d4e5f60",
-    "name": "выгрузка из СпортОрг",
+    "name": "выгрузка из CRM",
     "prefix": "vru_Qm9yaX",
     "role": "member",
     "createdAt": "2026-08-30T09:12:44.000Z",
@@ -8161,7 +8161,7 @@ curl "https://vruchay.ru/api/tokens" \
 
 ```json
 {
-  "name": "выгрузка из СпортОрг",
+  "name": "выгрузка из CRM",
   "role": "member"
 }
 ```
@@ -8179,7 +8179,7 @@ curl "https://vruchay.ru/api/tokens" \
 ```json
 {
   "id": "5f1c2e6a-9d0b-4c3e-8a7f-1b2c3d4e5f60",
-  "name": "выгрузка из СпортОрг",
+  "name": "выгрузка из CRM",
   "token": "vru_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 }
 ```
@@ -8202,7 +8202,7 @@ curl "https://vruchay.ru/api/tokens" \
 curl -X POST "https://vruchay.ru/api/tokens" \
   -b cookies.txt \
   -H "Content-Type: application/json" \
-  -d '{"name":"выгрузка из СпортОрг","role":"member"}'
+  -d '{"name":"выгрузка из CRM","role":"member"}'
 ```
 
 ---
@@ -8455,7 +8455,7 @@ curl -X POST "https://vruchay.ru/api/documents/$DOCUMENT_ID/validation" \
 | `name` | string | да | 1–200 символов после обрезки пробелов. Ошибка: «Введите название набора» |
 | `groupColumn` | string | нет | имя колонки таблицы получателей (`^[a-zA-Z][a-zA-Z0-9_]*$`, до 64) или `""` — весь протокол одна группа. По умолчанию `""`. Группа задаёт область дедупликации, подпись строки в отчёте и круг строк для `withinGroup` |
 | `statusColumn` | string | нет | имя колонки со статусом (DSQ/DNS/«снят») или `""`. По умолчанию `""` |
-| `isDefault` | boolean | нет | предлагать по умолчанию для нового соревнования. По умолчанию `false`. Набор по умолчанию у организации один: при сохранении с `true` признак снимается с остальных |
+| `isDefault` | boolean | нет | предлагать по умолчанию для нового мероприятия. По умолчанию `false`. Набор по умолчанию у организации один: при сохранении с `true` признак снимается с остальных |
 | `rules` | Rule[] | нет | до 50 правил; **порядок в массиве — приоритет**, `position` сервер проставляет сам. По умолчанию `[]` |
 
 ### Правило (`Rule`)
@@ -8499,7 +8499,7 @@ curl -X POST "https://vruchay.ru/api/documents/$DOCUMENT_ID/validation" \
 | `templateDocumentId` | UUID | да | документ-шаблон **той же организации**, не в корзине. Ошибка: «Выберите шаблон»; чужой или удалённый — 400 «Выбранный шаблон недоступен: он удалён или лежит в корзине» |
 | `subjectColumn` | string | нет | `""` (по умолчанию) — документ самому участнику; иначе имя колонки, откуда брать получателя (`coach`, `team`). По значению этой колонки идёт дедупликация |
 | `dedupeScope` | `all` \| `group` | нет | где искать повторы получателя. По умолчанию `all` |
-| `label` | string | нет | до 120, подпись для превью («Благодарность тренеру»). По умолчанию `""` |
+| `label` | string | нет | до 120, подпись для превью («Благодарность наставнику»). По умолчанию `""` |
 
 ## Набор правил в ответе (`AwardRuleSet`)
 
@@ -8997,7 +8997,7 @@ US Legal 216×356, квадрат 210×210, экран 16:9 167×297 (книжн
   "email": "ivanova@example.com",
   "documentId": "b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e",
   "documentTitle": "Сертификат участника",
-  "eventName": "Открытый кубок города",
+  "eventName": "Городской конкурс «Мастер года»",
   "eventDate": "14.06.2026",
   "issuedAt": "2026-06-15T09:12:44.000Z",
   "expiresAt": null,

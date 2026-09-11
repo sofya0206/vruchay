@@ -34,7 +34,7 @@ rate_limit: none
 ```json
 {
   "ok": true,
-  "name": "выгрузка из СпортОрг"
+  "name": "выгрузка из CRM"
 }
 ```
 
