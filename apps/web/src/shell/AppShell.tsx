@@ -36,6 +36,14 @@ export function AppShell() {
   const canGoBack = pathname !== '/';
 
   /*
+   * В материале у Escape своя работа: снять выделение блока, выйти из
+   * правки текста, закрыть панель. Лист делает это без preventDefault,
+   * и общий «Esc — назад» уводил бы со страницы посреди правки. Там
+   * назад — только стрелкой.
+   */
+  const escGoesBack = canGoBack && !/^\/(documents|mailing)\/[^/]+/.test(pathname);
+
+  /*
    * Escape — шаг назад по своим следам, то же, что стрелка под шапкой.
    *
    * Уступаем всем, для кого Escape уже что-то значит, иначе одно
@@ -47,7 +55,7 @@ export function AppShell() {
    *   так «Документы» сначала снимают поиск и выходят из папки.
    */
   useEffect(() => {
-    if (!canGoBack) return;
+    if (!escGoesBack) return;
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || e.defaultPrevented) return;
@@ -66,7 +74,7 @@ export function AppShell() {
 
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [canGoBack, navigate]);
+  }, [escGoesBack, navigate]);
 
   return (
     <div
@@ -120,7 +128,7 @@ export function AppShell() {
           <button
             type="button"
             onClick={() => navigate(-1)}
-            title="Назад (Esc)"
+            title={escGoesBack ? 'Назад (Esc)' : 'Назад'}
             aria-label="Назад"
             className="grid h-11 w-11 place-items-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
           >
