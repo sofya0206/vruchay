@@ -150,7 +150,10 @@ export function App() {
             показывали одно и то же. Список площадок — в
             integrations/sections.tsx. */}
         <Route path="/integrations" element={<IntegrationsPage />}>
-          <Route index element={<Navigate to="/integrations/info" replace />} />
+          {/* Сразу Тильда, а не «Инфо»: подключают её, а перечень площадок
+              и так стоит слева в колонке — отдельный экран-оглавление
+              человек пролистывал, чтобы нажать первый же пункт. */}
+          <Route index element={<Navigate to="/integrations/tilda" replace />} />
           {INTEGRATION_SECTIONS.map((s) => (
             <Route key={s.path} path={s.path} element={s.element} />
           ))}
