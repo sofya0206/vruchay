@@ -55,7 +55,7 @@ rate_limit: none
   "pageHeightMm": 210,
   "verifyEnabled": true,
   "verifyFields": ["name", "place"],
-  "eventName": "Первенство области по плаванию",
+  "eventName": "Конкурс «Мастер года»",
   "eventDate": "17–19 июня 2026",
   "eventPlace": "г. Челябинск",
   "eventHours": "",

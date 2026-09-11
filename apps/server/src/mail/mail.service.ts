@@ -62,7 +62,7 @@ export class MailService {
     }
 
     // Домен, уже подтверждённый другой организацией, заявить нельзя:
-    // иначе можно было бы слать письма от имени чужой федерации.
+    // иначе можно было бы слать письма от имени чужой организации.
     const claimed = await this.prisma.mailDomain.findFirst({
       where: { domain: normalized, status: 'verified', orgId: { not: orgId } },
       select: { id: true },

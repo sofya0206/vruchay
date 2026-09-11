@@ -95,7 +95,7 @@ export class RegistryController {
     return this.analytics.summary(user.orgId, query);
   }
 
-  /** Выгрузка того же реестра таблицей: федерации ведут отчётность в Excel. */
+  /** Выгрузка того же реестра таблицей: организации ведут отчётность в Excel. */
   @Get('export.csv')
   async csv(
     @CurrentUser() user: SessionUser,

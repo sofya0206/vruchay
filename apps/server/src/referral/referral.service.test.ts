@@ -22,7 +22,7 @@ function serviceWith(params: { referredBy?: string | null; invited?: Org[] }): R
       findUnique: async () => ({
         referredByOrgId: params.referredBy ?? null,
         referralCode: 'abc123',
-        name: 'Наша федерация',
+        name: 'Наша организация',
       }),
       findMany: async () =>
         invited.map((o) => ({ id: o.id, name: o.name, createdAt: new Date('2026-01-01') })),
@@ -124,21 +124,21 @@ describe('текст приглашения', () => {
 
   it('готов к пересылке: есть ссылка и обещанное число документов', async () => {
     const svc = serviceWith({});
-    const summary = await svc.summary('org', 'Федерация плавания');
+    const summary = await svc.summary('org', 'Учебный центр «Развитие»');
 
     expect(summary.link).toBe('https://vruchay.ru/register?ref=abc123');
     expect(summary.message).toContain('https://vruchay.ru/register?ref=abc123');
     // 50 базовых + 50 приветственных: столько увидит приглашённый.
     expect(summary.message).toContain('100');
-    expect(summary.message).toContain('Федерация плавания');
+    expect(summary.message).toContain('Учебный центр «Развитие»');
   });
 
   it('не ставит вторые кавычки, если они уже есть в названии', async () => {
-    // Спортшколы сплошь и рядом называются «Спортшкола «Олимп»»,
-    // и «Мы в «Спортшкола «Олимп»»» человек переслать постесняется.
+    // Организации сплошь и рядом называются «Учебный центр «Олимп»»,
+    // и «Мы в «Учебный центр «Олимп»»» человек переслать постесняется.
     const svc = serviceWith({});
-    const summary = await svc.summary('org', 'Спортшкола «Олимп»');
-    expect(summary.message).toContain('Мы в Спортшкола «Олимп»');
+    const summary = await svc.summary('org', 'Учебный центр «Олимп»');
+    expect(summary.message).toContain('Мы в Учебный центр «Олимп»');
     expect(summary.message).not.toContain('««');
   });
 });

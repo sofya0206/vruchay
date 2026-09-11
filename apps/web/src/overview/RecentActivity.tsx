@@ -38,7 +38,7 @@ export function RecentActivity({ data }: { data: Overview }) {
                   <span className="min-w-0 flex-1">
                     <span className="block truncate">{doc.title}</span>
                     {/* Название мероприятия важнее названия бланка: бланк
-                        федерации один на сезон, а соревнований десятки. */}
+                        организации один на сезон, а мероприятий десятки. */}
                     {doc.eventName && (
                       <span className="block truncate text-sm text-[var(--text-muted)]">
                         {doc.eventName}

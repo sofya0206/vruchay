@@ -28,7 +28,7 @@ rate_limit: none
 {
   "domainId": "0f6d1e3a-9c1b-4a4e-8b6a-2f1a5c7d9e01",
   "email": "awards@example.ru",
-  "displayName": "Федерация плавания"
+  "displayName": "Центр «Развитие»"
 }
 ```
 
@@ -52,7 +52,7 @@ rate_limit: none
   "orgId": "7b2a4c6e-1d3f-4e5a-9b8c-0d1e2f3a4b5c",
   "domainId": "0f6d1e3a-9c1b-4a4e-8b6a-2f1a5c7d9e01",
   "email": "awards@example.ru",
-  "displayName": "Федерация плавания",
+  "displayName": "Центр «Развитие»",
   "isDefault": false,
   "createdAt": "2026-08-20T09:20:00.000Z"
 }
@@ -78,5 +78,5 @@ rate_limit: none
 curl -X POST "https://vruchay.ru/api/mail/senders" \
   -H "Authorization: Bearer $VRUCHAY_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"domainId":"'"$DOMAIN_ID"'","email":"awards@example.ru","displayName":"Федерация плавания"}'
+  -d '{"domainId":"'"$DOMAIN_ID"'","email":"awards@example.ru","displayName":"Центр «Развитие»"}'
 ```

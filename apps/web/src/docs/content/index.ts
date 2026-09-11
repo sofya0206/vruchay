@@ -74,8 +74,8 @@ export const INDEX: DocEntry[] = [
   },
   {
     slug: "endpoints/awards/post-documents-id-awards-rule-set",
-    title: "Привязать набор правил к соревнованию",
-    meta: {"method":"POST","path":"/api/documents/{id}/awards/rule-set","title":"Привязать набор правил к соревнованию","group":"awards","auth":"token","roles":"any","rate_limit":"none"},
+    title: "Привязать набор правил к мероприятию",
+    meta: {"method":"POST","path":"/api/documents/{id}/awards/rule-set","title":"Привязать набор правил к мероприятию","group":"awards","auth":"token","roles":"any","rate_limit":"none"},
   },
   {
     slug: "endpoints/awards/post-documents-id-awards-suggest",

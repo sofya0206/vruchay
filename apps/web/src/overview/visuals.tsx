@@ -47,12 +47,12 @@ export function MiniSheet({
   kind = 'Сертификат',
   label = 'участника',
   name = 'Островская Анна',
-  main = 'за первое место на дистанции 200 м вольным стилем',
-  event = 'Первенство области по плаванию',
+  main = 'за первое место в номинации «Лучший проект»',
+  event = 'Конкурс «Мастер года»',
   foot = '17–19 июня 2026 · Челябинск',
-  signer = 'Президент федерации',
+  signer = 'Директор центра',
   signerName = 'А. В. Соколов',
-  org = 'Федерация плавания',
+  org = 'Центр «Развитие»',
   highlightName = false,
 }: SheetProps) {
   const u = 10 * scale;
@@ -274,7 +274,7 @@ export function CreateVisual() {
 /** Документы и шаблоны: полка готовых листов. */
 export function LibraryVisual() {
   const sheets: [string, string][] = [
-    ['Грамота', 'Спортивные соревнования'],
+    ['Грамота', 'Конкурсы и олимпиады'],
     ['Диплом', 'Олимпиады и конкурсы'],
     ['Сертификат', 'Обучение и семинары'],
   ];
@@ -351,10 +351,10 @@ export function MailVisual() {
         style={{ display: 'block', padding: '8px 10px', borderBottom: '1px solid var(--line)' }}
       >
         <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)' }}>
-          От: award@sport-fed.ru
+          От: award@example.ru
         </span>
         <span style={{ display: 'block', marginTop: 2, fontSize: 12, fontWeight: 500 }}>
-          Ваша грамота за первенство области
+          Ваша грамота за конкурс «Мастер года»
         </span>
       </span>
       {rows.map(([address, tone, label]) => (

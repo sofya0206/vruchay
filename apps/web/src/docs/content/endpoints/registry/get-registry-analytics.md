@@ -74,7 +74,7 @@ rate_limit: none
     {
       "documentId": "b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e",
       "title": "Сертификат участника",
-      "eventName": "Открытый кубок города",
+      "eventName": "Городской конкурс «Мастер года»",
       "issued": 640,
       "verifications": 1502
     }

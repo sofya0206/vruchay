@@ -43,7 +43,7 @@ rate_limit: none
 
 ```json
 {
-  "eventName": "Первенство области по плаванию",
+  "eventName": "Конкурс «Мастер года»",
   "eventDate": "17–19 июня 2026",
   "eventPlace": "г. Челябинск",
   "issueDate": "2026-06-19",
@@ -65,7 +65,7 @@ rate_limit: none
   "pageHeightMm": 210,
   "verifyEnabled": true,
   "verifyFields": ["name", "place"],
-  "eventName": "Первенство области по плаванию",
+  "eventName": "Конкурс «Мастер года»",
   "eventDate": "17–19 июня 2026",
   "eventPlace": "г. Челябинск",
   "eventHours": "",
@@ -100,5 +100,5 @@ rate_limit: none
 curl -X PATCH "https://vruchay.ru/api/documents/$DOCUMENT_ID" \
   -H "Authorization: Bearer $VRUCHAY_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"eventName":"Первенство области по плаванию","issueDate":"2026-06-19","expiresIn":"P1Y"}'
+  -d '{"eventName":"Конкурс «Мастер года»","issueDate":"2026-06-19","expiresIn":"P1Y"}'
 ```

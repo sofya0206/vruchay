@@ -76,7 +76,7 @@ rate_limit: none
     {
       "id": "913",
       "action": "token.create",
-      "summary": "Выдан токен доступа «выгрузка из СпортОрг»",
+      "summary": "Выдан токен доступа «выгрузка из CRM»",
       "actorName": "Мария Иванова",
       "actorEmail": "maria@example.org",
       "targetType": "token",
@@ -87,7 +87,7 @@ rate_limit: none
       "id": "912",
       "action": "generation.start",
       "summary": "Выпуск документов: 12",
-      "actorName": "Токен «выгрузка из СпортОрг»",
+      "actorName": "Токен «выгрузка из CRM»",
       "actorEmail": "",
       "targetType": "document",
       "targetId": "0c9b7a65-4d3e-4f21-8b0a-1e2f3a4b5c6d",

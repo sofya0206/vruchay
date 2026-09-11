@@ -28,7 +28,7 @@ const MATRIX: { feature: string; start: boolean; pro: boolean; max: boolean }[] 
   { feature: 'Отправка писем с вашего домена', start: false, pro: true, max: true },
   { feature: 'Форма на сайте и вставка в Тильду', start: false, pro: true, max: true },
   { feature: 'Доступ по API', start: false, pro: true, max: true },
-  { feature: 'Импорт протоколов соревнований', start: false, pro: false, max: true },
+  { feature: 'Импорт списков и протоколов мероприятий', start: false, pro: false, max: true },
   { feature: 'Правила награждения по занятым местам', start: false, pro: false, max: true },
   { feature: 'Приоритетная поддержка', start: false, pro: false, max: true },
 ];

@@ -112,7 +112,7 @@ export function RegisterPage() {
               onChange={(e) => setOrgName(e.target.value)}
               required
               maxLength={200}
-              placeholder="Федерация плавания области"
+              placeholder="Учебный центр «Развитие»"
               autoFocus
             />
             <span className="mt-1.5 block text-xs text-[var(--text-muted)]">

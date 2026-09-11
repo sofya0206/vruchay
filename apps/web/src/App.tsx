@@ -26,7 +26,6 @@ import { VerifyDocumentPage } from './pages/VerifyDocumentPage';
 import { GovPage } from './pages/GovPage';
 import { BusinessPage } from './pages/BusinessPage';
 import { PersonalPage } from './pages/PersonalPage';
-import { SportPage } from './pages/SportPage';
 import { EducationPage } from './pages/EducationPage';
 import { InternationalPage } from './pages/InternationalPage';
 import { PricingPage } from './pages/PricingPage';
@@ -55,7 +54,6 @@ const PUBLIC_PAGES: [string, ReactNode][] = [
   ['/gov', <GovPage />],
   ['/business', <BusinessPage />],
   ['/personal', <PersonalPage />],
-  ['/sport', <SportPage />],
   ['/education', <EducationPage />],
   ['/international', <InternationalPage />],
   ['/pricing', <PricingPage />],

@@ -59,7 +59,7 @@ export function Certificate() {
 
           <div className="relative text-center">
             <p className="text-[10px] tracking-[0.3em] text-[var(--text-muted)] uppercase">
-              Ассоциация тренеров
+              Центр «Развитие»
             </p>
             <div className="mx-auto mt-3 h-px w-12 bg-[var(--award)]/45" />
 
@@ -70,7 +70,7 @@ export function Certificate() {
             <p className="mt-1.5 font-serif text-xl">Кузьмина-Караваева Анна</p>
 
             <p className="mx-auto mt-3 max-w-[16rem] text-xs leading-relaxed text-[var(--text-muted)]">
-              за первое место на дистанции 200 метров вольным стилем
+              за первое место в номинации «Лучший проект»
             </p>
 
             <div className="mt-8 flex items-end justify-between">

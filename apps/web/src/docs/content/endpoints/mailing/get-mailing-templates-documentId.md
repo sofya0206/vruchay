@@ -48,8 +48,8 @@ rate_limit: none
   "documentId": "9e8d7c6b-5a4f-4e3d-2c1b-0a9f8e7d6c5b",
   "senderId": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
   "kind": "marketing",
-  "advertiserName": "ООО «Федерация плавания»",
-  "subject": "Соревнования сезона, {{name}}",
+  "advertiserName": "ООО «Развитие»",
+  "subject": "Мероприятия сезона, {{name}}",
   "bodyHtml": "<p>Здравствуйте, {{name}}!</p>",
   "attachGeneratedFile": false,
   "createdAt": "2026-08-21T10:00:00.000Z",
@@ -59,7 +59,7 @@ rate_limit: none
     "orgId": "7b2a4c6e-1d3f-4e5a-9b8c-0d1e2f3a4b5c",
     "domainId": "0f6d1e3a-9c1b-4a4e-8b6a-2f1a5c7d9e01",
     "email": "awards@example.ru",
-    "displayName": "Федерация плавания",
+    "displayName": "Центр «Развитие»",
     "isDefault": false,
     "createdAt": "2026-08-20T09:20:00.000Z"
   }

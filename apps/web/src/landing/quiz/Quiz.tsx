@@ -30,8 +30,8 @@ const KINDS = [
 
 const VOLUMES: { value: Volume; label: string; hint: string }[] = [
   { value: 'to5k', label: 'До 5 000', hint: 'несколько мероприятий в год' },
-  { value: 'to20k', label: 'До 20 000', hint: 'регулярные соревнования или курсы' },
-  { value: 'to60k', label: 'До 60 000', hint: 'календарь федерации' },
+  { value: 'to20k', label: 'До 20 000', hint: 'регулярные мероприятия или курсы' },
+  { value: 'to60k', label: 'До 60 000', hint: 'календарь крупной организации' },
   { value: 'more', label: 'Больше 60 000', hint: 'посчитаем отдельно' },
 ];
 
@@ -346,7 +346,7 @@ function Result({
         ) : (
           <div className="sm:col-span-2">
             <Label>Название мероприятия или организатора</Label>
-            <Input name="orgName" required placeholder="Кубок города по плаванию" />
+            <Input name="orgName" required placeholder="Конкурс «Мастер года»" />
           </div>
         )}
         <div>

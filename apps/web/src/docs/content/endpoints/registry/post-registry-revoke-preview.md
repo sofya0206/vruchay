@@ -25,7 +25,7 @@ rate_limit: none
 | `filter` | object | либо оно, либо `fileIds` | Отбор реестра ([reference/registry-filter.md](../../reference/registry-filter.md)); должен содержать хотя бы одно из `documentId`, `event`, `from`, `to`. |
 
 ```json
-{ "filter": { "event": "Открытый кубок города", "from": "2026-06-01", "to": "2026-06-30" } }
+{ "filter": { "event": "Городской конкурс «Мастер года»", "from": "2026-06-01", "to": "2026-06-30" } }
 ```
 
 ## Ответ

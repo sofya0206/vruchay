@@ -31,10 +31,10 @@
 - [GET /api/award-rules/templates — Документы, годные в шаблоны правил](https://vruchay.ru/docs/endpoints/awards/get-award-rules-templates): Список документов организации, из которых выбирают шаблон для выхода правила (outputs[].templateDocumentId).
 - [GET /api/award-rules — Список наборов правил награждения](https://vruchay.ru/docs/endpoints/awards/get-award-rules): Наборы правил награждения организации.
 - [PATCH /api/award-rules/{id} — Изменить набор правил](https://vruchay.ru/docs/endpoints/awards/patch-award-rules-id): Меняет набор правил.
-- [POST /api/award-rules/{id}/duplicate — Скопировать набор правил](https://vruchay.ru/docs/endpoints/awards/post-award-rules-id-duplicate): Делает копию набора — «взять как на прошлом соревновании и поправить».
+- [POST /api/award-rules/{id}/duplicate — Скопировать набор правил](https://vruchay.ru/docs/endpoints/awards/post-award-rules-id-duplicate): Делает копию набора — «взять как на прошлом мероприятии и поправить».
 - [POST /api/award-rules — Создать набор правил награждения](https://vruchay.ru/docs/endpoints/awards/post-award-rules): Заводит набор правил награждения у организации.
 - [POST /api/documents/{id}/awards/preview — Раскладка награждения — что выйдет, если выпустить сейчас](https://vruchay.ru/docs/endpoints/awards/post-documents-id-awards-preview): Прогоняет правила по таблице получателей документа и возвращает раскладку: кому какой шаблон полагается, сколько документов выйдет после дедупликации и какие строки остались без документа и почему.
-- [POST /api/documents/{id}/awards/rule-set — Привязать набор правил к соревнованию](https://vruchay.ru/docs/endpoints/awards/post-documents-id-awards-rule-set): Выбирает, по какому набору правил награждается это соревнование.
+- [POST /api/documents/{id}/awards/rule-set — Привязать набор правил к мероприятию](https://vruchay.ru/docs/endpoints/awards/post-documents-id-awards-rule-set): Выбирает, по какому набору правил награждается это мероприятие.
 - [POST /api/documents/{id}/awards/suggest — Заготовка правил по колонкам таблицы](https://vruchay.ru/docs/endpoints/awards/post-documents-id-awards-suggest): Собирает черновик набора правил по колонкам уже загруженной таблицы получателей.
 
 ## Эндпоинты: documents

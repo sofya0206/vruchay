@@ -35,7 +35,7 @@ rate_limit: none
 [
   {
     "id": "5f1c2e6a-9d0b-4c3e-8a7f-1b2c3d4e5f60",
-    "name": "выгрузка из СпортОрг",
+    "name": "выгрузка из CRM",
     "prefix": "vru_Qm9yaX",
     "role": "member",
     "createdAt": "2026-08-30T09:12:44.000Z",

@@ -174,14 +174,14 @@ export function ImportDialog({
           {headerChoice}
 
           {/*
-            Протокол соревнований показываем отдельно от обычной таблицы:
+            Протокол мероприятия показываем отдельно от обычной таблицы:
             группы — главное, что нужно проверить глазами перед импортом.
             Ошибка в разбиении на группы означает, что первых мест окажется
             одно вместо восьми, и заметят это уже на награждении.
           */}
           {sheet.protocol && sheet.protocol.groups.length > 0 && (
             <div className="rounded-lg bg-[var(--accent-soft)] px-3 py-2.5 text-sm text-[var(--accent)]">
-              <p className="font-medium">Распознан протокол соревнований</p>
+              <p className="font-medium">Распознан протокол мероприятия</p>
               <ul className="mt-1 space-y-0.5">
                 {sheet.protocol.groups.map((g) => (
                   <li key={g.title}>

@@ -30,7 +30,7 @@ rate_limit: none
 
 | Параметр | Тип | Обязателен | Описание |
 |---|---|---|---|
-| `id` | UUID (путь) | да | Идентификатор документа-соревнования |
+| `id` | UUID (путь) | да | Идентификатор документа-мероприятия |
 
 Тело:
 
@@ -41,7 +41,7 @@ rate_limit: none
 Пустое тело `{}` — законный запрос.
 
 ```json
-{ "name": "Первенство области, весна" }
+{ "name": "Конкурс «Мастер года», весна" }
 ```
 
 ## Ответ
@@ -51,7 +51,7 @@ rate_limit: none
 ```json
 {
   "id": "b3f1c8a2-aaaa-4d10-9e45-1a2b3c4d5e6f",
-  "name": "Первенство области, весна",
+  "name": "Конкурс «Мастер года», весна",
   "schemaVersion": 1,
   "groupColumn": "category",
   "statusColumn": "status",
@@ -116,5 +116,5 @@ rate_limit: none
 curl -X POST "https://vruchay.ru/api/documents/$DOCUMENT_ID/awards/suggest" \
   -H "Authorization: Bearer $VRUCHAY_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"name":"Первенство области, весна"}'
+  -d '{"name":"Конкурс «Мастер года», весна"}'
 ```

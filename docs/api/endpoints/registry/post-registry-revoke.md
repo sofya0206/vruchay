@@ -51,7 +51,7 @@ rate_limit: none
   "filter": { "documentId": "b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e" },
   "revoked": true,
   "expectedCount": 640,
-  "reasonPublic": "Протокол соревнований пересмотрен",
+  "reasonPublic": "Протокол мероприятия пересмотрен",
   "reasonInternal": "Ошибка судейской бригады, письмо от 20.06"
 }
 ```

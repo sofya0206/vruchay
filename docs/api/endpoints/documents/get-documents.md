@@ -63,7 +63,7 @@ rate_limit: none
       "updatedAt": "2026-08-30T10:12:44.000Z",
       "createdAt": "2026-08-01T08:00:00.000Z",
       "folderId": "9f1c0c8e-0f3c-4a1a-9c1f-1f7d2a3b4c5d",
-      "eventName": "Первенство области по плаванию",
+      "eventName": "Конкурс «Мастер года»",
       "eventDate": "17–19 июня 2026",
       "deletedAt": null,
       "sheetCount": 1,
