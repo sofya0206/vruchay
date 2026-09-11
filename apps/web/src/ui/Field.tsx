@@ -55,20 +55,46 @@ export function StatusChip({
  *
  * Подпись — часть кнопки, а не текст рядом: попасть по самому ползунку
  * с телефона трудно, а промах по настройке безопасности стоит дорого.
+ *
+ * Размер `lg` — для разделов в полный экран: там ползунок и подпись идут
+ * в один кегль с остальными настройками, а не мельче их.
  */
+const toggleSizes = {
+  md: {
+    track: 'h-5 w-9',
+    knob: 'h-4 w-4',
+    shift: 'translate-x-4',
+    label: 'text-sm',
+    hint: 'pl-12 text-xs',
+  },
+  lg: {
+    track: 'h-6 w-11',
+    knob: 'h-5 w-5',
+    shift: 'translate-x-5',
+    label: 'text-base',
+    // Длинную строку пояснения подрезаем: крупный переключатель стоит
+    // в широкой карточке, и текст во всю её ширину не читается.
+    hint: 'max-w-3xl pl-14 text-sm',
+  },
+} as const;
+
 export function Toggle({
   checked,
   onChange,
   label,
   hint,
   disabled,
+  size = 'md',
 }: {
   checked: boolean;
   onChange: (value: boolean) => void;
   label: ReactNode;
   hint?: ReactNode;
   disabled?: boolean;
+  size?: keyof typeof toggleSizes;
 }) {
+  const s = toggleSizes[size];
+
   return (
     <div>
       <button
@@ -81,19 +107,19 @@ export function Toggle({
       >
         <span
           aria-hidden
-          className={`mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors ${
+          className={`mt-0.5 inline-flex shrink-0 items-center rounded-full p-0.5 transition-colors ${s.track} ${
             checked ? 'bg-[var(--accent)]' : 'bg-[var(--line-strong)]'
           }`}
         >
           <span
-            className={`h-4 w-4 rounded-full bg-white transition-transform ${
-              checked ? 'translate-x-4' : ''
+            className={`rounded-full bg-white transition-transform ${s.knob} ${
+              checked ? s.shift : ''
             }`}
           />
         </span>
-        <span className="text-sm">{label}</span>
+        <span className={s.label}>{label}</span>
       </button>
-      {hint && <p className="mt-1 pl-12 text-xs text-[var(--text-muted)]">{hint}</p>}
+      {hint && <p className={`mt-1 text-[var(--text-muted)] ${s.hint}`}>{hint}</p>}
     </div>
   );
 }

@@ -145,7 +145,7 @@ export function EmbedCode({
 
   if (documentIds.length === 0) {
     return (
-      <p className="mt-3 text-sm text-[var(--text-muted)]">
+      <p className="mt-3 text-[var(--text-muted)]">
         Сначала выберите документ в настройках интеграции — без него вставлять нечего.
       </p>
     );
@@ -159,9 +159,9 @@ export function EmbedCode({
   });
 
   return (
-    <div className="mt-3 rounded-lg bg-[var(--surface-sunken)] p-3">
-      <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
-        <Code2 size={14} />
+    <div className="mt-3 max-w-4xl rounded-lg bg-[var(--surface-sunken)] p-4">
+      <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
+        <Code2 size={16} />
         Код для вставки на сайт
       </div>
 
@@ -172,7 +172,7 @@ export function EmbedCode({
             type="button"
             onClick={() => setPlatform(p.id)}
             aria-pressed={platform === p.id}
-            className={`rounded-lg px-2.5 py-1 text-sm transition-colors ${
+            className={`rounded-lg px-3 py-1.5 transition-colors ${
               platform === p.id
                 ? 'bg-[var(--accent)] text-[var(--accent-contrast)]'
                 : 'ring-1 ring-[var(--line-strong)] hover:bg-[var(--surface)]'
@@ -188,7 +188,7 @@ export function EmbedCode({
           value={documentId}
           onChange={(e) => setDocumentId(e.target.value)}
           aria-label="Какой документ выдавать"
-          className="mt-2 w-full rounded-lg bg-[var(--surface)] px-2.5 py-1.5 text-sm ring-1 ring-[var(--line)]"
+          className="mt-2.5 w-full rounded-lg bg-[var(--surface)] px-3 py-2 ring-1 ring-[var(--line)]"
         >
           {documentIds.map((id) => (
             <option key={id} value={id}>
@@ -198,16 +198,15 @@ export function EmbedCode({
         </select>
       )}
 
-      <p className="mt-2 text-sm">{WHERE[platform]}</p>
+      <p className="mt-2.5">{WHERE[platform]}</p>
 
-      <pre className="mt-2 overflow-x-auto rounded-lg bg-[var(--surface)] p-2.5 text-xs">
+      <pre className="mt-2.5 overflow-x-auto rounded-lg bg-[var(--surface)] p-3 text-sm">
         {code}
       </pre>
 
       <Button
-        size="sm"
-        className="mt-2"
-        icon={copied ? <Check size={14} /> : <Copy size={14} />}
+        className="mt-3"
+        icon={copied ? <Check size={16} /> : <Copy size={16} />}
         onClick={() => {
           void navigator.clipboard.writeText(code).then(() => {
             setCopied(true);

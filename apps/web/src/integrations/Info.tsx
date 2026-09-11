@@ -12,19 +12,19 @@ import { Plug } from 'lucide-react';
 export function Info() {
   return (
     <section>
-      <div className="rounded-xl bg-[var(--surface)] p-8 text-center ring-1 ring-[var(--line)]">
-        <Plug size={32} className="mx-auto text-[var(--text-muted)]" aria-hidden />
-        <h2 className="mt-3 font-serif text-2xl">Интеграции</h2>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
+      <div className="rounded-xl bg-[var(--surface)] p-10 text-center ring-1 ring-[var(--line)]">
+        <Plug size={40} className="mx-auto text-[var(--text-muted)]" aria-hidden />
+        <h2 className="mt-4 font-serif text-3xl">Интеграции</h2>
+        <p className="mt-2 text-[var(--text-muted)]">
           Интеграция Вручая с другими сайтами и сервисами
         </p>
       </div>
 
-      <div className="mt-6 rounded-xl bg-[var(--surface)] p-6 ring-1 ring-[var(--line)]">
-        <h3 className="font-serif text-xl">Интеграции</h3>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">Помощь → Интеграции</p>
+      <div className="mt-6 rounded-xl bg-[var(--surface)] p-7 ring-1 ring-[var(--line)]">
+        <h3 className="font-serif text-2xl">Интеграции</h3>
+        <p className="mt-1.5 text-sm text-[var(--text-muted)]">Помощь → Интеграции</p>
 
-        <ul className="mt-4 space-y-3 text-sm">
+        <ul className="mt-5 space-y-3.5">
           <Item to="/integrations/tilda" title="Интеграция с Tilda">
             Создание и публикация документов на сайтах, управляемых Тильдой.
           </Item>
@@ -41,8 +41,8 @@ export function Info() {
           </Item>
         </ul>
 
-        <h3 className="mt-8 font-serif text-lg">Нужна помощь?</h3>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
+        <h3 className="mt-9 font-serif text-xl">Нужна помощь?</h3>
+        <p className="mt-1.5 text-[var(--text-muted)]">
           Напишите нам в{' '}
           <Link to="/settings/support" className="text-[var(--accent)] hover:underline">
             техническую поддержку

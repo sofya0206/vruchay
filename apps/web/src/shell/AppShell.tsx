@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { LogOut, PenLine, Receipt, Settings } from 'lucide-react';
+import { useIsFetching, useQueryClient } from '@tanstack/react-query';
+import { LogOut, PenLine, Receipt, RotateCw, Settings } from 'lucide-react';
 import { useLogout, useMe } from '../auth/useAuth';
 import { useOverview } from '../api/overview';
 import { Button } from '../ui/Button';
@@ -17,6 +18,10 @@ import { InstallHint } from '../ui/InstallHint';
  * слева, работа с учётной записью справа. Ни хлебных крошек, ни названия
  * раздела: у разделов есть свои заголовки, и повтор давал третью полосу
  * подписей подряд.
+ *
+ * Набрано в полный рост: знак 44 пункта, слово — 24. Мелкая полоса подписей
+ * поверх широкого экрана читается как черновик, а шапка — первое, по чему
+ * судят о размере всего остального.
  */
 export function AppShell() {
   const me = useMe();
@@ -69,17 +74,35 @@ export function AppShell() {
     <div className="flex min-h-full flex-col">
       <header className="sticky top-0 z-20 border-b border-[var(--line)] bg-[var(--surface)]">
         {/* Во всю ширину окна, а не колонкой по центру: шапка — рама экрана,
-            и на ноутбуке её края должны совпадать с краями экрана. */}
-        <div className="flex items-center gap-3 px-6 py-3">
-          {/* Возврат на главную — левый верхний угол, одним словом.
-              Знака здесь нет: шапка не витрина марки, а рабочая полоса,
-              и синий квадрат рядом со словом читался как ещё одна кнопка. */}
+            и на ноутбуке её края должны совпадать с краями экрана.
+
+            Высота взята из --app-header: под шапкой приклеены колонки
+            разделов, и они отсчитывают своё место от неё. Минус пиксель —
+            нижняя линия, она входит в ту же высоту. */}
+        <div className="flex h-[calc(var(--app-header)-1px)] items-center gap-3 px-5">
+          {/* Возврат на главную — левый верхний угол: знак и слово одной
+              ссылкой. Знак снимали как раз потому, что отдельным квадратом
+              он читался как ещё одна кнопка; внутри ссылки он часть её,
+              а заголовок набран крупно — по нему опознают этаж кабинета,
+              не вчитываясь. */}
           <Link
             to="/"
-            className="rounded-lg px-2 py-1.5 font-medium transition-colors hover:bg-[var(--surface-sunken)]"
+            className="-mx-2 inline-flex items-center gap-3 rounded-xl px-2 py-1.5 transition-colors hover:bg-[var(--surface-sunken)]"
           >
-            Главная
+            <span
+              aria-hidden
+              className="inline-flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-[var(--accent)] ring-4 ring-[var(--accent-soft)]"
+            >
+              {/* Медаль залита, а не обведена: тот же знак, что на заставке. */}
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="#ffffff">
+                <circle cx="12" cy="9.5" r="4.3" />
+                <path d="M9.2 13.7 7.9 20.5 12 18.2l4.1 2.3-1.3-6.8L12 15.1Z" />
+              </svg>
+            </span>
+            <span className="text-2xl">Главная</span>
           </Link>
+
+          <RefreshButton />
 
           <div className="ml-auto flex items-center gap-3">
             {/* Редактирование остаётся наверху: к листу возвращаются
@@ -88,13 +111,13 @@ export function AppShell() {
               to={editorPath}
               title="Редактор макета"
               aria-label="Редактор макета"
-              className="inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
+              className="inline-flex items-center gap-2 rounded-lg px-2.5 py-2 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
             >
-              <PenLine size={15} />
+              <PenLine size={17} />
               <span className="hidden sm:inline">Редактор</span>
             </Link>
 
-            <span className="hidden text-sm text-[var(--text-muted)] lg:inline">
+            <span className="hidden text-[var(--text-muted)] lg:inline">
               {me.data?.email}
             </span>
             {/* Счета и заявки — наша собственная бухгалтерия. Клиенту эта
@@ -105,9 +128,9 @@ export function AppShell() {
                 to="/invoices"
                 title="Счета и заявки"
                 aria-label="Счета и заявки"
-                className="inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
+                className="inline-flex items-center gap-2 rounded-lg px-2.5 py-2 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
               >
-                <Receipt size={15} />
+                <Receipt size={17} />
                 <span className="hidden sm:inline">Счета</span>
               </Link>
             )}
@@ -118,15 +141,15 @@ export function AppShell() {
               to="/settings"
               title="Настройки"
               aria-label="Настройки"
-              className="inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
+              className="inline-flex items-center gap-2 rounded-lg px-2.5 py-2 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
             >
-              <Settings size={15} />
+              <Settings size={17} />
               <span className="hidden sm:inline">Настройки</span>
             </Link>
             <Button
-              size="sm"
               variant="ghost"
-              icon={<LogOut size={15} />}
+              className="px-2.5 py-2"
+              icon={<LogOut size={17} />}
               onClick={() => logout.mutate()}
             >
               <span className="hidden sm:inline">Выйти</span>
@@ -144,5 +167,33 @@ export function AppShell() {
 
       <InstallHint />
     </div>
+  );
+}
+
+/**
+ * Обновить то, что на экране.
+ *
+ * Данные кабинета кэшируются, и после правки на другом устройстве или
+ * в соседней вкладке экран показывает вчерашнее. Кнопка сбрасывает кэш
+ * целиком — перезагружать страницу ради этого не нужно, а перезагрузка
+ * вдобавок теряет место в списке.
+ *
+ * Значок вращается, пока идут запросы: иначе непонятно, нажалось ли, —
+ * ответ приходит быстрее, чем человек успевает посмотреть на экран.
+ */
+function RefreshButton() {
+  const qc = useQueryClient();
+  const fetching = useIsFetching() > 0;
+
+  return (
+    <button
+      type="button"
+      title="Обновить"
+      aria-label="Обновить"
+      onClick={() => void qc.invalidateQueries()}
+      className="rounded-lg p-2 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
+    >
+      <RotateCw size={20} className={fetching ? 'animate-spin' : undefined} />
+    </button>
   );
 }
