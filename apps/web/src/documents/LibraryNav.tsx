@@ -601,10 +601,11 @@ export function LibraryLayout({
   return (
     <div className="flex min-h-0 flex-1 flex-col md:flex-row">
       <aside className="border-b border-[var(--line)] md:w-60 md:shrink-0 md:border-r md:border-b-0">
-        {/* 65px — высота шапки кабинета (кнопка 40px и отступы 2×12) плюс
-            её линия. Колонка встаёт ровно под шапку и дальше стоит на месте,
-            пока список прокручивается. */}
-        <div className="p-3 md:sticky md:top-[65px] md:max-h-[calc(100vh-65px)] md:overflow-y-auto">
+        {/* --app-header — высота шапки кабинета вместе с её линией. Колонка
+            встаёт ровно под шапку и дальше стоит на месте, пока список
+            прокручивается. Числом высоту не пишем: шапку правят, и колонка
+            должна ехать за ней. */}
+        <div className="p-3 md:sticky md:top-[var(--app-header)] md:max-h-[calc(100vh-var(--app-header))] md:overflow-y-auto">
           {/* На телефоне колонка стоит над панелью, и две кнопки «Создать»
               оказались бы подряд одна под другой — здесь остаётся та,
               что в панели. */}
@@ -616,7 +617,7 @@ export function LibraryLayout({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="z-10 flex flex-wrap items-center gap-3 border-b border-[var(--line)] bg-[var(--surface)] px-6 py-3 md:sticky md:top-[65px]">
+        <div className="z-10 flex flex-wrap items-center gap-3 border-b border-[var(--line)] bg-[var(--surface)] px-6 py-3 md:sticky md:top-[var(--app-header)]">
           <div className="min-w-0 flex-1">{head}</div>
           {tools}
           <CreateLink label="Создать документ" />

@@ -18,8 +18,8 @@ function Value({ children, title }: { children: string; title: string }) {
   const [copied, setCopied] = useState(false);
 
   return (
-    <div className="mt-1.5 flex items-center gap-2 rounded-lg bg-[var(--surface)] px-2.5 py-1.5">
-      <code className="min-w-0 flex-1 truncate font-mono text-xs">{children}</code>
+    <div className="mt-2 flex items-center gap-2 rounded-lg bg-[var(--surface)] px-3 py-2">
+      <code className="min-w-0 flex-1 truncate font-mono text-sm">{children}</code>
       <button
         type="button"
         aria-label={`Скопировать ${title}`}
@@ -31,7 +31,7 @@ function Value({ children, title }: { children: string; title: string }) {
         }}
         className="shrink-0 text-[var(--text-muted)] hover:text-[var(--text)]"
       >
-        {copied ? <Check size={14} /> : <Copy size={14} />}
+        {copied ? <Check size={16} /> : <Copy size={16} />}
       </button>
     </div>
   );
@@ -42,12 +42,12 @@ function Step({ n, title, children }: { n: number; title: string; children?: Rea
     <li className="flex gap-3">
       <span
         aria-hidden
-        className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-xs font-medium text-[var(--accent-contrast)]"
+        className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-sm font-medium text-[var(--accent-contrast)]"
       >
         {n}
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-sm">{title}</p>
+        <p>{title}</p>
         {children}
       </div>
     </li>
@@ -58,11 +58,11 @@ function Step({ n, title, children }: { n: number; title: string; children?: Rea
 function Field({ name, what, required }: { name: string; what: string; required?: boolean }) {
   return (
     <tr className="border-t border-[var(--line)]">
-      <td className="py-1 pr-3 align-top">
-        <code className="font-mono text-xs">{name}</code>
+      <td className="py-1.5 pr-3 align-top">
+        <code className="font-mono text-sm">{name}</code>
       </td>
-      <td className="py-1 pr-3 align-top text-xs text-[var(--text-muted)]">{what}</td>
-      <td className="py-1 align-top text-xs text-[var(--text-muted)]">
+      <td className="py-1.5 pr-3 align-top text-sm text-[var(--text-muted)]">{what}</td>
+      <td className="py-1.5 align-top text-sm text-[var(--text-muted)]">
         {required ? 'обязательно' : '—'}
       </td>
     </tr>
@@ -78,15 +78,17 @@ export function TildaGuide({
   token: string;
   documentId: string;
 }) {
+  // Ширина по тексту, а не по карточке: пошаговая подсказка читается
+  // подряд, и строка во всю широкую карточку в ней особенно тяжела.
   return (
-    <div className="mt-3 rounded-lg bg-[var(--surface-sunken)] p-3">
-      <p className="text-xs text-[var(--text-muted)]">
+    <div className="mt-3 max-w-4xl rounded-lg bg-[var(--surface-sunken)] p-4">
+      <p className="text-sm text-[var(--text-muted)]">
         Если форма в Тильде уже есть и переделывать её не хочется
       </p>
 
       <ol className="mt-3 space-y-3">
         <Step n={1} title="В Тильде: форма → Контент → Приём данных из формы">
-          <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+          <p className="mt-0.5 text-sm text-[var(--text-muted)]">
             Включите «Свой скрипт для принятия данных» и вставьте этот адрес.
             Если включено подтверждение почты, участнику придёт письмо со ссылкой —
             одно нажатие, и документ в пути.
@@ -114,33 +116,33 @@ export function TildaGuide({
               <Field name="mask_email" what="почта участника" required />
             </tbody>
           </table>
-          <p className="mt-1.5 text-xs text-[var(--text-muted)]">
+          <p className="mt-1.5 text-sm text-[var(--text-muted)]">
             Любая другая переменная документа — так же: <code className="font-mono">%place</code>{' '}
             → поле <code className="font-mono">mask_place</code>. Только латиницей.
           </p>
         </Step>
 
         <Step n={4} title="Добавьте домен страницы в список сайтов выше">
-          <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+          <p className="mt-0.5 text-sm text-[var(--text-muted)]">
             Заявки с других сайтов отклоняются — это защита вашего пакета документов.
           </p>
         </Step>
       </ol>
 
       <div className="mt-3 border-t border-[var(--line)] pt-3">
-        <p className="text-sm">«Мои документы» — всё, что человек получал через ваши формы</p>
-        <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+        <p>«Мои документы» — всё, что человек получал через ваши формы</p>
+        <p className="mt-0.5 text-sm text-[var(--text-muted)]">
           Кнопка, по которой участник видит перечень своих документов и скачивает любой.
           Подтверждение кодом на почту — всегда. Вставьте рядом с кодом из блока выше:
         </p>
         <Value title="код кнопки «Мои документы»">{'<div data-vruchay-my data-label="Мои документы"></div>'}</Value>
-        <p className="mt-1.5 text-xs text-[var(--text-muted)]">
+        <p className="mt-1.5 text-sm text-[var(--text-muted)]">
           Или форма в Тильде со скрытым полем <code className="font-mono">doc_id</code> = <code className="font-mono">all</code> —
           так это делалось в ГрамотаДел.
         </p>
       </div>
 
-      <p className="mt-3 border-t border-[var(--line)] pt-2 text-xs text-[var(--text-muted)]">
+      <p className="mt-3 border-t border-[var(--line)] pt-2 text-sm text-[var(--text-muted)]">
         Галочка согласия обязательна по закону о персональных данных: без неё заявка
         не принимается. Мы записываем текст согласия и время — это доказательство,
         если участник потом предъявит претензию.
