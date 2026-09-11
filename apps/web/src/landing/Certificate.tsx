@@ -63,7 +63,7 @@ export function Certificate() {
             </p>
             <div className="mx-auto mt-3 h-px w-12 bg-[var(--award)]/45" />
 
-            <p className="mt-6 font-serif text-[2rem] leading-none tracking-wide">Грамота</p>
+            <p className="mt-6 font-serif text-[2rem] leading-none tracking-wide">Сертификат</p>
 
             <p className="mt-6 text-xs text-[var(--text-muted)]">награждается</p>
             {/* Имя — самое крупное после заголовка: документ именной. */}

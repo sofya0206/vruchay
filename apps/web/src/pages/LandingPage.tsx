@@ -250,7 +250,7 @@ function CheckYourself() {
 function FinalCta() {
   return (
     <section className="mx-auto max-w-[var(--width-page)] px-6 py-16 text-center">
-      <h2 className="vru-h2">Ближайшее награждение — уже спокойное</h2>
+      <h2 className="vru-h2">Ближайшее мероприятие — уже спокойное</h2>
       <p className="mx-auto mt-5 max-w-[520px] text-[var(--text-muted)]">
         Соберите документ, загрузите список, отправьте. Пятьдесят документов на пробу не
         стоят ничего.

@@ -42,12 +42,13 @@ export function DocumentChrome({
   return (
     <header className="shrink-0 border-b border-[var(--line)] bg-[var(--surface)]">
       <div className="flex items-start gap-3 px-3 pt-2 pb-1.5">
-        {/* Возврат в библиотеку — стрелкой в левом верхнем углу, как
-            на любой странице документа. */}
+        {/* Возврат на главную — стрелкой в левом верхнем углу. Именно
+            на главную, а не в список материалов: оттуда человек и пришёл,
+            и оттуда же расходятся остальные разделы. */}
         <Link
-          to="/documents"
-          title="Все материалы"
-          aria-label="Все материалы"
+          to="/"
+          title="На главную"
+          aria-label="На главную"
           className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg text-[var(--accent)] transition-colors hover:bg-[var(--surface-sunken)]"
         >
           <ArrowLeft size={19} />

@@ -339,12 +339,12 @@ export function FilesMock() {
             alignContent: 'center',
           }}
         >
-          <MiniSheet kind="Грамота" label="" main="за первое место" event="" />
+          <MiniSheet kind="Сертификат" label="" main="за первое место" event="" />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           <div style={{ paddingBottom: 10, borderBottom: '1px solid var(--line)', fontSize: 14 }}>
             <p style={{ fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              Грамота за место
+              Сертификат за место
             </p>
             <p
               style={{
@@ -407,7 +407,7 @@ export function LettersMock() {
     <Frame url="vruchay.ru / рассылка">
       <div style={{ padding: 16, borderBottom: '1px solid var(--line)' }}>
         <p style={{ fontSize: 14, color: 'var(--text-muted)' }}>От: Центр «Развитие» &lt;award@example.ru&gt;</p>
-        <p style={{ marginTop: 4, fontWeight: 500 }}>Ваша грамота за конкурс «Мастер года»</p>
+        <p style={{ marginTop: 4, fontWeight: 500 }}>Ваш сертификат за конкурс «Мастер года»</p>
       </div>
       {items.map(([mail, label, tone, when]) => (
         <div

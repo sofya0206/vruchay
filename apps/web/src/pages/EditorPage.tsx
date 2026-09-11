@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   Check,
@@ -1393,15 +1393,10 @@ export function EditorPage() {
               <div className="max-w-sm rounded-2xl bg-[var(--surface)] px-5 py-4 text-center shadow-sm ring-1 ring-[var(--line)]">
                 <p className="font-medium">Лист пока пустой</p>
                 <p className="mt-1 text-sm text-[var(--text-muted)]">
-                  Выберите заготовку, чтобы оформить документ, — текст на ней уже расставлен
-                  по листу. Или соберите лист сами: «Вставка» → «Загрузить бланк», потом текст.
+                  Загрузите свой бланк фоном, а поверх поставьте текст: «Вставка» →
+                  «Загрузить бланк», потом «Добавить текстовый блок». Фамилия и другие
+                  колонки списка подставляются переменными вида %name.
                 </p>
-                <Link
-                  to="/documents"
-                  className="mt-3 inline-block rounded-lg bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-[var(--accent-contrast)] hover:bg-[var(--accent-hover)]"
-                >
-                  Выбрать заготовку
-                </Link>
               </div>
             </div>
           )}

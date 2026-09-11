@@ -26,8 +26,6 @@ const GLOW =
   'radial-gradient(45% 50% at 100% 0%, rgba(176,131,65,.16), transparent 70%)';
 
 interface SheetProps {
-  /** Во сколько раз мельче обычного: от него считается весь кегль внутри. */
-  scale?: number;
   kind?: string;
   label?: string;
   name?: string;
@@ -43,7 +41,6 @@ interface SheetProps {
 
 /** Наградный лист в миниатюре: тот же порядок блоков, что и в настоящем. */
 export function MiniSheet({
-  scale = 1,
   kind = 'Сертификат',
   label = 'участника',
   name = 'Островская Анна',
@@ -55,7 +52,16 @@ export function MiniSheet({
   org = 'Центр «Развитие»',
   highlightName = false,
 }: SheetProps) {
-  const u = 10 * scale;
+  /*
+   * Кегль считается от ширины самого листа, а не в пикселях.
+   *
+   * Лист занимает всю ширину плитки, а плитка на разных экранах разной
+   * ширины; пиксельный кегль превращал текст в нечитаемую крупу на широком
+   * экране. 4,4 % ширины на условную единицу — те же пропорции, что у листа
+   * на посадочной: имя получателя выходит примерно в 1/28 ширины, как
+   * на настоящей грамоте.
+   */
+  const cq = (k: number) => `${(4.4 * k).toFixed(3)}cqw`;
 
   return (
     <div
@@ -63,6 +69,7 @@ export function MiniSheet({
         position: 'relative',
         width: '100%',
         aspectRatio: '297/210',
+        containerType: 'inline-size',
         background: 'var(--sheet-paper)',
         boxShadow: 'inset 0 0 0 1px var(--sheet-line)',
         overflow: 'hidden',
@@ -114,7 +121,7 @@ export function MiniSheet({
           style={{
             display: 'flex',
             justifyContent: 'space-between',
-            fontSize: u * 0.3,
+            fontSize: cq(0.3),
             letterSpacing: '.08em',
             textTransform: 'uppercase',
             color: 'var(--text-muted)',
@@ -126,15 +133,15 @@ export function MiniSheet({
 
         <div style={{ marginTop: 'auto', marginBottom: 'auto', textAlign: 'center' }}>
           <div
-            style={{ fontSize: u * 1.35, fontWeight: 700, letterSpacing: '.02em', lineHeight: 1.1 }}
+            style={{ fontSize: cq(1.35), fontWeight: 700, letterSpacing: '.02em', lineHeight: 1.1 }}
           >
             {kind}
           </div>
           {label && (
             <div
               style={{
-                marginTop: u * 0.15,
-                fontSize: u * 0.38,
+                marginTop: cq(0.15),
+                fontSize: cq(0.38),
                 letterSpacing: '.14em',
                 textTransform: 'uppercase',
                 color: 'var(--text-muted)',
@@ -145,16 +152,16 @@ export function MiniSheet({
           )}
           <div
             style={{
-              margin: `${u * 0.35}px auto 0`,
-              width: u * 3,
+              margin: `${cq(0.35)} auto 0`,
+              width: cq(3),
               height: 2,
               background: 'var(--accent-line)',
             }}
           />
           <div
             style={{
-              marginTop: u * 0.6,
-              fontSize: u * 0.3,
+              marginTop: cq(0.6),
+              fontSize: cq(0.3),
               letterSpacing: '.1em',
               textTransform: 'uppercase',
               color: 'var(--text-muted)',
@@ -166,14 +173,14 @@ export function MiniSheet({
             style={{
               position: 'relative',
               display: 'inline-block',
-              marginTop: u * 0.25,
-              padding: `${u * 0.18}px ${u * 0.9}px`,
+              marginTop: cq(0.25),
+              padding: `${cq(0.18)} ${cq(0.9)}`,
               borderRadius: 9999,
               background: 'rgba(255,255,255,.8)',
               boxShadow: highlightName
                 ? '0 0 0 1px var(--accent-line)'
                 : 'inset 0 0 0 1px rgba(9,17,53,.12)',
-              fontSize: u * 0.82,
+              fontSize: cq(0.82),
               fontWeight: 600,
               letterSpacing: '.01em',
             }}
@@ -197,9 +204,9 @@ export function MiniSheet({
           {main && (
             <div
               style={{
-                margin: `${u * 0.35}px auto 0`,
+                margin: `${cq(0.35)} auto 0`,
                 maxWidth: '70%',
-                fontSize: u * 0.36,
+                fontSize: cq(0.36),
                 lineHeight: 1.45,
                 color: 'var(--text-muted)',
               }}
@@ -215,7 +222,7 @@ export function MiniSheet({
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'flex-end',
-            fontSize: u * 0.3,
+            fontSize: cq(0.3),
           }}
         >
           <div>
@@ -238,8 +245,7 @@ export function CreateVisual() {
     <span style={{ display: 'grid', gap: 10, justifyItems: 'center', width: '100%' }}>
       <span style={{ display: 'block', width: '72%', boxShadow: 'var(--shadow-sheet)' }}>
         <MiniSheet
-          scale={0.55}
-          kind="Грамота"
+          kind="Сертификат"
           label=""
           main="за первое место"
           event=""
@@ -274,7 +280,7 @@ export function CreateVisual() {
 /** Документы и шаблоны: полка готовых листов. */
 export function LibraryVisual() {
   const sheets: [string, string][] = [
-    ['Грамота', 'Конкурсы и олимпиады'],
+    ['Благодарственное письмо', 'Корпоративные награждения'],
     ['Диплом', 'Олимпиады и конкурсы'],
     ['Сертификат', 'Обучение и семинары'],
   ];
@@ -296,7 +302,6 @@ export function LibraryVisual() {
         >
           <span style={{ display: 'block', width: 56, flexShrink: 0 }}>
             <MiniSheet
-              scale={0.22}
               kind={kind}
               label=""
               main=""
@@ -354,7 +359,7 @@ export function MailVisual() {
           От: award@example.ru
         </span>
         <span style={{ display: 'block', marginTop: 2, fontSize: 12, fontWeight: 500 }}>
-          Ваша грамота за конкурс «Мастер года»
+          Ваш сертификат за конкурс «Мастер года»
         </span>
       </span>
       {rows.map(([address, tone, label]) => (
