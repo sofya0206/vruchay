@@ -1,6 +1,6 @@
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, CircleHelp, Mail, ListChecks, ShieldCheck, Sparkles, Table2 } from 'lucide-react';
+import { CircleHelp } from 'lucide-react';
 import { api } from '../api/client';
 import type { DocumentDetail } from '../api/types';
 import { Loading } from '../ui/Loading';
@@ -12,7 +12,7 @@ import { VerifyPanel } from '../verify/VerifyPanel';
 import { DocumentChrome } from '../editor/DocumentChrome';
 import { useDocumentFileMenu } from '../editor/DocumentFileMenu';
 import type { MenuDef } from '../editor/MenuBar';
-import { WORKSPACE_TABS, workspaceTab, type WorkspaceTab } from './workspace-tabs';
+import { workspaceTab, type WorkspaceTab } from './workspace-tabs';
 
 /**
  * Рабочее место материала: список, правила, проверка, письмо.
@@ -27,10 +27,10 @@ import { WORKSPACE_TABS, workspaceTab, type WorkspaceTab } from './workspace-tab
  * по материалу, а не отдельной таблицей внутри каждого материала — иначе
  * «найдите грамоту Ивановой» опять означает обойти материалы по очереди.
  *
- * Ленты закладок над экраном больше нет: у материала две стороны — лист
- * и таблица, и переключатель между ними стоит в рамке страницы. Правила,
- * проверка, письмо и подлинность — не третья и не четвёртая сторона,
- * а настройки выпуска, и живут они в меню «Данные» над таблицей.
+ * Где человек находится, говорит лента вкладок в рамке страницы: она же
+ * стоит над листом, и переход «лист → письмо» стал одним нажатием вместо
+ * дороги через главную. Своего меню «Данные» здесь поэтому больше нет —
+ * оно повторяло ленту словами.
  */
 export function DocumentWorkspacePage() {
   const { id = '' } = useParams();
@@ -75,22 +75,6 @@ export function DocumentWorkspacePage() {
   const menus: MenuDef[] = [
     { id: 'file', label: 'Файл', entries: fileMenu.entries },
     {
-      id: 'data',
-      label: 'Данные',
-      entries: [
-        { icon: <Table2 size={16} />, label: 'Вернуться к таблице', onSelect: () => open('table') },
-        { separator: true },
-        { icon: <Sparkles size={16} />, label: 'Правила награждения', onSelect: () => open('rules') },
-        { icon: <ListChecks size={16} />, label: 'Проверить строки', onSelect: () => open('check') },
-        { icon: <Mail size={16} />, label: 'Письмо участнику', onSelect: () => open('mail') },
-        {
-          icon: <ShieldCheck size={16} />,
-          label: 'Подлинность документа',
-          onSelect: () => open('verify'),
-        },
-      ],
-    },
-    {
       id: 'help',
       label: 'Справка',
       entries: [
@@ -103,28 +87,9 @@ export function DocumentWorkspacePage() {
     },
   ];
 
-  const title = WORKSPACE_TABS.find((t) => t.id === tab)?.label ?? '';
-
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <DocumentChrome documentId={id} title={page.title} menus={menus} view="table" />
-
-      {/* Где человек находится и как вернуться — одной строкой. Заменяет
-          ленту закладок: у настроек выпуска один вход, из таблицы. */}
-      <div className="flex shrink-0 items-center gap-2 border-b border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-sm">
-        <button
-          type="button"
-          onClick={() => open('table')}
-          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
-        >
-          <ChevronLeft size={15} />
-          Таблица
-        </button>
-        <span aria-hidden className="text-[var(--line-strong)]">
-          /
-        </span>
-        <span className="font-medium">{title}</span>
-      </div>
+      <DocumentChrome documentId={id} title={page.title} menus={menus} tab={tab} />
 
       {tab === 'rules' ? (
         <RulesTab documentId={id} ruleSetId={page.ruleSetId ?? null} />
