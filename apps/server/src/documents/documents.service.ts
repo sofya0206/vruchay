@@ -1,12 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import {
-  buildStarterLayout,
-  CURRENT_LAYOUT_SCHEMA_VERSION,
-  findStarterPreset,
-  sheetLayout,
-  SheetLayout,
-} from '@gramota/shared';
+import { CURRENT_LAYOUT_SCHEMA_VERSION, sheetLayout, SheetLayout } from '@gramota/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { buildS3Key } from '../storage/s3-key';
@@ -58,7 +52,7 @@ export class DocumentsService {
       ...(query.search
         ? { title: { contains: query.search, mode: Prisma.QueryMode.insensitive } }
         : {}),
-      ...(query.category ? { category: query.category } : {}),
+      ...(query.folderId ? { folderId: query.folderId } : {}),
     };
 
     const [items, total] = await Promise.all([
@@ -74,7 +68,7 @@ export class DocumentsService {
           pageHeightMm: true,
           updatedAt: true,
           createdAt: true,
-          category: true,
+          folderId: true,
           /*
            * Мероприятие и число получателей — чтобы одинаково названные
            * материалы различались в списке. В рассылке три строки «Грамота
@@ -135,23 +129,12 @@ export class DocumentsService {
   }
 
   async create(orgId: string, dto: CreateDocumentDto) {
-    /*
-     * Заготовку раскладывает сервер, а не клиент: макет попадает в базу
-     * и оттуда в PDF, и принимать его готовым с клиента значило бы верить
-     * чужому json на слово. Здесь же лежит и список колонок, без которых
-     * заготовка печатает пустоту.
-     */
-    const preset = dto.presetId ? findStarterPreset(dto.presetId) : null;
-    const layout: SheetLayout = preset
-      ? buildStarterLayout(preset, {
-          pageWidthMm: dto.pageWidthMm,
-          pageHeightMm: dto.pageHeightMm,
-        })
-      : [];
+    if (dto.folderId) await this.folderOrFail(orgId, dto.folderId);
 
     // Документ без листа бесполезен, а таблица без колонок «имя» и «почта»
     // не даст ни сгенерировать файл, ни отправить его — создаём всё сразу.
-    const columns = preset ? preset.columns : [...DEFAULT_COLUMNS];
+    const columns = [...DEFAULT_COLUMNS];
+    const layout: SheetLayout = [];
 
     return this.prisma.document.create({
       data: {
@@ -159,7 +142,7 @@ export class DocumentsService {
         title: dto.title,
         pageWidthMm: dto.pageWidthMm,
         pageHeightMm: dto.pageHeightMm,
-        category: dto.category ?? preset?.category ?? null,
+        folderId: dto.folderId ?? null,
         sheets: {
           create: { position: 0, layout, schemaVersion: CURRENT_LAYOUT_SCHEMA_VERSION },
         },
@@ -210,7 +193,7 @@ export class DocumentsService {
         pageHeightMm: source.pageHeightMm,
         verifyEnabled: source.verifyEnabled,
         verifyFields: (source.verifyFields ?? []) as Prisma.InputJsonValue,
-        category: source.category,
+        folderId: source.folderId,
         // Связь на исходник, а не на его собственный исходник: цепочка копий
         // копий никому не нужна, человеку важен бланк, который он открывал.
         sourceDocumentId: source.id,
@@ -255,11 +238,29 @@ export class DocumentsService {
 
   async update(orgId: string, documentId: string, dto: UpdateDocumentDto) {
     await this.getOrFail(orgId, documentId);
+    if (dto.folderId) await this.folderOrFail(orgId, dto.folderId);
     return this.prisma.document.update({
       where: { id: documentId },
       data: dto,
       include: { sheets: { orderBy: { position: 'asc' } } },
     });
+  }
+
+  /**
+   * Папка обязана принадлежать той же организации.
+   *
+   * Внешний ключ этого не проверит: чужая папка существует, и без проверки
+   * материал уехал бы в неё по одному лишь идентификатору из запроса.
+   * Ответ 404, а не 403, — как и везде: иначе он подтвердил бы, что папка
+   * с таким идентификатором у кого-то есть.
+   */
+  private async folderOrFail(orgId: string, folderId: string) {
+    const folder = await this.prisma.documentFolder.findFirst({
+      where: { id: folderId, orgId },
+      select: { id: true },
+    });
+    if (!folder) throw new NotFoundException('Папка не найдена');
+    return folder;
   }
 
   /** Мягкое удаление: документ уходит в корзину, файлы остаются доступны по verify-ссылкам. */

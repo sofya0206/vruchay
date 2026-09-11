@@ -14,13 +14,9 @@ import {
   RotateCcw,
   Trash2,
 } from 'lucide-react';
-import {
-  daysLeftInTrash,
-  DOCUMENT_CATEGORIES,
-  TRASH_DAYS,
-  type DocumentCategory,
-} from '@gramota/shared';
+import { daysLeftInTrash, TRASH_DAYS } from '@gramota/shared';
 import type { DocumentSummary } from '../api/types';
+import { useFolders } from '../api/folders';
 import { formatWhen } from '../overview/format';
 import { SheetRenderer } from '../render/SheetRenderer';
 import { SheetThumbnail } from './SheetThumbnail';
@@ -52,8 +48,8 @@ export function DocumentCard({
 }: {
   doc: DocumentSummary;
   onRename: (doc: DocumentSummary) => void;
-  /** Переложить в папку раздела; `null` — вынуть из папок совсем. */
-  onMove: (doc: DocumentSummary, category: DocumentCategory | null) => void;
+  /** Переложить в папку; `null` — вынуть из папок совсем. */
+  onMove: (doc: DocumentSummary, folderId: string | null) => void;
   onDuplicate: (doc: DocumentSummary) => void;
   onDelete: (doc: DocumentSummary) => void;
   /** Заданы только в корзине: там карточка ведёт себя иначе. */
@@ -121,7 +117,7 @@ export function DocumentCard({
 
       <ActionsMenu
         title={doc.title}
-        category={doc.category ?? null}
+        folderId={doc.folderId ?? null}
         onRename={() => onRename(doc)}
         onMove={(to) => onMove(doc, to)}
         onDuplicate={() => onDuplicate(doc)}
@@ -234,19 +230,20 @@ function Preview({ doc }: { doc: DocumentSummary }) {
 /** Меню действий — то же, что человек привык видеть в проводнике и на диске. */
 function ActionsMenu({
   title,
-  category,
+  folderId,
   onRename,
   onMove,
   onDuplicate,
   onDelete,
 }: {
   title: string;
-  category: DocumentCategory | null;
+  folderId: string | null;
   onRename: () => void;
-  onMove: (category: DocumentCategory | null) => void;
+  onMove: (folderId: string | null) => void;
   onDuplicate: () => void;
   onDelete: () => void;
 }) {
+  const folders = useFolders();
   const [open, setOpen] = useState(false);
   /* Список папок открывается вместо меню, а не рядом с ним: папок шесть,
      и вложенное меню сбоку на карточке шириной в лист попросту не помещается
@@ -310,22 +307,29 @@ function ActionsMenu({
             <ChevronLeft size={14} /> Назад
           </button>
           <div className="my-1 border-t border-[var(--line)]" />
-          {DOCUMENT_CATEGORIES.map((c) => (
+          {(folders.data ?? []).map((f) => (
             <button
-              key={c.id}
+              key={f.id}
               type="button"
               role="menuitem"
               className={item}
               onClick={() => {
                 setOpen(false);
-                onMove(c.id);
+                onMove(f.id);
               }}
             >
               <Folder size={14} />
-              <span className="flex-1 truncate">{c.title}</span>
-              {category === c.id && <Check size={14} className="text-[var(--accent)]" />}
+              <span className="flex-1 truncate">{f.name}</span>
+              {folderId === f.id && <Check size={14} className="text-[var(--accent)]" />}
             </button>
           ))}
+          {/* Папок нет — говорим об этом прямо: пустое меню читается
+              как сломанное. */}
+          {(folders.data ?? []).length === 0 && (
+            <p className="px-3 py-2 text-sm text-[var(--text-muted)]">
+              Папок пока нет — заведите слева в колонке
+            </p>
+          )}
           <div className="my-1 border-t border-[var(--line)]" />
           <button
             type="button"
@@ -338,7 +342,7 @@ function ActionsMenu({
           >
             <FolderMinus size={14} />
             <span className="flex-1">Вне папок</span>
-            {category === null && <Check size={14} className="text-[var(--accent)]" />}
+            {folderId === null && <Check size={14} className="text-[var(--accent)]" />}
           </button>
         </div>
       )}

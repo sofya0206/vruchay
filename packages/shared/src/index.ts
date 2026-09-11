@@ -4,7 +4,7 @@ export * from './schema/autofit';
 export * from './schema/rich-text-resolve';
 export * from './typography';
 export * from './schema/page-sizes';
-export * from './schema/starter-presets';
+export * from './schema/sample-recipient';
 export * from './retention';
 export * from './variables';
 export * from './declension';

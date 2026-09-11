@@ -181,6 +181,7 @@ model Organization {
 
   members     OrgMember[]
   documents   Document[]
+  folders     DocumentFolder[]
   files       File[]
   jobs        GenerationJob[]
   mailDomains MailDomain[]
@@ -416,13 +417,14 @@ model Document {
   expiresAt DateTime? @map("expires_at")
 
   /**
-   * Раздел библиотеки: спортивные соревнования, обучение, благодарности.
-   * Не перечисление, а строка: набор разделов живёт в `@gramota/shared`
-   * и правится вместе с заготовками, а миграция ради нового раздела —
-   * цена, которой этот выбор не стоит. Значение проверяет Zod на входе.
-   * null — материал заведён до появления разделов или без выбора.
+   * Папка библиотеки. null — материал лежит в корне «Моих документов».
+   *
+   * SetNull, а не Cascade: удаление папки не удаляет то, что в ней лежало, —
+   * материалы возвращаются в корень. Папку заводят на глаз и удаляют так же
+   * легко, и цена ошибки не должна равняться потере сезона работы.
    */
-  category String? @map("category")
+  folderId String?         @map("folder_id") @db.Uuid
+  folder   DocumentFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
 
   /**
    * Материал, с которого сняли копию под новое мероприятие.
@@ -463,9 +465,39 @@ model Document {
   tildaRequests TildaRequest[]
 
   @@index([orgId, deletedAt])
-  // Библиотека фильтруется по разделу внутри организации — это её главный запрос.
-  @@index([orgId, category])
+  // Библиотека фильтруется по папке внутри организации — это её главный запрос.
+  @@index([orgId, folderId])
   @@map("documents")
+}
+
+/**
+ * Папка библиотеки — список материалов, который организация заводит себе сама.
+ *
+ * Плоский список без вложенности: папки здесь как ярлыки на полке, а не как
+ * дерево каталогов. Дерево требует переносов, хлебных крошек и ответа на
+ * вопрос «куда делся материал из удалённой ветки», а награждений за сезон
+ * десятки — их раскладывают в один уровень и этим обходятся.
+ *
+ * Названия свои: раньше набор разделов был зашит в код («Спортивные
+ * соревнования», «Олимпиады и конкурсы»), и организация, которая проводит
+ * семинары, читала их как чужой шаблон.
+ */
+model DocumentFolder {
+  id        String   @id @default(uuid()) @db.Uuid
+  orgId     String   @map("org_id") @db.Uuid
+  name      String
+  /** Порядок в колонке: человек ставит папки как ему удобно, а не по алфавиту. */
+  position  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  documents Document[]
+
+  /** Две папки с одним именем в одной организации различить нечем. */
+  @@unique([orgId, name])
+  @@index([orgId, position])
+  @@map("document_folders")
 }
 
 model Sheet {

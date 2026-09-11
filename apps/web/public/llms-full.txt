@@ -1713,7 +1713,7 @@ curl "https://vruchay.ru/api/documents/$DOCUMENT_ID/registry" \
 | `issueDate` | string \| null | дата выдачи (день, в JSON — полночь UTC); `null` — день выпуска |
 | `expiresIn` | string \| null | срок действия от выдачи, ISO 8601 (`P1Y`) |
 | `expiresAt` | string \| null | срок действия фиксированной датой; если заданы оба, побеждает дата |
-| `category` | string \| null | раздел |
+| `folderId` | string (UUID) \| null | папка; `null` — материал лежит в корне |
 | `sourceDocumentId` | UUID \| null | исходник копии (сырое поле; для показа удобнее `source`) |
 | `source` | `{ id, title }` \| null | исходный бланк, если он не в корзине |
 | `ruleSetId` | UUID \| null | привязанный набор правил награждения |
@@ -1737,7 +1737,7 @@ curl "https://vruchay.ru/api/documents/$DOCUMENT_ID/registry" \
   "issueDate": "2026-06-19T00:00:00.000Z",
   "expiresIn": null,
   "expiresAt": null,
-  "category": "sport",
+  "folderId": "9f1c0c8e-0f3c-4a1a-9c1f-1f7d2a3b4c5d",
   "sourceDocumentId": null,
   "source": null,
   "ruleSetId": "7c1f7d1e-2b5e-4c3a-9c1a-8d2f0a6b1e11",
@@ -1797,7 +1797,7 @@ curl "https://vruchay.ru/api/documents/$DOCUMENT_ID" \
 | `limit` | integer | нет | 1…100, по умолчанию 50 |
 | `offset` | integer | нет | ≥ 0, по умолчанию 0 |
 | `search` | string | нет | до 200 символов; поиск по названию без учёта регистра (подстрока) |
-| `category` | `sport` \| `contest` \| `education` \| `corporate` \| `accreditation` | нет | фильтр по разделу |
+| `folderId` | string (UUID) | нет | фильтр по папке; папки берутся из `GET /api/folders` |
 | `sort` | `updated` \| `created` \| `title` | нет | `updated` — по правке (новые сверху), `created` — по созданию, `title` — по названию. По умолчанию `updated` |
 | `trashed` | `true` \| `false` | нет | `true` — только корзина, `false` (по умолчанию) — только живые |
 
@@ -1814,7 +1814,7 @@ curl "https://vruchay.ru/api/documents/$DOCUMENT_ID" \
 | `items[].title` | string | |
 | `items[].pageWidthMm`, `items[].pageHeightMm` | number | размер листа, мм |
 | `items[].updatedAt`, `items[].createdAt` | string (ISO 8601) | |
-| `items[].category` | string \| null | раздел |
+| `items[].folderId` | string (UUID) \| null | папка; `null` — материал лежит в корне |
 | `items[].eventName`, `items[].eventDate` | string | мероприятие (пустые строки, если не заполнены) |
 | `items[].deletedAt` | string \| null | когда отправлен в корзину; `null` у живых |
 | `items[].sheetCount` | integer | число листов |
@@ -1835,7 +1835,7 @@ curl "https://vruchay.ru/api/documents/$DOCUMENT_ID" \
       "pageHeightMm": 210,
       "updatedAt": "2026-08-30T10:12:44.000Z",
       "createdAt": "2026-08-01T08:00:00.000Z",
-      "category": "sport",
+      "folderId": "9f1c0c8e-0f3c-4a1a-9c1f-1f7d2a3b4c5d",
       "eventName": "Первенство области по плаванию",
       "eventDate": "17–19 июня 2026",
       "deletedAt": null,
@@ -1858,13 +1858,13 @@ curl "https://vruchay.ru/api/documents/$DOCUMENT_ID" \
 
 | Код | Когда |
 |---|---|
-| 400 | параметр не прошёл проверку: `limit` вне 1…100, `offset` < 0, `search` длиннее 200, неизвестный `category`/`sort`, `trashed` не `true`/`false` |
+| 400 | параметр не прошёл проверку: `limit` вне 1…100, `offset` < 0, `search` длиннее 200, `folderId` не UUID, неизвестный `sort`, `trashed` не `true`/`false` |
 | 401 | нет токена или сессии |
 
 ## Пример
 
 ```bash
-curl "https://vruchay.ru/api/documents?limit=20&category=sport&sort=title" \
+curl "https://vruchay.ru/api/documents?limit=20&folderId=$FOLDER_ID&sort=title" \
   -H "Authorization: Bearer $VRUCHAY_TOKEN"
 ```
 
@@ -2034,7 +2034,7 @@ curl -X PATCH "https://vruchay.ru/api/documents/$DOCUMENT_ID/sheets/$SHEET_ID" \
 | `eventPlace` | string | нет | до 200 |
 | `eventHours` | string | нет | до 50 |
 | `issueDate` | string \| null | нет | `ГГГГ-ММ-ДД`; `null` — печатать день выпуска. Ошибки: «Дата в виде ГГГГ-ММ-ДД», «Такой даты нет» |
-| `category` | string \| null | нет | `sport` \| `contest` \| `education` \| `corporate` \| `accreditation`; `null` — убрать из разделов |
+| `folderId` | string (UUID) \| null | нет | папка из `GET /api/folders`; `null` — вынуть материал в корень |
 | `expiresIn` | string \| null | нет | длительность ISO 8601 от даты выдачи: `P1Y`, `P6M`, `P2W`, `P30D`, `P1Y6M`; до 20 символов, приводится к верхнему регистру; не больше 100 лет; `null` — снять. Ошибка: «Срок задаётся как P1Y, P6M, P2W или P30D» |
 | `expiresAt` | string \| null | нет | фиксированная дата окончания (любая запись, которую разбирает `Date`); `null` — снять. Ошибка: «Не удалось разобрать дату окончания срока» |
 
@@ -2069,7 +2069,7 @@ curl -X PATCH "https://vruchay.ru/api/documents/$DOCUMENT_ID/sheets/$SHEET_ID" \
   "issueDate": "2026-06-19T00:00:00.000Z",
   "expiresIn": null,
   "expiresAt": null,
-  "category": "sport",
+  "folderId": "9f1c0c8e-0f3c-4a1a-9c1f-1f7d2a3b4c5d",
   "sourceDocumentId": null,
   "ruleSetId": null,
   "createdAt": "2026-08-01T08:00:00.000Z",
@@ -2085,8 +2085,9 @@ curl -X PATCH "https://vruchay.ru/api/documents/$DOCUMENT_ID/sheets/$SHEET_ID" \
 
 | Код | Когда |
 |---|---|
-| 400 | «Нечего обновлять» — пустое тело; «Некорректный идентификатор»; «Введите название»; «Дата в виде ГГГГ-ММ-ДД»; «Такой даты нет»; «Срок задаётся как P1Y, P6M, P2W или P30D»; «Не удалось разобрать дату окончания срока»; выход за пределы длины/диапазона; неизвестный `category` |
+| 400 | «Нечего обновлять» — пустое тело; «Некорректный идентификатор»; «Введите название»; «Дата в виде ГГГГ-ММ-ДД»; «Такой даты нет»; «Срок задаётся как P1Y, P6M, P2W или P30D»; «Не удалось разобрать дату окончания срока»; выход за пределы длины/диапазона; `folderId` не UUID |
 | 401 | нет токена или сессии |
+| 404 | Папки с таким `folderId` в вашей организации нет: «Папка не найдена». |
 | 404 | «Документ не найден» — нет такого, чужой или в корзине |
 | 413 | тело больше 1 МБ |
 
@@ -2142,7 +2143,7 @@ curl -X PATCH "https://vruchay.ru/api/documents/$DOCUMENT_ID" \
   "issueDate": null,
   "expiresIn": null,
   "expiresAt": null,
-  "category": "sport",
+  "folderId": "9f1c0c8e-0f3c-4a1a-9c1f-1f7d2a3b4c5d",
   "sourceDocumentId": "6f1c3b2a-9d4e-4f5a-8b6c-7d8e9f0a1b2c",
   "ruleSetId": null,
   "createdAt": "2026-09-03T09:10:00.000Z",
@@ -2410,10 +2411,9 @@ curl -X POST "https://vruchay.ru/api/documents/$DOCUMENT_ID/sheets" \
 
 # POST /api/documents
 
-Создаёт материал сразу с одним листом и колонками таблицы получателей. Без `presetId`
-лист пустой (`layout: []`), колонки — `name` и `email`. С `presetId` сервер сам
-раскладывает по листу текст заготовки и заводит её колонки (у `sport-award` — ещё
-`place`); раздел берётся из заготовки, если `category` не передан.
+Создаёт материал сразу с одним листом и колонками таблицы получателей: лист пустой
+(`layout: []`), колонки — `name` и `email`. Раскладку человек собирает в редакторе
+или загружает свой бланк фоном.
 
 ## Запрос
 
@@ -2424,15 +2424,14 @@ curl -X POST "https://vruchay.ru/api/documents/$DOCUMENT_ID/sheets" \
 | `title` | string | да | 1–200 символов после обрезки пробелов. Ошибка: «Введите название» |
 | `pageWidthMm` | number | нет | 50…600, по умолчанию 297 |
 | `pageHeightMm` | number | нет | 50…600, по умолчанию 210 |
-| `category` | `sport` \| `contest` \| `education` \| `corporate` \| `accreditation` | нет | раздел библиотеки |
-| `presetId` | `sport-award` \| `contest-participant` \| `course-certificate` \| `corporate-thanks` | нет | заготовка макета |
+| `folderId` | string (UUID) | нет | папка из `GET /api/folders`; без неё материал ложится в корень |
 
 ```json
 {
   "title": "Грамота за место",
   "pageWidthMm": 297,
   "pageHeightMm": 210,
-  "presetId": "sport-award"
+  "folderId": "9f1c0c8e-0f3c-4a1a-9c1f-1f7d2a3b4c5d"
 }
 ```
 
@@ -2452,7 +2451,7 @@ curl -X POST "https://vruchay.ru/api/documents/$DOCUMENT_ID/sheets" \
 | `issueDate` | string \| null | дата выдачи; `null` — день выпуска |
 | `expiresIn` | string \| null | срок действия длительностью (`P1Y`) |
 | `expiresAt` | string \| null | срок действия фиксированной датой |
-| `category` | string \| null | |
+| `folderId` | string (UUID) \| null | |
 | `sourceDocumentId` | UUID \| null | исходник копии |
 | `ruleSetId` | UUID \| null | привязанный набор правил награждения |
 | `createdAt`, `updatedAt` | string | |
@@ -2476,7 +2475,7 @@ curl -X POST "https://vruchay.ru/api/documents/$DOCUMENT_ID/sheets" \
   "issueDate": null,
   "expiresIn": null,
   "expiresAt": null,
-  "category": "sport",
+  "folderId": "9f1c0c8e-0f3c-4a1a-9c1f-1f7d2a3b4c5d",
   "sourceDocumentId": null,
   "ruleSetId": null,
   "createdAt": "2026-09-03T09:00:00.000Z",
@@ -2507,7 +2506,7 @@ curl -X POST "https://vruchay.ru/api/documents/$DOCUMENT_ID/sheets" \
 
 | Код | Когда |
 |---|---|
-| 400 | «Введите название» — пустой `title`; `title` длиннее 200; размер листа вне 50…600; неизвестный `category` или `presetId` |
+| 400 | «Введите название» — пустой `title`; `title` длиннее 200; размер листа вне 50…600; `folderId` не UUID |
 | 401 | нет токена или сессии |
 | 413 | тело больше 1 МБ |
 
@@ -2517,7 +2516,171 @@ curl -X POST "https://vruchay.ru/api/documents/$DOCUMENT_ID/sheets" \
 curl -X POST "https://vruchay.ru/api/documents" \
   -H "Authorization: Bearer $VRUCHAY_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"title":"Грамота за место","presetId":"sport-award"}'
+  -d '{"title":"Грамота за место"}'
+```
+
+---
+
+<!-- endpoints/folders/delete-folders-id -->
+> method: DELETE | path: /api/folders/{id} | auth: token | roles: any | rate_limit: none
+
+# DELETE /api/folders/{id}
+
+Удаляет папку. **Материалы при этом не удаляются**: они возвращаются в корень библиотеки, и их видно в общем списке `GET /api/documents` без `folderId`. Отменить удаление нечем — папку заводят заново.
+
+## Запрос
+
+| Параметр | Тип | Обязателен | Описание |
+|---|---|---|---|
+| id | string (UUID) | да | Идентификатор папки. |
+
+Тела нет.
+
+## Ответ
+
+`200 OK` — удалённая папка: `id`, `name`, `position`.
+
+## Ошибки
+
+| Код | Когда |
+|---|---|
+| 400 | `id` не UUID: «Некорректный идентификатор». |
+| 401 | Нет токена или cookie-сессии. |
+| 404 | Папки с таким `id` в вашей организации нет: «Папка не найдена». Чужая папка тоже даёт 404. |
+
+## Пример
+
+```bash
+curl -X DELETE "https://vruchay.ru/api/folders/$FOLDER_ID" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+<!-- endpoints/folders/get-folders -->
+> method: GET | path: /api/folders | auth: token | roles: any | rate_limit: none
+
+# GET /api/folders
+
+Папки организации в том порядке, в каком они стоят в колонке кабинета. Папка — плоский список: вложенности нет, папки внутри папки не бывает. Материал лежит либо в одной папке, либо в корне.
+
+## Запрос
+
+Параметров нет.
+
+## Ответ
+
+`200 OK` — массив папок.
+
+| Поле | Тип | Описание |
+|---|---|---|
+| id | string (UUID) | Идентификатор папки. |
+| name | string | Название, как его завела организация. |
+| position | number | Порядок в колонке; меньше — выше. |
+| count | number | Сколько живых материалов внутри. Удалённые в архив не считаются. |
+
+```json
+[
+  { "id": "9f1c0c8e-0f3c-4a1a-9c1f-1f7d2a3b4c5d", "name": "Обучение", "position": 0, "count": 12 }
+]
+```
+
+## Ошибки
+
+| Код | Когда |
+|---|---|
+| 401 | Нет токена или cookie-сессии. |
+
+## Пример
+
+```bash
+curl "https://vruchay.ru/api/folders" -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+<!-- endpoints/folders/patch-folders-id -->
+> method: PATCH | path: /api/folders/{id} | auth: token | roles: any | rate_limit: none
+
+# PATCH /api/folders/{id}
+
+Меняет название папки. Материалы внутри не трогает.
+
+## Запрос
+
+| Параметр | Тип | Обязателен | Описание |
+|---|---|---|---|
+| id | string (UUID) | да | Идентификатор папки. |
+| name | string | да | 1…100 знаков. |
+
+```json
+{ "name": "Обучение и семинары" }
+```
+
+## Ответ
+
+`200 OK` — папка с новым названием.
+
+## Ошибки
+
+| Код | Когда |
+|---|---|
+| 400 | Пустое или слишком длинное название; `id` не UUID. |
+| 401 | Нет токена или cookie-сессии. |
+| 404 | Папки с таким `id` в вашей организации нет: «Папка не найдена». Чужая папка тоже даёт 404. |
+| 409 | «Папка с таким названием уже есть». |
+
+## Пример
+
+```bash
+curl -X PATCH "https://vruchay.ru/api/folders/$FOLDER_ID" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"name":"Обучение и семинары"}'
+```
+
+---
+
+<!-- endpoints/folders/post-folders -->
+> method: POST | path: /api/folders | auth: token | roles: any | rate_limit: none
+
+# POST /api/folders
+
+Заводит папку в конце списка. Названия в пределах организации не повторяются: две папки с одним именем различить нечем.
+
+## Запрос
+
+| Поле | Тип | Обязательно | Описание |
+|---|---|---|---|
+| name | string | да | 1…100 знаков. Пробелы по краям убираются. |
+
+```json
+{ "name": "Обучение" }
+```
+
+## Ответ
+
+`201 Created`
+
+| Поле | Тип | Описание |
+|---|---|---|
+| id | string (UUID) | Идентификатор новой папки. |
+| name | string | Название. |
+| position | number | Порядок в колонке. |
+
+## Ошибки
+
+| Код | Когда |
+|---|---|
+| 400 | Пустое название: «Введите название папки»; длиннее 100 знаков. |
+| 401 | Нет токена или cookie-сессии. |
+| 409 | «Папка с таким названием уже есть». |
+
+## Пример
+
+```bash
+curl -X POST "https://vruchay.ru/api/folders" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"name":"Обучение"}'
 ```
 
 ---

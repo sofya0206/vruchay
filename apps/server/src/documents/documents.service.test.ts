@@ -1,23 +1,24 @@
 import { CURRENT_LAYOUT_SCHEMA_VERSION } from '@gramota/shared';
 import { describe, expect, it } from 'vitest';
 import { NotFoundException } from '@nestjs/common';
-import { extractVariables } from '@gramota/shared';
 import { DocumentsService } from './documents.service';
 import { createDocumentSchema, listDocumentsSchema } from './documents.dto';
 
 /*
- * Проверяем то, за что отвечает сервер: скоуп организации, раскладку
- * заготовки на новом материале и то, что копия под новое мероприятие
- * не тащит за собой чужие персональные данные. Саму геометрию заготовок
- * проверяют тесты в @gramota/shared — дублировать их здесь незачем.
+ * Проверяем то, за что отвечает сервер: скоуп организации, папку нового
+ * материала и то, что копия под новое мероприятие не тащит за собой чужие
+ * персональные данные.
  *
- * Prisma подменяем заглушкой: запросов нужно ровно два — найти документ
- * и создать новый. Хранилище не трогаем вовсе.
+ * Prisma подменяем заглушкой: запросов нужно три — найти документ, найти
+ * папку и создать новый материал. Хранилище не трогаем вовсе.
  */
 
 const ORG = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const OTHER_ORG = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const DOCUMENT = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+const FOLDER = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+/** Папка соседней организации: по идентификатору она неотличима от своей. */
+const OTHER_FOLDER = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 
 interface Created {
   data: Record<string, unknown>;
@@ -31,7 +32,7 @@ interface StoredDocument {
   pageHeightMm: number;
   verifyEnabled: boolean;
   verifyFields: string[];
-  category: string | null;
+  folderId: string | null;
   eventName: string;
   eventDate: string;
   sheets: { position: number; layout: unknown; schemaVersion: number; backgroundFileId: null }[];
@@ -48,7 +49,7 @@ function stored(over: Partial<StoredDocument> = {}): StoredDocument {
     pageHeightMm: 210,
     verifyEnabled: true,
     verifyFields: ['name'],
-    category: 'sport',
+    folderId: FOLDER,
     eventName: 'Первенство области по плаванию',
     eventDate: '17–19 июня 2026',
     sheets: [
@@ -75,6 +76,11 @@ function serviceWith(docs: StoredDocument[] = [stored()]) {
         return { id: 'new', sheets: [] };
       },
     },
+    documentFolder: {
+      // Своя папка у организации одна; чужая существует, но принадлежит соседям.
+      findFirst: async ({ where }: { where: { id: string; orgId: string } }) =>
+        where.id === FOLDER && where.orgId === ORG ? { id: FOLDER } : null,
+    },
   };
   const storage = {};
   return {
@@ -87,7 +93,7 @@ function serviceWith(docs: StoredDocument[] = [stored()]) {
 function payload(entry: Created) {
   const data = entry.data as {
     title: string;
-    category: string | null;
+    folderId: string | null;
     sourceDocumentId?: string;
     eventName?: string;
     sheets: { create: { layout: unknown; schemaVersion: number } };
@@ -95,7 +101,7 @@ function payload(entry: Created) {
   };
   return {
     title: data.title,
-    category: data.category,
+    folderId: data.folderId,
     sourceDocumentId: data.sourceDocumentId,
     eventName: data.eventName,
     sheet: data.sheets.create,
@@ -126,44 +132,8 @@ describe('скоуп организации', () => {
   });
 });
 
-describe('создание из заготовки', () => {
-  it('материал получает расставленный макет и колонки заготовки', async () => {
-    const { service, created } = serviceWith();
-    const dto = createDocumentSchema.parse({
-      title: 'Грамота за место',
-      presetId: 'sport-award',
-    });
-
-    await service.create(ORG, dto);
-
-    const result = payload(created[0]);
-    const layout = result.sheet.layout as { type: string }[];
-    expect(layout.length).toBeGreaterThan(0);
-    expect(result.sheet.schemaVersion).toBe(CURRENT_LAYOUT_SCHEMA_VERSION);
-    // Заготовке нужна колонка «place», иначе «за %place_word место»
-    // напечатается как «за  место».
-    expect(result.columns).toContain('place');
-    // Раздел берётся из заготовки, если человек не выбрал свой.
-    expect(result.category).toBe('sport');
-  });
-
-  it('в макете заготовки нет переменных, которых сервис не знает', async () => {
-    const { service, created } = serviceWith();
-    const dto = createDocumentSchema.parse({
-      title: 'Сертификат',
-      presetId: 'course-certificate',
-    });
-
-    await service.create(ORG, dto);
-
-    const layout = payload(created[0]).sheet.layout as Parameters<typeof extractVariables>[0];
-    const known = new Set(['name', 'email', 'event', 'event_date', 'event_place', 'hours', 'org', 'date']);
-    for (const name of extractVariables(layout)) {
-      expect(known.has(name), `неизвестная переменная %${name}`).toBe(true);
-    }
-  });
-
-  it('без заготовки лист пустой, а колонок ровно две', async () => {
+describe('создание материала', () => {
+  it('лист пустой, колонок ровно две, папки нет', async () => {
     const { service, created } = serviceWith();
     const dto = createDocumentSchema.parse({ title: 'Свой бланк' });
 
@@ -171,29 +141,42 @@ describe('создание из заготовки', () => {
 
     const result = payload(created[0]);
     expect(result.sheet.layout).toEqual([]);
+    expect(result.sheet.schemaVersion).toBe(CURRENT_LAYOUT_SCHEMA_VERSION);
     expect(result.columns).toEqual(['name', 'email']);
-    expect(result.category).toBeNull();
+    expect(result.folderId).toBeNull();
   });
 
-  it('выбранный человеком раздел сильнее раздела заготовки', async () => {
+  it('материал ложится в выбранную папку', async () => {
     const { service, created } = serviceWith();
-    const dto = createDocumentSchema.parse({
-      title: 'Диплом',
-      presetId: 'sport-award',
-      category: 'contest',
-    });
+    const dto = createDocumentSchema.parse({ title: 'Диплом', folderId: FOLDER });
 
     await service.create(ORG, dto);
-    expect(payload(created[0]).category).toBe('contest');
+    expect(payload(created[0]).folderId).toBe(FOLDER);
   });
 
-  it('выдуманная заготовка и выдуманный раздел не проходят проверку', () => {
-    expect(() =>
-      createDocumentSchema.parse({ title: 'Грамота', presetId: 'нет-такой' }),
-    ).toThrow();
-    expect(() =>
-      createDocumentSchema.parse({ title: 'Грамота', category: 'нет-такого' }),
-    ).toThrow();
+  /*
+   * Внешний ключ этого не поймает: чужая папка существует, и без проверки
+   * материал уехал бы в неё по одному идентификатору из тела запроса.
+   * Ответ 404, а не 403, — иначе он подтвердил бы, что папка с таким
+   * идентификатором у кого-то есть.
+   */
+  it('в чужую папку материал не кладётся и отвечает 404', async () => {
+    const { service, created } = serviceWith();
+    const dto = createDocumentSchema.parse({ title: 'Диплом', folderId: OTHER_FOLDER });
+
+    await expect(service.create(ORG, dto)).rejects.toThrow(NotFoundException);
+    expect(created).toHaveLength(0);
+  });
+
+  it('в чужую папку материал не переносится и правкой', async () => {
+    const { service } = serviceWith();
+    await expect(service.update(ORG, DOCUMENT, { folderId: OTHER_FOLDER })).rejects.toThrow(
+      NotFoundException,
+    );
+  });
+
+  it('идентификатор папки не вида UUID не проходит проверку', () => {
+    expect(() => createDocumentSchema.parse({ title: 'Грамота', folderId: 'нет-такой' })).toThrow();
   });
 });
 
@@ -207,7 +190,8 @@ describe('копия под новое мероприятие', () => {
     // Мероприятие другое — иначе на новых грамотах оказалось бы старое
     // название, и заметили бы это уже после печати.
     expect(result.eventName).toBeUndefined();
-    expect(result.category).toBe('sport');
+    // Копия остаётся в той же папке: её делают, чтобы работать дальше там же.
+    expect(result.folderId).toBe(FOLDER);
   });
 
   /*
@@ -236,12 +220,12 @@ describe('фильтры библиотеки', () => {
     const query = listDocumentsSchema.parse({});
     expect(query.sort).toBe('updated');
     expect(query.trashed).toBe(false);
-    expect(query.category).toBeUndefined();
+    expect(query.folderId).toBeUndefined();
   });
 
-  it('раздел и порядок принимаются только из известного списка', () => {
-    expect(listDocumentsSchema.parse({ category: 'education' }).category).toBe('education');
-    expect(() => listDocumentsSchema.parse({ category: 'нет-такого' })).toThrow();
+  it('папка и порядок принимаются только в известном виде', () => {
+    expect(listDocumentsSchema.parse({ folderId: FOLDER }).folderId).toBe(FOLDER);
+    expect(() => listDocumentsSchema.parse({ folderId: 'нет-такой' })).toThrow();
     expect(() => listDocumentsSchema.parse({ sort: 'random' })).toThrow();
   });
 });
