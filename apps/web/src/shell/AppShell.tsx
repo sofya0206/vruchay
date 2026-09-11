@@ -96,14 +96,17 @@ export function AppShell() {
           а строки нет там, где возвращаться некуда. */}
       {canGoBack && (
         <div className="shrink-0 px-2 pt-1.5 sm:px-3">
+          {/* Без подписи: слово «Назад» рядом со стрелкой ничего к ней
+              не добавляло, а строку делало заметнее, чем она стоит.
+              Название остаётся в подсказке и для чтения с экрана. */}
           <button
             type="button"
             onClick={() => navigate(-1)}
             title="Назад (Esc)"
-            className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
+            aria-label="Назад"
+            className="grid h-8 w-8 place-items-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
           >
-            <ArrowLeft size={17} />
-            Назад
+            <ArrowLeft size={18} />
           </button>
         </div>
       )}
