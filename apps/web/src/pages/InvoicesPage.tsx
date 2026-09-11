@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Check, FileText, Send } from 'lucide-react';
+import { Check, FileText, Send } from 'lucide-react';
 import { api } from '../api/client';
 import { Button } from '../ui/Button';
 import { StatusChip } from '../ui/Field';
@@ -56,18 +55,6 @@ export function InvoicesPage() {
 
   return (
     <div className="min-h-full">
-      <header className="border-b border-[var(--line)] bg-[var(--surface)]">
-        <div className="mx-auto flex max-w-5xl items-center gap-3 px-6 py-3">
-          <Link
-            to="/documents"
-            className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)] hover:text-[var(--text)]"
-          >
-            <ArrowLeft size={16} />К материалам
-          </Link>
-          <span className="ml-auto font-serif text-lg">Счета и заявки</span>
-        </div>
-      </header>
-
       <main className="mx-auto max-w-5xl px-6 py-8">
         <div role="tablist" className="inline-flex rounded-xl bg-[var(--surface-sunken)] p-1">
           {(

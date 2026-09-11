@@ -120,10 +120,9 @@ export function App() {
       {/* Тема из настроек человека — применяется на всех страницах кабинета. */}
       <ThemeSync />
       <Routes>
-      {/* Разделы кабинета живут внутри общей оболочки: шапка и навигация
-          рисуются один раз и при переходах не перерисовываются. Редактор
-          материала, настройки и счета — снаружи: у редактора весь экран
-          занят листом, у остальных своя шапка со ссылкой назад. */}
+      {/* Весь кабинет живёт внутри одной оболочки: полоса разделов
+          рисуется один раз и стоит на каждом экране, включая редактор
+          и настройки. Снаружи только страница печати и политика. */}
       <Route element={<AppShell />}>
         <Route path="/" element={<OverviewPage />} />
         <Route path="/documents" element={<DocumentsPage />} />
@@ -160,31 +159,29 @@ export function App() {
         </Route>
         <Route path="/billing" element={<SectionStub path="/billing" />} />
         {/* ───────── КОНЕЦ МАРШРУТОВ РАЗДЕЛОВ БЛОКА 1 ───────── */}
+
+        {/* Две стороны материала — лист и таблица — тоже под полосой:
+            именно из них раньше не было пути никуда, кроме «назад».
+            Полоса тонкая, высота листу отдаётся от окна, а не от
+            содержимого — см. AppShell. */}
+        <Route path="/documents/:id" element={<EditorPage />} />
+        <Route path="/mailing/:id" element={<DocumentWorkspacePage />} />
+        {/* Настройки: у каждого раздела свой адрес, прямая ссылка открывает
+            именно его. Список разделов — в settings/sections.tsx. */}
+        <Route path="/settings" element={<SettingsPage />}>
+          <Route index element={<Navigate to="/settings/account" replace />} />
+          {SETTINGS_SECTIONS.map((s) => (
+            <Route key={s.path} path={s.path} element={s.element} />
+          ))}
+        </Route>
+        {/* Старый адрес формы на сайте: она переехала в свой раздел. */}
+        <Route
+          path="/settings/integrations"
+          element={<Navigate to="/integrations/tilda" replace />}
+        />
+        <Route path="/invoices" element={<InvoicesPage />} />
       </Route>
 
-      {/* Две стороны материала — лист и таблица — живут снаружи оболочки
-          кабинета: у них своя рамка с названием, меню и переключателем
-          между собой. Внутри оболочки над этой рамкой встала бы вторая
-          шапка, и на экран для работы оставалось бы на сотню пикселей
-          меньше. */}
-      <Route path="/documents/:id" element={<EditorPage />} />
-      {/* Рабочее место материала: список, правила, проверка, письмо.
-          Раньше это были вкладки редактора макета. */}
-      <Route path="/mailing/:id" element={<DocumentWorkspacePage />} />
-      {/* Настройки: у каждого раздела свой адрес, прямая ссылка открывает
-          именно его. Список разделов — в settings/sections.tsx. */}
-      <Route path="/settings" element={<SettingsPage />}>
-        <Route index element={<Navigate to="/settings/account" replace />} />
-        {SETTINGS_SECTIONS.map((s) => (
-          <Route key={s.path} path={s.path} element={s.element} />
-        ))}
-      </Route>
-      {/* Старый адрес формы на сайте: она переехала в свой раздел. */}
-      <Route
-        path="/settings/integrations"
-        element={<Navigate to="/integrations/tilda" replace />}
-      />
-      <Route path="/invoices" element={<InvoicesPage />} />
       <Route path="/login" element={<Navigate to="/" replace />} />
       {/* Вошедшему на этих страницах делать нечего: адрес уже подтверждён,
           организация есть. Отправляем в кабинет, а не показываем формы. */}
