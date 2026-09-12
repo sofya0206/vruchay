@@ -70,7 +70,7 @@ export function Checkbox({
   );
 
   return label === undefined ? (
-    <span className={className}>{control}</span>
+    <Bare control={control} disabled={disabled} className={className} />
   ) : (
     <Framed control={control} label={label} hint={hint} disabled={disabled} className={className} />
   );
@@ -109,9 +109,38 @@ export function Radio({
   );
 
   return label === undefined ? (
-    <span className={className}>{control}</span>
+    <Bare control={control} disabled={disabled} className={className} />
   ) : (
     <Framed control={control} label={label} hint={hint} disabled={disabled} className={className} />
+  );
+}
+
+/**
+ * Коробка без подписи — в ячейке таблицы.
+ *
+ * Всё равно `<label>`, а не `<span>`: настоящий `<input>` спрятан, и
+ * нажатие приходится на нарисованную коробку. Без `<label>` оно никуда
+ * не уходило — в реестре и таблице получателей строки не отмечались.
+ */
+function Bare({
+  control,
+  disabled,
+  className,
+}: {
+  control: ReactNode;
+  disabled?: boolean;
+  className?: string;
+}) {
+  return (
+    <label
+      className={cn(
+        'inline-flex',
+        disabled ? 'cursor-not-allowed' : 'cursor-pointer',
+        className,
+      )}
+    >
+      {control}
+    </label>
   );
 }
 
