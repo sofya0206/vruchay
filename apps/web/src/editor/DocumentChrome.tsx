@@ -30,6 +30,7 @@ export function DocumentChrome({
   tab,
   toolbar,
   action,
+  right,
 }: {
   documentId: string;
   title: string;
@@ -46,6 +47,12 @@ export function DocumentChrome({
    * действия не должно переезжать от вкладки к вкладке.
    */
   action?: ReactNode;
+  /**
+   * Чем занять правую часть рамки вместо «Редактор — Таблица» и
+   * «Выпустить». Шаги выпуска стоят здесь, а не второй строкой под
+   * рамкой: вторая строка отнимала высоту и повторяла кнопку «Выпустить».
+   */
+  right?: ReactNode;
 }) {
   /*
    * «Назад» из материала — наверх, в список документов, а не по истории
@@ -94,25 +101,27 @@ export function DocumentChrome({
           </div>
         </div>
 
-        <div className="ml-auto flex shrink-0 items-center gap-2">
-          <div className="flex items-center gap-1 rounded-xl bg-[var(--surface-sunken)] p-1">
-            <ViewLink
-              to={materialTabPath(documentId, 'sheet')}
-              active={tab === 'sheet'}
-              icon={<FileText size={16} />}
-            >
-              Редактор
-            </ViewLink>
-            <ViewLink
-              to={workspacePath(documentId)}
-              active={tab !== 'sheet'}
-              icon={<Table2 size={16} />}
-            >
-              Таблица
-            </ViewLink>
+        {right ?? (
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            <div className="flex items-center gap-1 rounded-xl bg-[var(--surface-sunken)] p-1">
+              <ViewLink
+                to={materialTabPath(documentId, 'sheet')}
+                active={tab === 'sheet'}
+                icon={<FileText size={16} />}
+              >
+                Редактор
+              </ViewLink>
+              <ViewLink
+                to={workspacePath(documentId)}
+                active={tab !== 'sheet'}
+                icon={<Table2 size={16} />}
+              >
+                Таблица
+              </ViewLink>
+            </div>
+            {issue}
           </div>
-          {issue}
-        </div>
+        )}
       </div>
 
       {toolbar && (

@@ -108,58 +108,61 @@ export function DocumentWorkspacePage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <DocumentChrome documentId={id} title={page.title} menus={menus} tab={tab} />
-
-      {/* Строка шагов: где человек в выпуске и что дальше. Шаги — ссылки,
-          чтобы вернуться к правилам с письма одним нажатием, а не
-          «назад» три раза. */}
-      <div className="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-2 border-b border-[var(--line)] bg-[var(--surface)] px-4 py-2">
-        <span className="text-sm font-medium text-[var(--text-muted)]">Выпуск</span>
-        <ol className="flex flex-wrap items-center gap-x-1 gap-y-1" aria-label="Шаги выпуска">
-          {ISSUE_STEPS.map((s, i) => {
-            const label = WORKSPACE_TABS.find((t) => t.id === s)?.label ?? s;
-            const current = s === tab;
-            const done = i < step;
-            return (
-              <li key={s} className="flex items-center">
-                <Link
-                  to={workspacePath(id, s)}
-                  aria-current={current ? 'step' : undefined}
-                  className={`inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm transition-colors ${
-                    current
-                      ? 'bg-[var(--accent-soft)] font-medium text-[var(--accent)]'
-                      : 'text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]'
-                  }`}
-                >
-                  <span
-                    className={`grid h-5 w-5 place-items-center rounded-full text-xs tabular-nums ${
-                      current
-                        ? 'bg-[var(--accent)] text-[var(--accent-contrast)]'
-                        : done
-                          ? 'bg-[var(--accent-soft)] text-[var(--accent)]'
-                          : 'bg-[var(--surface-sunken)] text-[var(--text-muted)]'
-                    }`}
-                  >
-                    {i + 1}
-                  </span>
-                  {label}
-                </Link>
-                {i < ISSUE_STEPS.length - 1 && (
-                  <span aria-hidden className="mx-1 text-[var(--line-strong)]">
-                    ›
-                  </span>
-                )}
-              </li>
-            );
-          })}
-        </ol>
-        <div className="ml-auto">
-          <Button variant="primary" size="sm" onClick={forward}>
-            {last ? 'Выпустить' : 'Далее'}
-            <ArrowRight size={15} />
-          </Button>
-        </div>
-      </div>
+      <DocumentChrome
+        documentId={id}
+        title={page.title}
+        menus={menus}
+        tab={tab}
+        right={
+          /* Шаги выпуска — в рамке, на месте «Редактор — Таблица»: где
+             человек в выпуске и что дальше. Шаги — ссылки, чтобы вернуться
+             к правилам с письма одним нажатием, а не «назад» три раза. */
+          <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-x-4 gap-y-2 self-center">
+            <ol className="flex flex-wrap items-center gap-x-1 gap-y-1" aria-label="Шаги выпуска">
+              {ISSUE_STEPS.map((s, i) => {
+                const label = WORKSPACE_TABS.find((t) => t.id === s)?.label ?? s;
+                const current = s === tab;
+                const done = i < step;
+                return (
+                  <li key={s} className="flex items-center">
+                    <Link
+                      to={workspacePath(id, s)}
+                      aria-current={current ? 'step' : undefined}
+                      className={`inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm transition-colors ${
+                        current
+                          ? 'bg-[var(--accent-soft)] font-medium text-[var(--accent)]'
+                          : 'text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]'
+                      }`}
+                    >
+                      <span
+                        className={`grid h-5 w-5 place-items-center rounded-full text-xs tabular-nums ${
+                          current
+                            ? 'bg-[var(--accent)] text-[var(--accent-contrast)]'
+                            : done
+                              ? 'bg-[var(--accent-soft)] text-[var(--accent)]'
+                              : 'bg-[var(--surface-sunken)] text-[var(--text-muted)]'
+                        }`}
+                      >
+                        {i + 1}
+                      </span>
+                      {label}
+                    </Link>
+                    {i < ISSUE_STEPS.length - 1 && (
+                      <span aria-hidden className="mx-1 text-[var(--line-strong)]">
+                        ›
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+            <Button variant="primary" size="sm" onClick={forward}>
+              {last ? 'Выпустить' : 'Далее'}
+              <ArrowRight size={15} />
+            </Button>
+          </div>
+        }
+      />
 
       {tab === 'rules' ? (
         <RulesTab documentId={id} ruleSetId={page.ruleSetId ?? null} />
