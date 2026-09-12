@@ -38,7 +38,7 @@ export function StatusChip({
   const tones = {
     neutral: 'bg-[var(--surface-sunken)] text-[var(--text-muted)]',
     progress: 'bg-[var(--award-soft)] text-[var(--award)]',
-    done: 'bg-[var(--accent-soft)] text-[var(--accent)]',
+    done: 'bg-[var(--ok-soft)] text-[var(--ok)]',
     error: 'bg-[var(--danger-soft)] text-[var(--danger)]',
   } as const;
   return (

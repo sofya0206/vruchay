@@ -35,6 +35,12 @@ const RECENT_LIMIT = 5;
  */
 const SENT_STATUSES = ['sent', 'delivered', 'opened'] as const;
 
+/** Письмо дошло: шлюз подтвердил доставку или человек его открыл. */
+const DELIVERED_STATUSES = ['delivered', 'opened'] as const;
+
+/** Письмо не дошло: отказ ящика или отказ шлюза — для человека одно и то же. */
+const UNDELIVERED_STATUSES = ['bounced', 'failed'] as const;
+
 /**
  * Сводка для рабочего стола кабинета.
  *
@@ -55,9 +61,22 @@ export class OverviewService {
 
   async summary(orgId: string, now = new Date()) {
     const since = monthStart(now);
+    const prevSince = monthStart(now, -1);
 
-    const [usage, issuedTotal, issuedMonth, emailsSent, materials, documents, jobs] =
-      await Promise.all([
+    const [
+      usage,
+      issuedTotal,
+      issuedMonth,
+      emailsSent,
+      materials,
+      documents,
+      jobs,
+      issuedPrevMonth,
+      emailsDelivered,
+      emailsUndelivered,
+      verifiedMonth,
+      verifications,
+    ] = await Promise.all([
       // Остаток берём у той же службы, что решает, пускать ли к выпуску:
       // разойдись эти две цифры — человек упёрся бы в предел, видя запас.
       this.org.usage(orgId),
@@ -91,6 +110,28 @@ export class OverviewService {
           document: { select: { title: true } },
         },
       }),
+      /*
+       * Прошлый месяц — ради стрелки рядом с «выпущено за месяц»:
+       * одна цифра без сравнения ничего не говорит, а сравнение
+       * с прошлым месяцем — то, что человек и так прикидывает в уме.
+       */
+      this.prisma.file.count({
+        where: { orgId, kind: 'generated', createdAt: { gte: prevSince, lt: since } },
+      }),
+      this.prisma.email.count({ where: { orgId, status: { in: [...DELIVERED_STATUSES] } } }),
+      this.prisma.email.count({ where: { orgId, status: { in: [...UNDELIVERED_STATUSES] } } }),
+      /*
+       * Документов, которые проверяли по QR в этом месяце. Именно
+       * документов: у файла хранится счётчик и дата последней проверки,
+       * истории по датам нет — так же считает и аналитика.
+       */
+      this.prisma.file.count({
+        where: { orgId, kind: 'generated', verifyLastAt: { gte: since } },
+      }),
+      this.prisma.file.aggregate({
+        where: { orgId, kind: 'generated' },
+        _sum: { verifyCount: true },
+      }),
     ]);
 
     return {
@@ -98,7 +139,15 @@ export class OverviewService {
       /** Выпущено за всё время — те же созданные файлы, по которым считается квота. */
       issuedTotal,
       issuedMonth,
+      issuedPrevMonth,
       emailsSent,
+      mail: {
+        delivered: emailsDelivered,
+        undelivered: emailsUndelivered,
+      },
+      /** Документов, проверенных по QR с начала месяца, и проверок за всё время. */
+      verifiedMonth,
+      verificationsTotal: verifications._sum.verifyCount ?? 0,
       /** Материалов в работе. Ноль означает, что организация ещё ничего не начинала. */
       materials,
       documents: documents.map((d) => ({

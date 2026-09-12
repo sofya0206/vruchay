@@ -50,7 +50,7 @@ export function formatWhen(iso: string, now = new Date()): string {
 
 export interface JobLook {
   label: string;
-  tone: 'neutral' | 'progress' | 'done';
+  tone: 'neutral' | 'progress' | 'done' | 'error';
 }
 
 /**
@@ -71,7 +71,9 @@ export function jobLook(status: JobStatus, failed = 0): JobLook {
         ? { label: 'готово, часть с ошибками', tone: 'progress' }
         : { label: 'готово', tone: 'done' };
     case 'failed':
-      return { label: 'не удалось', tone: 'neutral' };
+      // Единственное состояние задания, на которое надо реагировать, —
+      // серым, как «отменено», оно терялось.
+      return { label: 'не удалось', tone: 'error' };
     case 'canceled':
       return { label: 'отменено', tone: 'neutral' };
   }
@@ -93,6 +95,42 @@ export function protocolTitle(now = new Date()): string {
     year: 'numeric',
   }).format(now);
   return `Мероприятие от ${date}`;
+}
+
+const MONTHS_IN = [
+  'январе', 'феврале', 'марте', 'апреле', 'мае', 'июне',
+  'июле', 'августе', 'сентябре', 'октябре', 'ноябре', 'декабре',
+];
+const MONTHS_TO = [
+  'январю', 'февралю', 'марту', 'апрелю', 'маю', 'июню',
+  'июлю', 'августу', 'сентябрю', 'октябрю', 'ноябрю', 'декабрю',
+];
+
+/** Номер текущего месяца по Москве, 0–11: граница месяца та же, что у сервера. */
+function mskMonth(now: Date): number {
+  return Number(new Intl.DateTimeFormat('en-US', { timeZone: MSK, month: 'numeric' }).format(now)) - 1;
+}
+
+/** «в сентябре» — подпись плитки выпуска за месяц. */
+export function monthIn(now = new Date()): string {
+  return `в ${MONTHS_IN[mskMonth(now)]}`;
+}
+
+/**
+ * Сравнение с прошлым месяцем: «▲ 12 к августу», «▼ 3 к августу»,
+ * «как в августе». Цифра без сравнения ничего не говорит, а сравнивать
+ * с прошлым месяцем человек и так пытается в уме.
+ */
+export function monthDelta(
+  current: number,
+  previous: number,
+  now = new Date(),
+): { text: string; tone: 'up' | 'down' | 'flat' } {
+  const prev = (mskMonth(now) + 11) % 12;
+  const diff = current - previous;
+  if (diff > 0) return { text: `▲ ${diff} к ${MONTHS_TO[prev]}`, tone: 'up' };
+  if (diff < 0) return { text: `▼ ${-diff} к ${MONTHS_TO[prev]}`, tone: 'down' };
+  return { text: `как в ${MONTHS_IN[prev]}`, tone: 'flat' };
 }
 
 /** Склонение по числу: 1 документ, 2 документа, 5 документов. */

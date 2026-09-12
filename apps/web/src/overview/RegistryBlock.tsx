@@ -1,148 +1,247 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Search } from 'lucide-react';
-import { emptyFilters, filtersToQuery, useRegistry } from '../api/registry';
+import { Link } from 'react-router-dom';
+import { Search, X } from 'lucide-react';
+import {
+  emptyFilters,
+  filtersToQuery,
+  useRegistry,
+  useRegistryAnalytics,
+  type FileState,
+} from '../api/registry';
 import { StateChip } from '../registry/StateChip';
-import { plural, stateLabel, stateTone } from '../registry/registry-format';
+import {
+  formatDate,
+  mailLabel,
+  mailTone,
+  stateLabel,
+  stateTone,
+} from '../registry/registry-format';
+import { cn } from '../ui/cn';
 import { Input } from '../ui/Field';
-import { Block, Empty, Rows } from './Block';
-import { formatWhen } from './format';
+import { Card, Empty } from './Block';
 
-/** Сколько строк показать на главной: последние выданные или найденные. */
-const SHOWN = 6;
+const LAST_SHOWN = 6;
 
 /** Пауза после последней буквы, прежде чем спрашивать сервер. */
 const DEBOUNCE_MS = 250;
 
+type Tab = '' | Extract<FileState, 'valid' | 'revoked' | 'replaced'>;
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: '', label: 'Все' },
+  { id: 'valid', label: 'Действительны' },
+  { id: 'revoked', label: 'Отозваны' },
+  { id: 'replaced', label: 'Заменены' },
+];
+
 /**
- * Четвёртый блок полосы: найти выданное, не уходя с главной.
+ * Реестр — тело главной.
  *
- * Самый частый вопрос через месяц после мероприятия — «пришлите грамоту
- * Ивановой». Раньше ответ начинался с плитки «Реестр», за которой лежали
- * все восемь тысяч выданных документов и отбор, который ещё надо собрать.
+ * Последние выданные таблицей, а не карточками: у строки шесть сведений,
+ * и сравнивать их человек будет по столбцам. Быстрые отборы по состоянию
+ * со счётчиками стоят прямо над таблицей: «Отозваны 2» читается как дело,
+ * а не как пункт в выпадающем списке.
  *
- * Теперь поиск живой: с первой буквы под строкой стоят совпадения, и
- * чаще всего этого хватает. В сам реестр — только когда нужны действия
- * над найденным: переотправить, отозвать, скачать. Строка уезжает в
- * адрес тем же отбором, который реестр разбирает обратно
- * (`filtersFromQuery`), поэтому ссылку можно отдать коллеге.
+ * Поиск живой и никуда не уводит: совпадения встают под строкой с первой
+ * буквы, Enter применяет набранное сразу, не дожидаясь паузы. «Найдите
+ * грамоту Ивановой» — вопрос на десять секунд, и переход в раздел ради
+ * него — лишний шаг. За всем найденным целиком — стрелка в заголовке,
+ * она несёт с собой и слово, и отбор.
+ *
+ * Счётчики считаются по тому же поиску, что и таблица, — иначе над
+ * тремя найденными Ивановыми стояло бы «Все 50».
  */
 export function RegistryBlock() {
-  const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [search, setSearch] = useState('');
+  const [tab, setTab] = useState<Tab>('');
+  const filters = { ...emptyFilters, search, state: tab };
+  const registry = useRegistry(filters, 0, LAST_SHOWN);
+  const totals = useRegistryAnalytics({ ...emptyFilters, search }, true);
 
   useEffect(() => {
     const id = setTimeout(() => setSearch(query.trim()), DEBOUNCE_MS);
     return () => clearTimeout(id);
   }, [query]);
 
-  const registry = useRegistry({ ...emptyFilters, search }, 0, SHOWN);
-
   function onSubmit(event: FormEvent) {
     event.preventDefault();
-    navigate(searchPath(query));
+    setSearch(query.trim());
+  }
+
+  // Ответ на прежний запрос стоит, пока считается новый (placeholderData):
+  // приглушаем его, чтобы совпадения по «Ива» не приняли за «Иван».
+  const stale = registry.isFetching && registry.data !== undefined;
+
+  function clear() {
+    setQuery('');
+    setSearch('');
   }
 
   const rows = registry.data?.items ?? [];
   const total = registry.data?.total ?? 0;
-  const searching = search !== '';
-  // Ответ на прежний запрос стоит, пока считается новый: подпись об этом
-  // предупреждает, чтобы совпадения по «Ива» не приняли за «Иван».
-  const stale = registry.isFetching && registry.data !== undefined;
+  const t = totals.data;
+  const counts: Record<Tab, number | undefined> = {
+    '': t?.issued,
+    valid: t ? t.issued - t.revoked - t.replaced - t.expired : undefined,
+    revoked: t?.revoked,
+    replaced: t?.replaced,
+  };
 
   return (
-    <Block
-      title="Реестр"
-      about="Всё, что вы когда-либо выдали. Начните вводить фамилию, адрес почты или проверочный код — совпадения появятся сразу."
-      to="/registry"
-      linkLabel="Весь реестр"
+    <Card
+      title="Реестр выданного"
+      count={t ? `${t.issued}` : undefined}
+      to={registryPath(filters)}
+      linkLabel={search || tab ? 'Всё найденное в реестре' : 'Весь реестр'}
     >
-      <form onSubmit={onSubmit} className="mb-4 max-w-2xl">
-        <div className="relative">
-          <Search
-            size={16}
-            className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-[var(--text-muted)]"
-          />
-          <Input
-            className="pl-9"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Фамилия, адрес почты или проверочный код"
-            aria-label="Найти в реестре выданного"
-            autoComplete="off"
-          />
+      <div className="flex flex-wrap items-center gap-2 border-b border-[var(--line)] px-4 py-2.5">
+        <form onSubmit={onSubmit} role="search" className="flex min-w-60 flex-1 gap-2">
+          <div className="relative flex-1">
+            <Search
+              size={16}
+              className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-[var(--text-muted)]"
+            />
+            <Input
+              className="pl-9 pr-9 text-sm"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Фамилия, почта или проверочный код"
+              aria-label="Найти в реестре выданного"
+              autoComplete="off"
+            />
+            {(query || search) && (
+              <button
+                type="button"
+                onClick={clear}
+                aria-label="Очистить поиск"
+                className="absolute top-1/2 right-2 grid size-6 -translate-y-1/2 place-items-center rounded text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+        </form>
+        <div role="tablist" aria-label="Состояние" className="flex flex-wrap gap-1">
+          {TABS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              role="tab"
+              aria-selected={tab === item.id}
+              onClick={() => setTab(item.id)}
+              className={cn(
+                'inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-sm transition-colors',
+                tab === item.id
+                  ? 'bg-[var(--surface)] font-medium text-[var(--text)] ring-1 ring-[var(--line-strong)]'
+                  : 'text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]',
+              )}
+            >
+              {item.label}
+              {counts[item.id] !== undefined && (
+                <span
+                  className={cn(
+                    'tabular-nums',
+                    item.id === 'revoked' && counts.revoked ? 'text-[var(--danger)]' : 'text-[var(--text-muted)]',
+                  )}
+                >
+                  {counts[item.id]}
+                </span>
+              )}
+            </button>
+          ))}
         </div>
-      </form>
+      </div>
 
       {registry.isPending ? (
-        <p className="text-sm text-[var(--text-muted)]">Загружаем последние выданные…</p>
+        <Empty>Загружаем последние выданные…</Empty>
       ) : rows.length === 0 ? (
         <Empty>
-          {searching
-            ? 'Ничего не нашлось. Проверьте написание или попробуйте адрес почты.'
-            : 'Выданных документов пока нет. Они появятся здесь сразу после первого выпуска — и останутся навсегда.'}
+          {search
+            ? `По запросу «${search}» ничего не нашлось${tab ? ' в этом состоянии' : ''}.`
+            : tab
+              ? 'В этом состоянии документов нет.'
+              : 'Выданных документов пока нет. Они появятся здесь сразу после первого выпуска — и останутся навсегда.'}
         </Empty>
       ) : (
-        <>
-          <p
-            className={`mb-2 text-sm text-[var(--text-muted)] transition-opacity ${stale ? 'opacity-50' : ''}`}
-            aria-live="polite"
-          >
-            {searching
-              ? `Найдено ${total.toLocaleString('ru-RU')} ${plural(total, 'документ', 'документа', 'документов')}`
-              : 'Последние выданные'}
-          </p>
-          <Rows>
-            {rows.map((row) => (
-              <li key={row.fileId}>
-                {/*
-                 * Ведём поиском по имени, а не по коду: в реестре откроется
-                 * ровно то, что человек и хотел бы набрать сам, и строку
-                 * поиска там видно — её есть чем снять.
-                 */}
-                <Link
-                  to={searchPath(row.name)}
-                  className="flex flex-wrap items-baseline gap-x-4 gap-y-1 px-4 py-3 transition-colors hover:bg-[var(--accent-soft)]"
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium">{row.name}</span>
-                    <span className="mt-0.5 block truncate text-sm text-[var(--text-muted)]">
-                      {row.email && `${row.email} · `}
-                      {row.documentTitle}
-                      {row.eventName && ` · ${row.eventName}`}
+        <div
+          className={cn('overflow-x-auto transition-opacity', stale && 'opacity-60')}
+          aria-busy={stale}
+        >
+          <table className="w-full min-w-[46rem] table-fixed border-collapse text-sm">
+            {/* Ширины заданы, иначе длинная фамилия растягивает свою колонку,
+                и «Состояние» с «Проверок» уезжают за край карточки. */}
+            <colgroup>
+              <col className="w-[28%]" />
+              <col className="w-[20%]" />
+              <col className="w-[15%]" />
+              <col className="w-[14%]" />
+              <col className="w-[13%]" />
+              <col className="w-[10%]" />
+            </colgroup>
+            <thead>
+              <tr className="text-left text-xs tracking-wide text-[var(--text-muted)] uppercase">
+                <th className="px-4 py-2 font-medium">Получатель</th>
+                <th className="px-3 py-2 font-medium">Документ</th>
+                <th className="px-3 py-2 font-medium">Выдан</th>
+                <th className="px-3 py-2 font-medium">Письмо</th>
+                <th className="px-3 py-2 font-medium">Состояние</th>
+                <th className="px-4 py-2 text-right font-medium">Проверок</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.fileId} className="border-t border-[var(--line)] transition-colors hover:bg-[var(--surface-sunken)]">
+                  <td className="px-4 py-2.5">
+                    <Link to={searchPath(row.name)} className="block truncate font-medium">
+                      {row.name}
+                    </Link>
+                    <span className="block truncate text-xs text-[var(--text-muted)]">
+                      {row.email || 'без адреса'}
                     </span>
-                  </span>
-                  <StateChip tone={stateTone(row)}>{stateLabel(row)}</StateChip>
-                  <span className="shrink-0 text-sm text-[var(--text-muted)]">
-                    {formatWhen(row.issuedAt)}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </Rows>
+                  </td>
+                  <td className="px-3 py-2.5 text-[var(--text-muted)]">
+                    <span className="block truncate text-[var(--text)]">{row.documentTitle}</span>
+                    {row.eventName && <span className="block truncate text-xs">{row.eventName}</span>}
+                  </td>
+                  <td className="px-3 py-2.5 whitespace-nowrap">
+                    <span className="block tabular-nums">{formatDate(row.issuedAt)}</span>
+                    {/* Старые коды — UUID на 36 знаков; целиком он есть в реестре. */}
+                    <span className="block truncate font-mono text-xs text-[var(--text-muted)]" title={row.code}>
+                      {row.code}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <StateChip tone={mailTone(row.mail?.status)}>{mailLabel(row.mail?.status)}</StateChip>
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <StateChip tone={stateTone(row)}>{stateLabel(row)}</StateChip>
+                  </td>
+                  <td className="px-4 py-2.5 text-right tabular-nums">{row.verifyCount}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
           {total > rows.length && (
-            <Link
-              to={searchPath(query)}
-              className="mt-3 inline-block text-sm text-[var(--accent)] underline-offset-4 hover:underline"
-            >
-              Показать все {total.toLocaleString('ru-RU')} в реестре
-            </Link>
+            <p className="border-t border-[var(--line)] px-4 py-2 text-xs text-[var(--text-muted)]">
+              Показаны {rows.length} из {total} ·{' '}
+              <Link to={registryPath(filters)} className="text-[var(--accent)] underline-offset-4 hover:underline">
+                открыть всё в реестре
+              </Link>
+            </p>
           )}
-        </>
+        </div>
       )}
-    </Block>
+    </Card>
   );
 }
 
-/**
- * Адрес реестра с наложенным отбором.
- *
- * Собираем тем же кодом, что разбирает реестр, а не склейкой строки:
- * пустой запрос не должен превращаться в `?search=`, иначе реестр
- * откроется с отбором по пустой строке.
- */
+/** Адрес реестра с тем же отбором, что стоит на главной. */
+function registryPath(filters: typeof emptyFilters): string {
+  const query = filtersToQuery(filters);
+  return query ? `/registry?${query}` : '/registry';
+}
+
 export function searchPath(query: string): string {
-  const search = filtersToQuery({ ...emptyFilters, search: query.trim() });
-  return search ? `/registry?${search}` : '/registry';
+  return registryPath({ ...emptyFilters, search: query.trim() });
 }
