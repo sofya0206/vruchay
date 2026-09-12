@@ -6,7 +6,15 @@
     <meta name="theme-color" content="#127EE3" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Вручай" />
-    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <!--
+      Вкладка без значка — по решению владельца.
+
+      Пустой `data:` вместо удалённой строки: без неё браузер сам пошёл бы
+      за `/favicon.ico`, получил бы страницу приложения вместо картинки
+      и всё равно нарисовал бы что-то своё. Значок установленного
+      приложения это не трогает — он берётся из манифеста.
+    -->
+    <link rel="icon" href="data:," />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>Вручай</title>
 
