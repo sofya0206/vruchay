@@ -1,12 +1,7 @@
 import type { ReactNode } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCheck, FileText, Table2 } from 'lucide-react';
-import {
-  MATERIAL_TABS,
-  materialTabPath,
-  workspacePath,
-  type MaterialTab,
-} from '../mailing/workspace-tabs';
+import { Link } from 'react-router-dom';
+import { ArrowLeft, FileText, Table2 } from 'lucide-react';
+import { materialTabPath, workspacePath, type MaterialTab } from '../mailing/workspace-tabs';
 import { MenuBar, type MenuDef } from './MenuBar';
 
 /**
@@ -52,18 +47,21 @@ export function DocumentChrome({
    */
   action?: ReactNode;
 }) {
-  const navigate = useNavigate();
-
+  /*
+   * «Назад» из материала — наверх, в список документов, а не по истории
+   * браузера: история ведёт туда, откуда пришёл, — с шага «Подлинность»
+   * на лист, а с листа обратно в «Подлинность», — и человек ходит
+   * кругами, не находя выхода в кабинет.
+   */
   const back = (
-    <button
-      type="button"
-      onClick={() => navigate(-1)}
-      title="Назад"
-      aria-label="Назад"
+    <Link
+      to="/documents"
+      title="К документам"
+      aria-label="К документам"
       className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
     >
       <ArrowLeft size={19} />
-    </button>
+    </Link>
   );
 
   const issue = action ?? (
@@ -72,103 +70,56 @@ export function DocumentChrome({
       title="Отметить получателей и выпустить документы"
       className="inline-flex items-center gap-2 rounded-lg bg-[var(--accent)] px-2.5 py-1.5 text-sm font-medium text-[var(--accent-contrast)] transition-colors hover:bg-[var(--accent-hover)]"
     >
-      <CheckCheck size={15} />
       Выпустить
     </Link>
   );
 
   /*
-   * Лист — своя рамка, как была до ленты: крупное название, меню под ним,
-   * справа переключатель «Редактор — Таблица». Лента из шести вкладок
-   * здесь не стоит по решению владельца: на листе работают с макетом,
-   * и шесть подписей над ним — шум; дорога к списку, письму и остальному
-   * лежит через «Таблицу», где лента и живёт.
+   * Рамка одна на все стороны материала: крупное название, меню под ним,
+   * справа переключатель «Редактор — Таблица». Ленты вкладок здесь нет
+   * по решению владельца: на листе работают с макетом, в таблице — со
+   * списком, и шесть подписей над ними — шум. Всё, что идёт после
+   * таблицы, — правила, проверка, подлинность, письмо — не вкладки,
+   * а шаги выпуска: их ведёт своя строка под рамкой.
    */
-  if (tab === 'sheet') {
-    return (
-      <header className="shrink-0 border-b border-[var(--line)] bg-[var(--surface)]">
-        <div className="flex items-start gap-3 px-3 pt-2 pb-1.5">
-          <div className="mt-0.5">{back}</div>
+  return (
+    <header className="shrink-0 border-b border-[var(--line)] bg-[var(--surface)]">
+      <div className="flex items-start gap-3 px-3 pt-2 pb-1.5">
+        <div className="mt-0.5">{back}</div>
 
-          <div className="min-w-0">
-            <h1 className="truncate text-xl leading-tight">{title}</h1>
-            <div className="-ml-2 mt-0.5">
-              <MenuBar menus={menus} />
-            </div>
-          </div>
-
-          <div className="ml-auto flex shrink-0 items-center gap-2">
-            <div className="flex items-center gap-1 rounded-xl bg-[var(--surface-sunken)] p-1">
-              <ViewLink
-                to={materialTabPath(documentId, 'sheet')}
-                active
-                icon={<FileText size={16} />}
-              >
-                Редактор
-              </ViewLink>
-              <ViewLink to={workspacePath(documentId)} active={false} icon={<Table2 size={16} />}>
-                Таблица
-              </ViewLink>
-            </div>
-            {issue}
+        <div className="min-w-0">
+          <h1 className="truncate text-xl leading-tight">{title}</h1>
+          <div className="-ml-2 mt-0.5">
+            <MenuBar menus={menus} />
           </div>
         </div>
 
-        {toolbar && (
-          <div className="flex flex-wrap items-center gap-1 px-3 pb-1.5" role="toolbar">
-            {toolbar}
-          </div>
-        )}
-      </header>
-    );
-  }
-
-  return (
-    <header className="shrink-0 border-b border-[var(--line)] bg-[var(--surface)]">
-      <div className="flex h-11 items-center gap-1 border-b border-[var(--line)] px-2">
-        {back}
-
-        {/* Название — коротко и с подсказкой: в ряду с шестью вкладками
-            крупному заголовку места нет, а материал всё равно надо назвать. */}
-        <h1 className="min-w-0 max-w-[26ch] shrink truncate px-1 text-sm font-medium" title={title}>
-          {title}
-        </h1>
-
-        <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-[var(--line)]" />
-
-        {/* Лента прокручивается внутри себя: страница вбок не едет даже
-            тогда, когда шесть вкладок в ширину не помещаются. */}
-        <nav
-          aria-label="Стороны материала"
-          className="flex min-w-0 flex-1 items-stretch gap-0.5 self-stretch overflow-x-auto"
-        >
-          {MATERIAL_TABS.map((item) => (
-            <SpineTab
-              key={item.id}
-              to={materialTabPath(documentId, item.id)}
-              active={item.id === tab}
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          <div className="flex items-center gap-1 rounded-xl bg-[var(--surface-sunken)] p-1">
+            <ViewLink
+              to={materialTabPath(documentId, 'sheet')}
+              active={tab === 'sheet'}
+              icon={<FileText size={16} />}
             >
-              {item.label}
-            </SpineTab>
-          ))}
-        </nav>
-
-        <div className="shrink-0 pl-2">{issue}</div>
+              Редактор
+            </ViewLink>
+            <ViewLink
+              to={workspacePath(documentId)}
+              active={tab !== 'sheet'}
+              icon={<Table2 size={16} />}
+            >
+              Таблица
+            </ViewLink>
+          </div>
+          {issue}
+        </div>
       </div>
 
-      {/* Меню и панель значков — одной строкой, а не двумя: каждая лишняя
-          строка в рамке отнимается у листа. */}
-      <div className="flex flex-wrap items-center gap-1 px-2 py-1">
-        <MenuBar menus={menus} />
-        {toolbar && (
-          <>
-            <ToolDivider />
-            <div className="flex flex-1 flex-wrap items-center gap-1" role="toolbar">
-              {toolbar}
-            </div>
-          </>
-        )}
-      </div>
+      {toolbar && (
+        <div className="flex flex-wrap items-center gap-1 px-3 pb-1.5" role="toolbar">
+          {toolbar}
+        </div>
+      )}
     </header>
   );
 }
@@ -196,28 +147,6 @@ function ViewLink({
       }`}
     >
       {icon}
-      {children}
-    </Link>
-  );
-}
-
-/**
- * Вкладка хребта.
- *
- * Ссылка, а не кнопка: у каждой стороны материала свой адрес, и его надо
- * уметь открыть в соседней вкладке браузера и послать коллеге.
- */
-function SpineTab({ to, active, children }: { to: string; active: boolean; children: ReactNode }) {
-  return (
-    <Link
-      to={to}
-      aria-current={active ? 'page' : undefined}
-      className={`-mb-px inline-flex shrink-0 items-center whitespace-nowrap border-b-2 px-2.5 text-sm transition-colors ${
-        active
-          ? 'border-[var(--accent)] font-medium text-[var(--accent)]'
-          : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text)]'
-      }`}
-    >
       {children}
     </Link>
   );

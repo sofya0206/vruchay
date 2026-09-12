@@ -125,7 +125,11 @@ export function RulesTab({ documentId, ruleSetId }: Props) {
   }
 
   const previewError =
-    preview.error instanceof ApiError ? preview.error.message : preview.error ? 'Не удалось посчитать раскладку' : null;
+    preview.error instanceof ApiError
+      ? preview.error.message
+      : preview.error
+        ? 'Не удалось посчитать раскладку'
+        : null;
 
   return (
     <div className="min-h-0 flex-1 overflow-auto">
@@ -155,8 +159,8 @@ export function RulesTab({ documentId, ruleSetId }: Props) {
                 ))}
               </Select>
               <p className="mt-1 text-xs text-[var(--text-muted)]">
-                По ней ищутся повторы получателя и, если у условия взведено «внутри
-                группы», пересчитывается место.
+                По ней ищутся повторы получателя и, если у условия взведено «внутри группы»,
+                пересчитывается место.
               </p>
             </div>
 
@@ -206,8 +210,8 @@ export function RulesTab({ documentId, ruleSetId }: Props) {
           </section>
 
           <p className="text-sm text-[var(--text-muted)]">
-            Правила проверяются сверху вниз: выигрывает первое совпавшее. Последним ставьте
-            правило без условий — оно поймает всех, кого не разобрали правила выше.
+            Правила проверяются сверху вниз: выигрывает первое совпавшее. Последним ставьте правило
+            без условий — оно поймает всех, кого не разобрали правила выше.
           </p>
 
           <ul className="space-y-3">
@@ -220,9 +224,7 @@ export function RulesTab({ documentId, ruleSetId }: Props) {
                 columns={columns}
                 templates={templates.data ?? []}
                 hasGroupColumn={draft.groupColumn !== ''}
-                onChange={(next) =>
-                  setRules(draft.rules.map((r, j) => (j === index ? next : r)))
-                }
+                onChange={(next) => setRules(draft.rules.map((r, j) => (j === index ? next : r)))}
                 onMove={(direction) => move(index, direction)}
                 onRemove={() => setRules(draft.rules.filter((_, j) => j !== index))}
               />
@@ -270,8 +272,8 @@ function StartScreen({
       <div>
         <h2 className="font-serif text-xl">Правила награждения</h2>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
-          «Первое место — диплом победителя, снятым ничего, остальным грамота участника».
-          Набор сохраняется и переиспользуется на следующем соревновании.
+          «Первое место — диплом победителя, снятым ничего, остальным грамота участника». Набор
+          сохраняется и переиспользуется на следующем соревновании.
         </p>
       </div>
 
@@ -307,15 +309,22 @@ function StartScreen({
         >
           Собрать по колонкам протокола
         </Button>
-        <Button icon={<Plus size={15} />} onClick={onBlank}>
-          Начать с нуля
-        </Button>
+        {/* Второй кнопкой это читалось как выбор из двух равных, хотя
+            пустой набор нужен редко. Остаётся, но тихо. */}
+        <button
+          type="button"
+          onClick={onBlank}
+          className="inline-flex items-center gap-1 self-center text-sm text-[var(--text-muted)] underline-offset-4 hover:text-[var(--text)] hover:underline"
+        >
+          <Plus size={14} />
+          или начать с нуля
+        </button>
       </div>
 
       {!hasColumns && (
         <p className="text-sm text-[var(--text-muted)]">
-          В таблице получателей пока нет колонок. Загрузите протокол на вкладке
-          «Получатели» — тогда заготовка сама найдёт место, группу и статус.
+          В таблице получателей пока нет колонок. Загрузите протокол на вкладке «Получатели» — тогда
+          заготовка сама найдёт место, группу и статус.
         </p>
       )}
     </div>

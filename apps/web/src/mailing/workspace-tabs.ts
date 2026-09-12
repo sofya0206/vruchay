@@ -62,14 +62,34 @@ export interface MaterialTabInfo {
   label: string;
 }
 
-export const MATERIAL_TABS: MaterialTabInfo[] = [
-  { id: 'sheet', label: 'Лист' },
-  ...WORKSPACE_TABS,
-];
+export const MATERIAL_TABS: MaterialTabInfo[] = [{ id: 'sheet', label: 'Лист' }, ...WORKSPACE_TABS];
 
 /** Адрес вкладки материала. Лист — отдельный адрес, остальное — рабочее место. */
 export function materialTabPath(documentId: string, tab: MaterialTab): string {
   return tab === 'sheet'
     ? `/documents/${encodeURIComponent(documentId)}`
     : workspacePath(documentId, tab);
+}
+
+/**
+ * Шаги выпуска — в порядке, в котором их проходят после «Выпустить».
+ *
+ * Правила, проверка, подлинность и письмо — не четыре независимых
+ * раздела, а хвост одного процесса: список собран, дальше решают, кому
+ * какой документ, проверяют строки, задают срок действия, пишут письмо —
+ * и выпускают. Так это устроено у Certifier и Sertifier: Recipients → Send
+ * ведёт через шаги, а не раскладывает настройки по вкладкам, между
+ * которыми надо угадывать порядок.
+ */
+export const ISSUE_STEPS: WorkspaceTab[] = ['rules', 'check', 'verify', 'mail'];
+
+/** Номер шага выпуска, начиная с нуля; -1 — это не шаг (таблица). */
+export function issueStep(tab: WorkspaceTab): number {
+  return ISSUE_STEPS.indexOf(tab);
+}
+
+/** Следующий шаг выпуска; после последнего — сам выпуск, то есть null. */
+export function nextIssueStep(tab: WorkspaceTab): WorkspaceTab | null {
+  const i = issueStep(tab);
+  return i >= 0 && i < ISSUE_STEPS.length - 1 ? ISSUE_STEPS[i + 1] : null;
 }
