@@ -57,7 +57,7 @@ export function Happening({ data }: { data: Overview }) {
 
   return (
     <Block
-      title="Сейчас происходит"
+      title="Письма"
       about="Выпуск документов и судьба писем — по мере того как они уходят."
       to="/mailing"
       linkLabel="Все письма"

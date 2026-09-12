@@ -181,7 +181,7 @@ function AllClean({ total, onDone }: { total: number; onDone: () => void }) {
           {plural(total, 'строку', 'строки', 'строк')} — всё на месте.
         </p>
         <Button variant="primary" className="mt-5" onClick={onDone}>
-          Вернуться к выпуску
+          Дальше — к подлинности
         </Button>
       </div>
     </div>
