@@ -129,7 +129,7 @@ export function AppShell() {
           возвращаться некуда. Без подписи: слово ничего не добавляло к
           стрелке; название — в подсказке и для чтения с экрана. */}
       {canGoBack && (
-        <div className="flex h-[var(--back-row)] shrink-0 items-center px-2 sm:px-3">
+        <div className="flex h-[var(--back-row)] shrink-0 items-center px-3 sm:px-5">
           <button
             type="button"
             onClick={() => navigate(-1)}
