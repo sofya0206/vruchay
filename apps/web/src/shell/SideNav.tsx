@@ -25,12 +25,36 @@ export function SideNav({ collapsed, onToggle }: { collapsed: boolean; onToggle:
   const { pathname } = useLocation();
   const active = activeNav(pathname);
 
+  /*
+   * Ширина меняется скачком, без анимации: анимированная ширина
+   * перевёрстывала на каждом кадре всё, что справа, — реестр на
+   * полсотни строк и холст редактора, — и сворачивание «зависало».
+   * Ширина задана классом здесь, а не переменной на корне страницы:
+   * смена переменной на предке пересчитывала стили всему дереву.
+   */
   return (
-    <aside className="hidden w-[var(--sidebar-w)] shrink-0 border-r border-[var(--line)] bg-[var(--surface)] transition-[width] duration-[var(--duration-base)] md:block print:hidden">
+    <aside
+      className={cn(
+        'hidden shrink-0 border-r border-[var(--line)] bg-[var(--surface)] md:block print:hidden',
+        collapsed ? 'w-16' : 'w-60',
+      )}
+    >
       {/* Липнет под шапку тем же приёмом, что колонки внутри разделов:
           сама колонка растянута на всю строку, а на месте стоит её
           содержимое — иначе при прокрутке она уехала бы вверх. */}
       <div className="sticky top-[var(--app-header)] flex h-[calc(100dvh-var(--app-header))] flex-col overflow-y-auto p-2">
+        {/* Подпись над пунктами: в рейке из одних значков без неё
+            непонятно, что это меню, а не панель инструментов. */}
+        <p
+          className={cn(
+            'mb-1 px-3 text-xs tracking-wide text-[var(--text-muted)] uppercase',
+            // В рейке 48 пунктов под текст: кегль мельче, разрядки нет.
+            collapsed && 'px-0 text-center text-[10px] tracking-normal',
+          )}
+        >
+          Меню
+        </p>
+
         <nav aria-label="Разделы" className="flex flex-col gap-0.5">
           <Item
             to="/"

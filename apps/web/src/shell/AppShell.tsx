@@ -1,14 +1,10 @@
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { InstallHint } from '../ui/InstallHint';
 import { AccountMenu } from './AccountMenu';
 import { Brand } from './Brand';
 import { BurgerMenu } from './BurgerMenu';
 import { SideNav } from './SideNav';
-
-/** Ширина колонки разделов: с подписями и рейкой из одних иконок. */
-const SIDEBAR_W = '240px';
-const SIDEBAR_RAIL_W = '64px';
 
 const SIDEBAR_KEY = 'vruchay:sidebar';
 
@@ -70,10 +66,7 @@ export function AppShell() {
   }
 
   return (
-    <div
-      className="flex min-h-full flex-col"
-      style={{ '--sidebar-w': collapsed ? SIDEBAR_RAIL_W : SIDEBAR_W } as CSSProperties}
-    >
+    <div className="flex min-h-full flex-col">
       <header className="sticky top-0 z-20 shrink-0 border-b border-[var(--line)] bg-[var(--surface)]">
         {/* Во всю ширину окна, а не колонкой по центру: шапка — рама экрана.
             Минус пиксель — нижняя линия, она входит в ту же высоту. */}
