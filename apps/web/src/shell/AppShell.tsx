@@ -1,6 +1,4 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { useIsFetching, useQueryClient } from '@tanstack/react-query';
-import { RotateCw } from 'lucide-react';
 import { InstallHint } from '../ui/InstallHint';
 import { AccountMenu } from './AccountMenu';
 import { BurgerMenu } from './BurgerMenu';
@@ -9,8 +7,8 @@ import { TopNav } from './TopNav';
 /**
  * Оболочка кабинета: полоса разделов сверху — на каждом экране кабинета.
  *
- * Слева знак и пять разделов, справа — обновление и учётная запись, под
- * которой лежит служебное. Слово «Главная» ушло: по нему не было видно,
+ * Слева знак и пять разделов, справа — учётная запись, под которой
+ * лежит служебное. Слово «Главная» ушло: по нему не было видно,
  * что за ним меню, — теперь меню и есть полоса, а на главную ведёт знак,
  * как везде. Отдельной стрелки «Назад» в разделах нет: полоса и знак и
  * есть дорога куда угодно, а стрелка рядом с ними была третьим способом
@@ -61,8 +59,7 @@ export function AppShell() {
               <TopNav />
             </div>
 
-            <div className="ml-auto flex items-center gap-1">
-              <RefreshButton />
+            <div className="ml-auto">
               <AccountMenu />
             </div>
           </div>
@@ -88,30 +85,3 @@ export function AppShell() {
   );
 }
 
-/**
- * Обновить то, что на экране.
- *
- * Данные кабинета кэшируются, и после правки на другом устройстве или
- * в соседней вкладке экран показывает вчерашнее. Кнопка сбрасывает кэш
- * целиком — перезагружать страницу ради этого не нужно, а перезагрузка
- * вдобавок теряет место в списке.
- *
- * Значок вращается, пока идут запросы: иначе непонятно, нажалось ли, —
- * ответ приходит быстрее, чем человек успевает посмотреть на экран.
- */
-function RefreshButton() {
-  const qc = useQueryClient();
-  const fetching = useIsFetching() > 0;
-
-  return (
-    <button
-      type="button"
-      title="Обновить"
-      aria-label="Обновить"
-      onClick={() => void qc.invalidateQueries()}
-      className="grid h-11 w-11 place-items-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
-    >
-      <RotateCw size={20} className={fetching ? 'animate-spin' : undefined} />
-    </button>
-  );
-}
