@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Bold, Check, Eye, Italic, Paperclip, Send } from 'lucide-react';
+import { Bold, Check, Eye, Italic, MoreHorizontal, Paperclip, Send, Users } from 'lucide-react';
+import { IconButton } from '../ui/IconButton';
+import { Menu, MenuItem } from '../ui/Menu';
 import { api } from '../api/client';
 import type { RecipientTable } from '../api/recipients';
 import { Button } from '../ui/Button';
@@ -8,6 +10,7 @@ import { Input, Label } from '../ui/Field';
 import { toHtml, toText, wrapSelection } from '../mail/email-body';
 import { TriplePreview } from './TriplePreview';
 import { useMailingTemplate, useSaveTemplate, useTestSend, type Audience, type LetterKind } from './api';
+import { Checkbox } from '../ui/Checkbox';
 
 /** Что уйдёт участнику, если письмо не настраивали. */
 const DEFAULTS: Record<LetterKind, { subject: string; body: string }> = {
@@ -209,12 +212,7 @@ export function LetterCard({
         )}
 
         <label className="flex items-start gap-3 text-sm">
-          <input
-            type="checkbox"
-            checked={attach}
-            onChange={(e) => setAttach(e.target.checked)}
-            className="mt-0.5"
-          />
+          <Checkbox checked={attach} onChange={setAttach} className="mt-0.5" />
           <span>
             <span className="flex items-center gap-1.5 font-medium">
               <Paperclip size={14} /> Прикладывать документ к письму
@@ -230,19 +228,28 @@ export function LetterCard({
           <Button variant="primary" onClick={onSave} disabled={save.isPending}>
             Сохранить письмо
           </Button>
-          <Button icon={<Eye size={15} />} onClick={() => setPreview(true)}>
-            Проверить
+          <Button variant="ghost" icon={<Eye size={15} />} onClick={() => setPreview(true)}>
+            Посмотреть
           </Button>
-          <Button
-            icon={<Send size={15} />}
-            onClick={() => test.mutate({ documentId, kind })}
-            disabled={test.isPending}
+          <Menu
+            align="left"
+            trigger={({ open, toggle }) => (
+              <IconButton label="Ещё" aria-expanded={open} onClick={toggle}>
+                <MoreHorizontal size={18} />
+              </IconButton>
+            )}
           >
-            Письмо себе
-          </Button>
-          <Button onClick={onCheck} disabled={checking}>
-            {checking ? 'Считаем…' : 'Кому уйдёт'}
-          </Button>
+            <MenuItem
+              icon={<Send size={16} />}
+              disabled={test.isPending}
+              onClick={() => test.mutate({ documentId, kind })}
+            >
+              Отправить письмо себе
+            </MenuItem>
+            <MenuItem icon={<Users size={16} />} disabled={checking} onClick={onCheck}>
+              {checking ? 'Считаем…' : 'Кому уйдёт'}
+            </MenuItem>
+          </Menu>
 
           {saved && (
             <span className="flex items-center gap-1.5 text-sm text-[var(--accent)]">
@@ -328,14 +335,8 @@ function FormatButton({
   children: React.ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      aria-label={title}
-      className="grid h-8 w-8 place-items-center rounded-lg text-[var(--text-muted)] ring-1 ring-[var(--line)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
-    >
+    <IconButton size="sm" label={title} onClick={onClick} className="hairline">
       {children}
-    </button>
+    </IconButton>
   );
 }

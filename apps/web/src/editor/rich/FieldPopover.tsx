@@ -3,7 +3,8 @@ import { Trash2 } from 'lucide-react';
 import type { Editor } from '@tiptap/core';
 import type { MergeFieldFormat, MergeFieldNode } from '@gramota/shared';
 import { Button } from '../../ui/Button';
-import { Input, Label, Select } from '../../ui/Field';
+import { Input, Label } from '../../ui/Field';
+import { Select } from '../../ui/Select';
 
 /**
  * Настройки поля — по клику на фишку.
@@ -37,6 +38,12 @@ export function FieldPopover({
 
   return createPortal(
     <div
+      /* Метка нужна сторожу в InlineTextEditor: он по ней отличает «человек
+         щёлкнул в поповер» от «человек ушёл из блока». Раньше она висела
+         на обёртке в дереве React, а поповер уходит порталом в body — и
+         closest() до неё не доставал: щелчок в это поле закрывал правку
+         блока целиком. */
+      data-rich-popover
       className="fixed z-50 w-72 space-y-3 rounded-xl bg-[var(--surface)] p-3 shadow-lg ring-1 ring-[var(--line)]"
       style={{ left: Math.max(8, rect.left), top: rect.bottom + 6 }}
       onPointerDown={(e) => e.stopPropagation()}
@@ -56,18 +63,20 @@ export function FieldPopover({
         />
       </label>
 
-      <label className="block">
+      <div className="block">
         <Label>Регистр</Label>
         <Select
           value={attrs.format}
-          onChange={(e) => update({ format: e.target.value as MergeFieldFormat })}
-        >
-          <option value="none">как в таблице</option>
-          <option value="upper">ПРОПИСНЫМИ</option>
-          <option value="lower">строчными</option>
-          <option value="title">Каждое Слово С Заглавной</option>
-        </Select>
-      </label>
+          onChange={(format) => update({ format })}
+          aria-label="Регистр"
+          options={[
+            { value: 'none' as MergeFieldFormat, label: 'как в таблице' },
+            { value: 'upper' as MergeFieldFormat, label: 'ПРОПИСНЫМИ' },
+            { value: 'lower' as MergeFieldFormat, label: 'строчными' },
+            { value: 'title' as MergeFieldFormat, label: 'Каждое Слово С Заглавной' },
+          ]}
+        />
+      </div>
 
       <div className="flex justify-between">
         <Button

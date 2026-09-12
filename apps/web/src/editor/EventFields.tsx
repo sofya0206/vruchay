@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { CalendarDays, Check } from 'lucide-react';
 import type { DocumentDetail } from '../api/types';
 import { Input, Label } from '../ui/Field';
+import { DateField } from '../ui/DateField';
 
 export interface EventValues {
   eventName: string;
@@ -126,11 +127,15 @@ export function EventFields({
           грамоты за прошедшее мероприятие печатают позже награждения. */}
       <div>
         <Label>Дата выдачи</Label>
-        <Input
-          type="date"
+        <DateField
           value={values.issueDate}
-          onChange={(e) => edit('issueDate', e.target.value)}
-          onBlur={() => commit('issueDate')}
+          onChange={(date) => edit('issueDate', date)}
+          // Раньше сохранение висело на уходе из поля. С календарём уход
+          // наступает в миг его открытия, поэтому момент «человек закончил»
+          // приходит явно — при закрытии.
+          onCommit={() => commit('issueDate')}
+          aria-label="Дата выдачи"
+          placeholder="День выпуска"
         />
         <span className="mt-1 block text-xs text-[var(--text-muted)]">
           Пусто — день выпуска. Поля: <code className="font-mono">%date</code>,{' '}

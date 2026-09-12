@@ -2,7 +2,10 @@ import type { ReactNode } from 'react';
 import { X } from 'lucide-react';
 import type { AwardCondition, AwardOp, AwardStatus } from '@gramota/shared';
 import { AWARD_STATUSES, AWARD_STATUS_TITLES } from '@gramota/shared';
-import { Input, Select } from '../ui/Field';
+import { Checkbox } from '../ui/Checkbox';
+import { Input } from '../ui/Field';
+import { NumberField } from '../ui/NumberField';
+import { Select } from '../ui/Select';
 import { blankCondition, GENERAL_OPS, OP_TITLES, PLACE_OPS, STATUS_OPS } from './condition-labels';
 
 interface Props {
@@ -15,10 +18,12 @@ interface Props {
 }
 
 /**
- * Ширину задаём обёрткой, а не классом на самом поле: у Input и Select
- * из ui/Field в базовых классах есть w-full, и он выигрывает у переданного
- * w-40 независимо от порядка в атрибуте. Поле растягивалось на всю строку,
- * и условие переставало читаться одной фразой.
+ * Ширину задаём обёрткой, а не классом на самом поле.
+ *
+ * Раньше причина была в Tailwind: базовый w-full поля выигрывал у любого
+ * переданного w-40, и условие растягивалось на всю строку. Эту часть давно
+ * закрыл twMerge в ui/cn. Обёртка осталась ради shrink-0: строка условия
+ * переносится по словам, и без него поля сжимались бы до нечитаемых.
  */
 function Sized({ width, children }: { width: string; children: ReactNode }) {
   return <div className={`${width} shrink-0`}>{children}</div>;
@@ -42,47 +47,30 @@ export function ConditionRow({ condition, columns, hasGroupColumn, onChange, onR
         <Select
           aria-label="Колонка"
           value={condition.field}
-          onChange={(e) => onChange({ ...condition, field: e.target.value })}
-        >
-          {!columns.includes(condition.field) && (
-            <option value={condition.field}>{condition.field} — нет в таблице</option>
-          )}
-          {columns.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </Select>
+          onChange={(field) => onChange({ ...condition, field })}
+          options={[
+            /* Колонки в файле могло не стать, а условие на неё осталось.
+               Показываем её отдельной строкой: молчаливый сброс на первую
+               переписал бы само правило, и человек бы этого не увидел. */
+            ...(columns.includes(condition.field)
+              ? []
+              : [{ value: condition.field, label: `${condition.field} — нет в таблице` }]),
+            ...columns.map((c) => ({ value: c, label: c })),
+          ]}
+        />
       </Sized>
 
       <Sized width="w-48">
         <Select
           aria-label="Условие"
           value={condition.op}
-          onChange={(e) => setOp(e.target.value as AwardOp)}
-        >
-          <optgroup label="Место">
-            {PLACE_OPS.map((op) => (
-              <option key={op} value={op}>
-                {OP_TITLES[op]}
-              </option>
-            ))}
-          </optgroup>
-          <optgroup label="Статус">
-            {STATUS_OPS.map((op) => (
-              <option key={op} value={op}>
-                {OP_TITLES[op]}
-              </option>
-            ))}
-          </optgroup>
-          <optgroup label="Значение">
-            {GENERAL_OPS.map((op) => (
-              <option key={op} value={op}>
-                {OP_TITLES[op]}
-              </option>
-            ))}
-          </optgroup>
-        </Select>
+          onChange={setOp}
+          options={[
+            ...PLACE_OPS.map((op) => ({ value: op, label: OP_TITLES[op], group: 'Место' })),
+            ...STATUS_OPS.map((op) => ({ value: op, label: OP_TITLES[op], group: 'Статус' })),
+            ...GENERAL_OPS.map((op) => ({ value: op, label: OP_TITLES[op], group: 'Значение' })),
+          ]}
+        />
       </Sized>
 
       <ConditionValue condition={condition} onChange={onChange} />
@@ -96,11 +84,10 @@ export function ConditionRow({ condition, columns, hasGroupColumn, onChange, onR
               : 'Сначала выберите колонку группы вверху'
           }
         >
-          <input
-            type="checkbox"
+          <Checkbox
             checked={condition.withinGroup}
             disabled={!hasGroupColumn}
-            onChange={(e) => onChange({ ...condition, withinGroup: e.target.checked })}
+            onChange={(withinGroup) => onChange({ ...condition, withinGroup })}
           />
           внутри группы
         </label>
@@ -132,13 +119,12 @@ function ConditionValue({
     case 'placeEquals':
       return (
         <Sized width="w-24">
-          <Input
-            type="number"
+          <NumberField
             min={1}
             max={300}
             aria-label="Место"
             value={condition.value}
-            onChange={(e) => onChange({ ...condition, value: clampPlace(e.target.value) })}
+            onChange={(raw) => onChange({ ...condition, value: clampPlace(raw) })}
           />
         </Sized>
       );
@@ -148,32 +134,30 @@ function ConditionValue({
         <div className="flex items-center gap-2">
           <span className="text-sm text-[var(--text-muted)]">с</span>
           <Sized width="w-20">
-            <Input
-              type="number"
+            <NumberField
               min={1}
               max={300}
               aria-label="Место от"
               value={condition.value.from}
-              onChange={(e) =>
+              onChange={(raw) =>
                 onChange({
                   ...condition,
-                  value: { ...condition.value, from: clampPlace(e.target.value) },
+                  value: { ...condition.value, from: clampPlace(raw) },
                 })
               }
             />
           </Sized>
           <span className="text-sm text-[var(--text-muted)]">по</span>
           <Sized width="w-20">
-            <Input
-              type="number"
+            <NumberField
               min={1}
               max={300}
               aria-label="Место до"
               value={condition.value.to}
-              onChange={(e) =>
+              onChange={(raw) =>
                 onChange({
                   ...condition,
-                  value: { ...condition.value, to: clampPlace(e.target.value) },
+                  value: { ...condition.value, to: clampPlace(raw) },
                 })
               }
             />
@@ -189,7 +173,9 @@ function ConditionValue({
             return (
               <label
                 key={status}
-                className={`cursor-pointer rounded-full px-2.5 py-1 text-xs ring-1 transition-colors ${
+                /* Кольцо фокуса здесь своё: сам вход спрятан, и общее
+                   правило :focus-visible нарисовало бы его вокруг ничего. */
+                className={`cursor-pointer rounded-full px-2.5 py-1 text-xs ring-1 transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--focus)] ${
                   checked
                     ? 'bg-[var(--award-soft)] text-[var(--award)] ring-transparent'
                     : 'text-[var(--text-muted)] ring-[var(--line-strong)]'

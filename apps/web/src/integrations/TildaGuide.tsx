@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Check, Copy } from 'lucide-react';
+import { IconButton } from '../ui/IconButton';
 
 /**
  * Пошаговая настройка формы в Тильде.
@@ -20,19 +21,18 @@ function Value({ children, title }: { children: string; title: string }) {
   return (
     <div className="mt-2 flex items-center gap-2 rounded-lg bg-[var(--surface)] px-3 py-2">
       <code className="min-w-0 flex-1 truncate font-mono text-sm">{children}</code>
-      <button
-        type="button"
-        aria-label={`Скопировать ${title}`}
+      <IconButton
+        size="sm"
+        label={`Скопировать ${title}`}
         onClick={() => {
           void navigator.clipboard.writeText(children).then(() => {
             setCopied(true);
             setTimeout(() => setCopied(false), 1500);
           });
         }}
-        className="shrink-0 text-[var(--text-muted)] hover:text-[var(--text)]"
       >
         {copied ? <Check size={16} /> : <Copy size={16} />}
-      </button>
+      </IconButton>
     </div>
   );
 }

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Ban,
+  CheckCheck,
   CheckCircle2,
-  CircleHelp,
   Columns3,
   Download,
   Eye,
@@ -11,17 +11,13 @@ import {
   ListChecks,
   ListX,
   LoaderCircle,
-  Mail,
   Play,
   Plus,
   Rows3,
-  ShieldCheck,
-  Sparkles,
   Table2,
   Trash2,
   X,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import {
   useGeneration,
   useJobFailures,
@@ -43,8 +39,10 @@ import { DownloadDialog } from './DownloadDialog';
 import { InviteNudge } from '../referral/InviteNudge';
 import { DocumentChrome, ToolButton, ToolDivider } from '../editor/DocumentChrome';
 import { useDocumentFileMenu } from '../editor/DocumentFileMenu';
-import type { MenuDef } from '../editor/MenuBar';
-import { Dialog } from '../mailing/Dialog';
+import type { MenuEntry } from '../editor/DocumentChrome';
+import { IconButton } from '../ui/IconButton';
+import { Dialog } from '../ui/Dialog';
+import { Checkbox } from '../ui/Checkbox';
 import type { DocumentDetail } from '../api/types';
 import type { WorkspaceTab } from '../mailing/workspace-tabs';
 
@@ -59,23 +57,14 @@ import type { WorkspaceTab } from '../mailing/workspace-tabs';
 export function RecipientsTable({
   doc,
   onOpen,
-  onIssue,
-  startIssue = false,
-  onIssueStarted,
   onGoToRegistry,
 }: {
   doc: DocumentDetail;
   /** Переход к соседнему экрану материала: правила, проверка, письмо. */
   onOpen: (tab: WorkspaceTab) => void;
-  /** «Выпустить» из таблицы: ведёт по шагам выпуска, а не открывает окно сразу. */
-  onIssue: () => void;
-  /** Шаги пройдены — открыть окно выпуска сразу при показе таблицы. */
-  startIssue?: boolean;
-  onIssueStarted?: () => void;
   onGoToRegistry: () => void;
 }) {
   const documentId = doc.id;
-  const navigate = useNavigate();
   const fileMenu = useDocumentFileMenu(doc);
   const table = useRecipients(documentId);
   const m = useRecipientMutations(documentId);
@@ -100,15 +89,6 @@ export function RecipientsTable({
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState(false);
   const [asking, setAsking] = useState(false);
-
-  // Последний шаг выпуска вернул к таблице с просьбой открыть окно —
-  // открываем и снимаем просьбу с адреса, чтобы она не повторилась
-  // при обновлении страницы.
-  useEffect(() => {
-    if (!startIssue) return;
-    setAsking(true);
-    onIssueStarted?.();
-  }, [startIssue]);
   const [sent, setSent] = useState<SendResult | null>(null);
   const [downloading, setDownloading] = useState(false);
   // Отчёт об ошибках спрашиваем только когда есть о чём: лишний запрос
@@ -203,15 +183,11 @@ export function RecipientsTable({
      строчка на пустом экране читается как сломанная страница. */
   if (table.isPending)
     return (
-      <div className="grid h-full place-items-center text-[var(--text-muted)]">
-        Загрузка таблицы…
-      </div>
+      <div className="grid h-full place-items-center text-[var(--text-muted)]">Загрузка таблицы…</div>
     );
   if (!table.data)
     return (
-      <div className="grid h-full place-items-center text-[var(--text-muted)]">
-        Таблица недоступна
-      </div>
+      <div className="grid h-full place-items-center text-[var(--text-muted)]">Таблица недоступна</div>
     );
 
   const { columns, rows, checkedCount } = table.data;
@@ -224,9 +200,7 @@ export function RecipientsTable({
   const running = !stuck && (job?.status === 'queued' || job?.status === 'running');
   // Доделывать есть что, пока сделано меньше обещанного.
   const canResume =
-    !!job &&
-    (job.status === 'failed' || job.status === 'canceled' || stuck) &&
-    job.done < job.total;
+    !!job && (job.status === 'failed' || job.status === 'canceled' || stuck) && job.done < job.total;
 
   /**
    * Разбор для диалога. Один путь и для файла, и для вставки: правила
@@ -305,88 +279,44 @@ export function RecipientsTable({
    * колонки сервис не умеет. Пункт, за которым нет действия, хуже
    * отсутствующего.
    */
-  const menus: MenuDef[] = [
-    { id: 'file', label: 'Файл', entries: fileMenu.entries },
+  const actions: MenuEntry[] = [
+    ...fileMenu.entries,
+    { separator: true },
     {
-      id: 'insert',
-      label: 'Вставка',
-      entries: [
-        {
-          icon: <Rows3 size={16} />,
-          label: 'Добавить строку',
-          disabled: m.addRow.isPending,
-          onSelect: () => m.addRow.mutate(),
-        },
-        {
-          icon: <Columns3 size={16} />,
-          label: 'Добавить колонку',
-          onSelect: () => setAddingColumn(true),
-        },
-      ],
+      icon: <FileSpreadsheet size={16} />,
+      label: m.parseFile.isPending ? 'Читаем файл…' : 'Загрузить файл XLS',
+      disabled: m.parseFile.isPending,
+      onSelect: () => xlsInput.current?.click(),
     },
     {
-      id: 'data',
-      label: 'Данные',
-      entries: [
-        {
-          icon: <FileSpreadsheet size={16} />,
-          label: m.parseFile.isPending ? 'Читаем файл…' : 'Загрузить файл XLS',
-          disabled: m.parseFile.isPending,
-          onSelect: () => xlsInput.current?.click(),
-        },
-        { separator: true },
-        {
-          icon: <CheckCircle2 size={16} />,
-          label: 'Отметить все строки',
-          disabled: rows.length === 0,
-          onSelect: () => m.setChecked.mutate({ checked: true }),
-        },
-        {
-          icon: <ListX size={16} />,
-          label: 'Снять отметку со всех строк',
-          disabled: rows.length === 0,
-          onSelect: () => m.setChecked.mutate({ checked: false }),
-        },
-        { separator: true },
-        {
-          icon: <ListChecks size={16} />,
-          label: 'Проверить строки',
-          disabled: checkedCount === 0,
-          onSelect: () => onOpen('check'),
-        },
-        {
-          icon: <Sparkles size={16} />,
-          label: 'Правила награждения',
-          onSelect: () => onOpen('rules'),
-        },
-        {
-          icon: <Mail size={16} />,
-          label: 'Письмо участнику',
-          onSelect: () => onOpen('mail'),
-        },
-        {
-          icon: <ShieldCheck size={16} />,
-          label: 'Подлинность документа',
-          onSelect: () => onOpen('verify'),
-        },
-        { separator: true },
-        {
-          icon: <Table2 size={16} />,
-          label: 'Выданное по материалу',
-          onSelect: onGoToRegistry,
-        },
-      ],
+      icon: <Rows3 size={16} />,
+      label: 'Добавить строку',
+      disabled: m.addRow.isPending,
+      onSelect: () => m.addRow.mutate(),
     },
     {
-      id: 'help',
-      label: 'Справка',
-      entries: [
-        {
-          icon: <CircleHelp size={16} />,
-          label: 'Показать справку',
-          onSelect: () => navigate('/docs'),
-        },
-      ],
+      icon: <Columns3 size={16} />,
+      label: 'Добавить колонку',
+      onSelect: () => setAddingColumn(true),
+    },
+    { separator: true },
+    {
+      icon: <CheckCircle2 size={16} />,
+      label: 'Отметить все строки',
+      disabled: rows.length === 0,
+      onSelect: () => m.setChecked.mutate({ checked: true }),
+    },
+    {
+      icon: <ListX size={16} />,
+      label: 'Снять отметку со всех строк',
+      disabled: rows.length === 0,
+      onSelect: () => m.setChecked.mutate({ checked: false }),
+    },
+    { separator: true },
+    {
+      icon: <Table2 size={16} />,
+      label: 'Выданное по материалу',
+      onSelect: onGoToRegistry,
     },
   ];
 
@@ -504,22 +434,25 @@ export function RecipientsTable({
   );
 
   return (
-    /* Во всю высоту окна: страница таблицы рисуется сама по себе, без
-       оболочки кабинета, и высоту ей задать больше некому. */
-    <div className="flex h-full min-h-0 flex-col">
+    /* Точным счётом, а не `h-full`: оболочка кабинета не задаёт высоту
+       своей колонке (иначе колонка разделов теряла прилипание на длинных
+       страницах), и опереться на неё через `h-full` больше не на что. */
+    <div className="flex h-[calc(100dvh-var(--app-header))] min-h-0 flex-col">
       <DocumentChrome
         documentId={documentId}
         title={doc.title}
-        menus={menus}
+        actions={actions}
         tab="table"
         toolbar={toolbar}
         action={
           <Button
             variant="primary"
             size="sm"
-            icon={running ? <LoaderCircle size={15} className="animate-spin" /> : undefined}
+            icon={
+              running ? <LoaderCircle size={15} className="animate-spin" /> : <CheckCheck size={15} />
+            }
             disabled={running || checkedCount === 0}
-            onClick={onIssue}
+            onClick={() => setAsking(true)}
           >
             {running ? 'Выпускаем' : `Выпустить ${checkedCount || ''}`}
           </Button>
@@ -546,8 +479,8 @@ export function RecipientsTable({
           {send.isPending ? (
             <span className="flex items-center gap-2">
               <LoaderCircle size={14} className="animate-spin" />
-              Документы созданы: <span className="tabular font-medium">{job.done}</span>. Отправляем
-              письма…
+              Документы созданы: <span className="tabular font-medium">{job.done}</span>.
+              Отправляем письма…
             </span>
           ) : sent ? (
             <>
@@ -569,8 +502,8 @@ export function RecipientsTable({
           ) : (
             <>
               <span>
-                Документы созданы: <span className="tabular font-medium">{job.done}</span>. Они пока
-                никому не отправлены.
+                Документы созданы: <span className="tabular font-medium">{job.done}</span>. Они
+                пока никому не отправлены.
               </span>
               <button
                 onClick={() => setDownloading(true)}
@@ -589,8 +522,8 @@ export function RecipientsTable({
           задание не принимало, а помогало только «Отменить». */}
       {stuck && (
         <div className="border-b border-[var(--line)] bg-[var(--surface-sunken)] px-4 py-3 text-sm">
-          Выпуск так и не начался: очередь заданий не приняла пакет. Ничего не списано — нажмите
-          «Продолжить», и документы создадутся с того же места.
+          Выпуск так и не начался: очередь заданий не приняла пакет. Ничего не списано —
+          нажмите «Продолжить», и документы создадутся с того же места.
         </div>
       )}
 
@@ -607,9 +540,7 @@ export function RecipientsTable({
               <>
                 {' '}
                 За оставшиеся{' '}
-                <span className="tabular font-medium">
-                  {job.total - job.done - job.failed}
-                </span>{' '}
+                <span className="tabular font-medium">{job.total - job.done - job.failed}</span>{' '}
                 документов ничего не списано — выпуск можно продолжить с того же места.
               </>
             )}
@@ -683,16 +614,12 @@ export function RecipientsTable({
         {rows.length === 0 ? (
           <div className="grid h-full place-items-center p-10 text-center">
             <div>
-              <FileUp
-                size={26}
-                className="mx-auto mb-3 text-[var(--text-muted)]"
-                strokeWidth={1.5}
-              />
+              <FileUp size={26} className="mx-auto mb-3 text-[var(--text-muted)]" strokeWidth={1.5} />
               <p className="font-medium">Список получателей пуст</p>
               <p className="mt-1 max-w-md text-sm text-[var(--text-muted)]">
-                Загрузите файл Excel или CSV — подойдёт обычный список участников, шапку и лишние
-                строки сервис распознает сам. Или скопируйте таблицу в Excel и вставьте сюда через
-                Ctrl+V.
+                Загрузите файл Excel или CSV — подойдёт обычный список участников,
+                шапку и лишние строки сервис распознает сам. Или скопируйте таблицу
+                в Excel и вставьте сюда через Ctrl+V.
               </p>
               {/* Кнопка здесь обязательна: на панели значок без подписи,
                   и на пустом экране по нему не догадаться. */}
@@ -716,12 +643,10 @@ export function RecipientsTable({
             <thead className="sticky top-0 z-10 bg-[var(--surface-sunken)]">
               <tr>
                 <th className="w-10 border-r border-b border-[var(--line)] px-3 py-2">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={allChecked}
                     onChange={() => m.setChecked.mutate({ checked: !allChecked })}
                     aria-label="Отметить все"
-                    className="accent-[var(--accent)]"
                   />
                 </th>
                 {/* Номер строки — как в любой таблице: по нему называют место
@@ -742,13 +667,14 @@ export function RecipientsTable({
                   >
                     <span className="inline-flex items-center gap-1.5">
                       {columnTitle(col)}
-                      <button
+                      <IconButton
+                        size="sm"
+                        label={`Удалить колонку ${columnTitle(col)}`}
                         onClick={() => m.deleteColumn.mutate(col.id)}
-                        aria-label={`Удалить колонку ${columnTitle(col)}`}
-                        className="opacity-0 transition-opacity group-hover:opacity-100 hover:text-[var(--danger)]"
+                        className="size-6 opacity-0 group-hover:opacity-100 hover:text-[var(--danger)]"
                       >
                         <X size={12} />
-                      </button>
+                      </IconButton>
                     </span>
                     <span className="block font-mono text-xs font-normal text-[var(--text-muted)]">
                       %{col.name}
@@ -762,12 +688,10 @@ export function RecipientsTable({
               {rows.map((row, index) => (
                 <tr key={row.id} className="group hover:bg-[var(--surface-sunken)]/60">
                   <td className="border-r border-b border-[var(--line)] px-3 py-1 text-center">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={row.checked}
                       onChange={() => m.updateRow.mutate({ rowId: row.id, checked: !row.checked })}
                       aria-label="Включить в генерацию"
-                      className="accent-[var(--accent)]"
                     />
                   </td>
                   <td className="tabular border-r border-b border-[var(--line)] px-2 py-1 text-right text-xs text-[var(--text-muted)]">
@@ -793,13 +717,14 @@ export function RecipientsTable({
                     </td>
                   ))}
                   <td className="border-b border-[var(--line)] px-2 text-center">
-                    <button
+                    <IconButton
+                      size="sm"
+                      label="Удалить строку"
                       onClick={() => m.deleteRow.mutate(row.id)}
-                      aria-label="Удалить строку"
-                      className="text-[var(--text-muted)] opacity-0 transition-opacity group-hover:opacity-100 hover:text-[var(--danger)]"
+                      className="size-7 opacity-0 group-hover:opacity-100 hover:text-[var(--danger)]"
                     >
                       <Trash2 size={14} />
-                    </button>
+                    </IconButton>
                   </td>
                 </tr>
               ))}

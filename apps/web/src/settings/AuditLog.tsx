@@ -24,7 +24,7 @@ export function AuditLog() {
 
   return (
     <section>
-      <h2 className="flex items-center gap-2 font-serif text-xl">
+      <h2 className="flex items-center gap-2 text-lg font-medium">
         <ScrollText size={18} className="text-[var(--text-muted)]" />
         Журнал действий
       </h2>

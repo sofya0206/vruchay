@@ -15,7 +15,7 @@ describe('состояние документа', () => {
   it('отзыв и замена — разные слова, а не оттенки одного', () => {
     expect(stateLabel({ state: 'revoked', reissuePending: false })).toBe('Отозван');
     expect(stateLabel({ state: 'replaced', reissuePending: false })).toBe('Заменён');
-    expect(stateTone({ state: 'revoked', reissuePending: false })).toBe('bad');
+    expect(stateTone({ state: 'revoked', reissuePending: false })).toBe('error');
     expect(stateTone({ state: 'replaced', reissuePending: false })).toBe('warn');
   });
 
@@ -37,9 +37,9 @@ describe('состояние документа', () => {
 describe('состояние письма', () => {
   it('отсутствие письма отличается от неудачной отправки', () => {
     expect(mailLabel(null)).toBe('Не отправлялось');
-    expect(mailTone(null)).toBe('mute');
+    expect(mailTone(null)).toBe('neutral');
     expect(mailLabel('failed')).toBe('Ошибка отправки');
-    expect(mailTone('failed')).toBe('bad');
+    expect(mailTone('failed')).toBe('error');
   });
 
   it('незнакомое состояние показываем как есть, а не прячем', () => {

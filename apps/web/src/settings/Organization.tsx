@@ -50,7 +50,7 @@ export function OrgName() {
 
   return (
     <section>
-      <h2 className="flex items-center gap-2 font-serif text-xl">
+      <h2 className="flex items-center gap-2 text-lg font-medium">
         <Building2 size={18} className="text-[var(--accent)]" />
         Название организации
       </h2>
@@ -105,7 +105,7 @@ export function MyProfile() {
 
   return (
     <section>
-      <h2 className="flex items-center gap-2 font-serif text-xl">
+      <h2 className="flex items-center gap-2 text-lg font-medium">
         <UserRound size={18} className="text-[var(--accent)]" />
         Профиль
       </h2>

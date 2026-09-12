@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Check, CheckCheck, Clock, Mail, Plus, Users, X, type LucideIcon } from 'lucide-react';
+import { CheckCheck, Clock, Mail, Plus, Users, X, type LucideIcon } from 'lucide-react';
+import { ColumnList, ColumnRow, SectionLayout } from '../ui/SectionLayout';
 import type { MailingLog } from './api';
 import { LETTER_LISTS, listCount, mailList, mailListPath, type MailList } from './mail-lists';
 
@@ -20,9 +21,7 @@ import { LETTER_LISTS, listCount, mailList, mailListPath, type MailList } from '
 const ICONS: Record<MailList, LucideIcon> = {
   all: Mail,
   queued: Clock,
-  sent: Check,
   delivered: CheckCheck,
-  opened: CheckCheck,
   undelivered: X,
   lists: Users,
   new: Plus,
@@ -34,7 +33,7 @@ const ICONS: Record<MailList, LucideIcon> = {
  * дошло, вторая — что часть писем надо разбирать руками.
  */
 const TINTS: Partial<Record<MailList, string>> = {
-  opened: 'text-[var(--accent)]',
+  delivered: 'text-[var(--accent)]',
   undelivered: 'text-[var(--danger)]',
 };
 
@@ -68,78 +67,40 @@ export function MailNav({ counts }: { counts: MailingLog['summary'] }) {
 
   return (
     <nav aria-label="Папки писем" className="mt-3">
-      {/* На узком экране колонка заняла бы две трети экрана телефона,
-          поэтому там это лента, которая прокручивается вбок. */}
-      <div className="flex gap-1 overflow-x-auto md:block md:overflow-visible">
-        <ul className="flex gap-1 md:flex-col">
-          {LETTER_LISTS.map((item) => (
-            <Row
-              key={item.id}
-              id={item.id}
-              label={item.label}
-              active={current === item.id}
-              count={listCount(item.id, counts)}
-            />
-          ))}
-        </ul>
-
-        {/* Волосяная линия вместо подписи группы: письма и списки
-            получателей — разная работа, но подписывать их отдельно значит
-            занять две строки колонки ради двух слов. */}
-        <ul className="flex gap-1 md:mt-2 md:flex-col md:border-t md:border-[var(--line)] md:pt-2">
-          <Row id="lists" label="Списки получателей" active={current === 'lists'} />
-        </ul>
-      </div>
+      <ColumnList>
+        {LETTER_LISTS.map((item) => (
+          <ColumnRow
+            key={item.id}
+            to={mailListPath(item.id)}
+            icon={ICONS[item.id]}
+            active={current === item.id}
+            count={listCount(item.id, counts)}
+            tint={TINTS[item.id]}
+          >
+            {item.label}
+          </ColumnRow>
+        ))}
+      </ColumnList>
+      {/* Волосяная линия вместо подписи группы: письма и списки
+          получателей — разная работа, но подписывать их отдельно значит
+          занять две строки колонки ради двух слов. */}
+      <ColumnList className="md:mt-2 md:border-t md:border-[var(--line)] md:pt-2">
+        <ColumnRow
+          to={mailListPath('lists')}
+          icon={ICONS.lists}
+          active={current === 'lists'}
+        >
+          Списки получателей
+        </ColumnRow>
+      </ColumnList>
     </nav>
   );
 }
 
-function Row({
-  id,
-  label,
-  active,
-  count,
-}: {
-  id: MailList;
-  label: string;
-  active: boolean;
-  /** Сколько писем внутри. Ноль не рисуем — пустое место честнее нуля. */
-  count?: number;
-}) {
-  const Icon = ICONS[id];
-
-  return (
-    <li>
-      <Link
-        to={mailListPath(id)}
-        aria-current={active ? 'page' : undefined}
-        className={
-          'flex items-center gap-2.5 rounded-lg border-l-2 px-3 py-2 text-sm whitespace-nowrap ' +
-          'transition-colors ' +
-          (active
-            ? 'border-[var(--accent)] bg-[var(--accent-soft)] font-medium text-[var(--accent)]'
-            : 'border-transparent text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]')
-        }
-      >
-        <Icon
-          size={16}
-          strokeWidth={1.75}
-          className={`shrink-0 ${active ? '' : (TINTS[id] ?? '')}`}
-        />
-        <span className="md:flex-1 md:truncate">{label}</span>
-        {count ? <span className="tabular text-xs text-[var(--text-muted)]">{count}</span> : null}
-      </Link>
-    </li>
-  );
-}
-
 /**
- * Общая рамка раздела.
- *
- * `head` — левая часть верхней панели (название папки), `tools` — то,
- * что стоит перед кнопкой рассылки (обновить и поиск), `bar` — нижняя
- * строка состояния. Кнопку рассылки рамка рисует сама: она обязана
- * стоять на одном месте во всех папках раздела.
+ * Рама писем — общая `SectionLayout` с колонкой папок.
+ * «Новая рассылка» — одна кнопка: в колонке на широком экране, в панели —
+ * только на телефоне.
  */
 export function MailLayout({
   counts,
@@ -155,38 +116,25 @@ export function MailLayout({
   children: ReactNode;
 }) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-      <aside className="border-b border-[var(--line)] md:w-60 md:shrink-0 md:border-r md:border-b-0">
-        {/* --app-header — высота шапки кабинета вместе с её линией. Колонка
-            встаёт ровно под шапку и дальше стоит на месте, пока список
-            прокручивается. Числом высоту не пишем: шапку правят, и колонка
-            должна ехать за ней. */}
-        <div className="p-3 md:sticky md:top-[var(--app-header)] md:max-h-[calc(100vh-var(--app-header))] md:overflow-y-auto">
-          {/* На телефоне колонка стоит над панелью, и две кнопки рассылки
-              оказались бы подряд одна под другой — здесь остаётся та,
-              что в панели. */}
+    <SectionLayout
+      column={
+        <>
           <div className="hidden md:block">
             <NewMailingLink className="w-full" />
           </div>
           <MailNav counts={counts} />
-        </div>
-      </aside>
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        <div className="z-10 flex flex-wrap items-center gap-3 border-b border-[var(--line)] bg-[var(--surface)] px-6 py-3 md:sticky md:top-[var(--app-header)]">
-          <div className="min-w-0 flex-1">{head}</div>
+        </>
+      }
+      head={head}
+      tools={
+        <>
           {tools}
-          <NewMailingLink />
-        </div>
-
-        <main className="min-w-0 flex-1 px-6 py-6">{children}</main>
-
-        {bar && (
-          <div className="sticky bottom-0 z-10 flex flex-wrap items-center gap-3 border-t border-[var(--line)] bg-[var(--surface)] px-6 py-2.5 text-sm">
-            {bar}
-          </div>
-        )}
-      </div>
-    </div>
+          <NewMailingLink className="md:hidden" />
+        </>
+      }
+      bar={bar}
+    >
+      {children}
+    </SectionLayout>
   );
 }

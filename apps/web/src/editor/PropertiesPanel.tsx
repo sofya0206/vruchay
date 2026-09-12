@@ -27,13 +27,14 @@ import { describeSize, type SheetElement, type ShapeElement, type TextProps } fr
 import type { DocumentDetail } from '../api/types';
 import { PageSizePicker, type PageSizeValue } from '../documents/PageSizePicker';
 import { EventFields, type EventValues } from './EventFields';
-import { VerifySettings } from './VerifySettings';
 import { ColorField } from './ColorField';
 import { FONTS } from './fonts-list';
 import { MIXED, commonTextProps, commonValue, type AlignKind } from './selection';
 import type { Box } from './geometry';
 import { Button } from '../ui/Button';
-import { Input, Label, Select } from '../ui/Field';
+import { Input, Label } from '../ui/Field';
+import { NumberField } from '../ui/NumberField';
+import { Select } from '../ui/Select';
 
 interface Props {
   /** Выбранные блоки: ни одного, один или несколько. */
@@ -93,9 +94,6 @@ export function PropertiesPanel(props: Props) {
               </div>
             )}
             <EventFields doc={doc} onSave={onSaveEvent} onDraft={onEventDraft} />
-            <div className="mt-6">
-              <VerifySettings doc={doc} onSave={onSaveEvent} />
-            </div>
           </>
         ) : (
           <>
@@ -149,16 +147,15 @@ export function PropertiesPanel(props: Props) {
             {(['x', 'y', 'w', 'h'] as const).map((key) => (
               <label key={key} className="block">
                 <span className="block text-center text-[10px] uppercase text-[var(--text-muted)]">{key}</span>
-                <Input
-                  type="number"
+                <NumberField
                   step={0.5}
                   value={round(single[key])}
-                  onChange={(e) => {
-                    const value = Number(e.target.value);
+                  onChange={(raw) => {
+                    const value = Number(raw);
                     if (!Number.isFinite(value)) return;
                     props.onBox(single.id, { x: single.x, y: single.y, w: single.w, h: single.h, [key]: value });
                   }}
-                  className="tabular px-1 text-center"
+                  className="px-1 text-center"
                 />
               </label>
             ))}
@@ -169,28 +166,24 @@ export function PropertiesPanel(props: Props) {
       <div className="grid grid-cols-2 gap-2">
         <label className="block">
           <Label>Поворот, °</Label>
-          <Input
-            type="number"
+          <NumberField
             min={-360}
             max={360}
             step={1}
             value={shown(rotation) ?? ''}
             placeholder={rotation === MIXED ? MIXED_PLACEHOLDER : '0'}
-            onChange={(e) => props.onElement({ rotation: clampNumber(e.target.value, -360, 360, 0) })}
-            className="tabular"
+            onChange={(raw) => props.onElement({ rotation: clampNumber(raw, -360, 360, 0) })}
           />
         </label>
         <label className="block">
           <Label>Прозрачность, %</Label>
-          <Input
-            type="number"
+          <NumberField
             min={0}
             max={100}
             step={5}
             value={opacity === MIXED || opacity === undefined ? '' : Math.round(opacity * 100)}
             placeholder={opacity === MIXED ? MIXED_PLACEHOLDER : '100'}
-            onChange={(e) => props.onElement({ opacity: clampNumber(e.target.value, 0, 100, 100) / 100 })}
-            className="tabular"
+            onChange={(raw) => props.onElement({ opacity: clampNumber(raw, 0, 100, 100) / 100 })}
           />
         </label>
       </div>
@@ -335,69 +328,64 @@ function TextSection({
         отдельные слова оформляются на листе, панелью над блоком.
       </p>
 
-      <label className="block">
+      <div className="block">
         <Label>Шрифт</Label>
-        <Select value={str('fontFamily')} onChange={(e) => onChange({ fontFamily: e.target.value })}>
-          {p.fontFamily === MIXED && <option value="">{MIXED_PLACEHOLDER}</option>}
-          {FONTS.map((f) => (
-            <option key={f} value={f}>
-              {f}
-            </option>
-          ))}
-        </Select>
-      </label>
+        <Select
+          value={str('fontFamily')}
+          onChange={(fontFamily) => onChange({ fontFamily })}
+          aria-label="Шрифт"
+          options={[
+            /* Выделено несколько блоков с разными шрифтами — первой строкой
+               «Смешанное»: показать шрифт первого значило бы соврать. */
+            ...(p.fontFamily === MIXED ? [{ value: '', label: MIXED_PLACEHOLDER }] : []),
+            ...FONTS.map((f) => ({ value: f, label: f })),
+          ]}
+        />
+      </div>
 
       <div className="grid grid-cols-2 gap-2">
         <label className="block">
           <Label>Кегль, pt</Label>
-          <Input
-            type="number"
+          <NumberField
             min={4}
             max={200}
             step={0.5}
             value={num('fontSize')}
             placeholder={ph('fontSize', '16')}
-            onChange={(e) => onChange({ fontSize: clampNumber(e.target.value, 4, 200, 16) })}
-            className="tabular"
+            onChange={(raw) => onChange({ fontSize: clampNumber(raw, 4, 200, 16) })}
           />
         </label>
         <label className="block">
           <Label>Межстрочный</Label>
-          <Input
-            type="number"
+          <NumberField
             min={0.5}
             max={4}
             step={0.05}
             value={num('lineHeight')}
             placeholder={ph('lineHeight', '1.2')}
-            onChange={(e) => onChange({ lineHeight: clampNumber(e.target.value, 0.5, 4, 1.2) })}
-            className="tabular"
+            onChange={(raw) => onChange({ lineHeight: clampNumber(raw, 0.5, 4, 1.2) })}
           />
         </label>
         <label className="block">
           <Label>Разрядка, pt</Label>
-          <Input
-            type="number"
+          <NumberField
             min={-5}
             max={30}
             step={0.25}
             value={num('letterSpacing')}
             placeholder={ph('letterSpacing', '0')}
-            onChange={(e) => onChange({ letterSpacing: clampNumber(e.target.value, -5, 30, 0) })}
-            className="tabular"
+            onChange={(raw) => onChange({ letterSpacing: clampNumber(raw, -5, 30, 0) })}
           />
         </label>
         <label className="block">
           <Label>Отступ внутри, мм</Label>
-          <Input
-            type="number"
+          <NumberField
             min={0}
             max={50}
             step={0.5}
             value={num('padding')}
             placeholder={ph('padding', '0')}
-            onChange={(e) => onChange({ padding: clampNumber(e.target.value, 0, 50, 0) })}
-            className="tabular"
+            onChange={(raw) => onChange({ padding: clampNumber(raw, 0, 50, 0) })}
           />
         </label>
       </div>
@@ -470,14 +458,13 @@ function TextSection({
       <div>
         <Label>Обводка букв</Label>
         <div className="flex items-center gap-2">
-          <Input
-            type="number"
+          <NumberField
             min={0}
             max={2}
             step={0.05}
             value={num('strokeWidth')}
             placeholder={ph('strokeWidth', '0')}
-            onChange={(e) => onChange({ strokeWidth: clampNumber(e.target.value, 0, 2, 0) })}
+            onChange={(raw) => onChange({ strokeWidth: clampNumber(raw, 0, 2, 0) })}
             className="w-20"
           />
           <span className="text-sm text-[var(--text-muted)]">мм</span>
@@ -495,14 +482,13 @@ function TextSection({
       <div>
         <Label>Рамка и заливка блока</Label>
         <div className="flex items-center gap-2">
-          <Input
-            type="number"
+          <NumberField
             min={0}
             max={5}
             step={0.1}
             value={num('borderWidth')}
             placeholder={ph('borderWidth', '0')}
-            onChange={(e) => onChange({ borderWidth: clampNumber(e.target.value, 0, 5, 0) })}
+            onChange={(raw) => onChange({ borderWidth: clampNumber(raw, 0, 5, 0) })}
             className="w-20"
           />
           <span className="text-sm text-[var(--text-muted)]">мм</span>
@@ -579,28 +565,24 @@ function ShapeSection({
       <div className="grid grid-cols-2 gap-2">
         <label className="block">
           <Label>Обводка, мм</Label>
-          <Input
-            type="number"
+          <NumberField
             min={0}
             max={20}
             step={0.1}
             value={strokeWidth === MIXED ? '' : (strokeWidth ?? '')}
             placeholder={strokeWidth === MIXED ? MIXED_PLACEHOLDER : '0.5'}
-            onChange={(e) => onChange({ strokeWidth: clampNumber(e.target.value, 0, 20, 0.5) })}
-            className="tabular"
+            onChange={(raw) => onChange({ strokeWidth: clampNumber(raw, 0, 20, 0.5) })}
           />
         </label>
         <label className="block">
           <Label>Пунктир, мм</Label>
-          <Input
-            type="number"
+          <NumberField
             min={0}
             max={50}
             step={0.5}
             value={dash === MIXED ? '' : (dash ?? '')}
             placeholder={dash === MIXED ? MIXED_PLACEHOLDER : '0'}
-            onChange={(e) => onChange({ dash: clampNumber(e.target.value, 0, 50, 0) })}
-            className="tabular"
+            onChange={(raw) => onChange({ dash: clampNumber(raw, 0, 50, 0) })}
           />
         </label>
       </div>
@@ -623,14 +605,13 @@ function ShapeSection({
           {kind === 'rect' && (
             <label className="block">
               <Label>Скругление углов, мм</Label>
-              <Input
-                type="number"
+              <NumberField
                 min={0}
                 max={100}
                 step={0.5}
                 value={radius === MIXED ? '' : (radius ?? '')}
-                onChange={(e) => onChange({ radius: clampNumber(e.target.value, 0, 100, 0) })}
-                className="tabular w-28"
+                onChange={(raw) => onChange({ radius: clampNumber(raw, 0, 100, 0) })}
+                className="w-28"
               />
             </label>
           )}

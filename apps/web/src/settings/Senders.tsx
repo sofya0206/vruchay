@@ -5,7 +5,8 @@ import { Link } from 'react-router-dom';
 import { settingsApi, type Sender } from '../api/settings';
 import { ApiError } from '../api/client';
 import { Button } from '../ui/Button';
-import { Input, Label, Select, Textarea } from '../ui/Field';
+import { Input, Label, Textarea } from '../ui/Field';
+import { Select } from '../ui/Select';
 
 /**
  * Адреса, с которых уходят письма участникам.
@@ -53,7 +54,7 @@ export function Senders() {
 
   return (
     <section>
-      <h2 className="flex items-center gap-2 font-serif text-xl">
+      <h2 className="flex items-center gap-2 text-lg font-medium">
         <AtSign size={18} className="text-[var(--accent)]" />
         Адреса рассылки
       </h2>
@@ -117,18 +118,13 @@ export function Senders() {
                 <Label>Домен</Label>
                 <Select
                   value={domainId}
-                  onChange={(e) => {
-                    setDomainId(e.target.value);
-                    const d = verified.find((v) => v.id === e.target.value);
+                  onChange={(id) => {
+                    setDomainId(id);
+                    const d = verified.find((v) => v.id === id);
                     if (d) setEmail(`info@${d.domain}`);
                   }}
-                >
-                  {verified.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.domain}
-                    </option>
-                  ))}
-                </Select>
+                  options={verified.map((d) => ({ value: d.id, label: d.domain }))}
+                />
               </div>
             )}
             <div className="min-w-48 flex-1">

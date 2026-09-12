@@ -1,4 +1,5 @@
 import type { RegistryRow } from '../api/registry';
+import type { ChipTone } from '../ui/Field';
 
 /**
  * Подписи для реестра.
@@ -19,14 +20,14 @@ export function stateLabel(row: Pick<RegistryRow, 'state' | 'reissuePending'>): 
   return row.reissuePending ? 'Перевыпускается' : 'Действителен';
 }
 
-export type Tone = 'ok' | 'wait' | 'warn' | 'bad' | 'mute';
+export type Tone = ChipTone;
 
 export function stateTone(row: Pick<RegistryRow, 'state' | 'reissuePending'>): Tone {
-  if (row.state === 'revoked') return 'bad';
+  if (row.state === 'revoked') return 'error';
   if (row.state === 'replaced') return 'warn';
   // Истёкший — не беда, а прошлое: жёлтый, как у заменённого, не красный.
   if (row.state === 'expired') return 'warn';
-  return row.reissuePending ? 'wait' : 'ok';
+  return row.reissuePending ? 'progress' : 'done';
 }
 
 const MAIL_LABELS: Record<string, string> = {
@@ -44,10 +45,10 @@ export function mailLabel(status: string | null | undefined): string {
 }
 
 export function mailTone(status: string | null | undefined): Tone {
-  if (!status) return 'mute';
-  if (status === 'opened' || status === 'delivered') return 'ok';
-  if (status === 'bounced' || status === 'failed') return 'bad';
-  return 'wait';
+  if (!status) return 'neutral';
+  if (status === 'opened' || status === 'delivered') return 'done';
+  if (status === 'bounced' || status === 'failed') return 'error';
+  return 'progress';
 }
 
 /**

@@ -11,6 +11,7 @@ import {
   initialNames,
   NAME_RE,
 } from './column-mapping';
+import { Checkbox } from '../ui/Checkbox';
 
 /** Строки с принятыми правками. Непринятые предложения строк не касаются. */
 export function applySuggestions(
@@ -212,15 +213,14 @@ export function ImportDialog({
                   key={`${suggestion.kind}-${suggestion.column}`}
                   className="flex gap-2 text-sm"
                 >
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={accepted.includes(i)}
-                    onChange={(e) =>
+                    onChange={(checked) =>
                       setAccepted((prev) =>
-                        e.target.checked ? [...prev, i] : prev.filter((j) => j !== i),
+                        checked ? [...prev, i] : prev.filter((j) => j !== i),
                       )
                     }
-                    className="mt-0.5 accent-[var(--accent)]"
+                    className="mt-0.5"
                   />
                   <span>
                     <span className="inline-flex items-center gap-1.5">
@@ -304,11 +304,10 @@ export function ImportDialog({
             )}
             {canMerge && (
               <label className="mt-3 flex items-start gap-2 text-sm">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={mergeFullName}
-                  onChange={(e) => setMergeFullName(e.target.checked)}
-                  className="mt-0.5 accent-[var(--accent)]"
+                  onChange={setMergeFullName}
+                  className="mt-0.5"
                 />
                 <span>
                   Склеить фамилию, имя и отчество в одну переменную{' '}
@@ -351,15 +350,11 @@ export function ImportDialog({
         </div>
 
         <footer className="flex items-center gap-3 border-t border-[var(--line)] px-5 py-4">
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={mode === 'replace'}
-              onChange={(e) => setMode(e.target.checked ? 'replace' : 'append')}
-              className="accent-[var(--accent)]"
-            />
-            Заменить существующие строки
-          </label>
+          <Checkbox
+            checked={mode === 'replace'}
+            onChange={(checked) => setMode(checked ? 'replace' : 'append')}
+            label="Заменить существующие строки"
+          />
           <div className="ml-auto flex gap-2">
             <Button onClick={onCancel}>Отмена</Button>
             <Button

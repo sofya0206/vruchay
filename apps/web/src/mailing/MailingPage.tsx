@@ -5,12 +5,17 @@ import { CalendarRange, ChevronRight, RefreshCw, Search, Send } from 'lucide-rea
 import { api } from '../api/client';
 import type { DocumentList, DocumentSummary } from '../api/types';
 import { Button } from '../ui/Button';
-import { Input, Select } from '../ui/Field';
+import { Input, Textarea } from '../ui/Field';
+import { Checkbox, Radio } from '../ui/Checkbox';
+import { Select } from '../ui/Select';
+import { IconButton } from '../ui/IconButton';
+import { EmptyState } from '../ui/EmptyState';
+import { SectionTitle } from '../ui/SectionLayout';
 import { Loading } from '../ui/Loading';
 import { LetterCard } from './LetterCard';
 import { MailingLogTable } from './MailingLogTable';
 import { MailLayout } from './MailNav';
-import { Dialog } from './Dialog';
+import { Dialog } from '../ui/Dialog';
 import { documentLine } from './document-line';
 import { workspacePath } from './workspace-tabs';
 import { undeliveredCount } from './letter-preview';
@@ -159,43 +164,27 @@ export function MailingPage() {
     <>
       <MailLayout
         counts={summary}
+        // Открытая папка стоит в заголовке: иначе на половине списка
+        // непонятно, почему писем пять, когда их пятьсот.
         head={
-          <div className="flex min-w-0 items-baseline gap-2">
-            {/* Открытая папка стоит в заголовке: иначе на половине списка
-                непонятно, почему писем пять, когда их пятьсот. */}
-            <h1 className="truncate text-lg font-medium">{mailListLabel(list)}</h1>
-            {letterFolder && (
-              <span className="tabular text-sm text-[var(--text-muted)]">
-                {listCount(list, summary)}
-              </span>
-            )}
-            {list === 'lists' && documents.data && (
-              <span className="tabular text-sm text-[var(--text-muted)]">
-                {documents.data.total}
-              </span>
-            )}
-            {list === 'new' && (
-              <Link
-                to={mailListPath('all')}
-                className="text-sm text-[var(--text-muted)] underline underline-offset-4 hover:text-[var(--text)]"
-              >
-                Вернуться к письмам
-              </Link>
-            )}
-          </div>
+          <SectionTitle
+            count={
+              letterFolder
+                ? listCount(list, summary)
+                : list === 'lists'
+                  ? (documents.data?.total ?? null)
+                  : null
+            }
+          >
+            {mailListLabel(list)}
+          </SectionTitle>
         }
         tools={
           letterFolder ? (
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => void refresh()}
-                title="Обновить"
-                aria-label="Обновить список писем"
-                className="grid h-9 w-9 place-items-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
-              >
+              <IconButton label="Обновить список писем" onClick={() => void refresh()}>
                 <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
-              </button>
+              </IconButton>
               <div className="relative">
                 <Search
                   size={16}
@@ -219,31 +208,23 @@ export function MailingPage() {
               <div className="ml-auto flex flex-wrap items-center gap-3">
                 <Select
                   value={documentId}
-                  onChange={(e) => setDocumentId(e.target.value)}
+                  onChange={setDocumentId}
+                  options={[
+                    { value: '', label: 'Все материалы' },
+                    ...items.map((doc) => ({ value: doc.id, label: doc.title })),
+                  ]}
                   aria-label="Материал"
                   className="w-52 py-1 text-sm"
-                >
-                  <option value="">Все материалы</option>
-                  {items.map((doc) => (
-                    <option key={doc.id} value={doc.id}>
-                      {doc.title}
-                    </option>
-                  ))}
-                </Select>
+                />
                 <label className="flex items-center gap-2 text-[var(--text-muted)]">
                   <CalendarRange size={15} />
                   <Select
                     value={period}
-                    onChange={(e) => setPeriod(e.target.value as MailPeriod)}
+                    onChange={setPeriod}
+                    options={MAIL_PERIODS.map((o) => ({ value: o.id, label: o.label }))}
                     aria-label="Отрезок времени"
                     className="w-32 py-1 text-sm"
-                  >
-                    {MAIL_PERIODS.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </Select>
+                  />
                 </label>
               </div>
             </>
@@ -282,7 +263,7 @@ export function MailingPage() {
               }}
             />
 
-            <Step title="Что рассылаем" hint="Можно выбрать несколько материалов сразу">
+            <Step n={1} title="Что рассылаем" hint="Можно выбрать несколько материалов сразу">
               {items.length === 0 ? (
                 <p className="text-sm text-[var(--text-muted)]">
                   Материалов пока нет.{' '}
@@ -299,8 +280,7 @@ export function MailingPage() {
                           бывает три подряд, а разослать не тому списку нельзя —
                           письмо не отзывается. */}
                       <label className="flex items-start gap-3 rounded-xl px-3 py-2 hover:bg-[var(--surface-sunken)]">
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={selected.includes(doc.id)}
                           onChange={() => toggle(doc.id)}
                           className="mt-1"
@@ -319,6 +299,7 @@ export function MailingPage() {
             </Step>
 
             <Step
+              n={2}
               title="Кому"
               hint="Основной способ — таблица получателей: по ней же выпускаются документы"
             >
@@ -337,7 +318,7 @@ export function MailingPage() {
             </Step>
 
             {chosen.length > 0 && (
-              <Step title="Письмо" hint="У каждого материала своё письмо и своя проверка">
+              <Step n={3} title="Письмо" hint="У каждого материала своё письмо и своя проверка">
                 <div className="space-y-4">
                   {chosen.map((doc) => (
                     <LetterCard
@@ -435,18 +416,22 @@ export function MailingPage() {
 function Lists({ documents }: { documents: DocumentSummary[] }) {
   if (documents.length === 0) {
     return (
-      <p className="text-sm text-[var(--text-muted)]">
-        Материалов пока нет.{' '}
-        <Link to="/documents" className="text-[var(--accent)] hover:underline">
-          Создайте первый
-        </Link>
-        .
-      </p>
+      <EmptyState
+        icon={Send}
+        title="Материалов пока нет"
+        action={
+          <Button variant="primary" onClick={() => (window.location.href = '/documents?new=1')}>
+            Создать документ
+          </Button>
+        }
+      >
+        Список получателей живёт у материала — сначала заведите его.
+      </EmptyState>
     );
   }
 
   return (
-    <ul className="divide-y divide-[var(--line)] overflow-hidden rounded-2xl bg-[var(--surface)] ring-1 ring-[var(--line)]">
+    <ul className="card divide-y divide-[var(--line)] overflow-hidden">
       {documents.map((doc) => (
         <li key={doc.id}>
           <Link
@@ -499,15 +484,14 @@ function KindPicker({
       {options.map((option) => (
         <label
           key={option.id}
-          className={`cursor-pointer rounded-2xl p-4 ring-1 ${
+          className={`cursor-pointer rounded-2xl p-4 ring-1 transition-colors ${
             kind === option.id
               ? 'bg-[var(--accent-soft)] ring-[var(--accent)]'
-              : 'bg-[var(--surface)] ring-[var(--line)]'
+              : 'bg-[var(--surface)] ring-[var(--line)] hover:bg-[var(--surface-sunken)]'
           }`}
         >
           <span className="flex items-center gap-2 font-medium">
-            <input
-              type="radio"
+            <Radio
               name="letter-kind"
               checked={kind === option.id}
               onChange={() => onChange(option.id)}
@@ -535,8 +519,7 @@ function RecipientsPicker({
   return (
     <div className="space-y-3">
       <label className="flex items-start gap-3">
-        <input
-          type="radio"
+        <Radio
           name="recipient-source"
           checked={source === 'table'}
           onChange={() => onSource('table')}
@@ -551,8 +534,7 @@ function RecipientsPicker({
       </label>
 
       <label className="flex items-start gap-3">
-        <input
-          type="radio"
+        <Radio
           name="recipient-source"
           checked={source === 'manual'}
           onChange={() => onSource('manual')}
@@ -568,14 +550,14 @@ function RecipientsPicker({
       </label>
 
       {source === 'manual' && (
-        <textarea
+        <Textarea
           value={emails}
           onChange={(e) => onEmails(e.target.value)}
           rows={5}
           spellCheck={false}
           placeholder={'ivanov@example.ru\npetrov@example.ru'}
           aria-label="Список адресов"
-          className="w-full rounded-xl bg-[var(--surface)] px-3 py-2 font-mono text-sm ring-1 ring-[var(--line)] focus:ring-2 focus:ring-[var(--accent)] focus:outline-none"
+          className="font-mono text-sm"
         />
       )}
     </div>
@@ -585,7 +567,7 @@ function RecipientsPicker({
 /** Что ушло, а что нет — сразу после отправки, поимённо. */
 function SendReport({ result }: { result: SendResult }) {
   return (
-    <div className="space-y-3 rounded-2xl bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]">
+    <div className="card space-y-3 p-5">
       <h3 className="font-medium">Отправлено писем: {result.queued}</h3>
       {result.results.map((item) => (
         <div key={item.documentId} className="text-sm">
@@ -621,20 +603,28 @@ function SendReport({ result }: { result: SendResult }) {
   );
 }
 
+/** Шаг рассылки: номер в кружке, название, подсказка. */
 function Step({
+  n,
   title,
   hint,
   children,
 }: {
+  n: number;
   title: string;
   hint?: string;
   children: React.ReactNode;
 }) {
   return (
     <section>
-      <h2 className="font-serif text-lg">{title}</h2>
-      {hint && <p className="mt-1 mb-3 text-sm text-[var(--text-muted)]">{hint}</p>}
-      <div className={hint ? '' : 'mt-3'}>{children}</div>
+      <h2 className="flex items-center gap-3 text-lg font-medium">
+        <span className="grid size-7 shrink-0 place-items-center rounded-full bg-[var(--accent-soft)] text-sm font-medium text-[var(--accent)]">
+          {n}
+        </span>
+        {title}
+      </h2>
+      {hint && <p className="mt-1 mb-3 pl-10 text-sm text-[var(--text-muted)]">{hint}</p>}
+      <div className={hint ? 'pl-10' : 'mt-3 pl-10'}>{children}</div>
     </section>
   );
 }

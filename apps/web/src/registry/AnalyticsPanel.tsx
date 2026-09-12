@@ -27,7 +27,7 @@ export function AnalyticsPanel({ filters, active }: { filters: RegistryFilters; 
   return (
     <div className="space-y-6">
       <section>
-        <h2 className="mb-3 font-serif text-lg">Проверки по QR-коду</h2>
+        <h2 className="mb-3 text-lg font-medium">Проверки по QR-коду</h2>
         <div className="rounded-2xl bg-[var(--accent-soft)] p-5">
           <p className="text-3xl text-[var(--accent)] tabular-nums">
             {data.verifications.total.toLocaleString('ru-RU')}
@@ -47,7 +47,7 @@ export function AnalyticsPanel({ filters, active }: { filters: RegistryFilters; 
       </section>
 
       <section>
-        <h2 className="mb-3 font-serif text-lg">Что произошло с документами</h2>
+        <h2 className="mb-3 text-lg font-medium">Что произошло с документами</h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Tile value={data.issued} label="Выпущено" />
           <Tile value={data.mail.sent} label="Отправлено письмом" />
@@ -75,12 +75,12 @@ function ByDocument({ documents }: { documents: RegistryAnalytics['documents'] }
 
   return (
     <section>
-      <h2 className="mb-3 font-serif text-lg">По материалам</h2>
+      <h2 className="mb-3 text-lg font-medium">По материалам</h2>
       <div className="space-y-2">
         {documents.map((doc) => (
           <div
             key={doc.documentId ?? 'none'}
-            className="rounded-xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]"
+            className="hairline rounded-xl p-4"
           >
             <div className="flex flex-wrap items-baseline gap-x-3">
               <span className="font-medium">{doc.title}</span>
@@ -120,7 +120,7 @@ function Tile({
     bad: 'text-[var(--danger)]',
   };
   return (
-    <div className="rounded-xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]">
+    <div className="hairline rounded-xl p-4">
       <p className={`text-2xl tabular-nums ${colors[tone]}`}>{value.toLocaleString('ru-RU')}</p>
       <p className="mt-1 text-xs text-[var(--text-muted)]">{label}</p>
     </div>

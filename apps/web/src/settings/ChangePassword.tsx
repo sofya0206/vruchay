@@ -23,7 +23,7 @@ export function ChangePassword() {
 
   return (
     <section>
-      <h2 className="font-serif text-xl">Пароль</h2>
+      <h2 className="text-lg font-medium">Пароль</h2>
       <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)]">
         Меняйте, если пароль кто-то узнал или вы вводили его на чужом компьютере.
       </p>

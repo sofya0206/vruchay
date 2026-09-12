@@ -75,7 +75,7 @@ export function DownloadDialog({
     >
       <div className="max-h-full w-full max-w-lg overflow-auto rounded-2xl bg-[var(--surface)]">
         <header className="flex items-center gap-3 border-b border-[var(--line)] px-5 py-3.5">
-          <h2 className="font-serif text-lg">
+          <h2 className="font-medium">
             Скачать документы: <span className="tabular">{count}</span>
           </h2>
           <button

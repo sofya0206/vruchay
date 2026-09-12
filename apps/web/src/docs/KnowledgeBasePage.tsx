@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, Bot, Check, Copy, FileText, Search } from 'lucide-react';
+import { Input } from '../ui/Field';
 import { Meta } from '../seo/Meta';
 import { Button } from '../ui/Button';
 import { renderDoc } from './markdown';
@@ -36,7 +37,8 @@ function matches(page: DocPage, query: string): boolean {
     .includes(needle);
 }
 
-export function KnowledgeBasePage() {
+/** `embedded` — внутри оболочки кабинета: без своей шапки, колонка липнет под шапку кабинета. */
+export function KnowledgeBasePage({ embedded = false }: { embedded?: boolean }) {
   const params = useParams();
   const slug = params['*']?.replace(/\/$/, '') || HOME_SLUG;
   const [query, setQuery] = useState('');
@@ -90,6 +92,7 @@ export function KnowledgeBasePage() {
       />
 
       <div className="min-h-full bg-[var(--ground)]">
+        {!embedded && (
         <header className="border-b border-[var(--line)] bg-[var(--surface)]">
           <div className="mx-auto flex max-w-6xl items-center gap-3 px-6 py-3">
             <Link
@@ -105,20 +108,29 @@ export function KnowledgeBasePage() {
             </Link>
           </div>
         </header>
+        )}
 
-        <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-8 md:flex-row">
-          <nav className="w-full shrink-0 md:sticky md:top-8 md:max-h-[calc(100vh-6rem)] md:w-64 md:overflow-y-auto">
+        <div
+          className={`flex max-w-6xl flex-col gap-8 px-6 py-8 md:flex-row ${embedded ? '' : 'mx-auto'}`}
+        >
+          <nav
+            className={`w-full shrink-0 md:sticky md:w-64 md:overflow-y-auto ${
+              embedded
+                ? 'md:top-[calc(var(--app-header)+2rem)] md:max-h-[calc(100vh-var(--app-header)-4rem)]'
+                : 'md:top-8 md:max-h-[calc(100vh-6rem)]'
+            }`}
+          >
             <label className="relative mb-4 block">
               <Search
                 size={15}
                 className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-[var(--text-muted)]"
               />
-              <input
+              <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Поиск по адресу или названию"
                 aria-label="Поиск по документации"
-                className="w-full rounded-lg border border-[var(--line-strong)] bg-[var(--surface)] py-2 pr-3 pl-9 text-sm outline-none focus:border-[var(--focus)]"
+                className="py-2 pl-9 text-sm"
               />
             </label>
 
@@ -139,7 +151,7 @@ export function KnowledgeBasePage() {
                         <Link
                           to={`${BASE_PATH}/${item.slug}`}
                           aria-current={active ? 'page' : undefined}
-                          className={`block rounded-md px-2 py-1 text-sm ${
+                          className={`block rounded-lg px-3 py-1.5 text-sm ${
                             active
                               ? 'bg-[var(--accent-soft)] font-medium text-[var(--accent)]'
                               : 'text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]'
@@ -162,8 +174,8 @@ export function KnowledgeBasePage() {
 
           <main className="min-w-0 flex-1">
             {page?.slug === HOME_SLUG && (
-              <section className="mb-8 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-5">
-                <h2 className="mb-1 flex items-center gap-2 font-serif text-lg">
+              <section className="card mb-8 p-5">
+                <h2 className="mb-1 flex items-center gap-2 text-lg font-medium">
                   <Bot size={18} className="text-[var(--accent)]" />
                   Отдайте это своему ИИ
                 </h2>
@@ -172,7 +184,7 @@ export function KnowledgeBasePage() {
                   вставьте свой токен и приложите таблицу — помощник настроит выпуск сам.
                 </p>
 
-                <pre className="mb-4 max-h-56 overflow-auto rounded-xl border border-[var(--line)] bg-[var(--surface-sunken)] p-4 text-[0.8125rem] leading-relaxed whitespace-pre-wrap">
+                <pre className="mb-4 max-h-56 overflow-auto rounded-xl bg-[var(--surface-sunken)] p-4 text-[0.8125rem] leading-relaxed whitespace-pre-wrap">
                   <code className="font-mono">{integrationPrompt()}</code>
                 </pre>
 

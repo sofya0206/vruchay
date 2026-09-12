@@ -13,7 +13,8 @@ import {
 } from '../api/awards';
 import type { RuleSetPayload } from '../api/awards';
 import { Button } from '../ui/Button';
-import { Input, Label, Select } from '../ui/Field';
+import { Input, Label } from '../ui/Field';
+import { Select } from '../ui/Select';
 import { Loading } from '../ui/Loading';
 import { RuleCard } from './RuleCard';
 import { PreviewPanel } from './PreviewPanel';
@@ -149,15 +150,13 @@ export function RulesTab({ documentId, ruleSetId }: Props) {
               <Label>Колонка группы</Label>
               <Select
                 value={draft.groupColumn}
-                onChange={(e) => patch({ groupColumn: e.target.value })}
-              >
-                <option value="">весь протокол — одна группа</option>
-                {columns.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </Select>
+                onChange={(groupColumn) => patch({ groupColumn })}
+                aria-label="Колонка группы"
+                options={[
+                  { value: '', label: 'весь протокол — одна группа' },
+                  ...columns.map((c) => ({ value: c, label: c })),
+                ]}
+              />
               <p className="mt-1 text-xs text-[var(--text-muted)]">
                 По ней ищутся повторы получателя и, если у условия взведено «внутри группы»,
                 пересчитывается место.
@@ -168,15 +167,13 @@ export function RulesTab({ documentId, ruleSetId }: Props) {
               <Label>Колонка статуса</Label>
               <Select
                 value={draft.statusColumn}
-                onChange={(e) => patch({ statusColumn: e.target.value })}
-              >
-                <option value="">статусов нет</option>
-                {columns.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </Select>
+                onChange={(statusColumn) => patch({ statusColumn })}
+                aria-label="Колонка статуса"
+                options={[
+                  { value: '', label: 'статусов нет' },
+                  ...columns.map((c) => ({ value: c, label: c })),
+                ]}
+              />
               <p className="mt-1 text-xs text-[var(--text-muted)]">
                 DSQ, DNS, «снят» — по ней работает правило «не выдавать».
               </p>
@@ -270,7 +267,7 @@ function StartScreen({
   return (
     <div className="mx-auto max-w-2xl space-y-5 p-8">
       <div>
-        <h2 className="font-serif text-xl">Правила награждения</h2>
+        <h2 className="text-lg font-medium">Правила награждения</h2>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
           «Первое место — диплом победителя, снятым ничего, остальным грамота участника». Набор
           сохраняется и переиспользуется на следующем соревновании.

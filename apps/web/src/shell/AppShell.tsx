@@ -1,87 +1,126 @@
+import { useEffect, useState, type CSSProperties } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { InstallHint } from '../ui/InstallHint';
 import { AccountMenu } from './AccountMenu';
+import { Brand } from './Brand';
 import { BurgerMenu } from './BurgerMenu';
-import { TopNav } from './TopNav';
+import { SideNav } from './SideNav';
+
+/** Ширина колонки разделов: с подписями и рейкой из одних иконок. */
+const SIDEBAR_W = '240px';
+const SIDEBAR_RAIL_W = '64px';
+
+const SIDEBAR_KEY = 'vruchay:sidebar';
+
+function storedCollapsed(): boolean {
+  try {
+    return localStorage.getItem(SIDEBAR_KEY) === 'collapsed';
+  } catch {
+    return false;
+  }
+}
+
+/** Материал и его письмо: листу нужна вся ширина, колонка сама сжимается в рейку. */
+function isMaterial(pathname: string): boolean {
+  return /^\/(documents|mailing)\/[^/]+/.test(pathname);
+}
 
 /**
- * Оболочка кабинета: полоса разделов сверху — на каждом экране кабинета.
+ * Оболочка кабинета: шапка сверху, колонка разделов слева — на каждом экране.
  *
- * Слева знак и пять разделов, справа — учётная запись, под которой
- * лежит служебное. Слово «Главная» ушло: по нему не было видно,
- * что за ним меню, — теперь меню и есть полоса, а на главную ведёт знак,
- * как везде. Отдельной стрелки «Назад» в разделах нет: полоса и знак и
- * есть дорога куда угодно, а стрелка рядом с ними была третьим способом
- * попасть туда же. Набрано в полный рост: знак 44 пункта, слово — 24,
- * высота из `--app-header` — под шапкой приклеены колонки разделов, и
- * они отсчитывают своё место от неё.
+ * Стрелки «назад» нет: дорога назад у каждой страницы своя и подписана —
+ * путь в заголовке вложенного экрана, ссылка на список, колонка слева.
+ * Безымянная стрелка по истории браузера дублировала кнопку самого
+ * браузера и ела строку на каждом экране.
  *
- * Материал — лист, список, письмо — живёт без полосы: макету нужен весь
- * экран. Выход оттуда — стрелка в рамке материала, она ведёт в документы.
+ * Высоту редактору и рабочему месту письма даёт обёртка `Outlet`: ровно
+ * окно минус шапка, чтобы лист получил всё, что осталось, и не появился
+ * лишний скролл. Страницы длиннее окна из обёртки просто выступают —
+ * прокручивает их само окно, и липкие колонки разделов продолжают
+ * считать своё место от шапки.
  */
 export function AppShell() {
   const { pathname } = useLocation();
-  // Материал — это /documents/<id> и /mailing/<id>. Архив живёт по
-  // /documents/archive и материалом не является: у него, как у любого
-  // раздела, должна быть полоса.
-  const inMaterial = /^\/(documents|mailing)\/(?!archive(\/|$))[^/]+/.test(pathname);
+
+  /*
+   * Колонка разделов: человек сворачивает её сам, и это запоминается.
+   * В материале она свёрнута всегда, но развернуть на время можно —
+   * такой временный выбор в хранилище не пишем, иначе, выйдя из
+   * редактора, человек нашёл бы колонку не в том виде, в каком оставил.
+   */
+  const [stored, setStored] = useState(storedCollapsed);
+  const [override, setOverride] = useState<boolean | null>(null);
+  useEffect(() => setOverride(null), [pathname]);
+
+  const forced = isMaterial(pathname);
+  const collapsed = override ?? (forced || stored);
+
+  function toggleSidebar() {
+    if (forced) {
+      setOverride(!collapsed);
+      return;
+    }
+    const next = !stored;
+    setStored(next);
+    try {
+      localStorage.setItem(SIDEBAR_KEY, next ? 'collapsed' : 'open');
+    } catch {
+      // Приватное окно: колонка не запомнится, и только.
+    }
+  }
 
   return (
-    <div className="flex min-h-full flex-col">
-      {!inMaterial && (
-        <header className="sticky top-0 z-20 shrink-0 border-b border-[var(--line)] bg-[var(--surface)]">
-          {/* Во всю ширину окна, а не колонкой по центру: шапка — рама экрана.
-              Минус пиксель — нижняя линия, она входит в ту же высоту. */}
-          <div className="flex h-[calc(var(--app-header)-1px)] items-center gap-3 px-3 sm:px-5">
-            {/* Бургер — только на узком экране, где полосы нет. */}
-            <BurgerMenu />
+    <div
+      className="flex min-h-full flex-col"
+      style={{ '--sidebar-w': collapsed ? SIDEBAR_RAIL_W : SIDEBAR_W } as CSSProperties}
+    >
+      <header className="sticky top-0 z-20 shrink-0 border-b border-[var(--line)] bg-[var(--surface)]">
+        {/* Во всю ширину окна, а не колонкой по центру: шапка — рама экрана.
+            Минус пиксель — нижняя линия, она входит в ту же высоту. */}
+        <div className="flex h-[calc(var(--app-header)-1px)] items-center gap-3 px-3 sm:px-5">
+          {/* Бургер — только на узком экране, где колонки нет. */}
+          <BurgerMenu />
 
-            <Link
-              to="/"
-              aria-label="На главную"
-              className="-mx-2 inline-flex items-center gap-3 rounded-xl px-2 py-1.5 transition-colors hover:bg-[var(--surface-sunken)]"
-            >
-              <span
-                aria-hidden
-                className="inline-flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-[var(--accent)] ring-4 ring-[var(--accent-soft)]"
-              >
-                {/* Медаль залита, а не обведена: тот же знак, что на заставке. */}
-                <svg width="26" height="26" viewBox="0 0 24 24" fill="#ffffff">
-                  <circle cx="12" cy="9.5" r="4.3" />
-                  <path d="M9.2 13.7 7.9 20.5 12 18.2l4.1 2.3-1.3-6.8L12 15.1Z" />
-                </svg>
-              </span>
-              <span className="text-2xl font-medium">Вручай</span>
-            </Link>
+          <Link
+            to="/"
+            aria-label="На главную"
+            className="-mx-2 inline-flex items-center gap-3 rounded-xl px-2 py-1.5 transition-colors hover:bg-[var(--surface-sunken)]"
+          >
+            <Brand size={40} />
+            <span className="text-2xl font-medium">Вручай</span>
+          </Link>
 
-            {/* Полоса скрыта на узком экране: пять подписей туда не входят. */}
-            <div className="ml-3 hidden md:block">
-              <TopNav />
-            </div>
-
-            <div className="ml-auto">
-              <AccountMenu />
-            </div>
+          <div className="ml-auto flex items-center gap-1">
+            <AccountMenu />
           </div>
-        </header>
-      )}
+        </div>
+      </header>
 
-      {/* Высота обёртки — окно минус шапка: редактор (h-full) получает всё,
-          что осталось, а страницы длиннее окна просто выступают наружу —
-          прокручивает их окно, и липкие колонки разделов считают своё
-          место от шапки. */}
-      <div
-        className={
-          inMaterial
-            ? 'flex h-dvh shrink-0 flex-col'
-            : 'flex h-[calc(100dvh-var(--app-header))] shrink-0 flex-col'
-        }
-      >
-        <Outlet />
+      <div className="flex flex-1">
+        <SideNav collapsed={collapsed} onToggle={toggleSidebar} />
+
+        {/* `min-w-0` обязателен: лента вкладок редактора, холст и таблица
+            реестра прокручиваются внутри себя, а без него они распирали бы
+            колонку и вместе с ней всю страницу вбок.
+
+            Высота — `min-h`, а не `h`: с жёсткой высотой эта строка (и вместе
+            с ней колонка разделов) обрывалась ровно на одном экране, а более
+            длинная страница просто рисовалась поверх обрыва. Тогда `sticky`
+            внутри колонки разделов упирался в потолок этой обрубленной рамки
+            и переставал липнуть, как только страница прокручивалась дальше
+            первого экрана, — колонка «уезжала». `min-h` держит экран как
+            минимум, но растёт вместе с содержимым, и колонка разделов
+            растягивается вровень с ним на всю длину страницы.
+
+            Страницам с фиксированной высотой — редактору листа и рабочему
+            месту материала — при этом константа не нужна отсюда: у них есть
+            свой собственный `h-[calc(100dvh-var(--app-header))]` в корне. */}
+        <div className="flex min-h-[calc(100dvh-var(--app-header))] min-w-0 flex-1 flex-col">
+          <Outlet />
+        </div>
       </div>
 
       <InstallHint />
     </div>
   );
 }
-

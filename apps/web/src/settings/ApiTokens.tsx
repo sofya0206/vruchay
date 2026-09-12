@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Check, Copy, KeyRound, Plus, TriangleAlert, X } from 'lucide-react';
 import { useTokens, useTokenMutations, type ApiTokenInfo, type TokenRole } from '../api/tokens';
 import { Button } from '../ui/Button';
-import { Input, Label, Select } from '../ui/Field';
+import { Input, Label } from '../ui/Field';
+import { Select } from '../ui/Select';
 
 const ROLE_TITLE: Record<TokenRole, string> = {
   member: 'Выпускать документы',
@@ -26,12 +27,14 @@ export function ApiTokens() {
     <section>
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 font-serif text-xl"
+        className="flex items-center gap-2 text-lg font-medium"
         aria-expanded={open}
       >
-        <KeyRound size={18} className="text-[var(--text-muted)]" />
+        <KeyRound size={18} className="text-[var(--accent)]" />
         Доступ для программ
-        <span className="text-sm text-[var(--text-muted)]">{open ? 'скрыть' : 'показать'}</span>
+        <span className="rounded-full bg-[var(--surface-sunken)] px-2 py-0.5 text-xs font-normal text-[var(--text-muted)]">
+          {open ? 'скрыть' : 'показать'}
+        </span>
       </button>
       <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)]">
         Нужно, только если вы подключаете сервис к своей программе или сайту. Для обычной работы
@@ -83,10 +86,14 @@ function NewToken() {
       </div>
       <div>
         <Label>Права</Label>
-        <Select value={role} onChange={(e) => setRole(e.target.value as TokenRole)}>
-          <option value="member">{ROLE_TITLE.member}</option>
-          <option value="admin">{ROLE_TITLE.admin}</option>
-        </Select>
+        <Select
+          value={role}
+          onChange={setRole}
+          options={[
+            { value: 'member' as TokenRole, label: ROLE_TITLE.member },
+            { value: 'admin' as TokenRole, label: ROLE_TITLE.admin },
+          ]}
+        />
       </div>
       <Button
         type="submit"

@@ -8,7 +8,6 @@ import {
   useRegistryAnalytics,
   type FileState,
 } from '../api/registry';
-import { StateChip } from '../registry/StateChip';
 import {
   formatDate,
   mailLabel,
@@ -17,7 +16,7 @@ import {
   stateTone,
 } from '../registry/registry-format';
 import { cn } from '../ui/cn';
-import { Input } from '../ui/Field';
+import { Input, StatusChip } from '../ui/Field';
 import { Card, Empty } from './Block';
 
 const LAST_SHOWN = 6;
@@ -212,10 +211,10 @@ export function RegistryBlock() {
                     </span>
                   </td>
                   <td className="px-3 py-2.5">
-                    <StateChip tone={mailTone(row.mail?.status)}>{mailLabel(row.mail?.status)}</StateChip>
+                    <StatusChip tone={mailTone(row.mail?.status)}>{mailLabel(row.mail?.status)}</StatusChip>
                   </td>
                   <td className="px-3 py-2.5">
-                    <StateChip tone={stateTone(row)}>{stateLabel(row)}</StateChip>
+                    <StatusChip tone={stateTone(row)}>{stateLabel(row)}</StatusChip>
                   </td>
                   <td className="px-4 py-2.5 text-right tabular-nums">{row.verifyCount}</td>
                 </tr>

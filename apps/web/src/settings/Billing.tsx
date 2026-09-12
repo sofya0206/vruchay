@@ -3,7 +3,8 @@ import { Check, ReceiptText } from 'lucide-react';
 import { useBilling, useUpdateBilling, type BillingKind, type BillingPatch } from '../api/org';
 import { ApiError } from '../api/client';
 import { Button } from '../ui/Button';
-import { Input, Label, Select } from '../ui/Field';
+import { Input, Label } from '../ui/Field';
+import { Select } from '../ui/Select';
 import { formatDate } from './preferences';
 
 const KINDS: { value: BillingKind; title: string }[] = [
@@ -76,7 +77,7 @@ export function Billing() {
 
   return (
     <section>
-      <h2 className="flex items-center gap-2 font-serif text-xl">
+      <h2 className="flex items-center gap-2 text-lg font-medium">
         <ReceiptText size={18} className="text-[var(--accent)]" />
         Реквизиты
       </h2>
@@ -104,13 +105,11 @@ export function Billing() {
       >
         <div>
           <Label>Кто платит</Label>
-          <Select value={form.kind} onChange={(e) => set({ kind: e.target.value as BillingKind })}>
-            {KINDS.map((k) => (
-              <option key={k.value} value={k.value}>
-                {k.title}
-              </option>
-            ))}
-          </Select>
+          <Select
+            value={form.kind}
+            onChange={(kind) => set({ kind })}
+            options={KINDS.map((k) => ({ value: k.value, label: k.title }))}
+          />
         </div>
 
         <div>
