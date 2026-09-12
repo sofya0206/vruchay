@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
-import { Link } from 'react-router-dom';
-import { CheckCheck } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ArrowLeft, CheckCheck } from 'lucide-react';
 import { MATERIAL_TABS, materialTabPath, workspacePath, type MaterialTab } from '../mailing/workspace-tabs';
 import { MenuBar, type MenuDef } from './MenuBar';
 
@@ -47,9 +47,26 @@ export function DocumentChrome({
    */
   action?: ReactNode;
 }) {
+  const navigate = useNavigate();
+
   return (
     <header className="shrink-0 border-b border-[var(--line)] bg-[var(--surface)]">
       <div className="flex h-11 items-center gap-1 border-b border-[var(--line)] px-2">
+        {/* Назад — здесь, в строке материала, а не отдельной строкой под
+            шапкой кабинета: та строка над лентой вкладок стояла пустой
+            и только отнимала высоту у листа. Шаг по своим следам, как
+            и везде в кабинете; Esc тут не назначен — в редакторе у него
+            своя работа. */}
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          title="Назад"
+          aria-label="Назад"
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
+        >
+          <ArrowLeft size={19} />
+        </button>
+
         {/* Название — коротко и с подсказкой: в ряду с шестью вкладками
             крупному заголовку места нет, а материал всё равно надо назвать. */}
         <h1 className="min-w-0 max-w-[26ch] shrink truncate px-1 text-sm font-medium" title={title}>

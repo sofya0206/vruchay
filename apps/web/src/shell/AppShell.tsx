@@ -32,16 +32,18 @@ export function AppShell() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
 
-  // На главной возвращаться некуда: шаг назад оттуда — уже наружу кабинета.
-  const canGoBack = pathname !== '/';
-
   /*
-   * В материале у Escape своя работа: снять выделение блока, выйти из
-   * правки текста, закрыть панель. Лист делает это без preventDefault,
-   * и общий «Esc — назад» уводил бы со страницы посреди правки. Там
-   * назад — только стрелкой.
+   * Материал — лист, список, письмо — рисует стрелку «Назад» сам, в своей
+   * строке рядом с названием: отдельная строка над лентой вкладок стояла
+   * пустой и отнимала высоту у листа. И Escape там не назначен: в
+   * редакторе он снимает выделение блока без preventDefault, и общий
+   * «Esc — назад» уводил бы со страницы посреди правки.
    */
-  const escGoesBack = canGoBack && !/^\/(documents|mailing)\/[^/]+/.test(pathname);
+  const inMaterial = /^\/(documents|mailing)\/[^/]+/.test(pathname);
+
+  // На главной возвращаться некуда: шаг назад оттуда — уже наружу кабинета.
+  const canGoBack = pathname !== '/' && !inMaterial;
+  const escGoesBack = canGoBack;
 
   /*
    * Escape — шаг назад по своим следам, то же, что стрелка под шапкой.
@@ -128,7 +130,7 @@ export function AppShell() {
           <button
             type="button"
             onClick={() => navigate(-1)}
-            title={escGoesBack ? 'Назад (Esc)' : 'Назад'}
+            title="Назад (Esc)"
             aria-label="Назад"
             className="grid h-11 w-11 place-items-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
           >
