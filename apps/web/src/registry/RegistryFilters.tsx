@@ -1,5 +1,6 @@
 import { Search, X } from 'lucide-react';
 import { Input, Label } from '../ui/Field';
+import { DateField } from '../ui/DateField';
 import { Select } from '../ui/Select';
 import { Button } from '../ui/Button';
 import type { RegistryFacets, RegistryFilters as Filters } from '../api/registry';
@@ -140,15 +141,27 @@ export function RegistryFilters({ value, facets, onChange, onReset }: Props) {
           />
         </div>
 
-        <label className="block">
+        <div className="block">
           <Label>Выдан с</Label>
-          <Input type="date" value={value.from} onChange={(e) => set('from', e.target.value)} />
-        </label>
+          <DateField
+            value={value.from}
+            onChange={(from) => set('from', from)}
+            max={value.to || undefined}
+            aria-label="Выдан с"
+            placeholder="Любая дата"
+          />
+        </div>
 
-        <label className="block">
+        <div className="block">
           <Label>по</Label>
-          <Input type="date" value={value.to} onChange={(e) => set('to', e.target.value)} />
-        </label>
+          <DateField
+            value={value.to}
+            onChange={(to) => set('to', to)}
+            min={value.from || undefined}
+            aria-label="Выдан по"
+            placeholder="Любая дата"
+          />
+        </div>
       </div>
 
       {(active || value.search) && (

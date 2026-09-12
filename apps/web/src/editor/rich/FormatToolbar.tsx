@@ -21,6 +21,8 @@ import {
 import { isSafeHrefTemplate, type TextProps } from '@gramota/shared';
 import type { FieldInfo } from '../fields';
 import { FONTS, WEIGHTS } from '../fonts-list';
+import { ColorPicker } from '../../ui/ColorPicker';
+import { NumberField } from '../../ui/NumberField';
 import { Select } from '../../ui/Select';
 
 /**
@@ -102,16 +104,16 @@ export function FormatToolbar({
         className="h-8 w-auto rounded-md bg-transparent px-1 py-0 text-sm"
       />
 
-      <input
+      <NumberField
         aria-label="Кегль, pt"
-        type="number"
         min={4}
         max={200}
         step={0.5}
         placeholder={String(base.fontSize)}
         value={(state.style.fontSize as number | undefined) ?? ''}
-        onChange={(e) => setStyle({ fontSize: e.target.value ? Number(e.target.value) : null })}
-        className="tabular h-8 w-16 rounded-md bg-transparent px-1 text-sm ring-1 ring-[var(--line)]"
+        onChange={(raw) => setStyle({ fontSize: raw ? Number(raw) : null })}
+        compact
+        className="w-16"
       />
 
       <Select
@@ -150,21 +152,17 @@ export function FormatToolbar({
         <Subscript size={15} />
       </Tool>
 
-      <input
-        aria-label="Цвет текста"
-        type="color"
+      <ColorPicker
+        compact
+        label="Цвет текста"
         value={(state.style.color as string) ?? base.color}
-        onChange={(e) => setStyle({ color: e.target.value })}
-        className="h-8 w-8 cursor-pointer rounded-md bg-transparent"
-        title="Цвет текста"
+        onChange={(color) => setStyle({ color })}
       />
-      <input
-        aria-label="Цвет подложки"
-        type="color"
+      <ColorPicker
+        compact
+        label="Цвет подложки"
         value={(state.style.background as string) ?? '#ffffff'}
-        onChange={(e) => setStyle({ background: e.target.value })}
-        className="h-8 w-8 cursor-pointer rounded-md bg-transparent"
-        title="Подложка под буквами"
+        onChange={(background) => setStyle({ background })}
       />
 
       <span className="mx-0.5 h-6 w-px bg-[var(--line)]" />
@@ -223,19 +221,16 @@ export function FormatToolbar({
         className="h-8 w-auto rounded-md bg-transparent px-1 py-0 text-sm"
       />
 
-      <input
+      <NumberField
         aria-label="Разрядка, pt"
-        type="number"
         min={-5}
         max={30}
         step={0.25}
         placeholder="разрядка"
         value={(state.style.letterSpacing as number | undefined) ?? ''}
-        onChange={(e) =>
-          setStyle({ letterSpacing: e.target.value ? Number(e.target.value) : null })
-        }
-        className="tabular h-8 w-20 rounded-md bg-transparent px-1 text-sm ring-1 ring-[var(--line)]"
-        title="Межбуквенное расстояние"
+        onChange={(raw) => setStyle({ letterSpacing: raw ? Number(raw) : null })}
+        compact
+        className="w-20"
       />
 
       <Tool

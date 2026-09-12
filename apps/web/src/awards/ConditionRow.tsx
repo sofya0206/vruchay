@@ -4,6 +4,7 @@ import type { AwardCondition, AwardOp, AwardStatus } from '@gramota/shared';
 import { AWARD_STATUSES, AWARD_STATUS_TITLES } from '@gramota/shared';
 import { Checkbox } from '../ui/Checkbox';
 import { Input } from '../ui/Field';
+import { NumberField } from '../ui/NumberField';
 import { Select } from '../ui/Select';
 import { blankCondition, GENERAL_OPS, OP_TITLES, PLACE_OPS, STATUS_OPS } from './condition-labels';
 
@@ -118,13 +119,12 @@ function ConditionValue({
     case 'placeEquals':
       return (
         <Sized width="w-24">
-          <Input
-            type="number"
+          <NumberField
             min={1}
             max={300}
             aria-label="Место"
             value={condition.value}
-            onChange={(e) => onChange({ ...condition, value: clampPlace(e.target.value) })}
+            onChange={(raw) => onChange({ ...condition, value: clampPlace(raw) })}
           />
         </Sized>
       );
@@ -134,32 +134,30 @@ function ConditionValue({
         <div className="flex items-center gap-2">
           <span className="text-sm text-[var(--text-muted)]">с</span>
           <Sized width="w-20">
-            <Input
-              type="number"
+            <NumberField
               min={1}
               max={300}
               aria-label="Место от"
               value={condition.value.from}
-              onChange={(e) =>
+              onChange={(raw) =>
                 onChange({
                   ...condition,
-                  value: { ...condition.value, from: clampPlace(e.target.value) },
+                  value: { ...condition.value, from: clampPlace(raw) },
                 })
               }
             />
           </Sized>
           <span className="text-sm text-[var(--text-muted)]">по</span>
           <Sized width="w-20">
-            <Input
-              type="number"
+            <NumberField
               min={1}
               max={300}
               aria-label="Место до"
               value={condition.value.to}
-              onChange={(e) =>
+              onChange={(raw) =>
                 onChange({
                   ...condition,
-                  value: { ...condition.value, to: clampPlace(e.target.value) },
+                  value: { ...condition.value, to: clampPlace(raw) },
                 })
               }
             />

@@ -6,6 +6,7 @@ import type { DocumentDetail } from '../api/types';
 import { Button } from '../ui/Button';
 import { Radio } from '../ui/Checkbox';
 import { Input, Label } from '../ui/Field';
+import { DateField } from '../ui/DateField';
 import { Select } from '../ui/Select';
 
 /**
@@ -153,7 +154,7 @@ export function VerifyPanel({ doc }: { doc: DocumentDetail }) {
           {mode === 'date' && (
             <div className="space-y-2 pl-6">
               <Label>Действителен до</Label>
-              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              <DateField value={date} onChange={setDate} aria-label="Действителен до" />
             </div>
           )}
 

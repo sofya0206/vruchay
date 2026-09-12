@@ -29,6 +29,7 @@ export function NumberField({
   step = 1,
   placeholder,
   disabled,
+  compact,
   className,
   ...rest
 }: {
@@ -39,6 +40,8 @@ export function NumberField({
   step?: number;
   placeholder?: string;
   disabled?: boolean;
+  /** Ростом в строку панели оформления и без своей подложки. */
+  compact?: boolean;
   className?: string;
   'aria-label'?: string;
 }) {
@@ -74,12 +77,14 @@ export function NumberField({
           e.preventDefault();
           nudge(e.key === 'ArrowUp' ? 1 : -1);
         }}
-        className={
-          'tabular w-full rounded-lg bg-[var(--surface)] py-2 pr-7 pl-3 text-[var(--text)] ' +
-          'ring-1 ring-[var(--line)] transition-colors outline-none ' +
-          'placeholder:text-[var(--text-muted)] focus:ring-2 focus:ring-[var(--focus)] ' +
-          'disabled:opacity-40'
-        }
+        className={cn(
+          'tabular w-full rounded-lg text-[var(--text)] ring-1 ring-[var(--line)]',
+          'transition-colors outline-none placeholder:text-[var(--text-muted)]',
+          'focus:ring-2 focus:ring-[var(--focus)] disabled:opacity-40',
+          compact
+            ? 'h-8 bg-transparent py-0 pr-6 pl-2 text-sm'
+            : 'bg-[var(--surface)] py-2 pr-7 pl-3',
+        )}
       />
       <span
         aria-hidden

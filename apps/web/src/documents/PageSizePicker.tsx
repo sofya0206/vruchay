@@ -1,5 +1,6 @@
 import { PAGE_FORMATS, matchFormat, orientationOf, rotate } from '@gramota/shared';
-import { Input, Label } from '../ui/Field';
+import { Label } from '../ui/Field';
+import { NumberField } from '../ui/NumberField';
 import { Select } from '../ui/Select';
 
 export interface PageSizeValue {
@@ -74,22 +75,20 @@ export function PageSizePicker({
         <>
           <div className="w-28">
             <Label>Ширина, мм</Label>
-            <Input
-              type="number"
+            <NumberField
               min={50}
               max={600}
               value={Math.round(value.widthMm)}
-              onChange={(e) => onChange({ ...value, widthMm: clamp(e.target.value, value.widthMm) })}
+              onChange={(raw) => onChange({ ...value, widthMm: clamp(raw, value.widthMm) })}
             />
           </div>
           <div className="w-28">
             <Label>Высота, мм</Label>
-            <Input
-              type="number"
+            <NumberField
               min={50}
               max={600}
               value={Math.round(value.heightMm)}
-              onChange={(e) => onChange({ ...value, heightMm: clamp(e.target.value, value.heightMm) })}
+              onChange={(raw) => onChange({ ...value, heightMm: clamp(raw, value.heightMm) })}
             />
           </div>
         </>

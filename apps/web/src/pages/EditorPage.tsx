@@ -1208,7 +1208,8 @@ export function EditorPage() {
           value={Math.round(zoom * 100)}
           onChange={(e) => setZoom(clamp(Number(e.target.value) / 100, 0.25, 4))}
           aria-label="Масштаб"
-          className="w-24 accent-[var(--accent)]"
+          // Дорожка и бегунок покрашены в index.css: accent-color при appearance:none уже ничего не делает.
+          className="w-24"
         />
         <button
           type="button"
