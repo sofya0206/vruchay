@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Check, Copy, KeyRound, Plus, TriangleAlert, X } from 'lucide-react';
 import { useTokens, useTokenMutations, type ApiTokenInfo, type TokenRole } from '../api/tokens';
 import { Button } from '../ui/Button';
-import { Input, Label, Select } from '../ui/Field';
+import { Input, Label } from '../ui/Field';
+import { Select } from '../ui/Select';
 
 const ROLE_TITLE: Record<TokenRole, string> = {
   member: 'Выпускать документы',
@@ -83,10 +84,14 @@ function NewToken() {
       </div>
       <div>
         <Label>Права</Label>
-        <Select value={role} onChange={(e) => setRole(e.target.value as TokenRole)}>
-          <option value="member">{ROLE_TITLE.member}</option>
-          <option value="admin">{ROLE_TITLE.admin}</option>
-        </Select>
+        <Select
+          value={role}
+          onChange={setRole}
+          options={[
+            { value: 'member' as TokenRole, label: ROLE_TITLE.member },
+            { value: 'admin' as TokenRole, label: ROLE_TITLE.admin },
+          ]}
+        />
       </div>
       <Button
         type="submit"

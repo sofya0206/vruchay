@@ -6,7 +6,8 @@ import { api } from '../api/client';
 import type { DocumentList, DocumentSummary } from '../api/types';
 import { Button } from '../ui/Button';
 import { Checkbox, Radio } from '../ui/Checkbox';
-import { Input, Select } from '../ui/Field';
+import { Input } from '../ui/Field';
+import { Select } from '../ui/Select';
 import { Loading } from '../ui/Loading';
 import { LetterCard } from './LetterCard';
 import { MailingLogTable } from './MailingLogTable';
@@ -220,31 +221,23 @@ export function MailingPage() {
               <div className="ml-auto flex flex-wrap items-center gap-3">
                 <Select
                   value={documentId}
-                  onChange={(e) => setDocumentId(e.target.value)}
+                  onChange={setDocumentId}
+                  options={[
+                    { value: '', label: 'Все материалы' },
+                    ...items.map((doc) => ({ value: doc.id, label: doc.title })),
+                  ]}
                   aria-label="Материал"
                   className="w-52 py-1 text-sm"
-                >
-                  <option value="">Все материалы</option>
-                  {items.map((doc) => (
-                    <option key={doc.id} value={doc.id}>
-                      {doc.title}
-                    </option>
-                  ))}
-                </Select>
+                />
                 <label className="flex items-center gap-2 text-[var(--text-muted)]">
                   <CalendarRange size={15} />
                   <Select
                     value={period}
-                    onChange={(e) => setPeriod(e.target.value as MailPeriod)}
+                    onChange={setPeriod}
+                    options={MAIL_PERIODS.map((o) => ({ value: o.id, label: o.label }))}
                     aria-label="Отрезок времени"
                     className="w-32 py-1 text-sm"
-                  >
-                    {MAIL_PERIODS.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </Select>
+                  />
                 </label>
               </div>
             </>

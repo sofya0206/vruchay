@@ -1,5 +1,6 @@
 import { Search, X } from 'lucide-react';
-import { Input, Label, Select } from '../ui/Field';
+import { Input, Label } from '../ui/Field';
+import { Select } from '../ui/Select';
 import { Button } from '../ui/Button';
 import type { RegistryFacets, RegistryFilters as Filters } from '../api/registry';
 
@@ -74,56 +75,70 @@ export function RegistryFilters({ value, facets, onChange, onReset }: Props) {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <label className="block">
+        {/* Обёртка перестала быть label: подпись к кнопке-списку
+            привязывается через aria-label, а <Label> рисует её глазу. */}
+        <div className="block">
           <Label>Материал</Label>
-          <Select value={value.documentId} onChange={(e) => set('documentId', e.target.value)}>
-            <option value="">Любой</option>
-            {documentOptions(facets, value.documentId).map((doc) => (
-              <option key={doc.id} value={doc.id}>
-                {doc.label}
-              </option>
-            ))}
-          </Select>
-        </label>
+          <Select
+            value={value.documentId}
+            onChange={(id) => set('documentId', id)}
+            aria-label="Материал"
+            options={[
+              { value: '', label: 'Любой' },
+              ...documentOptions(facets, value.documentId).map((doc) => ({
+                value: doc.id,
+                label: doc.label,
+              })),
+            ]}
+          />
+        </div>
 
-        <label className="block">
+        <div className="block">
           <Label>Мероприятие</Label>
-          <Select value={value.event} onChange={(e) => set('event', e.target.value)}>
-            <option value="">Любое</option>
-            {facets?.events.map((event) => (
-              <option key={event} value={event}>
-                {event}
-              </option>
-            ))}
-          </Select>
-        </label>
+          <Select
+            value={value.event}
+            onChange={(event) => set('event', event)}
+            aria-label="Мероприятие"
+            options={[
+              { value: '', label: 'Любое' },
+              ...(facets?.events ?? []).map((event) => ({ value: event, label: event })),
+            ]}
+          />
+        </div>
 
-        <label className="block">
+        <div className="block">
           <Label>Состояние</Label>
           <Select
             value={value.state}
-            onChange={(e) => set('state', e.target.value as Filters['state'])}
-          >
-            <option value="">Любое</option>
-            <option value="valid">Действителен</option>
-            <option value="replaced">Заменён</option>
-            <option value="expired">Срок истёк</option>
-            <option value="revoked">Отозван</option>
-          </Select>
-        </label>
+            onChange={(state) => set('state', state)}
+            aria-label="Состояние"
+            options={[
+              { value: '' as Filters['state'], label: 'Любое' },
+              { value: 'valid' as Filters['state'], label: 'Действителен' },
+              { value: 'replaced' as Filters['state'], label: 'Заменён' },
+              { value: 'expired' as Filters['state'], label: 'Срок истёк' },
+              { value: 'revoked' as Filters['state'], label: 'Отозван' },
+            ]}
+          />
+        </div>
 
-        <label className="block">
+        <div className="block">
           <Label>Письмо</Label>
-          <Select value={value.mail} onChange={(e) => set('mail', e.target.value)}>
-            <option value="">Любое</option>
-            <option value="none">Не отправлялось</option>
-            <option value="sent">Отправлено</option>
-            <option value="delivered">Доставлено</option>
-            <option value="opened">Прочитано</option>
-            <option value="bounced">Не доставлено</option>
-            <option value="failed">Ошибка отправки</option>
-          </Select>
-        </label>
+          <Select
+            value={value.mail}
+            onChange={(mail) => set('mail', mail)}
+            aria-label="Письмо"
+            options={[
+              { value: '', label: 'Любое' },
+              { value: 'none', label: 'Не отправлялось' },
+              { value: 'sent', label: 'Отправлено' },
+              { value: 'delivered', label: 'Доставлено' },
+              { value: 'opened', label: 'Прочитано' },
+              { value: 'bounced', label: 'Не доставлено' },
+              { value: 'failed', label: 'Ошибка отправки' },
+            ]}
+          />
+        </div>
 
         <label className="block">
           <Label>Выдан с</Label>

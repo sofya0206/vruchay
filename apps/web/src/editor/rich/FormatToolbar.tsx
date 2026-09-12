@@ -21,6 +21,7 @@ import {
 import { isSafeHrefTemplate, type TextProps } from '@gramota/shared';
 import type { FieldInfo } from '../fields';
 import { FONTS, WEIGHTS } from '../fonts-list';
+import { Select } from '../../ui/Select';
 
 /**
  * Панель оформления над правящимся блоком.
@@ -90,19 +91,16 @@ export function FormatToolbar({
       style={{ left: Math.max(8, rect.left), top }}
       onPointerDown={(e) => e.preventDefault()}
     >
-      <select
+      <Select
         aria-label="Гарнитура"
         value={(state.style.fontFamily as string) ?? ''}
-        onChange={(e) => setStyle({ fontFamily: e.target.value || null })}
-        className="h-8 rounded-md bg-transparent px-1 text-sm ring-1 ring-[var(--line)]"
-      >
-        <option value="">Как у блока ({base.fontFamily})</option>
-        {FONTS.map((f) => (
-          <option key={f} value={f}>
-            {f}
-          </option>
-        ))}
-      </select>
+        onChange={(fontFamily) => setStyle({ fontFamily: fontFamily || null })}
+        options={[
+          { value: '', label: `Как у блока (${base.fontFamily})` },
+          ...FONTS.map((f) => ({ value: f, label: f })),
+        ]}
+        className="h-8 w-auto rounded-md bg-transparent px-1 py-0 text-sm"
+      />
 
       <input
         aria-label="Кегль, pt"
@@ -116,19 +114,14 @@ export function FormatToolbar({
         className="tabular h-8 w-16 rounded-md bg-transparent px-1 text-sm ring-1 ring-[var(--line)]"
       />
 
-      <select
+      <Select
         aria-label="Насыщенность"
-        value={(state.style.fontWeight as number | undefined) ?? ''}
-        onChange={(e) => setStyle({ fontWeight: e.target.value ? Number(e.target.value) : null })}
-        className="h-8 rounded-md bg-transparent px-1 text-sm ring-1 ring-[var(--line)]"
-      >
-        <option value="">Вес</option>
-        {WEIGHTS.map((w) => (
-          <option key={w} value={w}>
-            {w}
-          </option>
-        ))}
-      </select>
+        value={String(state.style.fontWeight ?? '')}
+        onChange={(weight) => setStyle({ fontWeight: weight ? Number(weight) : null })}
+        placeholder="Вес"
+        options={WEIGHTS.map((w) => ({ value: String(w), label: String(w) }))}
+        className="h-8 w-auto rounded-md bg-transparent px-1 py-0 text-sm"
+      />
 
       <Tool active={state.bold} title="Полужирный (Ctrl+B)" onClick={() => toggle('bold')}>
         <Bold size={15} />
@@ -217,17 +210,18 @@ export function FormatToolbar({
 
       <span className="mx-0.5 h-6 w-px bg-[var(--line)]" />
 
-      <select
+      <Select
         aria-label="Регистр"
         value={(state.style.transform as string) ?? ''}
-        onChange={(e) => setStyle({ transform: e.target.value || null })}
-        className="h-8 rounded-md bg-transparent px-1 text-sm ring-1 ring-[var(--line)]"
-      >
-        <option value="">Регистр</option>
-        <option value="uppercase">ПРОПИСНЫЕ</option>
-        <option value="lowercase">строчные</option>
-        <option value="smallcaps">Капитель</option>
-      </select>
+        onChange={(transform) => setStyle({ transform: transform || null })}
+        placeholder="Регистр"
+        options={[
+          { value: 'uppercase', label: 'ПРОПИСНЫЕ' },
+          { value: 'lowercase', label: 'строчные' },
+          { value: 'smallcaps', label: 'Капитель' },
+        ]}
+        className="h-8 w-auto rounded-md bg-transparent px-1 py-0 text-sm"
+      />
 
       <input
         aria-label="Разрядка, pt"

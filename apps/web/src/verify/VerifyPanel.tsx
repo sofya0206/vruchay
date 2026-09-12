@@ -5,7 +5,8 @@ import { api } from '../api/client';
 import type { DocumentDetail } from '../api/types';
 import { Button } from '../ui/Button';
 import { Radio } from '../ui/Checkbox';
-import { Input, Label, Select } from '../ui/Field';
+import { Input, Label } from '../ui/Field';
+import { Select } from '../ui/Select';
 
 /**
  * Готовые сроки: то, что просят чаще всего. Своя длительность — рядом
@@ -128,13 +129,11 @@ export function VerifyPanel({ doc }: { doc: DocumentDetail }) {
           {mode === 'duration' && (
             <div className="space-y-2 pl-6">
               <Label>Срок</Label>
-              <Select value={preset} onChange={(e) => setPreset(e.target.value)}>
-                {PRESETS.map((p) => (
-                  <option key={p.value} value={p.value}>
-                    {p.label}
-                  </option>
-                ))}
-              </Select>
+              <Select
+                value={preset}
+                onChange={setPreset}
+                options={PRESETS.map((p) => ({ value: p.value, label: p.label }))}
+              />
               {preset === 'custom' && (
                 <>
                   <Input

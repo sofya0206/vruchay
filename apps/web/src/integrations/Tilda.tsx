@@ -7,7 +7,8 @@ import type { DocumentList } from '../api/types';
 import { api } from '../api/client';
 import { Button } from '../ui/Button';
 import { Radio as UiRadio } from '../ui/Checkbox';
-import { Input, Label, Select, Toggle } from '../ui/Field';
+import { Input, Label, Toggle } from '../ui/Field';
+import { Select } from '../ui/Select';
 import { BareInput, Card, FieldCard } from './ui';
 import { EmbedCode } from './EmbedCode';
 import { TildaGuide } from './TildaGuide';
@@ -141,14 +142,15 @@ function CreateForm({
         </div>
         <div>
           <Label>Документ</Label>
-          <Select value={documentId} onChange={(e) => setDocumentId(e.target.value)}>
-            <option value="">Выберите документ</option>
-            {documents.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.title}
-              </option>
-            ))}
-          </Select>
+          <Select
+            value={documentId}
+            onChange={setDocumentId}
+            aria-label="Документ"
+            options={[
+              { value: '', label: 'Выберите документ' },
+              ...documents.map((d) => ({ value: d.id, label: d.title })),
+            ]}
+          />
         </div>
         <div className="sm:col-span-2">
           <Label>Домены, с которых принимаем заявки</Label>
@@ -400,22 +402,19 @@ function IntegrationBlock({
           <Select
             value=""
             disabled={busy}
-            onChange={(e) => {
-              const id = e.target.value;
+            aria-label="Добавить документ"
+            onChange={(id) => {
               if (id && !integration.documentIds.includes(id)) {
                 save.mutate({ documentIds: [...integration.documentIds, id] });
               }
             }}
-          >
-            <option value="">Выберите документ</option>
-            {documents
-              .filter((d) => !integration.documentIds.includes(d.id))
-              .map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.title}
-                </option>
-              ))}
-          </Select>
+            options={[
+              { value: '', label: 'Выберите документ' },
+              ...documents
+                .filter((d) => !integration.documentIds.includes(d.id))
+                .map((d) => ({ value: d.id, label: d.title })),
+            ]}
+          />
         </div>
       </Card>
 

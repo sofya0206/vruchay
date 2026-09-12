@@ -3,7 +3,8 @@ import { X } from 'lucide-react';
 import type { AwardCondition, AwardOp, AwardStatus } from '@gramota/shared';
 import { AWARD_STATUSES, AWARD_STATUS_TITLES } from '@gramota/shared';
 import { Checkbox } from '../ui/Checkbox';
-import { Input, Select } from '../ui/Field';
+import { Input } from '../ui/Field';
+import { Select } from '../ui/Select';
 import { blankCondition, GENERAL_OPS, OP_TITLES, PLACE_OPS, STATUS_OPS } from './condition-labels';
 
 interface Props {
@@ -16,10 +17,12 @@ interface Props {
 }
 
 /**
- * Ширину задаём обёрткой, а не классом на самом поле: у Input и Select
- * из ui/Field в базовых классах есть w-full, и он выигрывает у переданного
- * w-40 независимо от порядка в атрибуте. Поле растягивалось на всю строку,
- * и условие переставало читаться одной фразой.
+ * Ширину задаём обёрткой, а не классом на самом поле.
+ *
+ * Раньше причина была в Tailwind: базовый w-full поля выигрывал у любого
+ * переданного w-40, и условие растягивалось на всю строку. Эту часть давно
+ * закрыл twMerge в ui/cn. Обёртка осталась ради shrink-0: строка условия
+ * переносится по словам, и без него поля сжимались бы до нечитаемых.
  */
 function Sized({ width, children }: { width: string; children: ReactNode }) {
   return <div className={`${width} shrink-0`}>{children}</div>;
@@ -43,47 +46,30 @@ export function ConditionRow({ condition, columns, hasGroupColumn, onChange, onR
         <Select
           aria-label="Колонка"
           value={condition.field}
-          onChange={(e) => onChange({ ...condition, field: e.target.value })}
-        >
-          {!columns.includes(condition.field) && (
-            <option value={condition.field}>{condition.field} — нет в таблице</option>
-          )}
-          {columns.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </Select>
+          onChange={(field) => onChange({ ...condition, field })}
+          options={[
+            /* Колонки в файле могло не стать, а условие на неё осталось.
+               Показываем её отдельной строкой: молчаливый сброс на первую
+               переписал бы само правило, и человек бы этого не увидел. */
+            ...(columns.includes(condition.field)
+              ? []
+              : [{ value: condition.field, label: `${condition.field} — нет в таблице` }]),
+            ...columns.map((c) => ({ value: c, label: c })),
+          ]}
+        />
       </Sized>
 
       <Sized width="w-48">
         <Select
           aria-label="Условие"
           value={condition.op}
-          onChange={(e) => setOp(e.target.value as AwardOp)}
-        >
-          <optgroup label="Место">
-            {PLACE_OPS.map((op) => (
-              <option key={op} value={op}>
-                {OP_TITLES[op]}
-              </option>
-            ))}
-          </optgroup>
-          <optgroup label="Статус">
-            {STATUS_OPS.map((op) => (
-              <option key={op} value={op}>
-                {OP_TITLES[op]}
-              </option>
-            ))}
-          </optgroup>
-          <optgroup label="Значение">
-            {GENERAL_OPS.map((op) => (
-              <option key={op} value={op}>
-                {OP_TITLES[op]}
-              </option>
-            ))}
-          </optgroup>
-        </Select>
+          onChange={setOp}
+          options={[
+            ...PLACE_OPS.map((op) => ({ value: op, label: OP_TITLES[op], group: 'Место' })),
+            ...STATUS_OPS.map((op) => ({ value: op, label: OP_TITLES[op], group: 'Статус' })),
+            ...GENERAL_OPS.map((op) => ({ value: op, label: OP_TITLES[op], group: 'Значение' })),
+          ]}
+        />
       </Sized>
 
       <ConditionValue condition={condition} onChange={onChange} />

@@ -1,5 +1,6 @@
 import { PAGE_FORMATS, matchFormat, orientationOf, rotate } from '@gramota/shared';
-import { Input, Label, Select } from '../ui/Field';
+import { Input, Label } from '../ui/Field';
+import { Select } from '../ui/Select';
 
 export interface PageSizeValue {
   widthMm: number;
@@ -41,25 +42,32 @@ export function PageSizePicker({
     <div className="flex flex-wrap items-end gap-3">
       <div className="min-w-32">
         <Label>Формат</Label>
-        <Select value={custom ? 'custom' : format.id} onChange={(e) => pickFormat(e.target.value)}>
-          {PAGE_FORMATS.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.label} · {f.widthMm}×{f.heightMm} мм
-            </option>
-          ))}
-          <option value="custom">Свой размер</option>
-        </Select>
+        <Select
+          value={custom ? 'custom' : format.id}
+          onChange={pickFormat}
+          aria-label="Формат"
+          options={[
+            ...PAGE_FORMATS.map((f) => ({
+              value: f.id,
+              label: f.label,
+              hint: `${f.widthMm}×${f.heightMm} мм`,
+            })),
+            { value: 'custom', label: 'Свой размер' },
+          ]}
+        />
       </div>
 
       <div className="min-w-36">
         <Label>Ориентация</Label>
         <Select
           value={orientation}
-          onChange={(e) => onChange(rotate(value, e.target.value as 'portrait' | 'landscape'))}
-        >
-          <option value="landscape">Альбомная</option>
-          <option value="portrait">Книжная</option>
-        </Select>
+          onChange={(next) => onChange(rotate(value, next))}
+          aria-label="Ориентация"
+          options={[
+            { value: 'landscape' as const, label: 'Альбомная' },
+            { value: 'portrait' as const, label: 'Книжная' },
+          ]}
+        />
       </div>
 
       {custom && (

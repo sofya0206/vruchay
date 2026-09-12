@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Check, Code2, Copy } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { Select } from '../ui/Select';
 
 export type Platform = 'tilda' | 'wordpress' | 'bitrix' | 'html';
 
@@ -184,18 +185,13 @@ export function EmbedCode({
       </div>
 
       {documentIds.length > 1 && (
-        <select
+        <Select
           value={documentId}
-          onChange={(e) => setDocumentId(e.target.value)}
+          onChange={setDocumentId}
           aria-label="Какой документ выдавать"
-          className="mt-2.5 w-full rounded-lg bg-[var(--surface)] px-3 py-2 ring-1 ring-[var(--line)]"
-        >
-          {documentIds.map((id) => (
-            <option key={id} value={id}>
-              {titles.get(id) ?? id}
-            </option>
-          ))}
-        </select>
+          className="mt-2.5"
+          options={documentIds.map((id) => ({ value: id, label: titles.get(id) ?? id }))}
+        />
       )}
 
       <p className="mt-2.5">{WHERE[platform]}</p>

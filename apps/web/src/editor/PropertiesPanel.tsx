@@ -33,7 +33,8 @@ import { FONTS } from './fonts-list';
 import { MIXED, commonTextProps, commonValue, type AlignKind } from './selection';
 import type { Box } from './geometry';
 import { Button } from '../ui/Button';
-import { Input, Label, Select } from '../ui/Field';
+import { Input, Label } from '../ui/Field';
+import { Select } from '../ui/Select';
 
 interface Props {
   /** Выбранные блоки: ни одного, один или несколько. */
@@ -335,17 +336,20 @@ function TextSection({
         отдельные слова оформляются на листе, панелью над блоком.
       </p>
 
-      <label className="block">
+      <div className="block">
         <Label>Шрифт</Label>
-        <Select value={str('fontFamily')} onChange={(e) => onChange({ fontFamily: e.target.value })}>
-          {p.fontFamily === MIXED && <option value="">{MIXED_PLACEHOLDER}</option>}
-          {FONTS.map((f) => (
-            <option key={f} value={f}>
-              {f}
-            </option>
-          ))}
-        </Select>
-      </label>
+        <Select
+          value={str('fontFamily')}
+          onChange={(fontFamily) => onChange({ fontFamily })}
+          aria-label="Шрифт"
+          options={[
+            /* Выделено несколько блоков с разными шрифтами — первой строкой
+               «Смешанное»: показать шрифт первого значило бы соврать. */
+            ...(p.fontFamily === MIXED ? [{ value: '', label: MIXED_PLACEHOLDER }] : []),
+            ...FONTS.map((f) => ({ value: f, label: f })),
+          ]}
+        />
+      </div>
 
       <div className="grid grid-cols-2 gap-2">
         <label className="block">

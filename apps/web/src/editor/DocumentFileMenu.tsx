@@ -14,7 +14,8 @@ import { api } from '../api/client';
 import { useFolders } from '../api/folders';
 import type { DocumentDetail } from '../api/types';
 import { Button } from '../ui/Button';
-import { Input, Label, Select } from '../ui/Field';
+import { Input, Label } from '../ui/Field';
+import { Select } from '../ui/Select';
 import { Dialog } from '../mailing/Dialog';
 import type { MenuEntry } from './MenuBar';
 
@@ -190,14 +191,14 @@ export function useDocumentFileMenu(doc: DocumentDetail | undefined): {
           }
         >
           <Label>Папка</Label>
-          <Select value={folderId} onChange={(e) => setFolderId(e.target.value)}>
-            <option value="">Вне папок</option>
-            {(folders.data ?? []).map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name}
-              </option>
-            ))}
-          </Select>
+          <Select
+            value={folderId}
+            onChange={setFolderId}
+            options={[
+              { value: '', label: 'Вне папок' },
+              ...(folders.data ?? []).map((f) => ({ value: f.id, label: f.name })),
+            ]}
+          />
           {move.isError && (
             <p role="alert" className="mt-2 text-sm text-[var(--danger)]">
               {(move.error as Error).message}
