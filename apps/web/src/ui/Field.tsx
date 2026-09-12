@@ -1,4 +1,4 @@
-import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
+import type { InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react';
 import { cn } from './cn';
 
 const control =
@@ -21,10 +21,6 @@ export function Input({ className = '', ...rest }: InputHTMLAttributes<HTMLInput
 
 export function Textarea({ className = '', ...rest }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <textarea className={cn(control, className)} {...rest} />;
-}
-
-export function Select({ className = '', ...rest }: SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select className={cn(control, className)} {...rest} />;
 }
 
 export type ChipTone = 'neutral' | 'progress' | 'done' | 'warn' | 'error';

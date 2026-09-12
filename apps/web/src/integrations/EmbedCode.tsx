@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Check, Code2, Copy } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { Select } from '../ui/Field';
 import { Tabs } from '../ui/Tabs';
+import { Select } from '../ui/Select';
 
 export type Platform = 'tilda' | 'wordpress' | 'bitrix' | 'html';
 
@@ -126,7 +126,7 @@ export function embedCode(
 /**
  * Код для вставки с выбором площадки.
  *
- * Площадка выбирается кнопками, а не выпадающим списком: вариантов
+ * Площадка выбирается вкладками, а не выпадающим списком: вариантов
  * четыре, и все они должны быть видны сразу — человеку не приходится
  * догадываться, что его площадка вообще поддерживается.
  */
@@ -178,16 +178,11 @@ export function EmbedCode({
       {documentIds.length > 1 && (
         <Select
           value={documentId}
-          onChange={(e) => setDocumentId(e.target.value)}
+          onChange={setDocumentId}
           aria-label="Какой документ выдавать"
           className="mt-2.5"
-        >
-          {documentIds.map((id) => (
-            <option key={id} value={id}>
-              {titles.get(id) ?? id}
-            </option>
-          ))}
-        </Select>
+          options={documentIds.map((id) => ({ value: id, label: titles.get(id) ?? id }))}
+        />
       )}
 
       <p className="mt-2.5">{WHERE[platform]}</p>

@@ -5,8 +5,9 @@ import { CalendarRange, ChevronRight, RefreshCw, Search, Send } from 'lucide-rea
 import { api } from '../api/client';
 import type { DocumentList, DocumentSummary } from '../api/types';
 import { Button } from '../ui/Button';
-import { Input, Select, Textarea } from '../ui/Field';
-import { Checkbox } from '../ui/Checkbox';
+import { Input, Textarea } from '../ui/Field';
+import { Checkbox, Radio } from '../ui/Checkbox';
+import { Select } from '../ui/Select';
 import { IconButton } from '../ui/IconButton';
 import { EmptyState } from '../ui/EmptyState';
 import { SectionTitle } from '../ui/SectionLayout';
@@ -207,31 +208,23 @@ export function MailingPage() {
               <div className="ml-auto flex flex-wrap items-center gap-3">
                 <Select
                   value={documentId}
-                  onChange={(e) => setDocumentId(e.target.value)}
+                  onChange={setDocumentId}
+                  options={[
+                    { value: '', label: 'Все материалы' },
+                    ...items.map((doc) => ({ value: doc.id, label: doc.title })),
+                  ]}
                   aria-label="Материал"
                   className="w-52 py-1 text-sm"
-                >
-                  <option value="">Все материалы</option>
-                  {items.map((doc) => (
-                    <option key={doc.id} value={doc.id}>
-                      {doc.title}
-                    </option>
-                  ))}
-                </Select>
+                />
                 <label className="flex items-center gap-2 text-[var(--text-muted)]">
                   <CalendarRange size={15} />
                   <Select
                     value={period}
-                    onChange={(e) => setPeriod(e.target.value as MailPeriod)}
+                    onChange={setPeriod}
+                    options={MAIL_PERIODS.map((o) => ({ value: o.id, label: o.label }))}
                     aria-label="Отрезок времени"
                     className="w-32 py-1 text-sm"
-                  >
-                    {MAIL_PERIODS.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </Select>
+                  />
                 </label>
               </div>
             </>
@@ -498,8 +491,7 @@ function KindPicker({
           }`}
         >
           <span className="flex items-center gap-2 font-medium">
-            <input
-              type="radio"
+            <Radio
               name="letter-kind"
               checked={kind === option.id}
               onChange={() => onChange(option.id)}
@@ -527,8 +519,7 @@ function RecipientsPicker({
   return (
     <div className="space-y-3">
       <label className="flex items-start gap-3">
-        <input
-          type="radio"
+        <Radio
           name="recipient-source"
           checked={source === 'table'}
           onChange={() => onSource('table')}
@@ -543,8 +534,7 @@ function RecipientsPicker({
       </label>
 
       <label className="flex items-start gap-3">
-        <input
-          type="radio"
+        <Radio
           name="recipient-source"
           checked={source === 'manual'}
           onChange={() => onSource('manual')}

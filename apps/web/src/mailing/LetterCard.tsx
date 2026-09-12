@@ -10,6 +10,7 @@ import { Input, Label } from '../ui/Field';
 import { toHtml, toText, wrapSelection } from '../mail/email-body';
 import { TriplePreview } from './TriplePreview';
 import { useMailingTemplate, useSaveTemplate, useTestSend, type Audience, type LetterKind } from './api';
+import { Checkbox } from '../ui/Checkbox';
 
 /** Что уйдёт участнику, если письмо не настраивали. */
 const DEFAULTS: Record<LetterKind, { subject: string; body: string }> = {
@@ -211,12 +212,7 @@ export function LetterCard({
         )}
 
         <label className="flex items-start gap-3 text-sm">
-          <input
-            type="checkbox"
-            checked={attach}
-            onChange={(e) => setAttach(e.target.checked)}
-            className="mt-0.5"
-          />
+          <Checkbox checked={attach} onChange={setAttach} className="mt-0.5" />
           <span>
             <span className="flex items-center gap-1.5 font-medium">
               <Paperclip size={14} /> Прикладывать документ к письму

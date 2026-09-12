@@ -2,7 +2,9 @@ import type { ReactNode } from 'react';
 import { ArrowDown, ArrowUp, Ban, Copy, FileText, Plus, Trash2, X } from 'lucide-react';
 import type { AwardOutput, AwardRule } from '@gramota/shared';
 import { Button } from '../ui/Button';
-import { Input, Select } from '../ui/Field';
+import { Checkbox } from '../ui/Checkbox';
+import { Input } from '../ui/Field';
+import { Select } from '../ui/Select';
 import type { AwardTemplate } from '../api/awards';
 import { ConditionRow } from './ConditionRow';
 import { blankCondition, describeCondition } from './condition-labels';
@@ -86,14 +88,12 @@ export function RuleCard({
           </span>
         )}
 
-        <label className="ml-auto flex items-center gap-1.5 text-sm text-[var(--text-muted)]">
-          <input
-            type="checkbox"
-            checked={rule.enabled}
-            onChange={(e) => onChange({ ...rule, enabled: e.target.checked })}
-          />
-          включено
-        </label>
+        <Checkbox
+          checked={rule.enabled}
+          onChange={(enabled) => onChange({ ...rule, enabled })}
+          label="включено"
+          className="ml-auto items-center text-[var(--text-muted)]"
+        />
 
         <div className="flex items-center">
           <button
@@ -131,12 +131,13 @@ export function RuleCard({
                 <Select
                   aria-label="Как соединять условия"
                   value={rule.match}
-                  onChange={(e) => onChange({ ...rule, match: e.target.value as 'all' | 'any' })}
+                  onChange={(match) => onChange({ ...rule, match })}
+                  options={[
+                    { value: 'all' as const, label: 'выполнены все условия' },
+                    { value: 'any' as const, label: 'выполнено хотя бы одно' },
+                  ]}
                   className="py-1 text-xs normal-case"
-                >
-                  <option value="all">выполнены все условия</option>
-                  <option value="any">выполнено хотя бы одно</option>
-                </Select>
+                />
               </Sized>
             )}
           </div>
@@ -186,20 +187,21 @@ export function RuleCard({
               <Select
                 aria-label="Что делать"
                 value={rule.action}
-                onChange={(e) =>
+                onChange={(action) =>
                   onChange({
                     ...rule,
-                    action: e.target.value as 'issue' | 'skip',
+                    action,
                     // У правила «не выдавать» выходов не бывает: оставленные
                     // списком, они выглядели бы как обещание документа.
-                    outputs: e.target.value === 'skip' ? [] : rule.outputs,
+                    outputs: action === 'skip' ? [] : rule.outputs,
                   })
                 }
+                options={[
+                  { value: 'issue' as const, label: 'выдать документы' },
+                  { value: 'skip' as const, label: 'не выдавать ничего' },
+                ]}
                 className="py-1 text-sm"
-              >
-                <option value="issue">выдать документы</option>
-                <option value="skip">не выдавать ничего</option>
-              </Select>
+              />
             </Sized>
           </div>
 
@@ -218,15 +220,12 @@ export function RuleCard({
                     <Select
                       aria-label="Шаблон"
                       value={output.templateDocumentId}
-                      onChange={(e) => setOutput(i, { templateDocumentId: e.target.value })}
-                    >
-                      <option value="">— выберите шаблон —</option>
-                      {templates.map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.title}
-                        </option>
-                      ))}
-                    </Select>
+                      onChange={(templateDocumentId) => setOutput(i, { templateDocumentId })}
+                      options={[
+                        { value: '', label: '— выберите шаблон —' },
+                        ...templates.map((t) => ({ value: t.id, label: t.title })),
+                      ]}
+                    />
                   </Sized>
 
                   <span className="text-sm text-[var(--text-muted)]">кому:</span>
@@ -234,21 +233,18 @@ export function RuleCard({
                     <Select
                       aria-label="Получатель"
                       value={output.subjectColumn}
-                      onChange={(e) =>
+                      onChange={(subjectColumn) =>
                         setOutput(i, {
-                          subjectColumn: e.target.value,
+                          subjectColumn,
                           // Дедупликация имеет смысл только у получателя из колонки.
-                          dedupeScope: e.target.value ? output.dedupeScope : 'all',
+                          dedupeScope: subjectColumn ? output.dedupeScope : 'all',
                         })
                       }
-                    >
-                      <option value="">участнику</option>
-                      {columns.map((c) => (
-                        <option key={c} value={c}>
-                          по колонке «{c}»
-                        </option>
-                      ))}
-                    </Select>
+                      options={[
+                        { value: '', label: 'участнику' },
+                        ...columns.map((c) => ({ value: c, label: `по колонке «${c}»` })),
+                      ]}
+                    />
                   </Sized>
 
                   {output.subjectColumn && (
@@ -256,16 +252,17 @@ export function RuleCard({
                       <Select
                         aria-label="Область дедупликации"
                         value={output.dedupeScope}
-                        onChange={(e) =>
-                          setOutput(i, { dedupeScope: e.target.value as 'all' | 'group' })
-                        }
+                        onChange={(dedupeScope) => setOutput(i, { dedupeScope })}
+                        options={[
+                          { value: 'all' as const, label: 'один на весь протокол' },
+                          {
+                            value: 'group' as const,
+                            label: 'один на каждую группу',
+                            disabled: !hasGroupColumn,
+                          },
+                        ]}
                         title="Одному тренеру — один документ, даже если у него пять призёров"
-                      >
-                        <option value="all">один на весь протокол</option>
-                        <option value="group" disabled={!hasGroupColumn}>
-                          один на каждую группу
-                        </option>
-                      </Select>
+                      />
                     </Sized>
                   )}
 

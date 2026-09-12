@@ -3,8 +3,9 @@ import { Check, Mail, Trash2, UserPlus } from 'lucide-react';
 import { useTeam, useTeamMutations, type TeamMember, type TeamRole } from '../api/team';
 import { useMe } from '../auth/useAuth';
 import { Button } from '../ui/Button';
-import { Input, Label, Select } from '../ui/Field';
+import { Input, Label } from '../ui/Field';
 import { ConfirmDialog } from '../ui/Dialog';
+import { Select } from '../ui/Select';
 
 /** Понятные названия ролей: слово «роль» человеку ничего не говорит. */
 const ROLE_TITLE: Record<TeamRole, string> = {
@@ -141,14 +142,18 @@ function MemberRow({
 
       {canManage ? (
         <Select
-          value={member.role}
-          onChange={(e) => onRole(e.target.value as 'admin' | 'member')}
+          /* Владелец сюда не доходит: canManage выше гасит и его строку,
+             и свою собственную. Роли «владелец» в списке нет намеренно —
+             её не выдают и не снимают. */
+          value={member.role as 'admin' | 'member'}
+          onChange={onRole}
+          options={[
+            { value: 'member' as const, label: ROLE_TITLE.member },
+            { value: 'admin' as const, label: ROLE_TITLE.admin },
+          ]}
           className="w-44"
           aria-label={`Права: ${member.name || member.email}`}
-        >
-          <option value="member">{ROLE_TITLE.member}</option>
-          <option value="admin">{ROLE_TITLE.admin}</option>
-        </Select>
+        />
       ) : (
         <span className="text-sm text-[var(--text-muted)]">{ROLE_TITLE[member.role]}</span>
       )}
@@ -230,10 +235,14 @@ function InviteForm({
 
       <div>
         <Label>Что он сможет делать</Label>
-        <Select value={role} onChange={(e) => setRole(e.target.value as 'admin' | 'member')}>
-          <option value="member">{ROLE_TITLE.member}</option>
-          <option value="admin">{ROLE_TITLE.admin}</option>
-        </Select>
+        <Select
+          value={role}
+          onChange={setRole}
+          options={[
+            { value: 'member' as const, label: ROLE_TITLE.member },
+            { value: 'admin' as const, label: ROLE_TITLE.admin },
+          ]}
+        />
         <p className="mt-1.5 text-sm text-[var(--text-muted)]">{ROLE_HINT[role]}</p>
       </div>
 

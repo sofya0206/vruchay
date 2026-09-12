@@ -1,4 +1,4 @@
-import { Select } from '../ui/Field';
+import { Select } from '../ui/Select';
 
 export type LibrarySort = 'updated' | 'created' | 'title';
 
@@ -30,16 +30,11 @@ export function LibrarySortSelect({
       <span className="sr-only sm:not-sr-only">Порядок</span>
       <Select
         value={sort}
-        onChange={(e) => onSort(e.target.value as LibrarySort)}
+        onChange={onSort}
+        options={SORTS.map((s) => ({ value: s.id, label: s.title }))}
         aria-label="Порядок в библиотеке"
         className="w-48 py-1 text-sm"
-      >
-        {SORTS.map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.title}
-          </option>
-        ))}
-      </Select>
+      />
     </label>
   );
 }

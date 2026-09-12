@@ -40,8 +40,9 @@ import { DocumentChrome, ToolButton, ToolDivider } from '../editor/DocumentChrom
 import { useDocumentFileMenu } from '../editor/DocumentFileMenu';
 import { SheetTabs } from '../editor/SheetTabs';
 import type { MenuEntry } from '../editor/DocumentChrome';
-import { Select, StatusChip } from '../ui/Field';
+import { StatusChip } from '../ui/Field';
 import { IconButton } from '../ui/IconButton';
+import { Select } from '../ui/Select';
 import { api } from '../api/client';
 import { useOrgProfile } from '../api/org';
 import { useRecipients } from '../api/recipients';
@@ -1102,31 +1103,29 @@ export function EditorPage() {
       <ToolDivider />
 
       {/* Масштаб — одним списком, как в любом редакторе: «вписать» и
-          круглые проценты. Текущее значение стоит в закрытом списке;
-          Ctrl+колёсико по-прежнему меняет масштаб плавно. */}
+          круглые проценты. Текущее значение — подпись закрытой кнопки,
+          в сам список не входит: список — не состояние, а команды. */}
       <Select
         aria-label="Масштаб"
         title="Масштаб. Ещё: Ctrl+колёсико — масштаб, пробел — перетаскивание холста"
         value=""
-        onChange={(e) => {
-          const v = e.target.value;
+        placeholder={`${Math.round(zoom * 100)}%`}
+        onChange={(v) => {
           if (v === 'fit' || v === 'width' || v === 'height' || v === 'actual') zoomTo(v);
-          else if (v) setZoom(clamp(Number(v) / 100, 0.25, 4));
+          else setZoom(clamp(Number(v) / 100, 0.25, 4));
         }}
+        options={[
+          { value: 'fit', label: 'Вписать в окно' },
+          { value: 'width', label: 'По ширине' },
+          { value: 'height', label: 'По высоте' },
+          { value: '50', label: '50%' },
+          { value: '75', label: '75%' },
+          { value: 'actual', label: '100%' },
+          { value: '150', label: '150%' },
+          { value: '200', label: '200%' },
+        ]}
         className="tabular h-8 w-auto py-0 pr-7 pl-2 text-sm"
-      >
-        <option value="" hidden>
-          {Math.round(zoom * 100)}%
-        </option>
-        <option value="fit">Вписать в окно</option>
-        <option value="width">По ширине</option>
-        <option value="height">По высоте</option>
-        <option value="50">50%</option>
-        <option value="75">75%</option>
-        <option value="actual">100%</option>
-        <option value="150">150%</option>
-        <option value="200">200%</option>
-      </Select>
+      />
 
       <div className="ml-auto flex items-center gap-2">
         {/* Два взгляда на лист: заготовка с фишками полей и настоящая строка

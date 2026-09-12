@@ -8,7 +8,8 @@ import { TRASH_DAYS } from '@gramota/shared';
 import { api } from '../api/client';
 import type { DocumentDetail, DocumentList, DocumentSummary } from '../api/types';
 import { Button } from '../ui/Button';
-import { Input, Select } from '../ui/Field';
+import { Input } from '../ui/Field';
+import { Select } from '../ui/Select';
 import { DocumentCard } from '../documents/DocumentCard';
 import { PageSizePicker, type PageSizeValue } from '../documents/PageSizePicker';
 import { useFolders } from '../api/folders';
@@ -269,17 +270,14 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
             {(folders.data ?? []).length > 0 && (
               <Select
                 value={formFolderId}
-                onChange={(e) => setNewFolderId(e.target.value)}
+                onChange={setNewFolderId}
+                options={[
+                  { value: '', label: 'Вне папок' },
+                  ...(folders.data ?? []).map((f) => ({ value: f.id, label: f.name })),
+                ]}
                 aria-label="Папка нового материала"
                 className="w-56"
-              >
-                <option value="">Вне папок</option>
-                {(folders.data ?? []).map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.name}
-                  </option>
-                ))}
-              </Select>
+              />
             )}
             <Button
               type="submit"

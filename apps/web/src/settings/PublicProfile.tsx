@@ -9,6 +9,7 @@ import {
   type VerifyNameMode,
 } from '../api/org';
 import { Button } from '../ui/Button';
+import { Checkbox, Radio } from '../ui/Checkbox';
 import { Input, Label, Textarea } from '../ui/Field';
 
 /**
@@ -119,19 +120,14 @@ export function PublicProfile() {
           <Label>Кого показывать на странице проверки</Label>
           <div className="space-y-2">
             {NAME_MODES.map((mode) => (
-              <label key={mode.value} className="flex cursor-pointer items-start gap-2 text-sm">
-                <input
-                  type="radio"
-                  name="verify-name-mode"
-                  checked={form.verifyNameMode === mode.value}
-                  onChange={() => set('verifyNameMode', mode.value)}
-                  className="mt-0.5 accent-[var(--accent)]"
-                />
-                <span>
-                  {mode.label}
-                  <span className="block text-[var(--text-muted)]">{mode.hint}</span>
-                </span>
-              </label>
+              <Radio
+                key={mode.value}
+                name="verify-name-mode"
+                checked={form.verifyNameMode === mode.value}
+                onChange={() => set('verifyNameMode', mode.value)}
+                label={mode.label}
+                hint={mode.hint}
+              />
             ))}
           </div>
           <p className="mt-2 text-xs text-[var(--text-muted)]">
@@ -168,21 +164,12 @@ export function PublicProfile() {
         <hr className="border-[var(--line)]" />
 
         <div className="space-y-3">
-          <label className="flex cursor-pointer items-start gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={form.publicPageEnabled}
-              onChange={(e) => set('publicPageEnabled', e.target.checked)}
-              className="mt-0.5 accent-[var(--accent)]"
-            />
-            <span>
-              Публичная страница организации
-              <span className="block text-[var(--text-muted)]">
-                Логотип, описание, ИНН, список программ и поиск документа по номеру — то, что первым
-                спрашивают HR и приёмные комиссии.
-              </span>
-            </span>
-          </label>
+          <Checkbox
+            checked={form.publicPageEnabled}
+            onChange={(checked) => set('publicPageEnabled', checked)}
+            label="Публичная страница организации"
+            hint="Логотип, описание, ИНН, список программ и поиск документа по номеру — то, что первым спрашивают HR и приёмные комиссии."
+          />
 
           {form.publicPageEnabled && (
             <div className="space-y-4 pl-6">
@@ -274,52 +261,31 @@ export function PublicProfile() {
                 </div>
               </div>
 
-              <label className="flex cursor-pointer items-start gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={form.publicIndexable}
-                  onChange={(e) => set('publicIndexable', e.target.checked)}
-                  className="mt-0.5 accent-[var(--accent)]"
-                />
-                <span>
-                  Разрешить поисковикам индексировать страницу организации и страницы проверки
-                  <span className="block text-[var(--text-muted)]">
-                    Выключено — на всех страницах стоит noindex, и в поиске их нет.
-                  </span>
-                </span>
-              </label>
+              <Checkbox
+                checked={form.publicIndexable}
+                onChange={(checked) => set('publicIndexable', checked)}
+                label="Разрешить поисковикам индексировать страницу организации и страницы проверки"
+                hint="Выключено — на всех страницах стоит noindex, и в поиске их нет."
+              />
 
-              <label className="flex cursor-pointer items-start gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={form.publicSearchByName}
-                  onChange={(e) => {
-                    set('publicSearchByName', e.target.checked);
-                    if (!e.target.checked) setConsent(false);
-                  }}
-                  className="mt-0.5 accent-[var(--accent)]"
-                />
-                <span>
-                  Поиск документов по ФИО в публичном реестре
-                  <span className="block text-[var(--text-muted)]">
-                    Поиск по номеру документа есть всегда. Поиск по фамилии — распространение
-                    персональных данных (ст. 10.1 152-ФЗ): нужно отдельное согласие каждого
-                    участника, его собираете вы.
-                  </span>
-                </span>
-              </label>
+              <Checkbox
+                checked={form.publicSearchByName}
+                onChange={(checked) => {
+                  set('publicSearchByName', checked);
+                  if (!checked) setConsent(false);
+                }}
+                label="Поиск документов по ФИО в публичном реестре"
+                hint="Поиск по номеру документа есть всегда. Поиск по фамилии — распространение персональных данных (ст. 10.1 152-ФЗ): нужно отдельное согласие каждого участника, его собираете вы."
+              />
 
               {needsConsent && (
-                <label className="ml-6 flex cursor-pointer items-start gap-2 rounded-xl bg-[var(--award-soft)] p-3 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={consent}
-                    onChange={(e) => setConsent(e.target.checked)}
-                    className="mt-0.5 accent-[var(--accent)]"
-                  />
-                  {/* Черновик формулировки — до показа настоящим клиентам её смотрит юрист. */}
-                  <span>{CONSENT_DRAFT}</span>
-                </label>
+                /* Черновик формулировки — до показа настоящим клиентам её смотрит юрист. */
+                <Checkbox
+                  checked={consent}
+                  onChange={setConsent}
+                  label={CONSENT_DRAFT}
+                  className="ml-6 rounded-xl bg-[var(--award-soft)] p-3"
+                />
               )}
             </div>
           )}

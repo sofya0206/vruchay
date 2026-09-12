@@ -199,6 +199,71 @@ h2 {
   outline-offset: 2px;
 }
 
+/*
+ * Ползунок. Единственный контрол, который остаётся нативным: перетаскивание,
+ * шаг стрелками и Home/End браузер даёт сам, и переписывать это на div
+ * значило бы потерять их ради одной только внешности. Красим дорожку
+ * и бегунок — больше от системного вида ничего не остаётся.
+ *
+ * Псевдоэлементы Chromium и Firefox в один селектор через запятую не
+ * соберёшь: незнакомый префикс заставляет движок выбросить всё правило.
+ */
+input[type='range'] {
+  appearance: none;
+  background: transparent;
+  height: 16px;
+}
+
+input[type='range']::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--line-strong);
+}
+
+input[type='range']::-moz-range-track {
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--line-strong);
+}
+
+input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border-radius: 9999px;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  box-shadow: 0 1px 2px 0 rgba(12, 43, 100, 0.32);
+}
+
+input[type='range']::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  box-shadow: 0 1px 2px 0 rgba(12, 43, 100, 0.32);
+}
+
+input[type='range']:disabled::-webkit-slider-thumb {
+  background: var(--line-strong);
+}
+
+/*
+ * Уголок-хват у текстовых полей. Системный рисуется тремя серыми
+ * насечками — единственное место в интерфейсе, где встречается такой
+ * штрих. Тянуть поле оставляем, убираем только сам глиф: в Chromium
+ * он живёт в `::-webkit-resizer`, в остальных браузерах его и нет.
+ */
+textarea {
+  resize: vertical;
+}
+
+textarea::-webkit-resizer {
+  display: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

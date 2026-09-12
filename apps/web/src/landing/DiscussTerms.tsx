@@ -14,7 +14,9 @@ import {
   type VolumeBand,
 } from '@gramota/shared';
 import { Button } from '../ui/Button';
-import { Input, Label, Select, Textarea } from '../ui/Field';
+import { Checkbox } from '../ui/Checkbox';
+import { Input, Label, Textarea } from '../ui/Field';
+import { Select } from '../ui/Select';
 
 /**
  * Заявка на разговор об условиях.
@@ -36,6 +38,14 @@ export function DiscussTerms() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [sent, setSent] = useState(false);
+  /* Галочка стала управляемой: нарисованная коробка знает своё состояние
+     из пропа. Сам вход остался настоящим и именованным — заявку по-прежнему
+     собирает FormData, и браузерная проверка required тоже на месте. */
+  const [consent, setConsent] = useState(false);
+  /* Объём и время звонка тоже переехали в состояние: кнопка-список
+     значения в FormData не кладёт, и заявка приходила бы без них. */
+  const [volume, setVolume] = useState<VolumeBand | ''>('');
+  const [callTime, setCallTime] = useState<CallTime | ''>('');
 
   function toggle(kind: EventKind) {
     setKinds((cur) => (cur.includes(kind) ? cur.filter((k) => k !== kind) : [...cur, kind]));
@@ -60,8 +70,8 @@ export function DiscussTerms() {
       contact: text('contact') ?? '',
       email: text('email') ?? '',
       phone: text('phone'),
-      volume: text('volume') as VolumeBand | undefined,
-      callTime: text('callTime') as CallTime | undefined,
+      volume: volume || undefined,
+      callTime: callTime || undefined,
       comment: text('comment'),
       eventKinds: kinds,
       consent: true,
@@ -109,30 +119,30 @@ export function DiscussTerms() {
 
             <div>
               <Label>Сколько документов в год</Label>
-              <Select name="volume" defaultValue="">
-                <option value="" disabled>
-                  Выберите примерный объём
-                </option>
-                {VOLUME_BANDS.map((band) => (
-                  <option key={band} value={band}>
-                    {VOLUME_BAND_LABELS[band]}
-                  </option>
-                ))}
-              </Select>
+              <Select
+                value={volume}
+                onChange={setVolume}
+                placeholder="Выберите примерный объём"
+                aria-label="Сколько документов в год"
+                options={VOLUME_BANDS.map((band) => ({
+                  value: band,
+                  label: VOLUME_BAND_LABELS[band],
+                }))}
+              />
             </div>
 
             <div>
               <Label>Когда удобно позвонить</Label>
-              <Select name="callTime" defaultValue="">
-                <option value="" disabled>
-                  Выберите время
-                </option>
-                {CALL_TIMES.map((time) => (
-                  <option key={time} value={time}>
-                    {CALL_TIME_LABELS[time]}
-                  </option>
-                ))}
-              </Select>
+              <Select
+                value={callTime}
+                onChange={setCallTime}
+                placeholder="Выберите время"
+                aria-label="Когда удобно позвонить"
+                options={CALL_TIMES.map((time) => ({
+                  value: time,
+                  label: CALL_TIME_LABELS[time],
+                }))}
+              />
             </div>
 
             <fieldset className="sm:col-span-2">
@@ -190,11 +200,12 @@ export function DiscussTerms() {
             </div>
 
             <label className="flex cursor-pointer gap-3 text-sm leading-relaxed sm:col-span-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 name="consent"
                 required
-                className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--accent)]"
+                checked={consent}
+                onChange={setConsent}
+                className="mt-0.5 shrink-0"
               />
               {/* Текст берётся из общего справочника: сервер записывает
                   в заявку его редакцию, и они обязаны совпадать. */}

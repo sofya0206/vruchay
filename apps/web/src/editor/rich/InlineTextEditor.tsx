@@ -108,7 +108,7 @@ export function InlineTextEditor({
       setTimeout(() => {
         const active = document.activeElement;
         if (editor.isFocused) return;
-        if (active?.closest('[data-rich-toolbar], [data-rich-popover]')) return;
+        if (active?.closest('[data-rich-toolbar], [data-rich-popover], [data-ui-popover]')) return;
         finish();
       }, 0);
     };
@@ -140,17 +140,15 @@ export function InlineTextEditor({
       <FormatToolbar editor={editor} fields={fields} base={element.props} />
       <SuggestionList state={suggestion} />
       {fieldPos !== null && (
-        <div data-rich-popover>
-          <FieldPopover
-            editor={editor}
-            pos={fieldPos}
-            label={fieldLabel}
-            onClose={() => {
-              setFieldPos(null);
-              editor.commands.focus();
-            }}
-          />
-        </div>
+        <FieldPopover
+          editor={editor}
+          pos={fieldPos}
+          label={fieldLabel}
+          onClose={() => {
+            setFieldPos(null);
+            editor.commands.focus();
+          }}
+        />
       )}
     </FieldContext.Provider>
   );
