@@ -6,6 +6,7 @@ import { ApiError } from '../api/client';
 import type { DocumentList } from '../api/types';
 import { api } from '../api/client';
 import { Button } from '../ui/Button';
+import { Radio as UiRadio } from '../ui/Checkbox';
 import { Input, Label, Select, Toggle } from '../ui/Field';
 import { BareInput, Card, FieldCard } from './ui';
 import { EmbedCode } from './EmbedCode';
@@ -550,20 +551,15 @@ function Radio({
   hint: string;
 }) {
   return (
-    <label className="flex cursor-pointer items-start gap-3">
-      <input
-        type="radio"
-        name={name}
-        checked={checked}
-        disabled={disabled}
-        onChange={onSelect}
-        className="mt-0.5 size-5 shrink-0 accent-[var(--accent)]"
-      />
-      <span className="max-w-3xl">
-        <span className="block">{label}</span>
-        <span className="mt-1 block text-sm text-[var(--text-muted)]">{hint}</span>
-      </span>
-    </label>
+    <UiRadio
+      name={name}
+      checked={checked}
+      disabled={disabled}
+      onChange={onSelect}
+      label={label}
+      hint={hint}
+      className="max-w-3xl gap-3 text-base"
+    />
   );
 }
 

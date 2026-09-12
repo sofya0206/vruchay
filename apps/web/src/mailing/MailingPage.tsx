@@ -5,6 +5,7 @@ import { CalendarRange, ChevronRight, RefreshCw, Search, Send } from 'lucide-rea
 import { api } from '../api/client';
 import type { DocumentList, DocumentSummary } from '../api/types';
 import { Button } from '../ui/Button';
+import { Checkbox, Radio } from '../ui/Checkbox';
 import { Input, Select } from '../ui/Field';
 import { Loading } from '../ui/Loading';
 import { LetterCard } from './LetterCard';
@@ -299,8 +300,7 @@ export function MailingPage() {
                           бывает три подряд, а разослать не тому списку нельзя —
                           письмо не отзывается. */}
                       <label className="flex items-start gap-3 rounded-xl px-3 py-2 hover:bg-[var(--surface-sunken)]">
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={selected.includes(doc.id)}
                           onChange={() => toggle(doc.id)}
                           className="mt-1"
@@ -506,8 +506,7 @@ function KindPicker({
           }`}
         >
           <span className="flex items-center gap-2 font-medium">
-            <input
-              type="radio"
+            <Radio
               name="letter-kind"
               checked={kind === option.id}
               onChange={() => onChange(option.id)}
@@ -535,8 +534,7 @@ function RecipientsPicker({
   return (
     <div className="space-y-3">
       <label className="flex items-start gap-3">
-        <input
-          type="radio"
+        <Radio
           name="recipient-source"
           checked={source === 'table'}
           onChange={() => onSource('table')}
@@ -551,8 +549,7 @@ function RecipientsPicker({
       </label>
 
       <label className="flex items-start gap-3">
-        <input
-          type="radio"
+        <Radio
           name="recipient-source"
           checked={source === 'manual'}
           onChange={() => onSource('manual')}

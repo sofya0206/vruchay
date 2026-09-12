@@ -4,6 +4,7 @@ import { CalendarClock, Check, ShieldCheck } from 'lucide-react';
 import { api } from '../api/client';
 import type { DocumentDetail } from '../api/types';
 import { Button } from '../ui/Button';
+import { Radio } from '../ui/Checkbox';
 import { Input, Label, Select } from '../ui/Field';
 
 /**
@@ -114,19 +115,14 @@ export function VerifyPanel({ doc }: { doc: DocumentDetail }) {
               ['date', 'До фиксированной даты', 'сезонные допуски, членство'],
             ] as const
           ).map(([value, label, hint]) => (
-            <label key={value} className="flex cursor-pointer items-start gap-2 text-sm">
-              <input
-                type="radio"
-                name="expiry-mode"
-                checked={mode === value}
-                onChange={() => setMode(value)}
-                className="mt-0.5 accent-[var(--accent)]"
-              />
-              <span>
-                {label}
-                <span className="block text-[var(--text-muted)]">{hint}</span>
-              </span>
-            </label>
+            <Radio
+              key={value}
+              name="expiry-mode"
+              checked={mode === value}
+              onChange={() => setMode(value)}
+              label={label}
+              hint={hint}
+            />
           ))}
 
           {mode === 'duration' && (

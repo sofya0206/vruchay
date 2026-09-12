@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { ArrowDown, ArrowUp, Ban, Copy, FileText, Plus, Trash2, X } from 'lucide-react';
 import type { AwardOutput, AwardRule } from '@gramota/shared';
 import { Button } from '../ui/Button';
+import { Checkbox } from '../ui/Checkbox';
 import { Input, Select } from '../ui/Field';
 import type { AwardTemplate } from '../api/awards';
 import { ConditionRow } from './ConditionRow';
@@ -86,14 +87,12 @@ export function RuleCard({
           </span>
         )}
 
-        <label className="ml-auto flex items-center gap-1.5 text-sm text-[var(--text-muted)]">
-          <input
-            type="checkbox"
-            checked={rule.enabled}
-            onChange={(e) => onChange({ ...rule, enabled: e.target.checked })}
-          />
-          включено
-        </label>
+        <Checkbox
+          checked={rule.enabled}
+          onChange={(enabled) => onChange({ ...rule, enabled })}
+          label="включено"
+          className="ml-auto items-center text-[var(--text-muted)]"
+        />
 
         <div className="flex items-center">
           <button

@@ -1,5 +1,6 @@
 import { ArrowUpRight, ShieldAlert, Trash2 } from 'lucide-react';
 import type { RegistryRow } from '../api/registry';
+import { Checkbox } from '../ui/Checkbox';
 import { StateChip } from './StateChip';
 import {
   formatDate,
@@ -35,12 +36,10 @@ export function RegistryTable({ rows, selected, onToggle, onToggleAll, onOpen }:
         <thead>
           <tr className="border-b border-[var(--line)] text-left text-xs tracking-wide text-[var(--text-muted)] uppercase">
             <th className="w-10 px-3 py-3">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={allChecked}
                 onChange={onToggleAll}
                 aria-label="Отметить все на странице"
-                className="size-4 accent-[var(--accent)]"
               />
             </th>
             <th className="px-3 py-3 font-medium">Получатель</th>
@@ -73,12 +72,10 @@ export function RegistryTable({ rows, selected, onToggle, onToggleAll, onOpen }:
                 className="cursor-pointer border-b border-[var(--line)] last:border-0 hover:bg-[var(--surface-sunken)]"
               >
                 <td className="px-3 py-3 align-top" onClick={(e) => e.stopPropagation()}>
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={selected.has(row.fileId)}
                     onChange={() => onToggle(row.fileId)}
                     aria-label={`Отметить документ: ${row.name || row.code}`}
-                    className="size-4 accent-[var(--accent)]"
                   />
                 </td>
 

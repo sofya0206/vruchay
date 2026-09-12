@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { X } from 'lucide-react';
 import type { AwardCondition, AwardOp, AwardStatus } from '@gramota/shared';
 import { AWARD_STATUSES, AWARD_STATUS_TITLES } from '@gramota/shared';
+import { Checkbox } from '../ui/Checkbox';
 import { Input, Select } from '../ui/Field';
 import { blankCondition, GENERAL_OPS, OP_TITLES, PLACE_OPS, STATUS_OPS } from './condition-labels';
 
@@ -96,11 +97,10 @@ export function ConditionRow({ condition, columns, hasGroupColumn, onChange, onR
               : 'Сначала выберите колонку группы вверху'
           }
         >
-          <input
-            type="checkbox"
+          <Checkbox
             checked={condition.withinGroup}
             disabled={!hasGroupColumn}
-            onChange={(e) => onChange({ ...condition, withinGroup: e.target.checked })}
+            onChange={(withinGroup) => onChange({ ...condition, withinGroup })}
           />
           внутри группы
         </label>
@@ -189,7 +189,9 @@ function ConditionValue({
             return (
               <label
                 key={status}
-                className={`cursor-pointer rounded-full px-2.5 py-1 text-xs ring-1 transition-colors ${
+                /* Кольцо фокуса здесь своё: сам вход спрятан, и общее
+                   правило :focus-visible нарисовало бы его вокруг ничего. */
+                className={`cursor-pointer rounded-full px-2.5 py-1 text-xs ring-1 transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--focus)] ${
                   checked
                     ? 'bg-[var(--award-soft)] text-[var(--award)] ring-transparent'
                     : 'text-[var(--text-muted)] ring-[var(--line-strong)]'

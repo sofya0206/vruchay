@@ -5,6 +5,7 @@ import { api } from '../api/client';
 import { Button } from '../ui/Button';
 import { Input, Label } from '../ui/Field';
 import { parseBody, toHtml, toText, wrapSelection, type Run } from './email-body';
+import { Checkbox } from '../ui/Checkbox';
 
 interface EmailTemplate {
   id: string;
@@ -189,12 +190,7 @@ export function EmailTemplateEditor({ documentId }: { documentId: string }) {
           Дополнительно
         </summary>
         <label className="mt-3 flex items-start gap-3 text-sm">
-          <input
-            type="checkbox"
-            checked={attach}
-            onChange={(e) => setAttach(e.target.checked)}
-            className="mt-0.5"
-          />
+          <Checkbox checked={attach} onChange={setAttach} className="mt-0.5" />
           <span>
             <span className="flex items-center gap-1.5 font-medium">
               <Paperclip size={14} /> Прикладывать документ к письму

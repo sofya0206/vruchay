@@ -14,6 +14,7 @@ import {
   type VolumeBand,
 } from '@gramota/shared';
 import { Button } from '../ui/Button';
+import { Checkbox } from '../ui/Checkbox';
 import { Input, Label, Select, Textarea } from '../ui/Field';
 
 /**
@@ -36,6 +37,10 @@ export function DiscussTerms() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [sent, setSent] = useState(false);
+  /* Галочка стала управляемой: нарисованная коробка знает своё состояние
+     из пропа. Сам вход остался настоящим и именованным — заявку по-прежнему
+     собирает FormData, и браузерная проверка required тоже на месте. */
+  const [consent, setConsent] = useState(false);
 
   function toggle(kind: EventKind) {
     setKinds((cur) => (cur.includes(kind) ? cur.filter((k) => k !== kind) : [...cur, kind]));
@@ -190,11 +195,12 @@ export function DiscussTerms() {
             </div>
 
             <label className="flex cursor-pointer gap-3 text-sm leading-relaxed sm:col-span-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 name="consent"
                 required
-                className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--accent)]"
+                checked={consent}
+                onChange={setConsent}
+                className="mt-0.5 shrink-0"
               />
               {/* Текст берётся из общего справочника: сервер записывает
                   в заявку его редакцию, и они обязаны совпадать. */}

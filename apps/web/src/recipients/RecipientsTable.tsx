@@ -48,6 +48,7 @@ import type { MenuDef } from '../editor/MenuBar';
 import { Dialog } from '../mailing/Dialog';
 import type { DocumentDetail } from '../api/types';
 import type { WorkspaceTab } from '../mailing/workspace-tabs';
+import { Checkbox } from '../ui/Checkbox';
 
 /**
  * Таблица получателей — вторая сторона материала.
@@ -690,12 +691,10 @@ export function RecipientsTable({
             <thead className="sticky top-0 z-10 bg-[var(--surface-sunken)]">
               <tr>
                 <th className="w-10 border-r border-b border-[var(--line)] px-3 py-2">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={allChecked}
                     onChange={() => m.setChecked.mutate({ checked: !allChecked })}
                     aria-label="Отметить все"
-                    className="accent-[var(--accent)]"
                   />
                 </th>
                 {/* Номер строки — как в любой таблице: по нему называют место
@@ -736,14 +735,10 @@ export function RecipientsTable({
               {rows.map((row, index) => (
                 <tr key={row.id} className="group hover:bg-[var(--surface-sunken)]/60">
                   <td className="border-r border-b border-[var(--line)] px-3 py-1 text-center">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={row.checked}
-                      onChange={() =>
-                        m.updateRow.mutate({ rowId: row.id, checked: !row.checked })
-                      }
+                      onChange={() => m.updateRow.mutate({ rowId: row.id, checked: !row.checked })}
                       aria-label="Включить в генерацию"
-                      className="accent-[var(--accent)]"
                     />
                   </td>
                   <td className="tabular border-r border-b border-[var(--line)] px-2 py-1 text-right text-xs text-[var(--text-muted)]">
