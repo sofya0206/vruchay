@@ -24,10 +24,13 @@ export function BillingPage() {
 
   return (
     <PageLayout head={<SectionTitle>Оплата</SectionTitle>}>
-      <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
+      {/* Две колонки, а не три: «Продлить» и «Реквизиты» — равные по весу
+          пути, и делить их как 2:1 было нечем. Верхняя карточка — во всю
+          ширину над ними. */}
+      <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
         <Card
           title={usage?.source === 'trial' ? 'Бесплатная проба' : (usage?.planName ?? 'План')}
-          className="lg:col-span-3"
+          className="lg:col-span-2"
         >
           <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
             <div>
@@ -60,7 +63,7 @@ export function BillingPage() {
           </p>
         </Card>
 
-        <Card title="Продлить или расширить" className="lg:col-span-2">
+        <Card title="Продлить или расширить">
           <p className="text-sm text-[var(--text-muted)]">
             Расскажите, сколько документов и как часто вы выдаёте, — подберём условия и выставим
             счёт на организацию.

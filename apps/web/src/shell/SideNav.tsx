@@ -43,6 +43,18 @@ export function SideNav({ collapsed, onToggle }: { collapsed: boolean; onToggle:
           сама колонка растянута на всю строку, а на месте стоит её
           содержимое — иначе при прокрутке она уехала бы вверх. */}
       <div className="sticky top-[var(--app-header)] flex h-[calc(100dvh-var(--app-header))] flex-col overflow-y-auto p-2">
+        {/* Подпись над пунктами: в рейке из одних значков без неё
+            непонятно, что это меню, а не панель инструментов. */}
+        <p
+          className={cn(
+            'mb-1 px-3 text-xs tracking-wide text-[var(--text-muted)] uppercase',
+            // В рейке 48 пунктов под текст: кегль мельче, разрядки нет.
+            collapsed && 'px-0 text-center text-[10px] tracking-normal',
+          )}
+        >
+          Меню
+        </p>
+
         <nav aria-label="Разделы" className="flex flex-col gap-0.5">
           <Item
             to="/"
