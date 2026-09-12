@@ -134,7 +134,7 @@ function Row({ item }: { item: LogItem }) {
   const colors = {
     neutral: 'bg-[var(--surface-sunken)] text-[var(--text-muted)]',
     progress: 'bg-[var(--award-soft)] text-[var(--award)]',
-    done: 'bg-[var(--accent-soft)] text-[var(--accent)]',
+    done: 'bg-[var(--ok-soft)] text-[var(--ok)]',
     danger: 'bg-[var(--danger-soft)] text-[var(--danger)]',
   } as const;
   const Icon = STATUS_ICONS[item.status];

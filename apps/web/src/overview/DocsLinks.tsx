@@ -33,7 +33,7 @@ const LINKS: { to: string; label: string; external?: boolean }[] = [
 
 export function DocsLinks() {
   return (
-    <footer className="mt-auto px-6 py-4">
+    <footer className="mt-auto px-3 py-4 sm:px-5">
       <ul className="flex flex-wrap gap-x-6 gap-y-2">
         {LINKS.map((link) => (
           <li key={link.to}>

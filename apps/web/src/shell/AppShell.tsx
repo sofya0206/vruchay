@@ -1,11 +1,11 @@
 import { useEffect, type CSSProperties } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { useIsFetching, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, RotateCw } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { InstallHint } from '../ui/InstallHint';
 import { AccountMenu } from './AccountMenu';
 import { BurgerMenu } from './BurgerMenu';
 import { TopNav } from './TopNav';
+import { parentPath, parentTitle } from './nav';
 
 /** Высота строки со стрелкой возврата; на главной строки нет. */
 const BACK_ROW = '48px';
@@ -29,22 +29,28 @@ const BACK_ROW = '48px';
  * продолжают считать своё место от шапки.
  */
 export function AppShell() {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const navigate = useNavigate();
 
-  // На главной возвращаться некуда: шаг назад оттуда — уже наружу кабинета.
+  /*
+   * Стрелка ведёт на уровень выше, а не назад по истории браузера:
+   * история водила кругами между материалом и его письмом. На главной
+   * стрелки нет — выше неё только выход из кабинета.
+   */
+  const parent = parentPath(pathname, search);
   const canGoBack = pathname !== '/';
+  const goUp = () => navigate(parent);
 
   /*
    * В материале у Escape своя работа: снять выделение блока, выйти из
    * правки текста, закрыть панель. Лист делает это без preventDefault,
-   * и общий «Esc — назад» уводил бы со страницы посреди правки. Там
-   * назад — только стрелкой.
+   * и общий «Esc — выше» уводил бы со страницы посреди правки. Там
+   * выход — только стрелкой.
    */
   const escGoesBack = canGoBack && !/^\/(documents|mailing)\/[^/]+/.test(pathname);
 
   /*
-   * Escape — шаг назад по своим следам, то же, что стрелка под шапкой.
+   * Escape — на уровень выше, то же, что стрелка под шапкой.
    *
    * Уступаем всем, для кого Escape уже что-то значит, иначе одно
    * нажатие закрывало бы диалог и вместе с ним уводило со страницы:
@@ -69,12 +75,12 @@ export function AppShell() {
         return;
       }
 
-      navigate(-1);
+      navigate(parent);
     };
 
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [escGoesBack, navigate]);
+  }, [escGoesBack, navigate, parent]);
 
   return (
     <div
@@ -111,25 +117,26 @@ export function AppShell() {
             <TopNav />
           </div>
 
-          <div className="ml-auto flex items-center gap-1">
-            <RefreshButton />
+          {/* Справа только учётная запись: вторая иконка рядом с кружком
+              отбирала внимание и читалась как ещё один такой же угол. */}
+          <div className="ml-auto flex items-center">
             <AccountMenu />
           </div>
         </div>
       </header>
 
-      {/* Возврат — своей строкой под шапкой, а не в ней: в шапке он
-          появлялся и исчезал вместе со страницей и каждый раз двигал знак
-          вбок. Здесь он никого не толкает, а строки нет там, где
-          возвращаться некуда. Без подписи: слово ничего не добавляло к
-          стрелке; название — в подсказке и для чтения с экрана. */}
+      {/* Стрелка — своей строкой под шапкой, а не в ней: в шапке она
+          появлялась и исчезала вместе со страницей и каждый раз двигала знак
+          вбок. Здесь она никого не толкает, а строки нет там, где выше
+          некуда. Без подписи: слово ничего не добавляло к стрелке;
+          куда ведёт — в подсказке и для чтения с экрана. */}
       {canGoBack && (
         <div className="flex h-[var(--back-row)] shrink-0 items-center px-2 sm:px-3">
           <button
             type="button"
-            onClick={() => navigate(-1)}
-            title={escGoesBack ? 'Назад (Esc)' : 'Назад'}
-            aria-label="Назад"
+            onClick={goUp}
+            title={escGoesBack ? `${parentTitle(parent)} (Esc)` : parentTitle(parent)}
+            aria-label={parentTitle(parent)}
             className="grid h-11 w-11 place-items-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
           >
             <ArrowLeft size={20} />
@@ -143,33 +150,5 @@ export function AppShell() {
 
       <InstallHint />
     </div>
-  );
-}
-
-/**
- * Обновить то, что на экране.
- *
- * Данные кабинета кэшируются, и после правки на другом устройстве или
- * в соседней вкладке экран показывает вчерашнее. Кнопка сбрасывает кэш
- * целиком — перезагружать страницу ради этого не нужно, а перезагрузка
- * вдобавок теряет место в списке.
- *
- * Значок вращается, пока идут запросы: иначе непонятно, нажалось ли, —
- * ответ приходит быстрее, чем человек успевает посмотреть на экран.
- */
-function RefreshButton() {
-  const qc = useQueryClient();
-  const fetching = useIsFetching() > 0;
-
-  return (
-    <button
-      type="button"
-      title="Обновить"
-      aria-label="Обновить"
-      onClick={() => void qc.invalidateQueries()}
-      className="grid h-11 w-11 place-items-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
-    >
-      <RotateCw size={20} className={fetching ? 'animate-spin' : undefined} />
-    </button>
   );
 }

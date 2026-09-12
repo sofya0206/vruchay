@@ -37,7 +37,12 @@ function serviceWith({
       // условие по дате, и путать их нельзя.
       count: vi.fn(async (args: Call) => {
         calls.file.push(args);
+        if (args.where?.verifyLastAt !== undefined) return 0;
         return args.where?.createdAt === undefined ? issuedTotal : issuedMonth;
+      }),
+      aggregate: vi.fn(async (args: Call) => {
+        calls.file.push(args);
+        return { _sum: { verifyCount: 0 } };
       }),
     },
     email: {
@@ -99,7 +104,7 @@ describe('сводка', () => {
       ...calls.jobs,
     ].map((c) => c.where?.orgId);
 
-    expect(orgIds).toHaveLength(6);
+    expect(orgIds).toHaveLength(11);
     expect(orgIds.every((id) => id === 'org-1')).toBe(true);
   });
 
