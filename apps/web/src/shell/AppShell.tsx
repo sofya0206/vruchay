@@ -33,11 +33,12 @@ export function AppShell() {
   const navigate = useNavigate();
 
   /*
-   * Материал — лист, список, письмо — рисует стрелку «Назад» сам, в своей
-   * строке рядом с названием: отдельная строка над лентой вкладок стояла
-   * пустой и отнимала высоту у листа. И Escape там не назначен: в
-   * редакторе он снимает выделение блока без preventDefault, и общий
-   * «Esc — назад» уводил бы со страницы посреди правки.
+   * Материал — лист, список, письмо — живёт без полосы разделов: по
+   * решению владельца там нужен весь экран под макет, как было до
+   * переделки. Выход — стрелка «Назад» в рамке материала. И Escape там
+   * не назначен: в редакторе он снимает выделение блока без
+   * preventDefault, и общий «Esc — назад» уводил бы со страницы посреди
+   * правки.
    */
   const inMaterial = /^\/(documents|mailing)\/[^/]+/.test(pathname);
 
@@ -83,42 +84,44 @@ export function AppShell() {
       className="flex min-h-full flex-col"
       style={{ '--back-row': canGoBack ? BACK_ROW : '0px' } as CSSProperties}
     >
-      <header className="sticky top-0 z-20 shrink-0 border-b border-[var(--line)] bg-[var(--surface)]">
-        {/* Во всю ширину окна, а не колонкой по центру: шапка — рама экрана.
+      {!inMaterial && (
+        <header className="sticky top-0 z-20 shrink-0 border-b border-[var(--line)] bg-[var(--surface)]">
+          {/* Во всю ширину окна, а не колонкой по центру: шапка — рама экрана.
             Минус пиксель — нижняя линия, она входит в ту же высоту. */}
-        <div className="flex h-[calc(var(--app-header)-1px)] items-center gap-3 px-3 sm:px-5">
-          {/* Бургер — только на узком экране, где полосы нет. */}
-          <BurgerMenu />
+          <div className="flex h-[calc(var(--app-header)-1px)] items-center gap-3 px-3 sm:px-5">
+            {/* Бургер — только на узком экране, где полосы нет. */}
+            <BurgerMenu />
 
-          <Link
-            to="/"
-            aria-label="На главную"
-            className="-mx-2 inline-flex items-center gap-3 rounded-xl px-2 py-1.5 transition-colors hover:bg-[var(--surface-sunken)]"
-          >
-            <span
-              aria-hidden
-              className="inline-flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-[var(--accent)] ring-4 ring-[var(--accent-soft)]"
+            <Link
+              to="/"
+              aria-label="На главную"
+              className="-mx-2 inline-flex items-center gap-3 rounded-xl px-2 py-1.5 transition-colors hover:bg-[var(--surface-sunken)]"
             >
-              {/* Медаль залита, а не обведена: тот же знак, что на заставке. */}
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="#ffffff">
-                <circle cx="12" cy="9.5" r="4.3" />
-                <path d="M9.2 13.7 7.9 20.5 12 18.2l4.1 2.3-1.3-6.8L12 15.1Z" />
-              </svg>
-            </span>
-            <span className="text-2xl font-medium">Вручай</span>
-          </Link>
+              <span
+                aria-hidden
+                className="inline-flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-[var(--accent)] ring-4 ring-[var(--accent-soft)]"
+              >
+                {/* Медаль залита, а не обведена: тот же знак, что на заставке. */}
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="#ffffff">
+                  <circle cx="12" cy="9.5" r="4.3" />
+                  <path d="M9.2 13.7 7.9 20.5 12 18.2l4.1 2.3-1.3-6.8L12 15.1Z" />
+                </svg>
+              </span>
+              <span className="text-2xl font-medium">Вручай</span>
+            </Link>
 
-          {/* Полоса скрыта на узком экране: пять подписей туда не входят. */}
-          <div className="ml-3 hidden md:block">
-            <TopNav />
-          </div>
+            {/* Полоса скрыта на узком экране: пять подписей туда не входят. */}
+            <div className="ml-3 hidden md:block">
+              <TopNav />
+            </div>
 
-          <div className="ml-auto flex items-center gap-1">
-            <RefreshButton />
-            <AccountMenu />
+            <div className="ml-auto flex items-center gap-1">
+              <RefreshButton />
+              <AccountMenu />
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       {/* Возврат — своей строкой под шапкой, а не в ней: в шапке он
           появлялся и исчезал вместе со страницей и каждый раз двигал знак
@@ -139,7 +142,13 @@ export function AppShell() {
         </div>
       )}
 
-      <div className="flex h-[calc(100dvh-var(--app-header)-var(--back-row))] shrink-0 flex-col">
+      <div
+        className={
+          inMaterial
+            ? 'flex h-dvh shrink-0 flex-col'
+            : 'flex h-[calc(100dvh-var(--app-header)-var(--back-row))] shrink-0 flex-col'
+        }
+      >
         <Outlet />
       </div>
 

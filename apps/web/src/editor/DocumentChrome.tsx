@@ -1,7 +1,12 @@
 import type { ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCheck } from 'lucide-react';
-import { MATERIAL_TABS, materialTabPath, workspacePath, type MaterialTab } from '../mailing/workspace-tabs';
+import { ArrowLeft, CheckCheck, FileText, Table2 } from 'lucide-react';
+import {
+  MATERIAL_TABS,
+  materialTabPath,
+  workspacePath,
+  type MaterialTab,
+} from '../mailing/workspace-tabs';
 import { MenuBar, type MenuDef } from './MenuBar';
 
 /**
@@ -49,23 +54,79 @@ export function DocumentChrome({
 }) {
   const navigate = useNavigate();
 
+  const back = (
+    <button
+      type="button"
+      onClick={() => navigate(-1)}
+      title="Назад"
+      aria-label="Назад"
+      className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
+    >
+      <ArrowLeft size={19} />
+    </button>
+  );
+
+  const issue = action ?? (
+    <Link
+      to={workspacePath(documentId)}
+      title="Отметить получателей и выпустить документы"
+      className="inline-flex items-center gap-2 rounded-lg bg-[var(--accent)] px-2.5 py-1.5 text-sm font-medium text-[var(--accent-contrast)] transition-colors hover:bg-[var(--accent-hover)]"
+    >
+      <CheckCheck size={15} />
+      Выпустить
+    </Link>
+  );
+
+  /*
+   * Лист — своя рамка, как была до ленты: крупное название, меню под ним,
+   * справа переключатель «Редактор — Таблица». Лента из шести вкладок
+   * здесь не стоит по решению владельца: на листе работают с макетом,
+   * и шесть подписей над ним — шум; дорога к списку, письму и остальному
+   * лежит через «Таблицу», где лента и живёт.
+   */
+  if (tab === 'sheet') {
+    return (
+      <header className="shrink-0 border-b border-[var(--line)] bg-[var(--surface)]">
+        <div className="flex items-start gap-3 px-3 pt-2 pb-1.5">
+          <div className="mt-0.5">{back}</div>
+
+          <div className="min-w-0">
+            <h1 className="truncate text-xl leading-tight">{title}</h1>
+            <div className="-ml-2 mt-0.5">
+              <MenuBar menus={menus} />
+            </div>
+          </div>
+
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            <div className="flex items-center gap-1 rounded-xl bg-[var(--surface-sunken)] p-1">
+              <ViewLink
+                to={materialTabPath(documentId, 'sheet')}
+                active
+                icon={<FileText size={16} />}
+              >
+                Редактор
+              </ViewLink>
+              <ViewLink to={workspacePath(documentId)} active={false} icon={<Table2 size={16} />}>
+                Таблица
+              </ViewLink>
+            </div>
+            {issue}
+          </div>
+        </div>
+
+        {toolbar && (
+          <div className="flex flex-wrap items-center gap-1 px-3 pb-1.5" role="toolbar">
+            {toolbar}
+          </div>
+        )}
+      </header>
+    );
+  }
+
   return (
     <header className="shrink-0 border-b border-[var(--line)] bg-[var(--surface)]">
       <div className="flex h-11 items-center gap-1 border-b border-[var(--line)] px-2">
-        {/* Назад — здесь, в строке материала, а не отдельной строкой под
-            шапкой кабинета: та строка над лентой вкладок стояла пустой
-            и только отнимала высоту у листа. Шаг по своим следам, как
-            и везде в кабинете; Esc тут не назначен — в редакторе у него
-            своя работа. */}
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          title="Назад"
-          aria-label="Назад"
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
-        >
-          <ArrowLeft size={19} />
-        </button>
+        {back}
 
         {/* Название — коротко и с подсказкой: в ряду с шестью вкладками
             крупному заголовку места нет, а материал всё равно надо назвать. */}
@@ -92,18 +153,7 @@ export function DocumentChrome({
           ))}
         </nav>
 
-        <div className="shrink-0 pl-2">
-          {action ?? (
-            <Link
-              to={workspacePath(documentId)}
-              title="Отметить получателей и выпустить документы"
-              className="inline-flex items-center gap-2 rounded-lg bg-[var(--accent)] px-2.5 py-1.5 text-sm font-medium text-[var(--accent-contrast)] transition-colors hover:bg-[var(--accent-hover)]"
-            >
-              <CheckCheck size={15} />
-              Выпустить
-            </Link>
-          )}
-        </div>
+        <div className="shrink-0 pl-2">{issue}</div>
       </div>
 
       {/* Меню и панель значков — одной строкой, а не двумя: каждая лишняя
@@ -120,6 +170,34 @@ export function DocumentChrome({
         )}
       </div>
     </header>
+  );
+}
+
+/** Переключатель сторон материала на листе: «Редактор — Таблица». */
+function ViewLink({
+  to,
+  active,
+  icon,
+  children,
+}: {
+  to: string;
+  active: boolean;
+  icon: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <Link
+      to={to}
+      aria-current={active ? 'page' : undefined}
+      className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+        active
+          ? 'bg-[var(--accent)] text-[var(--accent-contrast)]'
+          : 'text-[var(--text-muted)] hover:bg-[var(--surface)] hover:text-[var(--text)]'
+      }`}
+    >
+      {icon}
+      {children}
+    </Link>
   );
 }
 
