@@ -15,7 +15,7 @@ export function RolePermissions() {
 
   return (
     <div className="mt-8">
-      <h3 className="font-serif text-lg">Права ролей</h3>
+      <h3 className="font-medium">Права ролей</h3>
       <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)]">
         Владелец у организации один — он же распоряжается оплатой. Управляющий делает всё то же,
         кроме денег и передачи организации.

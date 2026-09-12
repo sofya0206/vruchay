@@ -5,6 +5,7 @@ import { api } from '../api/client';
 import { Button } from '../ui/Button';
 import { Input, Label } from '../ui/Field';
 import { parseBody, toHtml, toText, wrapSelection, type Run } from './email-body';
+import { Checkbox } from '../ui/Checkbox';
 
 interface EmailTemplate {
   id: string;
@@ -116,7 +117,7 @@ export function EmailTemplateEditor({ documentId }: { documentId: string }) {
   return (
     <div className="mx-auto max-w-3xl space-y-5 p-6">
       <header>
-        <h2 className="font-serif text-xl">Письмо участнику</h2>
+        <h2 className="text-lg font-medium">Письмо участнику</h2>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
           Так выглядит письмо, которое придёт вместе с документом. Отправителем участник
           увидит название вашей организации.
@@ -189,12 +190,7 @@ export function EmailTemplateEditor({ documentId }: { documentId: string }) {
           Дополнительно
         </summary>
         <label className="mt-3 flex items-start gap-3 text-sm">
-          <input
-            type="checkbox"
-            checked={attach}
-            onChange={(e) => setAttach(e.target.checked)}
-            className="mt-0.5"
-          />
+          <Checkbox checked={attach} onChange={setAttach} className="mt-0.5" />
           <span>
             <span className="flex items-center gap-1.5 font-medium">
               <Paperclip size={14} /> Прикладывать документ к письму

@@ -35,7 +35,7 @@ export function Sessions() {
 
   return (
     <section>
-      <h2 className="flex items-center gap-2 font-serif text-xl">
+      <h2 className="flex items-center gap-2 text-lg font-medium">
         <MonitorSmartphone size={18} className="text-[var(--accent)]" />
         Устройства
       </h2>
@@ -98,7 +98,7 @@ function LoginHistory() {
 
   return (
     <div className="mt-8">
-      <h3 className="font-serif text-lg">Журнал входов</h3>
+      <h3 className="font-medium">Журнал входов</h3>
       <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)]">
         Последние попытки войти в вашу учётную запись — и удачные, и нет.
       </p>

@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Award, Gift, LoaderCircle, MailCheck } from 'lucide-react';
+import { Gift, LoaderCircle, MailCheck } from 'lucide-react';
+import { Brand } from '../shell/Brand';
 import { useRegister } from '../auth/useAuth';
 import { forgetRef, rememberRefFromUrl, storedRef } from '../auth/referral-code';
 import { useReferralOffer } from '../api/referral';
@@ -71,9 +72,7 @@ export function RegisterPage() {
     <div className="grid h-full place-items-center p-6">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex items-center gap-3">
-          <span className="grid h-11 w-11 place-items-center rounded-xl bg-[var(--accent)] text-[var(--accent-contrast)]">
-            <Award size={22} strokeWidth={1.75} />
-          </span>
+          <Brand size={44} />
           <div>
             <h1 className="text-2xl leading-tight font-semibold">Вручай</h1>
             <p className="text-sm text-[var(--text-muted)]">

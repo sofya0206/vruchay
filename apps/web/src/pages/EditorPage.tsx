@@ -5,33 +5,24 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
-  Circle,
-  CircleHelp,
   CopyPlus,
   Dot,
   Grid3x3,
-  Image as ImageIcon,
   ImageUp,
   Layers,
-  Link2,
   LoaderCircle,
   Magnet,
-  Minus,
   Paintbrush,
   Printer,
-  QrCode,
   Redo2,
   SlidersHorizontal,
-  Square,
   SquareDashed,
   Table2,
   Trash2,
   TriangleAlert,
-  Type,
   Undo2,
   Variable,
   X,
-  ZoomIn,
 } from 'lucide-react';
 import type { Editor } from '@tiptap/core';
 import {
@@ -48,8 +39,10 @@ import { InsertMenu, type InsertKind } from '../editor/InsertMenu';
 import { DocumentChrome, ToolButton, ToolDivider } from '../editor/DocumentChrome';
 import { useDocumentFileMenu } from '../editor/DocumentFileMenu';
 import { SheetTabs } from '../editor/SheetTabs';
-import type { MenuDef } from '../editor/MenuBar';
+import type { MenuEntry } from '../editor/DocumentChrome';
 import { StatusChip } from '../ui/Field';
+import { IconButton } from '../ui/IconButton';
+import { Select } from '../ui/Select';
 import { api } from '../api/client';
 import { useOrgProfile } from '../api/org';
 import { useRecipients } from '../api/recipients';
@@ -980,144 +973,54 @@ export function EditorPage() {
   const pickBackground = () => backgroundInput.current?.click();
 
   /*
-   * Строка меню листа.
-   *
-   * Набор тот же, что у любого редактора документов: файл, правка, вставка,
-   * данные, справка. Ничего сверх того, что редактор действительно умеет:
-   * пункт, за которым нет действия, хуже отсутствующего — по нему нажимают
-   * и решают, что сломалось.
+   * Меню «…» листа: действия над материалом целиком и редкие правки.
+   * Всё, чем пользуются постоянно, стоит значком на панели; вставка —
+   * в своём меню там же, а стороны материала — в ленте вкладок.
    */
-  const menus: MenuDef[] = [
-    { id: 'file', label: 'Файл', entries: fileMenu.entries },
+  const actions: MenuEntry[] = [
+    ...fileMenu.entries,
     {
-      id: 'edit',
-      label: 'Правка',
-      entries: [
-        {
-          icon: <Undo2 size={16} />,
-          label: 'Отменить',
-          shortcut: 'Ctrl+Z',
-          disabled: !history.canUndo,
-          onSelect: history.undo,
-        },
-        {
-          icon: <Redo2 size={16} />,
-          label: 'Вернуть',
-          shortcut: 'Ctrl+Shift+Z',
-          disabled: !history.canRedo,
-          onSelect: history.redo,
-        },
-        { separator: true },
-        {
-          icon: <SquareDashed size={16} />,
-          label: 'Выделить все блоки',
-          shortcut: 'Ctrl+A',
-          onSelect: () => setSelected(new Set(selectableIds(layout))),
-        },
-        {
-          icon: <CopyPlus size={16} />,
-          label: 'Дублировать блок',
-          shortcut: 'Ctrl+D',
-          disabled: selectedElements.length === 0,
-          onSelect: () => cloneInto(selectedElements),
-        },
-        { separator: true },
-        {
-          icon: <Paintbrush size={16} />,
-          label: 'Скопировать оформление',
-          disabled: !selectedElements.some((el) => el.type === 'text'),
-          onSelect: () => {
-            const source = selectedElements.find((el): el is TextElement => el.type === 'text');
-            if (source) setStyleClipboard(pickTextStyle(source.props));
-          },
-        },
-        {
-          icon: <Paintbrush size={16} />,
-          label: 'Применить оформление',
-          disabled: styleClipboard === null || selected.size === 0,
-          onSelect: () => styleClipboard && patchTextProps(styleClipboard),
-        },
-        { separator: true },
-        {
-          icon: <Trash2 size={16} />,
-          label: 'Удалить блок',
-          shortcut: 'Delete',
-          danger: true,
-          disabled: selected.size === 0,
-          onSelect: removeSelected,
-        },
-      ],
+      icon: <Table2 size={16} />,
+      label: 'Открыть таблицу',
+      onSelect: () => navigate(workspacePath(id)),
+    },
+    { separator: true },
+    {
+      icon: <SquareDashed size={16} />,
+      label: 'Выделить все блоки',
+      shortcut: 'Ctrl+A',
+      onSelect: () => setSelected(new Set(selectableIds(layout))),
     },
     {
-      id: 'insert',
-      label: 'Вставка',
-      entries: [
-        {
-          icon: <ImageIcon size={16} />,
-          label: hasBackground ? 'Заменить бланк' : 'Загрузить бланк',
-          disabled: uploadBackground.isPending,
-          onSelect: pickBackground,
-        },
-        { separator: true },
-        {
-          icon: <Type size={16} />,
-          label: 'Добавить текстовый блок',
-          onSelect: () => addElement({ type: 'text' }),
-        },
-        {
-          icon: <QrCode size={16} />,
-          label: 'Добавить QR-код',
-          onSelect: () => addElement({ type: 'qr' }),
-        },
-        {
-          icon: <Link2 size={16} />,
-          label: 'Добавить ссылку',
-          onSelect: () => addElement({ type: 'link' }),
-        },
-        { separator: true },
-        {
-          icon: <Minus size={16} />,
-          label: 'Добавить линию',
-          onSelect: () => addElement({ type: 'shape', kind: 'line' }),
-        },
-        {
-          icon: <Square size={16} />,
-          label: 'Добавить прямоугольник',
-          onSelect: () => addElement({ type: 'shape', kind: 'rect' }),
-        },
-        {
-          icon: <Circle size={16} />,
-          label: 'Добавить овал',
-          onSelect: () => addElement({ type: 'shape', kind: 'ellipse' }),
-        },
-      ],
+      icon: <CopyPlus size={16} />,
+      label: 'Дублировать блок',
+      shortcut: 'Ctrl+D',
+      disabled: selectedElements.length === 0,
+      onSelect: () => cloneInto(selectedElements),
     },
     {
-      id: 'data',
-      label: 'Данные',
-      entries: [
-        {
-          icon: <Table2 size={16} />,
-          label: 'Открыть таблицу',
-          onSelect: () => navigate(workspacePath(id)),
-        },
-        {
-          icon: <Variable size={16} />,
-          label: 'Поля подстановки',
-          onSelect: () => setPanel('fields'),
-        },
-      ],
+      icon: <Paintbrush size={16} />,
+      label: 'Скопировать оформление',
+      disabled: !selectedElements.some((el) => el.type === 'text'),
+      onSelect: () => {
+        const source = selectedElements.find((el): el is TextElement => el.type === 'text');
+        if (source) setStyleClipboard(pickTextStyle(source.props));
+      },
     },
     {
-      id: 'help',
-      label: 'Справка',
-      entries: [
-        {
-          icon: <CircleHelp size={16} />,
-          label: 'Показать справку',
-          onSelect: () => navigate('/docs'),
-        },
-      ],
+      icon: <Paintbrush size={16} />,
+      label: 'Применить оформление',
+      disabled: styleClipboard === null || selected.size === 0,
+      onSelect: () => styleClipboard && patchTextProps(styleClipboard),
+    },
+    { separator: true },
+    {
+      icon: <Trash2 size={16} />,
+      label: 'Удалить блок',
+      shortcut: 'Delete',
+      danger: true,
+      disabled: selected.size === 0,
+      onSelect: removeSelected,
     },
   ];
 
@@ -1199,52 +1102,30 @@ export function EditorPage() {
 
       <ToolDivider />
 
-      <div className="flex items-center gap-2 rounded-lg px-2 py-0.5 ring-1 ring-[var(--line)]">
-        <ZoomIn size={15} className="text-[var(--text-muted)]" />
-        <input
-          type="range"
-          min={25}
-          max={400}
-          value={Math.round(zoom * 100)}
-          onChange={(e) => setZoom(clamp(Number(e.target.value) / 100, 0.25, 4))}
-          aria-label="Масштаб"
-          className="w-24 accent-[var(--accent)]"
-        />
-        <button
-          type="button"
-          onClick={() => zoomTo('fit')}
-          title="Вписать лист в окно. Ещё: Ctrl+колёсико — масштаб, пробел — перетаскивание холста"
-          className="tabular w-11 text-right text-sm text-[var(--text-muted)] hover:text-[var(--text)]"
-        >
-          {Math.round(zoom * 100)}%
-        </button>
-        <span className="flex gap-0.5 text-xs text-[var(--text-muted)]">
-          <button
-            type="button"
-            onClick={() => zoomTo('width')}
-            className="rounded px-1 hover:bg-[var(--surface-sunken)]"
-            title="По ширине"
-          >
-            Ш
-          </button>
-          <button
-            type="button"
-            onClick={() => zoomTo('height')}
-            className="rounded px-1 hover:bg-[var(--surface-sunken)]"
-            title="По высоте"
-          >
-            В
-          </button>
-          <button
-            type="button"
-            onClick={() => zoomTo('actual')}
-            className="rounded px-1 hover:bg-[var(--surface-sunken)]"
-            title="Натуральная величина"
-          >
-            1:1
-          </button>
-        </span>
-      </div>
+      {/* Масштаб — одним списком, как в любом редакторе: «вписать» и
+          круглые проценты. Текущее значение — подпись закрытой кнопки,
+          в сам список не входит: список — не состояние, а команды. */}
+      <Select
+        aria-label="Масштаб"
+        title="Масштаб. Ещё: Ctrl+колёсико — масштаб, пробел — перетаскивание холста"
+        value=""
+        placeholder={`${Math.round(zoom * 100)}%`}
+        onChange={(v) => {
+          if (v === 'fit' || v === 'width' || v === 'height' || v === 'actual') zoomTo(v);
+          else setZoom(clamp(Number(v) / 100, 0.25, 4));
+        }}
+        options={[
+          { value: 'fit', label: 'Вписать в окно' },
+          { value: 'width', label: 'По ширине' },
+          { value: 'height', label: 'По высоте' },
+          { value: '50', label: '50%' },
+          { value: '75', label: '75%' },
+          { value: 'actual', label: '100%' },
+          { value: '150', label: '150%' },
+          { value: '200', label: '200%' },
+        ]}
+        className="tabular h-8 w-auto py-0 pr-7 pl-2 text-sm"
+      />
 
       <div className="ml-auto flex items-center gap-2">
         {/* Два взгляда на лист: заготовка с фишками полей и настоящая строка
@@ -1319,11 +1200,15 @@ export function EditorPage() {
   );
 
   return (
-    <div className="flex h-full flex-col">
+    // Высота — точным счётом, а не `h-full`: оболочка кабинета больше не
+    // задаёт высоту своей колонке (это ломало прилипание разделов на
+    // длинных страницах, см. AppShell), и опереться на неё через `h-full`
+    // стало не на что. Лист по-прежнему получает ровно экран без шапки.
+    <div className="flex h-[calc(100dvh-var(--app-header))] flex-col">
       <DocumentChrome
         documentId={id}
         title={page.title}
-        menus={menus}
+        actions={actions}
         tab="sheet"
         toolbar={toolbar}
       />
@@ -1638,15 +1523,9 @@ export function EditorPage() {
               <Tab active={panel === 'layers'} onClick={() => setPanel('layers')} icon={<Layers size={14} />}>
                 Слои
               </Tab>
-              <button
-                type="button"
-                title="Закрыть панель"
-                aria-label="Закрыть панель"
-                onClick={() => setPanel(null)}
-                className="grid w-9 shrink-0 place-items-center border-b-2 border-transparent text-[var(--text-muted)] transition-colors hover:text-[var(--text)]"
-              >
+              <IconButton size="sm" label="Закрыть панель" onClick={() => setPanel(null)} className="m-1 shrink-0">
                 <X size={15} />
-              </button>
+              </IconButton>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto p-4">
               {panel === 'props' && (

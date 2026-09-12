@@ -8,11 +8,14 @@ import { TRASH_DAYS } from '@gramota/shared';
 import { api } from '../api/client';
 import type { DocumentDetail, DocumentList, DocumentSummary } from '../api/types';
 import { Button } from '../ui/Button';
-import { Input, Select } from '../ui/Field';
+import { Input } from '../ui/Field';
+import { Select } from '../ui/Select';
 import { DocumentCard } from '../documents/DocumentCard';
 import { PageSizePicker, type PageSizeValue } from '../documents/PageSizePicker';
 import { useFolders } from '../api/folders';
 import { LibrarySortSelect, type LibrarySort } from '../documents/LibraryFilters';
+import { RenameDialog } from '../documents/RenameDialog';
+import { EmptyState } from '../ui/EmptyState';
 
 /**
  * Библиотека материалов.
@@ -37,6 +40,8 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
   const [newFolderId, setNewFolderId] = useState<string | '' | null>(null);
   // A4 альбомная — то, на чём печатают грамоты чаще всего.
   const [size, setSize] = useState<PageSizeValue>({ widthMm: 297, heightMm: 210 });
+  /** Материал, который переименовывают в окне. */
+  const [renaming, setRenaming] = useState<DocumentSummary | null>(null);
 
   // Какой список смотрим — решает адрес, а не состояние страницы.
   const trash = archived;
@@ -126,7 +131,10 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
   const rename = useMutation({
     mutationFn: (v: { id: string; title: string }) =>
       api.patch<DocumentDetail>(`/documents/${v.id}`, { title: v.title }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['documents'] }),
+    onSuccess: () => {
+      setRenaming(null);
+      void qc.invalidateQueries({ queryKey: ['documents'] });
+    },
   });
 
   /** Переложить материал в другую папку. `null` — вынуть из папок совсем. */
@@ -136,10 +144,6 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['documents'] }),
   });
 
-  function onRename(doc: DocumentSummary) {
-    const title = window.prompt('Новое название документа', doc.title)?.trim();
-    if (title && title !== doc.title) rename.mutate({ id: doc.id, title });
-  }
 
   /** Что стоит в выборе папки: тронутое человеком или открытая папка. */
   const formFolderId = newFolderId ?? folderId ?? '';
@@ -240,10 +244,7 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
       {/* Размер выбирается до создания, а не после: поменять его у документа,
           на котором уже расставлен текст, значит сдвинуть весь макет. */}
       {scratch && (
-        <form
-          onSubmit={onCreate}
-          className="mb-6 space-y-3 rounded-xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]"
-        >
+        <form onSubmit={onCreate} className="card mb-6 space-y-3 p-4">
           <div className="flex items-baseline justify-between gap-2">
             <h2 className="font-medium">Материал с чистого листа</h2>
             <button
@@ -269,17 +270,14 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
             {(folders.data ?? []).length > 0 && (
               <Select
                 value={formFolderId}
-                onChange={(e) => setNewFolderId(e.target.value)}
+                onChange={setNewFolderId}
+                options={[
+                  { value: '', label: 'Вне папок' },
+                  ...(folders.data ?? []).map((f) => ({ value: f.id, label: f.name })),
+                ]}
                 aria-label="Папка нового материала"
                 className="w-56"
-              >
-                <option value="">Вне папок</option>
-                {(folders.data ?? []).map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.name}
-                  </option>
-                ))}
-              </Select>
+              />
             )}
             <Button
               type="submit"
@@ -310,62 +308,37 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
 
         {documents.isPending && <p className="text-[var(--text-muted)]">Загрузка…</p>}
 
-        {nothingFound && (
-          <div className="rounded-xl border border-dashed border-[var(--line-strong)] px-6 py-12 text-center">
-            {trash ? (
-              <>
-                <Archive
-                  size={28}
-                  className="mx-auto mb-3 text-[var(--text-muted)]"
-                  strokeWidth={1.5}
-                />
-                <p className="font-medium">Архив пуст</p>
-                <p className="mt-1 text-sm text-[var(--text-muted)]">
-                  Удалённые материалы лежат здесь {TRASH_DAYS} дней — успеете передумать
-                </p>
-              </>
-            ) : (
-              <>
-                <FileText
-                  size={28}
-                  className="mx-auto mb-3 text-[var(--text-muted)]"
-                  strokeWidth={1.5}
-                />
-                <p className="font-medium">
-                  {search ? 'Ничего не нашлось' : folder ? 'Папка пуста' : 'Здесь пока пусто'}
-                </p>
-                {search ? (
-                  <p className="mt-1 text-sm text-[var(--text-muted)]">
-                    Попробуйте изменить запрос или открыть другую папку
-                  </p>
-                ) : folder ? (
-                  /* Говорим, как сюда что-то положить: папка, в которую нельзя
-                     ничего переложить, выглядит сломанной, а не пустой. */
-                  <p className="mt-1 text-sm text-[var(--text-muted)]">
-                    Переложить сюда материал можно из меню карточки в{' '}
-                    <Link to="/documents" className="underline underline-offset-4">
-                      рабочих
-                    </Link>{' '}
-                    — «Переложить в папку». Новый материал кладётся в папку при создании.
-                  </p>
-                ) : (
-                  /* Не пересказываем инструкцию, а показываем дорогу: новичок
-                     на пустом экране ищет, куда нажать, а не что почитать. */
-                  <div className="mt-1 text-sm text-[var(--text-muted)]">
-                    <p>
-                      Нажмите «Создать документ», загрузите свой бланк и подгоните поля: фамилию,
-                      место, дату.
-                    </p>
-                    <p className="mt-2">
-                      Ничего страшного не произойдёт — пока вы не выпустили файлы, ничего
-                      не расходуется.
-                    </p>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        )}
+        {nothingFound &&
+          (trash ? (
+            <EmptyState icon={Archive} title="Архив пуст">
+              Удалённые материалы лежат здесь {TRASH_DAYS} дней — успеете передумать
+            </EmptyState>
+          ) : search ? (
+            <EmptyState icon={FileText} title="Ничего не нашлось">
+              Попробуйте изменить запрос или открыть другую папку
+            </EmptyState>
+          ) : folder ? (
+            <EmptyState icon={FileText} title="Папка пуста">
+              Переложить сюда материал можно из меню карточки в{' '}
+              <Link to="/documents" className="underline underline-offset-4">
+                рабочих
+              </Link>{' '}
+              — «Переложить в папку». Новый материал кладётся в папку при создании.
+            </EmptyState>
+          ) : (
+            <EmptyState
+              icon={FileText}
+              title="Здесь пока пусто"
+              action={
+                <Button variant="primary" icon={<Plus size={16} />} onClick={() => navigate('/documents?new=1')}>
+                  Создать документ
+                </Button>
+              }
+            >
+              Загрузите свой бланк и подгоните поля: фамилию, место, дату. Пока вы не выпустили
+              файлы, ничего не расходуется.
+            </EmptyState>
+          ))}
 
         {/* Карточки одного размера, сколько влезет в строку: колонка слева
             съедает ширину, и жёсткие «три в ряд» оставляли бы на широком
@@ -375,7 +348,7 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
             <DocumentCard
               key={doc.id}
               doc={doc}
-              onRename={onRename}
+              onRename={setRenaming}
               onMove={(d, to) => move.mutate({ id: d.id, folderId: to })}
               onDuplicate={(d) => duplicate.mutate(d.id)}
               onDelete={(d) => remove.mutate(d.id)}
@@ -385,6 +358,15 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
           ))}
         </ul>
       </section>
+      {renaming && (
+        <RenameDialog
+          initial={renaming.title}
+          pending={rename.isPending}
+          error={rename.error?.message}
+          onSubmit={(title) => rename.mutate({ id: renaming.id, title })}
+          onClose={() => setRenaming(null)}
+        />
+      )}
     </LibraryLayout>
   );
 }

@@ -6,7 +6,6 @@ import { RegisterPage } from './pages/RegisterPage';
 import { ConfirmEmailPage } from './pages/ConfirmEmailPage';
 import { DocumentsPage } from './pages/DocumentsPage';
 import { AppShell } from './shell/AppShell';
-import { SectionStub } from './shell/SectionStub';
 import { OverviewPage } from './overview/OverviewPage';
 import { EditorPage } from './pages/EditorPage';
 import { RenderPage } from './pages/RenderPage';
@@ -31,6 +30,7 @@ import { PricingPage } from './pages/PricingPage';
 import { OfferPage } from './pages/OfferPage';
 import { DpaPage } from './pages/DpaPage';
 import { KnowledgeBasePage } from './docs/KnowledgeBasePage';
+import { BillingPage } from './billing/BillingPage';
 import { IssuerPage } from './public/IssuerPage';
 import { LandingPage } from './pages/LandingPage';
 import { DiscussTermsPage } from './pages/DiscussTermsPage';
@@ -41,8 +41,8 @@ import { rememberRefFromUrl } from './auth/referral-code';
 import { Loading } from './ui/Loading';
 
 /**
- * Страницы, открытые всем: отраслевые лендинги, тарифы, юридические
- * документы и база знаний.
+ * Страницы, открытые всем: отраслевые лендинги, тарифы и юридические
+ * документы.
  *
  * Перечислены один раз и подставляются в обе ветки маршрутов — для гостя
  * и для вошедшего. Иначе половина ссылок работала бы только до входа:
@@ -58,7 +58,6 @@ const PUBLIC_PAGES: [string, ReactNode][] = [
   ['/pricing', <PricingPage />],
   ['/oferta', <OfferPage />],
   ['/dpa', <DpaPage />],
-  ['/docs/*', <KnowledgeBasePage />],
 ];
 
 function publicRoutes() {
@@ -109,6 +108,7 @@ export function App() {
         {/* Публичная страница организации — реестр эмитента для проверяющих. */}
         <Route path="/org/:slug" element={<IssuerPage />} />
         {publicRoutes()}
+        <Route path="/docs/*" element={<KnowledgeBasePage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     );
@@ -158,7 +158,7 @@ export function App() {
             <Route key={s.path} path={s.path} element={s.element} />
           ))}
         </Route>
-        <Route path="/billing" element={<SectionStub path="/billing" />} />
+        <Route path="/billing" element={<BillingPage />} />
         {/* ───────── КОНЕЦ МАРШРУТОВ РАЗДЕЛОВ БЛОКА 1 ───────── */}
 
         {/* Две стороны материала — лист и таблица — тоже под полосой:
@@ -181,6 +181,9 @@ export function App() {
           element={<Navigate to="/integrations/tilda" replace />}
         />
         <Route path="/invoices" element={<InvoicesPage />} />
+        {/* База знаний для вошедшего — внутри кабинета, с той же колонкой
+            разделов; гость читает её без оболочки. */}
+        <Route path="/docs/*" element={<KnowledgeBasePage embedded />} />
       </Route>
 
       <Route path="/login" element={<Navigate to="/" replace />} />

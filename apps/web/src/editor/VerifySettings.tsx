@@ -1,5 +1,6 @@
 import { ShieldCheck } from 'lucide-react';
 import { useRecipients } from '../api/recipients';
+import { Checkbox } from '../ui/Checkbox';
 import type { DocumentDetail } from '../api/types';
 
 const COLUMN_TITLE: Record<string, string> = {
@@ -50,20 +51,12 @@ export function VerifySettings({
         Проверка по QR
       </h3>
 
-      <label className="flex cursor-pointer items-start gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={doc.verifyEnabled}
-          onChange={(e) => onSave({ verifyEnabled: e.target.checked })}
-          className="mt-0.5 accent-[var(--accent)]"
-        />
-        <span>
-          Разрешить проверку
-          <span className="mt-0.5 block text-[var(--text-muted)]">
-            Посторонний сканирует QR с документа и видит, что он настоящий.
-          </span>
-        </span>
-      </label>
+      <Checkbox
+        checked={doc.verifyEnabled}
+        onChange={(checked) => onSave({ verifyEnabled: checked })}
+        label="Разрешить проверку"
+        hint="Посторонний сканирует QR с документа и видит, что он настоящий."
+      />
 
       {doc.verifyEnabled && (
         <div>
@@ -74,15 +67,12 @@ export function VerifySettings({
           {columns.length > 0 ? (
             <div className="mt-2 space-y-1.5">
               {columns.map((col) => (
-                <label key={col.id} className="flex cursor-pointer items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={fields.includes(col.name)}
-                    onChange={() => toggleField(col.name)}
-                    className="accent-[var(--accent)]"
-                  />
-                  {COLUMN_TITLE[col.name] ?? col.name}
-                </label>
+                <Checkbox
+                  key={col.id}
+                  checked={fields.includes(col.name)}
+                  onChange={() => toggleField(col.name)}
+                  label={COLUMN_TITLE[col.name] ?? col.name}
+                />
               ))}
             </div>
           ) : (

@@ -1,23 +1,33 @@
+import { Link } from 'react-router-dom';
+import type { LucideIcon } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { EmptyState } from '../ui/EmptyState';
 
 /**
  * Экран интеграции, у которой ещё нет серверной части.
  *
- * Показываем ровно то, что человек увидит и потом: заголовок площадки
- * и кнопку «Создать интеграцию». Кнопка неактивна — обещать нажатие,
- * которое ничего не сделает, хуже, чем честно показать, что раздел
- * готовится.
+ * Говорим прямо, что готовим подключение, и даём дорогу — написать нам:
+ * кнопка «Создать», которая ничего не делает, читалась бы как поломка.
  */
-export function CreateStub({ title, about }: { title: string; about: string }) {
+export function CreateStub({
+  icon,
+  title,
+  about,
+}: {
+  icon: LucideIcon;
+  title: string;
+  about: string;
+}) {
   return (
-    <section>
-      <h2 className="font-serif text-2xl">{title}</h2>
-      <p className="mt-2.5 max-w-3xl text-[var(--text-muted)]">{about}</p>
-
-      <Button variant="primary" size="lg" className="mt-6" disabled>
-        Создать интеграцию
-      </Button>
-      <p className="mt-2 text-sm text-[var(--text-muted)]">Раздел готовится</p>
-    </section>
+    <div className="card">
+      <EmptyState icon={icon} title={title} action={
+        <Link to="/settings/support">
+          <Button>Написать в поддержку</Button>
+        </Link>
+      }>
+        {about}
+        <span className="mt-2 block">Подключение готовится — напишите нам, и мы расскажем, когда оно появится.</span>
+      </EmptyState>
+    </div>
   );
 }

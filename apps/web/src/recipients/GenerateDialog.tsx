@@ -108,7 +108,7 @@ export function GenerateDialog({
               <ChevronLeft size={18} />
             </button>
           )}
-          <h2 className="font-serif text-lg">
+          <h2 className="font-medium">
             {step === 'choose' ? (
               <>
                 Подписываем документы: <span className="tabular">{rows.length}</span>

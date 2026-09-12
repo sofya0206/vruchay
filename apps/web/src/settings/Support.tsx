@@ -33,7 +33,7 @@ export function Support() {
 
   return (
     <section>
-      <h2 className="flex items-center gap-2 font-serif text-xl">
+      <h2 className="flex items-center gap-2 text-lg font-medium">
         <LifeBuoy size={18} className="text-[var(--accent)]" />
         Поддержка
       </h2>
@@ -178,7 +178,7 @@ function TicketView({ id, onBack }: { id: string; onBack: () => void }) {
         Все обращения
       </Button>
 
-      <h2 className="mt-2 flex flex-wrap items-center gap-2 font-serif text-xl">
+      <h2 className="mt-2 flex flex-wrap items-center gap-2 text-lg font-medium">
         {data.subject}
         <StatusChip tone={STATUS[data.status].tone}>{STATUS[data.status].title}</StatusChip>
       </h2>

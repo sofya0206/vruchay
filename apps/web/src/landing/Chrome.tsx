@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Award } from 'lucide-react';
+import { Brand } from '../shell/Brand';
 import { Button } from '../ui/Button';
 
 /**
@@ -43,10 +43,8 @@ export function SiteHeader({ links }: { links?: HeaderLink[] }) {
     <header className="sticky top-0 z-20 border-b border-[var(--line)] bg-[var(--surface)]/85 backdrop-blur">
       <div className="mx-auto flex max-w-5xl items-center gap-3 px-6 py-3">
         <Link to="/" className="flex items-center gap-3">
-          <span className="grid h-8 w-8 place-items-center rounded-lg bg-[var(--accent)] text-[var(--accent-contrast)]">
-            <Award size={17} strokeWidth={1.75} />
-          </span>
-          <span className="font-serif text-lg">Вручай</span>
+          <Brand size={32} />
+          <span className="text-lg font-medium">Вручай</span>
         </Link>
         <nav className="ml-auto flex items-center gap-1 text-sm">
           {items.map((l) => (

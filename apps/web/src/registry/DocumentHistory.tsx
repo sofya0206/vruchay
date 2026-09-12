@@ -2,7 +2,7 @@ import { Download, Mail, ShieldCheck, X } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Loading } from '../ui/Loading';
 import { useRegistryDetail } from '../api/registry';
-import { StateChip } from './StateChip';
+import { StatusChip } from '../ui/Field';
 import {
   formatDate,
   formatDateTime,
@@ -37,7 +37,7 @@ export function DocumentHistory({ fileId, onClose }: Props) {
     >
       <header className="flex items-start gap-3 border-b border-[var(--line)] px-6 py-4">
         <div className="min-w-0 flex-1">
-          <h2 className="truncate font-serif text-xl">{row?.name || 'Документ'}</h2>
+          <h2 className="truncate text-lg font-medium">{row?.name || 'Документ'}</h2>
           <p className="truncate text-sm text-[var(--text-muted)]">
             {row ? `${row.documentTitle}${row.eventName ? ` · ${row.eventName}` : ''}` : ''}
           </p>
@@ -58,10 +58,10 @@ export function DocumentHistory({ fileId, onClose }: Props) {
         {row && detail.data && (
           <div className="space-y-6">
             <div className="flex flex-wrap items-center gap-2">
-              <StateChip tone={stateTone(row)}>{stateLabel(row)}</StateChip>
-              <StateChip tone={mailTone(row.mail?.status)}>{mailLabel(row.mail?.status)}</StateChip>
+              <StatusChip tone={stateTone(row)}>{stateLabel(row)}</StatusChip>
+              <StatusChip tone={mailTone(row.mail?.status)}>{mailLabel(row.mail?.status)}</StatusChip>
               {retentionLabel(row.retention) && (
-                <StateChip tone="bad">{retentionLabel(row.retention)}</StateChip>
+                <StatusChip tone="error">{retentionLabel(row.retention)}</StatusChip>
               )}
             </div>
 

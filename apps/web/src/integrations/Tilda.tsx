@@ -6,7 +6,9 @@ import { ApiError } from '../api/client';
 import type { DocumentList } from '../api/types';
 import { api } from '../api/client';
 import { Button } from '../ui/Button';
-import { Input, Label, Select, Toggle } from '../ui/Field';
+import { Radio as UiRadio } from '../ui/Checkbox';
+import { Input, Label, Toggle } from '../ui/Field';
+import { Select } from '../ui/Select';
 import { BareInput, Card, FieldCard } from './ui';
 import { EmbedCode } from './EmbedCode';
 import { TildaGuide } from './TildaGuide';
@@ -51,7 +53,7 @@ export function Tilda({ heading = true }: { heading?: boolean }) {
       {/* Заголовок снимается, когда экран стоит блоком на главной: там
           над ним уже написано, что это за блок, и два заголовка подряд
           читаются как два разных раздела. */}
-      {heading && <h2 className="font-serif text-2xl">Интеграция с Tilda</h2>}
+      {heading && <h2 className="text-lg font-medium">Интеграция с Tilda</h2>}
 
       {!list.isLoading && items.length === 0 && !adding && (
         <>
@@ -140,14 +142,15 @@ function CreateForm({
         </div>
         <div>
           <Label>Документ</Label>
-          <Select value={documentId} onChange={(e) => setDocumentId(e.target.value)}>
-            <option value="">Выберите документ</option>
-            {documents.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.title}
-              </option>
-            ))}
-          </Select>
+          <Select
+            value={documentId}
+            onChange={setDocumentId}
+            aria-label="Документ"
+            options={[
+              { value: '', label: 'Выберите документ' },
+              ...documents.map((d) => ({ value: d.id, label: d.title })),
+            ]}
+          />
         </div>
         <div className="sm:col-span-2">
           <Label>Домены, с которых принимаем заявки</Label>
@@ -399,22 +402,19 @@ function IntegrationBlock({
           <Select
             value=""
             disabled={busy}
-            onChange={(e) => {
-              const id = e.target.value;
+            aria-label="Добавить документ"
+            onChange={(id) => {
               if (id && !integration.documentIds.includes(id)) {
                 save.mutate({ documentIds: [...integration.documentIds, id] });
               }
             }}
-          >
-            <option value="">Выберите документ</option>
-            {documents
-              .filter((d) => !integration.documentIds.includes(d.id))
-              .map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.title}
-                </option>
-              ))}
-          </Select>
+            options={[
+              { value: '', label: 'Выберите документ' },
+              ...documents
+                .filter((d) => !integration.documentIds.includes(d.id))
+                .map((d) => ({ value: d.id, label: d.title })),
+            ]}
+          />
         </div>
       </Card>
 
@@ -550,20 +550,15 @@ function Radio({
   hint: string;
 }) {
   return (
-    <label className="flex cursor-pointer items-start gap-3">
-      <input
-        type="radio"
-        name={name}
-        checked={checked}
-        disabled={disabled}
-        onChange={onSelect}
-        className="mt-0.5 size-5 shrink-0 accent-[var(--accent)]"
-      />
-      <span className="max-w-3xl">
-        <span className="block">{label}</span>
-        <span className="mt-1 block text-sm text-[var(--text-muted)]">{hint}</span>
-      </span>
-    </label>
+    <UiRadio
+      name={name}
+      checked={checked}
+      disabled={disabled}
+      onChange={onSelect}
+      label={label}
+      hint={hint}
+      className="max-w-3xl gap-3 text-base"
+    />
   );
 }
 

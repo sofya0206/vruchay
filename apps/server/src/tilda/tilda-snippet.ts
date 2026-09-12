@@ -48,6 +48,18 @@ export const TILDA_STYLES = `
   border:1px solid #cfccc2;border-radius:10px;outline:none;background:#fff;color:#16211c}
 .vru-input:focus{border-color:#1f5d3f;box-shadow:0 0 0 3px rgba(31,93,63,.15)}
 .vru-input[readonly]{background:#f2f1ec;color:#5f6b64}
+/* Флажок согласия. Рисуем свой: системный квадратик в каждой системе
+   свой и рядом с зелёной кнопкой виджета выглядит чужой заплатой.
+   Вход остаётся настоящим — это чужая страница, и терять из-за
+   внешности клавиатуру, диктор и required там нельзя. */
+.vru-check{appearance:none;-webkit-appearance:none;flex:0 0 auto;width:18px;height:18px;
+  margin:1px 0 0;border:1px solid #cfccc2;border-radius:5px;background:#fff;cursor:pointer;
+  display:inline-grid;place-content:center;transition:background .15s,border-color .15s}
+.vru-check::after{content:'';width:10px;height:6px;border:2px solid #fff;border-top:0;
+  border-right:0;transform:rotate(-45deg) translate(1px,-1px);opacity:0}
+.vru-check:checked{background:#1f5d3f;border-color:#1f5d3f}
+.vru-check:checked::after{opacity:1}
+.vru-check:focus-visible{outline:2px solid #1f5d3f;outline-offset:2px}
 .vru-ghost{margin-top:10px;width:100%;padding:10px;border:1px solid #cfccc2;border-radius:10px;
   cursor:pointer;background:#fff;color:#16211c;font-size:14px}
 .vru-share{display:flex;gap:8px;justify-content:center;margin-top:14px;flex-wrap:wrap}
@@ -364,7 +376,7 @@ export function buildTildaScript(baseUrl: string, config: PublicConfig): string 
     consent.style.gap = '8px';
     consent.style.alignItems = 'flex-start';
     consent.style.textAlign = 'left';
-    var check = el('input');
+    var check = el('input', 'vru-check');
     check.type = 'checkbox';
     var span = el('span');
     // textContent, а не innerHTML: текст приходит из настроек, и вставлять

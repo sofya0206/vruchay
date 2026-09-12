@@ -3,24 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#1F5D3F" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#10150F" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#127EE3" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Вручай" />
-    <!--
-      Значка во вкладке нет: там остаётся одно слово.
-
-      Пустой `data:` вместо простого отсутствия ссылки — не причуда.
-      Без ссылки браузер идёт за `/favicon.ico` сам и, не найдя его,
-      достаёт из кеша прежний значок; пустая ссылка говорит «значка нет»
-      прямо и перебивает кеш.
-
-      Иконка приложения при этом на месте: она объявлена в манифесте
-      (vite.config.ts) и показывается на домашнем экране и в списке
-      установленных — там значок нужен, это единственное, чем приложение
-      себя называет.
-    -->
-    <link rel="icon" href="data:," />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>Вручай</title>
 
@@ -45,7 +31,7 @@
         z-index: 9999;
         display: grid;
         place-items: center;
-        background: #fbfaf7;
+        background: #ffffff;
         opacity: 0;
         animation: splash-in 0.4s ease-out 0.35s forwards;
       }
@@ -53,10 +39,10 @@
         width: 56px;
         height: 56px;
         border-radius: 16px;
-        /* Синий дизайн-системы, тот же, что у значка вкладки и логотипа
-           в шапке: заставка — первое, что человек видит, и знак на ней
-           должен быть тем же самым, а не родственным. */
-        background: #127ee3;
+        /* Тот же градиент, что у знака в шапке и у иконки приложения:
+           заставка — первое, что человек видит, и знак на ней должен быть
+           тем же самым, а не родственным. */
+        background: linear-gradient(135deg, #0f77ff, #6d5df6);
         display: grid;
         place-items: center;
         animation: splash-beat 1.8s ease-in-out infinite;
@@ -70,7 +56,7 @@
         margin-top: 18px;
         text-align: center;
         font: 500 15px/1.4 'Jost', ui-sans-serif, system-ui, -apple-system, sans-serif;
-        color: #5f6b64;
+        color: #36394a;
       }
       @keyframes splash-in {
         to {
@@ -90,13 +76,7 @@
       }
       @media (prefers-color-scheme: dark) {
         #splash {
-          background: #10150f;
-        }
-        #splash .mark {
-          background: #0f77ff;
-        }
-        #splash .word {
-          color: #97a399;
+          background: #ffffff;
         }
       }
       /* Тем, кто просил систему не двигать картинки, показываем неподвижно. */
@@ -186,10 +166,10 @@
     <div id="splash">
       <div>
         <div class="mark">
-          <!-- Медаль залита, а не обведена: тот же знак, что во вкладке. -->
-          <svg width="30" height="30" viewBox="0 0 24 24" fill="#ffffff" aria-hidden="true">
-            <circle cx="12" cy="9.5" r="4.3" />
-            <path d="M9.2 13.7 7.9 20.5 12 18.2l4.1 2.3-1.3-6.8L12 15.1Z" />
+          <!-- Печать с галочкой — тот же знак, что в шапке (shell/Brand.tsx). -->
+          <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#ffffff" aria-hidden="true">
+            <circle cx="12" cy="12" r="6.6" stroke-width="1.9" />
+            <path d="M8.7 12.3l2.2 2.2 4.6-4.9" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" />
           </svg>
         </div>
         <div class="word">Вручай</div>

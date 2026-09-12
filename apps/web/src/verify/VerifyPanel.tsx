@@ -4,7 +4,10 @@ import { CalendarClock, Check, ShieldCheck } from 'lucide-react';
 import { api } from '../api/client';
 import type { DocumentDetail } from '../api/types';
 import { Button } from '../ui/Button';
-import { Input, Label, Select } from '../ui/Field';
+import { Radio } from '../ui/Checkbox';
+import { Input, Label } from '../ui/Field';
+import { DateField } from '../ui/DateField';
+import { Select } from '../ui/Select';
 
 /**
  * Готовые сроки: то, что просят чаще всего. Своя длительность — рядом
@@ -95,7 +98,7 @@ export function VerifyPanel({ doc }: { doc: DocumentDetail }) {
   return (
     <div className="mx-auto max-w-3xl space-y-8 px-6 py-6">
       <section>
-        <h2 className="flex items-center gap-2 font-serif text-xl">
+        <h2 className="flex items-center gap-2 text-lg font-medium">
           <CalendarClock size={18} className="text-[var(--accent)]" />
           Срок действия
         </h2>
@@ -114,31 +117,24 @@ export function VerifyPanel({ doc }: { doc: DocumentDetail }) {
               ['date', 'До фиксированной даты', 'сезонные допуски, членство'],
             ] as const
           ).map(([value, label, hint]) => (
-            <label key={value} className="flex cursor-pointer items-start gap-2 text-sm">
-              <input
-                type="radio"
-                name="expiry-mode"
-                checked={mode === value}
-                onChange={() => setMode(value)}
-                className="mt-0.5 accent-[var(--accent)]"
-              />
-              <span>
-                {label}
-                <span className="block text-[var(--text-muted)]">{hint}</span>
-              </span>
-            </label>
+            <Radio
+              key={value}
+              name="expiry-mode"
+              checked={mode === value}
+              onChange={() => setMode(value)}
+              label={label}
+              hint={hint}
+            />
           ))}
 
           {mode === 'duration' && (
             <div className="space-y-2 pl-6">
               <Label>Срок</Label>
-              <Select value={preset} onChange={(e) => setPreset(e.target.value)}>
-                {PRESETS.map((p) => (
-                  <option key={p.value} value={p.value}>
-                    {p.label}
-                  </option>
-                ))}
-              </Select>
+              <Select
+                value={preset}
+                onChange={setPreset}
+                options={PRESETS.map((p) => ({ value: p.value, label: p.label }))}
+              />
               {preset === 'custom' && (
                 <>
                   <Input
@@ -158,7 +154,7 @@ export function VerifyPanel({ doc }: { doc: DocumentDetail }) {
           {mode === 'date' && (
             <div className="space-y-2 pl-6">
               <Label>Действителен до</Label>
-              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              <DateField value={date} onChange={setDate} aria-label="Действителен до" />
             </div>
           )}
 
@@ -186,7 +182,7 @@ export function VerifyPanel({ doc }: { doc: DocumentDetail }) {
       </section>
 
       <section>
-        <h2 className="flex items-center gap-2 font-serif text-xl">
+        <h2 className="flex items-center gap-2 text-lg font-medium">
           <ShieldCheck size={18} className="text-[var(--accent)]" />
           Страница проверки
         </h2>

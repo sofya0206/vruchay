@@ -59,9 +59,20 @@
   --text-6xl--line-height: 1.25;
   --text-6xl--letter-spacing: 0.018em;
 
-  --shadow-subtle:
-    0 0 0 1px var(--color-electric-blue), 0 1px 2px 0 rgba(12, 43, 100, 0.32),
-    0 6px 16px 0 rgba(12, 43, 100, 0.32);
+}
+
+/*
+ * Две утилиты, из которых собран весь кабинет: карточка и волосяная линия.
+ * Радиусы и тени в остальном коде не пишутся вручную — берутся отсюда.
+ */
+@utility card {
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: var(--ring-line);
+}
+
+@utility hairline {
+  box-shadow: var(--ring-line);
 }
 
 :root {
@@ -197,6 +208,71 @@ h2 {
 :where(a, button, input, select, textarea):focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
+}
+
+/*
+ * Ползунок. Единственный контрол, который остаётся нативным: перетаскивание,
+ * шаг стрелками и Home/End браузер даёт сам, и переписывать это на div
+ * значило бы потерять их ради одной только внешности. Красим дорожку
+ * и бегунок — больше от системного вида ничего не остаётся.
+ *
+ * Псевдоэлементы Chromium и Firefox в один селектор через запятую не
+ * соберёшь: незнакомый префикс заставляет движок выбросить всё правило.
+ */
+input[type='range'] {
+  appearance: none;
+  background: transparent;
+  height: 16px;
+}
+
+input[type='range']::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--line-strong);
+}
+
+input[type='range']::-moz-range-track {
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--line-strong);
+}
+
+input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border-radius: 9999px;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  box-shadow: 0 1px 2px 0 rgba(12, 43, 100, 0.32);
+}
+
+input[type='range']::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  box-shadow: 0 1px 2px 0 rgba(12, 43, 100, 0.32);
+}
+
+input[type='range']:disabled::-webkit-slider-thumb {
+  background: var(--line-strong);
+}
+
+/*
+ * Уголок-хват у текстовых полей. Системный рисуется тремя серыми
+ * насечками — единственное место в интерфейсе, где встречается такой
+ * штрих. Тянуть поле оставляем, убираем только сам глиф: в Chromium
+ * он живёт в `::-webkit-resizer`, в остальных браузерах его и нет.
+ */
+textarea {
+  resize: vertical;
+}
+
+textarea::-webkit-resizer {
+  display: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -391,10 +467,6 @@ h2 {
 :root[data-density='compact'] table :is(th, td) {
   padding-top: 0.375rem;
   padding-bottom: 0.375rem;
-}
-
-:root[data-density='compact'] main {
-  --density-gap: 0.75rem;
 }
 
 /* Посадочная страница. Гарнитура здесь та же, что и в кабинете, — задан
