@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Ban,
-  CheckCheck,
   CheckCircle2,
   CircleHelp,
   Columns3,
@@ -60,11 +59,19 @@ import type { WorkspaceTab } from '../mailing/workspace-tabs';
 export function RecipientsTable({
   doc,
   onOpen,
+  onIssue,
+  startIssue = false,
+  onIssueStarted,
   onGoToRegistry,
 }: {
   doc: DocumentDetail;
   /** Переход к соседнему экрану материала: правила, проверка, письмо. */
   onOpen: (tab: WorkspaceTab) => void;
+  /** «Выпустить» из таблицы: ведёт по шагам выпуска, а не открывает окно сразу. */
+  onIssue: () => void;
+  /** Шаги пройдены — открыть окно выпуска сразу при показе таблицы. */
+  startIssue?: boolean;
+  onIssueStarted?: () => void;
   onGoToRegistry: () => void;
 }) {
   const documentId = doc.id;
@@ -93,6 +100,15 @@ export function RecipientsTable({
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState(false);
   const [asking, setAsking] = useState(false);
+
+  // Последний шаг выпуска вернул к таблице с просьбой открыть окно —
+  // открываем и снимаем просьбу с адреса, чтобы она не повторилась
+  // при обновлении страницы.
+  useEffect(() => {
+    if (!startIssue) return;
+    setAsking(true);
+    onIssueStarted?.();
+  }, [startIssue]);
   const [sent, setSent] = useState<SendResult | null>(null);
   const [downloading, setDownloading] = useState(false);
   // Отчёт об ошибках спрашиваем только когда есть о чём: лишний запрос
@@ -187,11 +203,15 @@ export function RecipientsTable({
      строчка на пустом экране читается как сломанная страница. */
   if (table.isPending)
     return (
-      <div className="grid h-full place-items-center text-[var(--text-muted)]">Загрузка таблицы…</div>
+      <div className="grid h-full place-items-center text-[var(--text-muted)]">
+        Загрузка таблицы…
+      </div>
     );
   if (!table.data)
     return (
-      <div className="grid h-full place-items-center text-[var(--text-muted)]">Таблица недоступна</div>
+      <div className="grid h-full place-items-center text-[var(--text-muted)]">
+        Таблица недоступна
+      </div>
     );
 
   const { columns, rows, checkedCount } = table.data;
@@ -204,7 +224,9 @@ export function RecipientsTable({
   const running = !stuck && (job?.status === 'queued' || job?.status === 'running');
   // Доделывать есть что, пока сделано меньше обещанного.
   const canResume =
-    !!job && (job.status === 'failed' || job.status === 'canceled' || stuck) && job.done < job.total;
+    !!job &&
+    (job.status === 'failed' || job.status === 'canceled' || stuck) &&
+    job.done < job.total;
 
   /**
    * Разбор для диалога. Один путь и для файла, и для вставки: правила
@@ -495,11 +517,9 @@ export function RecipientsTable({
           <Button
             variant="primary"
             size="sm"
-            icon={
-              running ? <LoaderCircle size={15} className="animate-spin" /> : <CheckCheck size={15} />
-            }
+            icon={running ? <LoaderCircle size={15} className="animate-spin" /> : undefined}
             disabled={running || checkedCount === 0}
-            onClick={() => setAsking(true)}
+            onClick={onIssue}
           >
             {running ? 'Выпускаем' : `Выпустить ${checkedCount || ''}`}
           </Button>
@@ -526,8 +546,8 @@ export function RecipientsTable({
           {send.isPending ? (
             <span className="flex items-center gap-2">
               <LoaderCircle size={14} className="animate-spin" />
-              Документы созданы: <span className="tabular font-medium">{job.done}</span>.
-              Отправляем письма…
+              Документы созданы: <span className="tabular font-medium">{job.done}</span>. Отправляем
+              письма…
             </span>
           ) : sent ? (
             <>
@@ -549,8 +569,8 @@ export function RecipientsTable({
           ) : (
             <>
               <span>
-                Документы созданы: <span className="tabular font-medium">{job.done}</span>. Они
-                пока никому не отправлены.
+                Документы созданы: <span className="tabular font-medium">{job.done}</span>. Они пока
+                никому не отправлены.
               </span>
               <button
                 onClick={() => setDownloading(true)}
@@ -569,8 +589,8 @@ export function RecipientsTable({
           задание не принимало, а помогало только «Отменить». */}
       {stuck && (
         <div className="border-b border-[var(--line)] bg-[var(--surface-sunken)] px-4 py-3 text-sm">
-          Выпуск так и не начался: очередь заданий не приняла пакет. Ничего не списано —
-          нажмите «Продолжить», и документы создадутся с того же места.
+          Выпуск так и не начался: очередь заданий не приняла пакет. Ничего не списано — нажмите
+          «Продолжить», и документы создадутся с того же места.
         </div>
       )}
 
@@ -587,7 +607,9 @@ export function RecipientsTable({
               <>
                 {' '}
                 За оставшиеся{' '}
-                <span className="tabular font-medium">{job.total - job.done - job.failed}</span>{' '}
+                <span className="tabular font-medium">
+                  {job.total - job.done - job.failed}
+                </span>{' '}
                 документов ничего не списано — выпуск можно продолжить с того же места.
               </>
             )}
@@ -661,12 +683,16 @@ export function RecipientsTable({
         {rows.length === 0 ? (
           <div className="grid h-full place-items-center p-10 text-center">
             <div>
-              <FileUp size={26} className="mx-auto mb-3 text-[var(--text-muted)]" strokeWidth={1.5} />
+              <FileUp
+                size={26}
+                className="mx-auto mb-3 text-[var(--text-muted)]"
+                strokeWidth={1.5}
+              />
               <p className="font-medium">Список получателей пуст</p>
               <p className="mt-1 max-w-md text-sm text-[var(--text-muted)]">
-                Загрузите файл Excel или CSV — подойдёт обычный список участников,
-                шапку и лишние строки сервис распознает сам. Или скопируйте таблицу
-                в Excel и вставьте сюда через Ctrl+V.
+                Загрузите файл Excel или CSV — подойдёт обычный список участников, шапку и лишние
+                строки сервис распознает сам. Или скопируйте таблицу в Excel и вставьте сюда через
+                Ctrl+V.
               </p>
               {/* Кнопка здесь обязательна: на панели значок без подписи,
                   и на пустом экране по нему не догадаться. */}
@@ -739,9 +765,7 @@ export function RecipientsTable({
                     <input
                       type="checkbox"
                       checked={row.checked}
-                      onChange={() =>
-                        m.updateRow.mutate({ rowId: row.id, checked: !row.checked })
-                      }
+                      onChange={() => m.updateRow.mutate({ rowId: row.id, checked: !row.checked })}
                       aria-label="Включить в генерацию"
                       className="accent-[var(--accent)]"
                     />

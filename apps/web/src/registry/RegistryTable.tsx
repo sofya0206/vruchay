@@ -31,10 +31,10 @@ export function RegistryTable({ rows, selected, onToggle, onToggleAll, onOpen }:
 
   return (
     <div className="overflow-x-auto rounded-2xl bg-[var(--surface)] ring-1 ring-[var(--line)]">
-      <table className="w-full min-w-[64rem] border-collapse text-sm">
+      <table className="w-full min-w-[64rem] border-collapse">
         <thead>
-          <tr className="border-b border-[var(--line)] text-left text-xs tracking-wide text-[var(--text-muted)] uppercase">
-            <th className="w-10 px-3 py-3">
+          <tr className="border-b border-[var(--line)] text-left text-sm tracking-wide text-[var(--text-muted)] uppercase">
+            <th className="w-10 px-4 py-3.5">
               <input
                 type="checkbox"
                 checked={allChecked}
@@ -43,13 +43,13 @@ export function RegistryTable({ rows, selected, onToggle, onToggleAll, onOpen }:
                 className="size-4 accent-[var(--accent)]"
               />
             </th>
-            <th className="px-3 py-3 font-medium">Получатель</th>
-            <th className="px-3 py-3 font-medium">Материал и мероприятие</th>
-            <th className="px-3 py-3 font-medium">Выдан</th>
-            <th className="px-3 py-3 font-medium">Письмо</th>
-            <th className="px-3 py-3 font-medium">Состояние</th>
-            <th className="px-3 py-3 text-right font-medium">Проверок</th>
-            <th className="w-10 px-3 py-3" />
+            <th className="px-4 py-3.5 font-medium">Получатель</th>
+            <th className="px-4 py-3.5 font-medium">Материал и мероприятие</th>
+            <th className="px-4 py-3.5 font-medium">Выдан</th>
+            <th className="px-4 py-3.5 font-medium">Письмо</th>
+            <th className="px-4 py-3.5 font-medium">Состояние</th>
+            <th className="px-4 py-3.5 text-right font-medium">Проверок</th>
+            <th className="w-10 px-4 py-3.5" />
           </tr>
         </thead>
         <tbody>
@@ -72,7 +72,7 @@ export function RegistryTable({ rows, selected, onToggle, onToggleAll, onOpen }:
                 onClick={() => onOpen(row.fileId)}
                 className="cursor-pointer border-b border-[var(--line)] last:border-0 hover:bg-[var(--surface-sunken)]"
               >
-                <td className="px-3 py-3 align-top" onClick={(e) => e.stopPropagation()}>
+                <td className="px-4 py-3.5 align-top" onClick={(e) => e.stopPropagation()}>
                   <input
                     type="checkbox"
                     checked={selected.has(row.fileId)}
@@ -82,25 +82,25 @@ export function RegistryTable({ rows, selected, onToggle, onToggleAll, onOpen }:
                   />
                 </td>
 
-                <td className="px-3 py-3 align-top">
+                <td className="px-4 py-3.5 align-top">
                   <p className="font-medium">{row.name || 'Без имени'}</p>
-                  <p className="text-xs text-[var(--text-muted)]">{row.email || 'без адреса'}</p>
+                  <p className="text-sm text-[var(--text-muted)]">{row.email || 'без адреса'}</p>
                 </td>
 
-                <td className="px-3 py-3 align-top">
+                <td className="px-4 py-3.5 align-top">
                   <p>{row.documentTitle}</p>
                   {row.eventName && (
-                    <p className="text-xs text-[var(--text-muted)]">{row.eventName}</p>
+                    <p className="text-sm text-[var(--text-muted)]">{row.eventName}</p>
                   )}
                   {retention && (
-                    <p className="mt-1 inline-flex items-center gap-1 text-xs text-[var(--danger)]">
+                    <p className="mt-1 inline-flex items-center gap-1 text-sm text-[var(--danger)]">
                       <Trash2 size={12} />
                       {retention}
                     </p>
                   )}
                 </td>
 
-                <td className="px-3 py-3 align-top whitespace-nowrap tabular-nums">
+                <td className="px-4 py-3.5 align-top whitespace-nowrap tabular-nums">
                   {formatDate(row.issuedAt)}
                   {row.expiresAt && (
                     <p className="text-[11px] text-[var(--text-muted)]">
@@ -112,16 +112,16 @@ export function RegistryTable({ rows, selected, onToggle, onToggleAll, onOpen }:
                   </p>
                 </td>
 
-                <td className="px-3 py-3 align-top">
+                <td className="px-4 py-3.5 align-top">
                   <StateChip tone={mailTone(row.mail?.status)}>
                     {mailLabel(row.mail?.status)}
                   </StateChip>
                   {row.mail?.error && (
-                    <p className="mt-1 max-w-48 text-xs text-[var(--danger)]">{row.mail.error}</p>
+                    <p className="mt-1 max-w-48 text-sm text-[var(--danger)]">{row.mail.error}</p>
                   )}
                 </td>
 
-                <td className="px-3 py-3 align-top">
+                <td className="px-4 py-3.5 align-top">
                   <StateChip tone={stateTone(row)}>
                     {row.state === 'revoked' && <ShieldAlert size={12} />}
                     {stateLabel(row)}
@@ -139,9 +139,9 @@ export function RegistryTable({ rows, selected, onToggle, onToggleAll, onOpen }:
                   )}
                 </td>
 
-                <td className="px-3 py-3 text-right align-top tabular-nums">{row.verifyCount}</td>
+                <td className="px-4 py-3.5 text-right align-top tabular-nums">{row.verifyCount}</td>
 
-                <td className="px-3 py-3 align-top">
+                <td className="px-4 py-3.5 align-top">
                   <button
                     type="button"
                     onClick={(e) => {

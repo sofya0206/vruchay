@@ -29,12 +29,17 @@ export function Card({
         {count !== undefined && (
           <span className="text-sm text-[var(--text-muted)] tabular-nums">{count}</span>
         )}
+        {/* Стрелка без подписи: карточка уже названа как раздел, и «Весь
+            реестр» рядом с «Реестр выданного» повторяло слово. Куда ведёт —
+            в подсказке и для чтения с экрана. */}
         {to && linkLabel && (
           <Link
             to={to}
-            className="ml-auto inline-flex items-center gap-1 text-sm text-[var(--accent)] underline-offset-4 hover:underline"
+            title={linkLabel}
+            aria-label={linkLabel}
+            className="-my-1 ml-auto grid h-9 w-9 shrink-0 place-items-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
           >
-            {linkLabel} <ArrowRight size={14} />
+            <ArrowRight size={18} />
           </Link>
         )}
       </header>

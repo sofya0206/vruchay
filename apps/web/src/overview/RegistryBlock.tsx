@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, X } from 'lucide-react';
 import {
@@ -16,12 +16,14 @@ import {
   stateLabel,
   stateTone,
 } from '../registry/registry-format';
-import { Button } from '../ui/Button';
 import { cn } from '../ui/cn';
 import { Input } from '../ui/Field';
 import { Card, Empty } from './Block';
 
 const LAST_SHOWN = 6;
+
+/** Пауза после последней буквы, прежде чем спрашивать сервер. */
+const DEBOUNCE_MS = 250;
 
 type Tab = '' | Extract<FileState, 'valid' | 'revoked' | 'replaced'>;
 
@@ -40,10 +42,11 @@ const TABS: { id: Tab; label: string }[] = [
  * со счётчиками стоят прямо над таблицей: «Отозваны 2» читается как дело,
  * а не как пункт в выпадающем списке.
  *
- * Поиск работает здесь же, по Enter, и никуда не уводит: «найдите грамоту
- * Ивановой» — вопрос на десять секунд, и переход в раздел ради него —
- * лишний шаг. За всем найденным целиком — ссылка «Весь реестр», она
- * несёт с собой и слово, и отбор.
+ * Поиск живой и никуда не уводит: совпадения встают под строкой с первой
+ * буквы, Enter применяет набранное сразу, не дожидаясь паузы. «Найдите
+ * грамоту Ивановой» — вопрос на десять секунд, и переход в раздел ради
+ * него — лишний шаг. За всем найденным целиком — стрелка в заголовке,
+ * она несёт с собой и слово, и отбор.
  *
  * Счётчики считаются по тому же поиску, что и таблица, — иначе над
  * тремя найденными Ивановыми стояло бы «Все 50».
@@ -56,10 +59,19 @@ export function RegistryBlock() {
   const registry = useRegistry(filters, 0, LAST_SHOWN);
   const totals = useRegistryAnalytics({ ...emptyFilters, search }, true);
 
+  useEffect(() => {
+    const id = setTimeout(() => setSearch(query.trim()), DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [query]);
+
   function onSubmit(event: FormEvent) {
     event.preventDefault();
     setSearch(query.trim());
   }
+
+  // Ответ на прежний запрос стоит, пока считается новый (placeholderData):
+  // приглушаем его, чтобы совпадения по «Ива» не приняли за «Иван».
+  const stale = registry.isFetching && registry.data !== undefined;
 
   function clear() {
     setQuery('');
@@ -96,6 +108,7 @@ export function RegistryBlock() {
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Фамилия, почта или проверочный код"
               aria-label="Найти в реестре выданного"
+              autoComplete="off"
             />
             {(query || search) && (
               <button
@@ -108,9 +121,6 @@ export function RegistryBlock() {
               </button>
             )}
           </div>
-          <Button type="submit" variant="secondary" size="sm">
-            Найти
-          </Button>
         </form>
         <div role="tablist" aria-label="Состояние" className="flex flex-wrap gap-1">
           {TABS.map((item) => (
@@ -154,7 +164,10 @@ export function RegistryBlock() {
               : 'Выданных документов пока нет. Они появятся здесь сразу после первого выпуска — и останутся навсегда.'}
         </Empty>
       ) : (
-        <div className="overflow-x-auto">
+        <div
+          className={cn('overflow-x-auto transition-opacity', stale && 'opacity-60')}
+          aria-busy={stale}
+        >
           <table className="w-full min-w-[46rem] table-fixed border-collapse text-sm">
             {/* Ширины заданы, иначе длинная фамилия растягивает свою колонку,
                 и «Состояние» с «Проверок» уезжают за край карточки. */}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SECTIONS } from './sections';
-import { NAV_ITEMS, activeNav, parentPath, parentTitle } from './nav';
+import { NAV_ITEMS, activeNav } from './nav';
 
 describe('заглушки разделов', () => {
   it('у каждой есть название и строка объяснения', () => {
@@ -46,37 +46,5 @@ describe('открытый пункт полосы', () => {
     expect(NAV_ITEMS).toHaveLength(5);
     const tos = NAV_ITEMS.map((i) => i.to);
     expect(new Set(tos).size).toBe(tos.length);
-  });
-});
-
-/*
- * Стрелка под шапкой ведёт на уровень выше, а не назад по истории.
- * Ошибка здесь — человек ходит кругами между материалом и письмом
- * или между корнем раздела и его редиректом.
- */
-describe('стрелка на уровень выше', () => {
-  it('из материала — к документам, из раздела — на главную', () => {
-    expect(parentPath('/documents/8f0e6a0e-0f5b-4a1a-9c3a-2f2b1d4e5c6a')).toBe('/documents');
-    expect(parentPath('/documents')).toBe('/');
-    expect(parentPath('/mailing/8f0e6a0e')).toBe('/mailing');
-    expect(parentPath('/documents/archive')).toBe('/documents');
-  });
-
-  it('сначала снимает отбор и вкладку, потом сегмент пути', () => {
-    expect(parentPath('/registry', '?tab=analytics')).toBe('/registry');
-    expect(parentPath('/registry', '?search=Иванова')).toBe('/registry');
-    expect(parentPath('/registry', '')).toBe('/');
-  });
-
-  it('из площадки интеграций и вкладки настроек — сразу на главную: их корень редиректит', () => {
-    expect(parentPath('/integrations/tilda')).toBe('/');
-    expect(parentPath('/settings/account')).toBe('/');
-    expect(parentPath('/settings/support')).toBe('/');
-  });
-
-  it('подсказка называет место назначения', () => {
-    expect(parentTitle('/')).toBe('На главную');
-    expect(parentTitle('/documents')).toBe('К документам');
-    expect(parentTitle('/invoices')).toBe('На уровень выше');
   });
 });

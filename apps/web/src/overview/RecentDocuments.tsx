@@ -13,7 +13,7 @@ import { formatWhen, jobLook } from './format';
  */
 export function RecentDocuments({ data }: { data: Overview }) {
   return (
-    <Card title="Недавние документы" to="/documents" linkLabel="Все">
+    <Card title="Документы" to="/documents" linkLabel="Все документы">
       {data.documents.length === 0 ? (
         <Empty>Документов пока нет. Начните с кнопки «Создать документ».</Empty>
       ) : (
