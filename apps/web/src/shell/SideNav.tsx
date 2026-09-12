@@ -25,8 +25,20 @@ export function SideNav({ collapsed, onToggle }: { collapsed: boolean; onToggle:
   const { pathname } = useLocation();
   const active = activeNav(pathname);
 
+  /*
+   * Ширина меняется скачком, без анимации: анимированная ширина
+   * перевёрстывала на каждом кадре всё, что справа, — реестр на
+   * полсотни строк и холст редактора, — и сворачивание «зависало».
+   * Ширина задана классом здесь, а не переменной на корне страницы:
+   * смена переменной на предке пересчитывала стили всему дереву.
+   */
   return (
-    <aside className="hidden w-[var(--sidebar-w)] shrink-0 border-r border-[var(--line)] bg-[var(--surface)] transition-[width] duration-[var(--duration-base)] md:block print:hidden">
+    <aside
+      className={cn(
+        'hidden shrink-0 border-r border-[var(--line)] bg-[var(--surface)] md:block print:hidden',
+        collapsed ? 'w-16' : 'w-60',
+      )}
+    >
       {/* Липнет под шапку тем же приёмом, что колонки внутри разделов:
           сама колонка растянута на всю строку, а на месте стоит её
           содержимое — иначе при прокрутке она уехала бы вверх. */}

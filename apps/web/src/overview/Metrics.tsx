@@ -26,8 +26,10 @@ export function Metrics({ data, now = new Date() }: { data: Overview; now?: Date
   const undelivered = data.mail.undelivered;
   const deliveredShare = sent > 0 ? Math.round((delivered / sent) * 100) : null;
 
+  // `contents`: плитки встают прямо в сетку страницы, чтобы четвёртая
+  // делила колонку с блоками справа, а не жила в своей отдельной сетке.
   return (
-    <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <ul className="contents">
       <Tile
         label={usage.source === 'trial' ? 'Осталось на пробе' : 'Осталось по плану'}
         value={unlimited ? '∞' : (usage.left ?? 0)}

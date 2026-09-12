@@ -1,23 +1,28 @@
 import { useState } from 'react';
+import { Plus } from 'lucide-react';
 import { useOverview } from '../api/overview';
 import { useMe } from '../auth/useAuth';
+import { Button } from '../ui/Button';
 import { Loading } from '../ui/Loading';
+import { PageHeader } from '../ui/PageHeader';
 import { DocsLinks } from './DocsLinks';
-import { Flow } from './Flow';
+import { protocolTitle } from './format';
 import { Happening } from './Happening';
 import { Metrics } from './Metrics';
 import { RecentDocuments } from './RecentDocuments';
 import { RegistryBlock } from './RegistryBlock';
+import { useCreateMaterial } from './useCreateMaterial';
 import { Welcome } from './Welcome';
 import { markWelcomeSeen, welcomeSeen } from './welcome-seen';
 
 /**
  * Главная кабинета — сводка и реестр, а не оглавление.
  *
- * Сверху вниз: путь награждения с единственной залитой кнопкой, четыре
- * плитки (остаток, выпуск за месяц, доставка писем, проверки по QR),
- * ниже — реестр выданного во всю ширину и колонка справа: что идёт
- * сейчас и недавние документы.
+ * Сверху заголовок раздела с единственной залитой кнопкой «Создать
+ * документ», под ним четыре плитки (остаток, выпуск за месяц, доставка
+ * писем, проверки по QR), ниже — реестр выданного на три колонки
+ * и четвёртая колонка: письма и недавние документы. Сетка одна на всё:
+ * четвёртая плитка и колонка справа стоят на одной линии.
  *
  * Такой порядок — общий у сервисов, которые смотрели: одно действие
  * в шапке или первой строке, цифры, затем таблица. Реестр стоит в теле
@@ -33,6 +38,7 @@ import { markWelcomeSeen, welcomeSeen } from './welcome-seen';
 export function OverviewPage() {
   const me = useMe();
   const overview = useOverview();
+  const create = useCreateMaterial();
   // Нажатие в этой же вкладке: localStorage мы уже прочитали и второй раз
   // за ним не пойдём, поэтому закрытие держим и в состоянии страницы.
   const [dismissed, setDismissed] = useState(false);
@@ -71,21 +77,41 @@ export function OverviewPage() {
     );
   }
 
-  // Во всю ширину окна и с теми же полями, что у шапки: первая карточка
-  // начинается ровно под знаком, а справа не остаётся пустого поля,
-  // из-за которого вся страница выглядела сдвинутой влево.
+  // Поля те же, что у остальных разделов (SectionLayout): под колонкой
+  // слева главная начинается на той же линии, что документы и реестр.
   return (
     <>
-      <main className="w-full px-3 pt-5 pb-10 sm:px-5">
-        <div className="grid gap-4">
-          <Flow data={data} />
+      <main className="min-w-0 flex-1 px-6 py-6">
+        <PageHeader
+          title="Главная"
+          about="Сколько осталось, что выпущено за месяц и кому что выдано."
+          actions={
+            <Button
+              variant="primary"
+              icon={<Plus size={16} />}
+              disabled={create.isPending}
+              onClick={() => create.mutate(protocolTitle())}
+            >
+              Создать документ
+            </Button>
+          }
+        />
+        {create.isError && (
+          <p role="alert" className="mb-4 text-sm text-[var(--danger)]">
+            Не удалось создать документ. Попробуйте ещё раз.
+          </p>
+        )}
+        {/* Одна сетка на плитки и на нижний ряд: реестр занимает три
+            колонки, письма с документами — четвёртую, ровно под четвёртой
+            плиткой. Две сетки друг под другом ломали эту линию. */}
+        <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Metrics data={data} />
-          <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+          <div className="min-w-0 sm:col-span-2 lg:col-span-3">
             <RegistryBlock />
-            <div className="grid gap-4">
-              <Happening data={data} />
-              <RecentDocuments data={data} />
-            </div>
+          </div>
+          <div className="grid gap-4 sm:col-span-2 lg:col-span-1">
+            <Happening data={data} />
+            <RecentDocuments data={data} />
           </div>
         </div>
       </main>
