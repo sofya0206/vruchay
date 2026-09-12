@@ -137,7 +137,7 @@ export function RegistryPage() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-8">
+    <main className="w-full px-6 py-7 md:px-8">
       <div role="tablist" className="mb-6 inline-flex rounded-xl bg-[var(--surface-sunken)] p-1">
         {(
           [
@@ -150,7 +150,7 @@ export function RegistryPage() {
             role="tab"
             aria-selected={tab === value}
             onClick={() => setTab(value)}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors duration-200 ${
+            className={`rounded-lg px-5 py-2.5 font-medium transition-colors duration-200 ${
               tab === value
                 ? 'bg-[var(--surface)] text-[var(--text)]'
                 : 'text-[var(--text-muted)] hover:text-[var(--text)]'

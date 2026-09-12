@@ -11,8 +11,11 @@ import { ArrowRight } from 'lucide-react';
  * заголовок у каждого. Разная рамка у каждого блока превратила бы полосу
  * обратно в набор карточек, из которого человек выбирает, куда нажать.
  *
- * Ссылка справа ведёт в раздел целиком: на главной стоит рабочая часть,
- * а всё остальное — списки, архив, настройки — за этой ссылкой.
+ * Стрелка справа ведёт в раздел целиком: на главной стоит рабочая часть,
+ * а всё остальное — списки, архив, настройки — за ней. Без подписи:
+ * блок уже называется как раздел, и «Все документы» рядом с «Мои
+ * документы» повторяло слово; название остаётся в подсказке и для
+ * чтения с экрана.
  */
 export function Block({
   title,
@@ -39,9 +42,11 @@ export function Block({
         {to && linkLabel && (
           <Link
             to={to}
-            className="inline-flex shrink-0 items-center gap-1 text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--text)]"
+            title={linkLabel}
+            aria-label={linkLabel}
+            className="grid h-9 w-9 shrink-0 place-items-center self-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
           >
-            {linkLabel} <ArrowRight size={14} />
+            <ArrowRight size={18} />
           </Link>
         )}
       </div>
