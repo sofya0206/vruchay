@@ -51,7 +51,7 @@ export function Tilda({ heading = true }: { heading?: boolean }) {
       {/* Заголовок снимается, когда экран стоит блоком на главной: там
           над ним уже написано, что это за блок, и два заголовка подряд
           читаются как два разных раздела. */}
-      {heading && <h2 className="font-serif text-2xl">Интеграция с Tilda</h2>}
+      {heading && <h2 className="text-lg font-medium">Интеграция с Tilda</h2>}
 
       {!list.isLoading && items.length === 0 && !adding && (
         <>

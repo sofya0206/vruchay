@@ -59,9 +59,20 @@
   --text-6xl--line-height: 1.25;
   --text-6xl--letter-spacing: 0.018em;
 
-  --shadow-subtle:
-    0 0 0 1px var(--color-electric-blue), 0 1px 2px 0 rgba(12, 43, 100, 0.32),
-    0 6px 16px 0 rgba(12, 43, 100, 0.32);
+}
+
+/*
+ * Две утилиты, из которых собран весь кабинет: карточка и волосяная линия.
+ * Радиусы и тени в остальном коде не пишутся вручную — берутся отсюда.
+ */
+@utility card {
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: var(--ring-line);
+}
+
+@utility hairline {
+  box-shadow: var(--ring-line);
 }
 
 :root {
@@ -380,10 +391,6 @@ h2 {
 :root[data-density='compact'] table :is(th, td) {
   padding-top: 0.375rem;
   padding-bottom: 0.375rem;
-}
-
-:root[data-density='compact'] main {
-  --density-gap: 0.75rem;
 }
 
 /* Посадочная страница. Гарнитура здесь та же, что и в кабинете, — задан

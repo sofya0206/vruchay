@@ -1,6 +1,5 @@
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { CircleHelp } from 'lucide-react';
 import { api } from '../api/client';
 import type { DocumentDetail } from '../api/types';
 import { Loading } from '../ui/Loading';
@@ -11,7 +10,6 @@ import { EmailTemplateEditor } from '../mail/EmailTemplateEditor';
 import { VerifyPanel } from '../verify/VerifyPanel';
 import { DocumentChrome } from '../editor/DocumentChrome';
 import { useDocumentFileMenu } from '../editor/DocumentFileMenu';
-import type { MenuDef } from '../editor/MenuBar';
 import { workspaceTab, type WorkspaceTab } from './workspace-tabs';
 
 /**
@@ -29,8 +27,7 @@ import { workspaceTab, type WorkspaceTab } from './workspace-tabs';
  *
  * Где человек находится, говорит лента вкладок в рамке страницы: она же
  * стоит над листом, и переход «лист → письмо» стал одним нажатием вместо
- * дороги через главную. Своего меню «Данные» здесь поэтому больше нет —
- * оно повторяло ленту словами.
+ * дороги через главную.
  */
 export function DocumentWorkspacePage() {
   const { id = '' } = useParams();
@@ -72,24 +69,13 @@ export function DocumentWorkspacePage() {
   }
 
   /* Настройки выпуска: у каждой своя страница, рамка у всех одна. */
-  const menus: MenuDef[] = [
-    { id: 'file', label: 'Файл', entries: fileMenu.entries },
-    {
-      id: 'help',
-      label: 'Справка',
-      entries: [
-        {
-          icon: <CircleHelp size={16} />,
-          label: 'Показать справку',
-          onSelect: () => navigate('/docs'),
-        },
-      ],
-    },
-  ];
-
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <DocumentChrome documentId={id} title={page.title} menus={menus} tab={tab} />
+    // Высота — точным счётом, а не `h-full`: оболочка кабинета не задаёт
+    // высоту своей колонке (иначе колонка разделов теряла прилипание
+    // на длинных страницах), поэтому опереться на неё через `h-full` больше
+    // не на что.
+    <div className="flex h-[calc(100dvh-var(--app-header))] min-h-0 flex-col">
+      <DocumentChrome documentId={id} title={page.title} actions={fileMenu.entries} tab={tab} />
 
       {tab === 'rules' ? (
         <RulesTab documentId={id} ruleSetId={page.ruleSetId ?? null} />

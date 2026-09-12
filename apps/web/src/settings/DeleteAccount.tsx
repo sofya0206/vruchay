@@ -42,7 +42,7 @@ export function DeleteAccount() {
 
   return (
     <section>
-      <h2 className="flex items-center gap-2 font-serif text-xl">
+      <h2 className="flex items-center gap-2 text-lg font-medium">
         <TriangleAlert size={18} className="text-[var(--danger)]" />
         Удалить учётную запись
       </h2>

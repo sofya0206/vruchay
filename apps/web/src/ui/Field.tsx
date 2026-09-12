@@ -27,23 +27,24 @@ export function Select({ className = '', ...rest }: SelectHTMLAttributes<HTMLSel
   return <select className={cn(control, className)} {...rest} />;
 }
 
-/** Состояние выводим формой и цветом сразу — чтобы читалось не только по тексту. */
-export function StatusChip({
-  tone,
-  children,
-}: {
-  tone: 'neutral' | 'progress' | 'done' | 'error';
-  children: ReactNode;
-}) {
+export type ChipTone = 'neutral' | 'progress' | 'done' | 'warn' | 'error';
+
+/**
+ * Состояние выводим формой и цветом сразу — чтобы читалось не только
+ * по тексту. Пять оттенков: «никак», «идёт», «готово», «требует внимания»
+ * и «беда» — реестру нужно отличать замену и отзыв от простого «идёт».
+ */
+export function StatusChip({ tone, children }: { tone: ChipTone; children: ReactNode }) {
   const tones = {
     neutral: 'bg-[var(--surface-sunken)] text-[var(--text-muted)]',
     progress: 'bg-[var(--award-soft)] text-[var(--award)]',
     done: 'bg-[var(--accent-soft)] text-[var(--accent)]',
+    warn: 'bg-[var(--award-soft)] text-[var(--award)] ring-1 ring-[var(--award)]/40',
     error: 'bg-[var(--danger-soft)] text-[var(--danger)]',
   } as const;
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${tones[tone]}`}
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap ${tones[tone]}`}
     >
       {children}
     </span>

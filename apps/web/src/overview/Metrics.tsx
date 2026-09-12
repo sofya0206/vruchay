@@ -1,14 +1,13 @@
+import { Link } from 'react-router-dom';
 import type { Overview } from '../api/overview';
 import { DiscussTermsLink } from '../billing/DiscussTermsLink';
 
 /**
- * Четыре цифры о награждениях — первое, что видно на главной.
+ * Четыре цифры о награждениях — плитками, каждая ведёт туда, где
+ * за ней стоит список.
  *
- * Стоят вместо приветствия: «Здравствуйте, Соня» занимало верхнюю строку
- * экрана и ничего не сообщало. Раньше это были четыре карточки, каждая
- * с абзацем пояснения, — экран занимали объяснения, а не цифры. Осталось
- * число и слово под ним, без рамок и подложки; всё, что нужно объяснить,
- * объясняется только когда это важно — когда документы заканчиваются.
+ * Число и слово под ним; всё, что нужно объяснить, объясняется только
+ * когда это важно — когда документы заканчиваются.
  */
 export function Metrics({ data }: { data: Overview }) {
   const { usage } = data;
@@ -23,15 +22,16 @@ export function Metrics({ data }: { data: Overview }) {
 
   return (
     <div>
-      <ul className="grid grid-cols-2 gap-x-8 gap-y-5 sm:grid-cols-4">
-        <Metric label="Выпущено" value={data.issuedTotal} />
-        <Metric label="За месяц" value={data.issuedMonth} />
+      <ul className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <Metric label="Выдано всего" value={data.issuedTotal} to="/registry" />
+        <Metric label="За этот месяц" value={data.issuedMonth} to="/registry?tab=analytics" />
+        <Metric label="Писем отправлено" value={data.emailsSent} to="/mailing" />
         <Metric
           label={usage.source === 'trial' ? 'Осталось на пробе' : 'Осталось по плану'}
           value={unlimited ? '∞' : (usage.left ?? 0)}
           tone={low ? 'danger' : 'normal'}
+          to="/billing"
         />
-        <Metric label="Писем" value={data.emailsSent} />
       </ul>
 
       {/* Единственная строка, которая здесь осталась: срок плана кончился.
@@ -41,7 +41,7 @@ export function Metrics({ data }: { data: Overview }) {
           Первый вопрос при этом — не пропали ли уже выданные документы,
           и ответ на него не должен зависеть от того, дозвонились ли до нас. */}
       {usage.expired && (
-        <p className="mt-4 text-sm text-[var(--text-muted)]">
+        <p className="mt-3 text-sm text-[var(--text-muted)]">
           Срок плана закончился · выданные документы остаются действительными ·{' '}
           {/*
            * Ссылки на страницу тарифов нет: публичных цен больше нет,
@@ -58,22 +58,29 @@ export function Metrics({ data }: { data: Overview }) {
 function Metric({
   label,
   value,
+  to,
   tone = 'normal',
 }: {
   label: string;
   value: number | string;
+  to: string;
   tone?: 'normal' | 'danger';
 }) {
   return (
     <li>
-      <p
-        className={`text-3xl font-semibold tabular-nums ${
-          tone === 'danger' ? 'text-[var(--danger)]' : ''
-        }`}
+      <Link
+        to={to}
+        className="card block p-5 transition-colors hover:bg-[var(--accent-soft)]"
       >
-        {value}
-      </p>
-      <p className="mt-0.5 text-sm text-[var(--text-muted)]">{label}</p>
+        <p
+          className={`text-3xl font-semibold tabular-nums ${
+            tone === 'danger' ? 'text-[var(--danger)]' : ''
+          }`}
+        >
+          {value}
+        </p>
+        <p className="mt-0.5 text-sm text-[var(--text-muted)]">{label}</p>
+      </Link>
     </li>
   );
 }

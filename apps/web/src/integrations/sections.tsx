@@ -1,14 +1,14 @@
 import type { ReactNode } from 'react';
+import { CircleHelp, Globe, Link2, Send, Sheet, type LucideIcon } from 'lucide-react';
 import { Info } from './Info';
 import { Tilda } from './Tilda';
 import { CreateStub } from './CreateStub';
-import { InfoGlyph, LinkGlyph, SheetsGlyph, TelegramGlyph, TildaGlyph } from './glyphs';
 
 export interface IntegrationSection {
   /** Часть адреса после /integrations/ — она же ключ раздела. */
   path: string;
   title: string;
-  icon: ReactNode;
+  icon: LucideIcon;
   element: ReactNode;
 }
 
@@ -20,15 +20,16 @@ export interface IntegrationSection {
  * что это такое, потом сами площадки.
  */
 export const INTEGRATION_SECTIONS: IntegrationSection[] = [
-  { path: 'info', title: 'Инфо', icon: InfoGlyph, element: <Info /> },
-  { path: 'tilda', title: 'Tilda', icon: TildaGlyph, element: <Tilda /> },
+  { path: 'info', title: 'Как это работает', icon: CircleHelp, element: <Info /> },
+  { path: 'tilda', title: 'Tilda', icon: Globe, element: <Tilda heading={false} /> },
   {
     path: 'google-sheets',
     title: 'Google Таблицы',
-    icon: SheetsGlyph,
+    icon: Sheet,
     element: (
       <CreateStub
-        title="Интеграция с Google Таблицами"
+        icon={Sheet}
+        title="Google Таблицы"
         about="Документы будут выпускаться сами, по мере того как в таблицу добавляются строки с участниками."
       />
     ),
@@ -36,9 +37,10 @@ export const INTEGRATION_SECTIONS: IntegrationSection[] = [
   {
     path: 'telegram',
     title: 'Бот в Telegram',
-    icon: TelegramGlyph,
+    icon: Send,
     element: (
       <CreateStub
+        icon={Send}
         title="Бот в Telegram"
         about="Участник напишет боту своё имя или адрес почты и получит свой документ, не заходя на сайт."
       />
@@ -47,11 +49,12 @@ export const INTEGRATION_SECTIONS: IntegrationSection[] = [
   {
     path: 'link',
     title: 'Форма по ссылке',
-    icon: LinkGlyph,
+    icon: Link2,
     element: (
       <CreateStub
+        icon={Link2}
         title="Форма по ссылке"
-        about="Ссылка на форму нашего сервиса: участник переходит по ней, сам заполняет пустые поля документа и отправляет его себе на почту. Свой сайт для этого не нужен."
+        about="Участник переходит по ссылке, сам заполняет пустые поля документа и отправляет его себе на почту. Свой сайт для этого не нужен."
       />
     ),
   },

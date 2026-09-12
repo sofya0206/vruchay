@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { MemoryRouter } from 'react-router-dom';
 import { Metrics } from './Metrics';
 import type { Overview } from '../api/overview';
 import type { Usage, UsageWarn } from '../api/org';
@@ -44,7 +45,13 @@ function overview(usage: Partial<Usage>): Overview {
   };
 }
 
-const html = (usage: Partial<Usage>) => renderToStaticMarkup(<Metrics data={overview(usage)} />);
+// Плитки — ссылки в разделы, а ссылкам нужен маршрутизатор.
+const html = (usage: Partial<Usage>) =>
+  renderToStaticMarkup(
+    <MemoryRouter>
+      <Metrics data={overview(usage)} />
+    </MemoryRouter>,
+  );
 
 describe('плитка остатка', () => {
   it('на плане называет план, а не пробу', () => {

@@ -4,6 +4,9 @@ import { Check, FileText, Send } from 'lucide-react';
 import { api } from '../api/client';
 import { Button } from '../ui/Button';
 import { StatusChip } from '../ui/Field';
+import { Loading } from '../ui/Loading';
+import { PageLayout, SectionTitle } from '../ui/SectionLayout';
+import { Tabs } from '../ui/Tabs';
 
 /**
  * Счета и заявки.
@@ -54,39 +57,25 @@ export function InvoicesPage() {
   const [tab, setTab] = useState<'invoices' | 'leads' | 'orgs'>('invoices');
 
   return (
-    <div className="min-h-full">
-      <main className="mx-auto max-w-5xl px-6 py-8">
-        <div role="tablist" className="inline-flex rounded-xl bg-[var(--surface-sunken)] p-1">
-          {(
-            [
-              ['invoices', 'Счета'],
-              ['leads', 'Заявки'],
-              ['orgs', 'Организации'],
-            ] as const
-          ).map(([value, label]) => (
-            <button
-              key={value}
-              role="tab"
-              aria-selected={tab === value}
-              onClick={() => setTab(value)}
-              className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors duration-200 ${
-                tab === value
-                  ? 'bg-[var(--surface)] text-[var(--text)]'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text)]'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        <div className="mt-6">
-          {tab === 'invoices' && <Invoices />}
-          {tab === 'leads' && <Leads />}
-          {tab === 'orgs' && <Organizations />}
-        </div>
-      </main>
-    </div>
+    <PageLayout
+      head={<SectionTitle>Счета и заявки</SectionTitle>}
+      tools={
+        <Tabs
+          label="Разделы"
+          value={tab}
+          onChange={setTab}
+          items={[
+            { id: 'invoices', label: 'Счета' },
+            { id: 'leads', label: 'Заявки' },
+            { id: 'orgs', label: 'Организации' },
+          ]}
+        />
+      }
+    >
+      {tab === 'invoices' && <Invoices />}
+      {tab === 'leads' && <Leads />}
+      {tab === 'orgs' && <Organizations />}
+    </PageLayout>
   );
 }
 
@@ -107,7 +96,7 @@ function Invoices() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['invoices'] }),
   });
 
-  if (invoices.isPending) return <p className="text-[var(--text-muted)]">Загрузка…</p>;
+  if (invoices.isPending) return <Loading />;
   // Отказ и пустой список — разные вещи, и раньше оба давали пустую
   // страницу без единого слова: человек не понимал, у него нет счетов
   // или у него нет доступа.
@@ -115,7 +104,7 @@ function Invoices() {
 
   if (invoices.data?.length === 0) {
     return (
-      <p className="rounded-xl bg-[var(--surface-sunken)] p-5 text-sm text-[var(--text-muted)]">
+      <p className="rounded-2xl bg-[var(--surface-sunken)] p-5 text-sm text-[var(--text-muted)]">
         Счетов пока нет. Они выставляются сами, когда организация проходит подбор
         тарифа на сайте и указывает ИНН.
       </p>
@@ -127,7 +116,7 @@ function Invoices() {
       {invoices.data?.map((inv) => (
         <article
           key={inv.id}
-          className="flex flex-wrap items-center gap-x-5 gap-y-3 rounded-xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]"
+          className="flex flex-wrap items-center gap-x-5 gap-y-3 card p-4"
         >
           <div className="min-w-56 flex-1">
             <div className="flex flex-wrap items-center gap-2">
@@ -187,7 +176,7 @@ function Invoices() {
 /** Один и тот же ответ на «сюда нельзя» — во всех трёх вкладках. */
 function NoAccess() {
   return (
-    <div className="rounded-xl bg-[var(--surface-sunken)] p-5 text-sm text-[var(--text-muted)]">
+    <div className="rounded-2xl bg-[var(--surface-sunken)] p-5 text-sm text-[var(--text-muted)]">
       <p className="text-[var(--text)]">Этот раздел — для владельца сервиса.</p>
       <p className="mt-1">
         Здесь наша собственная бухгалтерия, а не данные вашей организации. Всё, что нужно вам,
@@ -204,12 +193,12 @@ function Leads() {
     retry: false,
   });
 
-  if (leads.isPending) return <p className="text-[var(--text-muted)]">Загрузка…</p>;
+  if (leads.isPending) return <Loading />;
   if (leads.isError) return <NoAccess />;
 
   if (leads.data?.length === 0) {
     return (
-      <p className="rounded-xl bg-[var(--surface-sunken)] p-5 text-sm text-[var(--text-muted)]">
+      <p className="rounded-2xl bg-[var(--surface-sunken)] p-5 text-sm text-[var(--text-muted)]">
         Заявок пока нет.
       </p>
     );
@@ -220,7 +209,7 @@ function Leads() {
       {leads.data?.map((lead) => (
         <article
           key={lead.id}
-          className="rounded-xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]"
+          className="card p-4"
         >
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-medium">{lead.orgName}</span>
@@ -297,7 +286,7 @@ function Organizations() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['platform-orgs'] }),
   });
 
-  if (orgs.isPending) return <p className="text-[var(--text-muted)]">Загрузка…</p>;
+  if (orgs.isPending) return <Loading />;
   if (orgs.isError) return <NoAccess />;
 
   const items = orgs.data ?? [];
@@ -308,7 +297,7 @@ function Organizations() {
       {items.map((org) => (
         <article
           key={org.id}
-          className="flex flex-wrap items-center gap-3 rounded-2xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]"
+          className="flex flex-wrap items-center gap-3 card p-4"
         >
           <div className="min-w-52 flex-1">
             <div className="flex items-center gap-2">

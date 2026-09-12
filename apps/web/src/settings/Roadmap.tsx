@@ -19,8 +19,8 @@ export function Roadmap() {
   const vote = useRoadmapVote();
 
   return (
-    <div className="mt-10">
-      <h2 className="flex items-center gap-2 font-serif text-xl">
+    <div>
+      <h2 className="flex items-center gap-2 text-lg font-medium">
         <Map size={18} className="text-[var(--accent)]" />
         Что дальше
       </h2>

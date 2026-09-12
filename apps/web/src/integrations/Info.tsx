@@ -1,74 +1,55 @@
 import { Link } from 'react-router-dom';
-import { Plug } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
+import { INTEGRATION_SECTIONS } from './sections';
+import { Card } from '../ui/Card';
 
-/**
- * Первый экран раздела.
- *
- * Раньше здесь была кнопка «Узнать больше», которая уводила в справку.
- * Теперь та же справка стоит прямо на экране: человек, который открыл
- * интеграции впервые, за один взгляд понимает, что тут можно подключить,
- * и уходит сразу в нужный раздел, а не в отдельное окно помощи.
- */
+/** Что здесь можно подключить — списком площадок с дорогой в каждую. */
+const ABOUT: Record<string, string> = {
+  tilda: 'Кнопка «Получить документ» на сайте, который управляется Тильдой.',
+  'google-sheets': 'Документы выпускаются сами из строк таблицы.',
+  telegram: 'Участник пишет боту имя или почту и получает документ.',
+  link: 'Участник заполняет форму по ссылке и получает документ на почту.',
+};
+
 export function Info() {
+  const platforms = INTEGRATION_SECTIONS.filter((s) => s.path !== 'info');
+
   return (
-    <section>
-      <div className="rounded-xl bg-[var(--surface)] p-10 text-center ring-1 ring-[var(--line)]">
-        <Plug size={40} className="mx-auto text-[var(--text-muted)]" aria-hidden />
-        <h2 className="mt-4 font-serif text-3xl">Интеграции</h2>
-        <p className="mt-2 text-[var(--text-muted)]">
-          Интеграция Вручая с другими сайтами и сервисами
-        </p>
-      </div>
+    <div className="space-y-6">
+      <p className="max-w-2xl text-[var(--text-muted)]">
+        Интеграция — это способ выдать документ без вашего участия: участник сам находит себя
+        и получает свой файл, а выданное попадает в реестр как обычно.
+      </p>
 
-      <div className="mt-6 rounded-xl bg-[var(--surface)] p-7 ring-1 ring-[var(--line)]">
-        <h3 className="font-serif text-2xl">Интеграции</h3>
-        <p className="mt-1.5 text-sm text-[var(--text-muted)]">Помощь → Интеграции</p>
-
-        <ul className="mt-5 space-y-3.5">
-          <Item to="/integrations/tilda" title="Интеграция с Tilda">
-            Создание и публикация документов на сайтах, управляемых Тильдой.
-          </Item>
-          <Item to="/integrations/google-sheets" title="Интеграция с Google Таблицами">
-            Автоматическое создание документов из данных в Google Таблицах.
-          </Item>
-          <Item to="/integrations/telegram" title="Бот в Telegram">
-            Ваши участники смогут получить свои документы, указав свои
-            персональные данные, например ФИО или адрес электронной почты.
-          </Item>
-          <Item to="/integrations/link" title="Форма по ссылке">
-            Участник переходит по вашей ссылке, сам заполняет данные документа
-            и отправляет его себе на почту.
-          </Item>
+      <Card title="Что можно подключить">
+        <ul className="divide-y divide-[var(--line)]">
+          {platforms.map((s) => (
+            <li key={s.path}>
+              <Link
+                to={`/integrations/${s.path}`}
+                className="-mx-2 flex items-center gap-3 rounded-lg px-2 py-3 transition-colors hover:bg-[var(--surface-sunken)]"
+              >
+                <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]">
+                  <s.icon size={18} strokeWidth={1.75} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block font-medium">{s.title}</span>
+                  <span className="block text-sm text-[var(--text-muted)]">{ABOUT[s.path]}</span>
+                </span>
+                <ArrowRight size={16} className="shrink-0 text-[var(--text-muted)]" />
+              </Link>
+            </li>
+          ))}
         </ul>
+      </Card>
 
-        <h3 className="mt-9 font-serif text-xl">Нужна помощь?</h3>
-        <p className="mt-1.5 text-[var(--text-muted)]">
-          Напишите нам в{' '}
-          <Link to="/settings/support" className="text-[var(--accent)] hover:underline">
-            техническую поддержку
-          </Link>
-          . Мы с радостью поможем вам.
-        </p>
-      </div>
-    </section>
-  );
-}
-
-function Item({
-  to,
-  title,
-  children,
-}: {
-  to: string;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <li className="list-disc marker:text-[var(--line-strong)] ml-5">
-      <Link to={to} className="font-medium text-[var(--accent)] hover:underline">
-        {title}
-      </Link>
-      . {children}
-    </li>
+      <p className="text-sm text-[var(--text-muted)]">
+        Нужна помощь с подключением — напишите нам в{' '}
+        <Link to="/settings/support" className="text-[var(--accent)] hover:underline">
+          поддержку
+        </Link>
+        .
+      </p>
+    </div>
   );
 }

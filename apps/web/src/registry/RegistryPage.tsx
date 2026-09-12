@@ -3,6 +3,10 @@ import { useSearchParams } from 'react-router-dom';
 import { Download, FileSpreadsheet, RefreshCw, Send, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Loading } from '../ui/Loading';
+import { PageLayout, SectionTitle } from '../ui/SectionLayout';
+import { Tabs } from '../ui/Tabs';
+import { EmptyState as Empty } from '../ui/EmptyState';
+import { Search } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   emptyFilters,
@@ -137,30 +141,20 @@ export function RegistryPage() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-8">
-      <div role="tablist" className="mb-6 inline-flex rounded-xl bg-[var(--surface-sunken)] p-1">
-        {(
-          [
-            ['registry', 'Реестр'],
-            ['analytics', 'Аналитика'],
-          ] as const
-        ).map(([value, label]) => (
-          <button
-            key={value}
-            role="tab"
-            aria-selected={tab === value}
-            onClick={() => setTab(value)}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors duration-200 ${
-              tab === value
-                ? 'bg-[var(--surface)] text-[var(--text)]'
-                : 'text-[var(--text-muted)] hover:text-[var(--text)]'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
+    <PageLayout
+      head={<SectionTitle>Реестр</SectionTitle>}
+      tools={
+        <Tabs
+          label="Разделы реестра"
+          value={tab}
+          onChange={setTab}
+          items={[
+            { id: 'registry', label: 'Выданные документы' },
+            { id: 'analytics', label: 'Аналитика' },
+          ]}
+        />
+      }
+    >
       <RegistryFilters
         value={filters}
         facets={facets.data}
@@ -187,11 +181,9 @@ export function RegistryPage() {
       {tab === 'analytics' ? (
         <div className="mt-6 space-y-10">
           {/* Сначала по текущему отбору — за этим сюда и приходят из
-              материала; ниже — по организации целиком: то, что раньше
-              жило отдельной страницей /analytics и было вторым входом
-              в те же цифры. */}
+              материала; ниже — по организации целиком. */}
           <AnalyticsPanel filters={filters} active={tab === 'analytics'} />
-          <AnalyticsPage embedded />
+          <AnalyticsPage />
         </div>
       ) : (
         <>
@@ -216,31 +208,30 @@ export function RegistryPage() {
                   Отозвать всё найденное
                 </Button>
               )}
-              <a
-                href={`/api/registry/export.csv${query ? `?${query}` : ''}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Button size="sm" icon={<FileSpreadsheet size={14} />}>
-                  Таблицей
-                </Button>
-              </a>
-              <a
-                href={`/api/registry/archive?${[query, ids.length > 0 ? `ids=${ids.join(',')}` : '']
-                  .filter(Boolean)
-                  .join('&')}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Button size="sm" icon={<Download size={14} />} disabled={total === 0}>
-                  {ids.length > 0 ? `Скачать отмеченные (${ids.length})` : 'Скачать всё найденное'}
-                </Button>
-              </a>
+              {/* Выгрузки — ссылки, а не кнопки: файл отдаёт сервер. Пока
+                  выгружать нечего, ссылки нет вовсе — кнопка с `disabled`
+                  внутри живой ссылки всё равно открывала бы пустой файл. */}
+              {total > 0 && (
+                <>
+                  <ExportLink href={`/api/registry/export.csv${query ? `?${query}` : ''}`}>
+                    <FileSpreadsheet size={14} /> Таблицей
+                  </ExportLink>
+                  <ExportLink
+                    href={`/api/registry/archive?${[query, ids.length > 0 ? `ids=${ids.join(',')}` : '']
+                      .filter(Boolean)
+                      .join('&')}`}
+                  >
+                    <Download size={14} />
+                    {ids.length > 0 ? `Скачать отмеченные (${ids.length})` : 'Скачать всё найденное'}
+                  </ExportLink>
+                </>
+              )}
             </div>
           </div>
 
           {selected.size > 0 && (
-            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-[var(--surface-sunken)] p-3">
+            <div className="mt-3 rounded-xl bg-[var(--surface-sunken)] p-3">
+              <div className="flex flex-wrap items-center gap-2">
               <Button
                 size="sm"
                 variant="primary"
@@ -300,10 +291,11 @@ export function RegistryPage() {
               >
                 Вернуть проверку
               </Button>
-              <span className="text-xs text-[var(--text-muted)]">
+              </div>
+              <p className="mt-2 text-xs text-[var(--text-muted)]">
                 Перевыпуск создаёт новый документ вместо этого. Отзыв — признаёт документ
                 недействительным без замены.
-              </span>
+              </p>
             </div>
           )}
 
@@ -365,24 +357,33 @@ export function RegistryPage() {
           }}
         />
       )}
-    </main>
+    </PageLayout>
   );
 }
 
 function EmptyState({ hasFilters }: { hasFilters: boolean }) {
+  return hasFilters ? (
+    <Empty icon={Search} title="По этому отбору ничего нет">
+      Попробуйте убрать часть условий.
+    </Empty>
+  ) : (
+    <Empty icon={ShieldCheck} title="Здесь появятся выданные документы">
+      Реестр наполняется сам: как только выпуск по материалу закончится, все грамоты и
+      сертификаты будут искаться отсюда — по фамилии, почте или проверочному коду.
+    </Empty>
+  );
+}
+
+/** Выгрузка файла — ссылка в виде малой кнопки. */
+function ExportLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl bg-[var(--surface-sunken)] p-6 text-sm text-[var(--text-muted)]">
-      {hasFilters ? (
-        <p>По этому отбору ничего нет. Попробуйте убрать часть условий.</p>
-      ) : (
-        <>
-          <p className="text-[var(--text)]">Здесь появятся выданные документы.</p>
-          <p className="mt-1">
-            Реестр наполняется сам: как только выпуск по материалу закончится, все грамоты и
-            сертификаты будут искаться отсюда — по фамилии, почте или проверочному коду.
-          </p>
-        </>
-      )}
-    </div>
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-2 rounded-lg bg-[var(--surface)] px-2.5 py-1.5 text-sm font-medium ring-1 ring-[var(--line)] transition-colors hover:bg-[var(--surface-sunken)]"
+    >
+      {children}
+    </a>
   );
 }

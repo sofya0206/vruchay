@@ -1,42 +1,55 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCheck } from 'lucide-react';
+import { CheckCheck, ChevronRight, MoreHorizontal } from 'lucide-react';
 import { MATERIAL_TABS, materialTabPath, workspacePath, type MaterialTab } from '../mailing/workspace-tabs';
-import { MenuBar, type MenuDef } from './MenuBar';
+import { IconButton } from '../ui/IconButton';
+import { Menu, MenuDivider, MenuItem } from '../ui/Menu';
+
+/** Пункт меню «…» либо разделитель между смысловыми группами. */
+export type MenuEntry =
+  | { separator: true }
+  | {
+      separator?: false;
+      icon?: ReactNode;
+      label: string;
+      /** Горячая клавиша — справа серым. */
+      shortcut?: string;
+      onSelect: () => void;
+      disabled?: boolean;
+      /** Опасное действие — красным. Такое в меню всегда последнее. */
+      danger?: boolean;
+    };
 
 /**
- * Рамка страницы материала: хребет из вкладок и строка меню под ним.
+ * Рамка страницы материала: путь, лента вкладок, действие и меню «…».
  *
  * Одна на все стороны материала. Лист, список, правила, проверка, письмо
- * и подлинность — не разные разделы, а один материал с разных сторон, и
- * пока ленты не было, дорога от листа к письму шла через главную: три
- * нажатия и ни одного очевидного. Теперь при переходе меняется только
- * содержимое под рамкой.
+ * и подлинность — не разные разделы, а один материал с разных сторон:
+ * при переходе меняется только содержимое под рамкой.
  *
- * Верхний ряд — тонкий, 44 px: над ним стоит такая же по высоте общая
- * полоса кабинета, и вдвоём они уже забирают у листа заметную часть
- * экрана. Поэтому здесь нет ни учётной записи, ни значка справки, ни
- * стрелки возврата — всё это живёт в общей полосе, а справка ещё и
- * в меню «Справка». Своя стрелка встала бы прямо под чужой, и две
- * одинаковые стрелки друг под другом вели бы в разные места.
+ * Путь «Документы › Название» — и заголовок, и дорога назад: подписанная,
+ * а не безымянная стрелка по истории браузера.
  *
- * Ширину не ограничиваем: обе страницы работают во весь экран, и колонка
- * по центру отняла бы у листа поля, а у таблицы — колонки.
+ * Строки меню «Файл / Правка / Вставка» больше нет: половина её пунктов
+ * стояла ещё раз на панели значков, а вторая половина повторяла ленту
+ * вкладок словами. Что осталось — действия над материалом целиком и
+ * редкие правки — лежит в одном меню «…» рядом с «Выпустить».
  */
 export function DocumentChrome({
   documentId,
   title,
-  menus,
+  actions,
   tab,
   toolbar,
   action,
 }: {
   documentId: string;
   title: string;
-  menus: MenuDef[];
+  /** Пункты меню «…». */
+  actions: MenuEntry[];
   /** Какая сторона материала открыта — она подсвечена в ленте вкладок. */
   tab: MaterialTab;
-  /** Панель значков под меню. Своя у листа и у таблицы. */
+  /** Панель значков под лентой. Своя у листа и у таблицы. */
   toolbar?: ReactNode;
   /**
    * Чем «Выпустить» занимается на этой вкладке.
@@ -49,14 +62,21 @@ export function DocumentChrome({
 }) {
   return (
     <header className="shrink-0 border-b border-[var(--line)] bg-[var(--surface)]">
-      <div className="flex h-11 items-center gap-1 border-b border-[var(--line)] px-2">
-        {/* Название — коротко и с подсказкой: в ряду с шестью вкладками
-            крупному заголовку места нет, а материал всё равно надо назвать. */}
-        <h1 className="min-w-0 max-w-[26ch] shrink truncate px-1 text-sm font-medium" title={title}>
-          {title}
+      <div className="flex h-12 items-center gap-1 border-b border-[var(--line)] px-3">
+        <h1 className="flex min-w-0 max-w-[32ch] shrink items-center gap-1 text-sm font-medium">
+          <Link
+            to="/documents"
+            className="shrink-0 text-[var(--text-muted)] transition-colors hover:text-[var(--text)] hover:underline"
+          >
+            Документы
+          </Link>
+          <ChevronRight size={14} aria-hidden className="shrink-0 text-[var(--text-muted)]" />
+          <span className="truncate" title={title}>
+            {title}
+          </span>
         </h1>
 
-        <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-[var(--line)]" />
+        <span aria-hidden className="mx-2 h-5 w-px shrink-0 bg-[var(--line)]" />
 
         {/* Лента прокручивается внутри себя: страница вбок не едет даже
             тогда, когда шесть вкладок в ширину не помещаются. */}
@@ -75,33 +95,51 @@ export function DocumentChrome({
           ))}
         </nav>
 
-        <div className="shrink-0 pl-2">
+        <div className="flex shrink-0 items-center gap-1 pl-2">
           {action ?? (
             <Link
               to={workspacePath(documentId)}
               title="Отметить получателей и выпустить документы"
-              className="inline-flex items-center gap-2 rounded-lg bg-[var(--accent)] px-2.5 py-1.5 text-sm font-medium text-[var(--accent-contrast)] transition-colors hover:bg-[var(--accent-hover)]"
+              className="inline-flex h-9 items-center gap-2 rounded-lg bg-[var(--accent)] px-3 text-sm font-medium text-[var(--accent-contrast)] transition-colors hover:bg-[var(--accent-hover)]"
             >
               <CheckCheck size={15} />
               Выпустить
             </Link>
           )}
+          <Menu
+            trigger={({ open, toggle }) => (
+              <IconButton label="Ещё действия" aria-expanded={open} onClick={toggle} size="sm" className="size-9">
+                <MoreHorizontal size={18} />
+              </IconButton>
+            )}
+          >
+            {actions.map((entry, i) =>
+              entry.separator ? (
+                <MenuDivider key={i} />
+              ) : (
+                <MenuItem
+                  key={i}
+                  icon={<span className="grid w-4 place-items-center text-[var(--text-muted)]">{entry.icon}</span>}
+                  disabled={entry.disabled}
+                  danger={entry.danger}
+                  onClick={entry.onSelect}
+                >
+                  <span className="flex-1 whitespace-nowrap">{entry.label}</span>
+                  {entry.shortcut && (
+                    <span className="shrink-0 text-xs text-[var(--text-muted)]">{entry.shortcut}</span>
+                  )}
+                </MenuItem>
+              ),
+            )}
+          </Menu>
         </div>
       </div>
 
-      {/* Меню и панель значков — одной строкой, а не двумя: каждая лишняя
-          строка в рамке отнимается у листа. */}
-      <div className="flex flex-wrap items-center gap-1 px-2 py-1">
-        <MenuBar menus={menus} />
-        {toolbar && (
-          <>
-            <ToolDivider />
-            <div className="flex flex-1 flex-wrap items-center gap-1" role="toolbar">
-              {toolbar}
-            </div>
-          </>
-        )}
-      </div>
+      {toolbar && (
+        <div className="flex flex-wrap items-center gap-1 px-2 py-1" role="toolbar">
+          {toolbar}
+        </div>
+      )}
     </header>
   );
 }
@@ -128,7 +166,7 @@ function SpineTab({ to, active, children }: { to: string; active: boolean; child
   );
 }
 
-/** Значок на панели под меню: квадратная кнопка без подписи. */
+/** Значок на панели: квадратная кнопка без подписи. */
 export function ToolButton({
   title,
   onClick,
@@ -143,21 +181,9 @@ export function ToolButton({
   children: ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      title={title}
-      aria-label={title}
-      aria-pressed={active}
-      disabled={disabled}
-      onClick={onClick}
-      className={`grid h-8 w-8 place-items-center rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
-        active
-          ? 'bg-[var(--accent-soft)] text-[var(--accent)]'
-          : 'text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]'
-      }`}
-    >
+    <IconButton size="sm" label={title} active={active} disabled={disabled} onClick={onClick}>
       {children}
-    </button>
+    </IconButton>
   );
 }
 

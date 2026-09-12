@@ -26,33 +26,26 @@ import { PlatformFunnel } from './PlatformFunnel';
  * устройства, мы не собираем — это перевело бы нас из обработчика
  * по поручению в самостоятельного оператора персональных данных.
  */
-export function AnalyticsPage({ embedded = false }: { embedded?: boolean }) {
+export function AnalyticsPage() {
   const me = useMe();
   const analytics = useOrgAnalytics();
-
-  // Встроенный вид — внутри вкладки реестра: без своей колонки и заголовка
-  // первого уровня, они там уже есть.
-  const Wrap = embedded ? 'section' : 'main';
-  const wrapClass = embedded ? 'space-y-8' : 'mx-auto max-w-5xl space-y-8 px-6 py-8';
-  const Title = embedded ? 'h2' : 'h1';
-  const titleClass = embedded ? 'font-serif text-lg' : 'text-2xl font-semibold';
 
   if (analytics.isPending) return <Loading label="Считаем" />;
   if (analytics.isError || !analytics.data) {
     return (
-      <Wrap className={wrapClass}>
-        <Title className={titleClass}>{embedded ? 'По организации' : 'Аналитика'}</Title>
+      <section className="space-y-8">
+        <h2 className="text-lg font-medium">По организации</h2>
         <p className="mt-2 text-sm text-[var(--text-muted)]">Цифры сейчас не посчитать.</p>
-      </Wrap>
+      </section>
     );
   }
 
   const data = analytics.data;
 
   return (
-    <Wrap className={wrapClass}>
+    <section className="space-y-8 border-t border-[var(--line)] pt-8">
       <header>
-        <Title className={titleClass}>{embedded ? 'По организации' : 'Аналитика'}</Title>
+        <h2 className="text-lg font-medium">По организации</h2>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
           Что происходит с выданными документами и где спотыкается награждение
         </p>
@@ -64,7 +57,7 @@ export function AnalyticsPage({ embedded = false }: { embedded?: boolean }) {
       <Months data={data} />
 
       {me.data?.isPlatform && <PlatformFunnel />}
-    </Wrap>
+    </section>
   );
 }
 
@@ -74,7 +67,7 @@ function Verifications({ data }: { data: OrgAnalytics }) {
 
   return (
     <section>
-      <h2 className="mb-3 font-serif text-lg">Проверки по QR-коду</h2>
+      <h2 className="mb-3 text-lg font-medium">Проверки по QR-коду</h2>
       <div className="rounded-2xl bg-[var(--accent-soft)] p-5">
         <p className="flex items-center gap-2 text-3xl text-[var(--accent)] tabular-nums">
           <QrCode size={24} strokeWidth={1.5} />
@@ -107,7 +100,7 @@ function Quality({ data }: { data: OrgAnalytics }) {
 
   return (
     <section>
-      <h2 className="mb-3 font-serif text-lg">Качество выпуска</h2>
+      <h2 className="mb-3 text-lg font-medium">Качество выпуска</h2>
       <div className="grid gap-3 sm:grid-cols-3">
         <Tile
           icon={<Check size={16} strokeWidth={1.5} />}
@@ -152,9 +145,9 @@ function Activation({
 
   return (
     <section>
-      <h2 className="mb-3 font-serif text-lg">Ваш путь</h2>
+      <h2 className="mb-3 text-lg font-medium">Ваш путь</h2>
 
-      <div className="rounded-2xl bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]">
+      <div className="card p-5">
         <p className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
           <Timer size={16} strokeWidth={1.5} />
           От регистрации до первого выпущенного документа
@@ -181,7 +174,7 @@ function Activation({
         {steps.map((step) => (
           <li
             key={step.key}
-            className="flex items-center gap-3 rounded-xl bg-[var(--surface)] px-4 py-3 ring-1 ring-[var(--line)]"
+            className="flex items-center gap-3 hairline rounded-xl px-4 py-3"
           >
             <span
               className={`flex size-6 shrink-0 items-center justify-center rounded-full ${
@@ -206,7 +199,7 @@ function Months({ data }: { data: OrgAnalytics }) {
 
   return (
     <section>
-      <h2 className="mb-3 font-serif text-lg">По месяцам</h2>
+      <h2 className="mb-3 text-lg font-medium">По месяцам</h2>
       <div className="grid gap-3 sm:grid-cols-2">
         <MonthCard numbers={data.thisMonth} note="идёт сейчас" />
         <MonthCard numbers={data.lastMonth} note="о нём приходит сводка" />
@@ -234,7 +227,7 @@ function Months({ data }: { data: OrgAnalytics }) {
 
 function MonthCard({ numbers, note }: { numbers: MonthNumbers; note: string }) {
   return (
-    <div className="rounded-2xl bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]">
+    <div className="card p-5">
       <p className="font-medium">
         {numbers.title} <span className="text-xs text-[var(--text-muted)]">· {note}</span>
       </p>
@@ -268,7 +261,7 @@ function Tile({
   hint: string;
 }) {
   return (
-    <div className="rounded-xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]">
+    <div className="hairline rounded-xl p-4">
       <p className="flex items-center gap-2 text-2xl tabular-nums">
         <span className="text-[var(--text-muted)]">{icon}</span>
         {value}

@@ -95,7 +95,7 @@ export function VerifyPanel({ doc }: { doc: DocumentDetail }) {
   return (
     <div className="mx-auto max-w-3xl space-y-8 px-6 py-6">
       <section>
-        <h2 className="flex items-center gap-2 font-serif text-xl">
+        <h2 className="flex items-center gap-2 text-lg font-medium">
           <CalendarClock size={18} className="text-[var(--accent)]" />
           Срок действия
         </h2>
@@ -186,7 +186,7 @@ export function VerifyPanel({ doc }: { doc: DocumentDetail }) {
       </section>
 
       <section>
-        <h2 className="flex items-center gap-2 font-serif text-xl">
+        <h2 className="flex items-center gap-2 text-lg font-medium">
           <ShieldCheck size={18} className="text-[var(--accent)]" />
           Страница проверки
         </h2>

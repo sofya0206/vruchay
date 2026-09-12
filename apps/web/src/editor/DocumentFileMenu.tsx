@@ -14,9 +14,10 @@ import { api } from '../api/client';
 import { useFolders } from '../api/folders';
 import type { DocumentDetail } from '../api/types';
 import { Button } from '../ui/Button';
-import { Input, Label, Select } from '../ui/Field';
-import { Dialog } from '../mailing/Dialog';
-import type { MenuEntry } from './MenuBar';
+import { Label, Select } from '../ui/Field';
+import { Dialog } from '../ui/Dialog';
+import { RenameDialog } from '../documents/RenameDialog';
+import type { MenuEntry } from './DocumentChrome';
 
 /**
  * Меню «Файл» — действия над материалом целиком.
@@ -39,7 +40,6 @@ export function useDocumentFileMenu(doc: DocumentDetail | undefined): {
   const [renaming, setRenaming] = useState(false);
   const [moving, setMoving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [title, setTitle] = useState('');
   const [folderId, setFolderId] = useState<string | ''>('');
 
   const folders = useFolders();
@@ -108,10 +108,7 @@ export function useDocumentFileMenu(doc: DocumentDetail | undefined): {
       icon: <PencilLine size={16} />,
       label: 'Переименовать',
       disabled: !doc,
-      onSelect: () => {
-        setTitle(doc?.title ?? '');
-        setRenaming(true);
-      },
+      onSelect: () => setRenaming(true),
     },
     {
       icon: <FolderInput size={16} />,
@@ -135,39 +132,13 @@ export function useDocumentFileMenu(doc: DocumentDetail | undefined): {
   const dialogs = (
     <>
       {renaming && (
-        <Dialog
-          title="Переименовать материал"
+        <RenameDialog
+          initial={doc?.title ?? ''}
+          pending={rename.isPending}
+          error={rename.isError ? (rename.error as Error).message : undefined}
+          onSubmit={(value) => rename.mutate(value)}
           onClose={() => setRenaming(false)}
-          footer={
-            <>
-              <Button
-                variant="primary"
-                disabled={!title.trim() || rename.isPending}
-                onClick={() => rename.mutate(title.trim())}
-              >
-                {rename.isPending ? 'Сохраняем…' : 'Сохранить'}
-              </Button>
-              <Button variant="ghost" onClick={() => setRenaming(false)}>
-                Отмена
-              </Button>
-            </>
-          }
-        >
-          <Label>Название</Label>
-          <Input
-            autoFocus
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && title.trim()) rename.mutate(title.trim());
-            }}
-          />
-          {rename.isError && (
-            <p role="alert" className="mt-2 text-sm text-[var(--danger)]">
-              {(rename.error as Error).message}
-            </p>
-          )}
-        </Dialog>
+        />
       )}
 
       {moving && (

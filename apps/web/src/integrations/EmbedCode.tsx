@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Check, Code2, Copy } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { Select } from '../ui/Field';
+import { Tabs } from '../ui/Tabs';
 
 export type Platform = 'tilda' | 'wordpress' | 'bitrix' | 'html';
 
@@ -159,43 +161,33 @@ export function EmbedCode({
   });
 
   return (
-    <div className="mt-3 max-w-4xl rounded-lg bg-[var(--surface-sunken)] p-4">
+    <div className="mt-3 max-w-4xl rounded-xl bg-[var(--surface-sunken)] p-4">
       <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
         <Code2 size={16} />
         Код для вставки на сайт
       </div>
 
-      <div className="mt-2 flex flex-wrap gap-1.5">
-        {PLATFORMS.map((p) => (
-          <button
-            key={p.id}
-            type="button"
-            onClick={() => setPlatform(p.id)}
-            aria-pressed={platform === p.id}
-            className={`rounded-lg px-3 py-1.5 transition-colors ${
-              platform === p.id
-                ? 'bg-[var(--accent)] text-[var(--accent-contrast)]'
-                : 'ring-1 ring-[var(--line-strong)] hover:bg-[var(--surface)]'
-            }`}
-          >
-            {p.title}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        className="mt-2"
+        label="Площадка"
+        value={platform}
+        onChange={setPlatform}
+        items={PLATFORMS.map((p) => ({ id: p.id, label: p.title }))}
+      />
 
       {documentIds.length > 1 && (
-        <select
+        <Select
           value={documentId}
           onChange={(e) => setDocumentId(e.target.value)}
           aria-label="Какой документ выдавать"
-          className="mt-2.5 w-full rounded-lg bg-[var(--surface)] px-3 py-2 ring-1 ring-[var(--line)]"
+          className="mt-2.5"
         >
           {documentIds.map((id) => (
             <option key={id} value={id}>
               {titles.get(id) ?? id}
             </option>
           ))}
-        </select>
+        </Select>
       )}
 
       <p className="mt-2.5">{WHERE[platform]}</p>

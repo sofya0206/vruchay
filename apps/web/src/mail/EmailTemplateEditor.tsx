@@ -116,7 +116,7 @@ export function EmailTemplateEditor({ documentId }: { documentId: string }) {
   return (
     <div className="mx-auto max-w-3xl space-y-5 p-6">
       <header>
-        <h2 className="font-serif text-xl">Письмо участнику</h2>
+        <h2 className="text-lg font-medium">Письмо участнику</h2>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
           Так выглядит письмо, которое придёт вместе с документом. Отправителем участник
           увидит название вашей организации.

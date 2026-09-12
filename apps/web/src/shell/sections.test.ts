@@ -1,20 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SECTIONS } from './sections';
 import { NAV_ITEMS, activeNav } from './nav';
-
-describe('заглушки разделов', () => {
-  it('у каждой есть название и строка объяснения', () => {
-    for (const s of SECTIONS) {
-      expect(s.label).not.toBe('');
-      expect(s.about).not.toBe('');
-    }
-  });
-
-  it('адреса не повторяются', () => {
-    const paths = SECTIONS.map((s) => s.path);
-    expect(new Set(paths).size).toBe(paths.length);
-  });
-});
 
 /*
  * Подсветка пункта полосы — не украшение: по ней человек понимает, где он.

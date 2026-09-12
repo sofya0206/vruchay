@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { jobPercent, lastJob, runningJobs, undelivered } from './desk';
+import { allStepsDone, firstSteps, jobPercent, lastJob, runningJobs, undelivered } from './desk';
 import type { OverviewJob } from '../api/overview';
 import type { LogItem } from '../mailing/api';
 
@@ -76,6 +76,23 @@ describe('насколько задание прошло', () => {
 
   it('не переваливает за сто, если выпущено больше заявленного', () => {
     expect(jobPercent({ done: 45, total: 40 })).toBe(100);
+  });
+});
+
+describe('первые шаги', () => {
+  it('у новой организации ни один не пройден', () => {
+    const steps = firstSteps({ materials: 0, issuedTotal: 0, emailsSent: 0 });
+    expect(steps.map((s) => s.done)).toEqual([false, false, false]);
+    expect(allStepsDone(steps)).toBe(false);
+  });
+
+  it('отмечает по сделанному, а не по порядку: выпуск через API тоже считается', () => {
+    const steps = firstSteps({ materials: 1, issuedTotal: 12, emailsSent: 0 });
+    expect(steps.map((s) => s.done)).toEqual([true, true, false]);
+  });
+
+  it('когда всё сделано, блок на главной больше не нужен', () => {
+    expect(allStepsDone(firstSteps({ materials: 3, issuedTotal: 40, emailsSent: 40 }))).toBe(true);
   });
 });
 

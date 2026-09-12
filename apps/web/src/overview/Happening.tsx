@@ -5,7 +5,7 @@ import type { Overview } from '../api/overview';
 import { useMailingLog } from '../mailing/api';
 import { formatLetterTime, listCount, mailListPath, type MailList } from '../mailing/mail-lists';
 import { StatusChip } from '../ui/Field';
-import { Block, Empty, Rows } from './Block';
+import { Card, Rows } from '../ui/Card';
 import { jobPercent, runningJobs, undelivered } from './desk';
 import { jobLook } from './format';
 
@@ -53,21 +53,19 @@ export function Happening({ data }: { data: Overview }) {
     return () => clearInterval(timer);
   }, [running, qc]);
 
+  // В тишине блока нет вовсе: пустая рамка с «ничего не идёт» — это
+  // и есть лишнее на главной.
   const quiet = !running && letters === 0;
+  if (quiet) return null;
 
   return (
-    <Block
+    <Card
       title="Сейчас происходит"
-      about="Выпуск документов и судьба писем — по мере того как они уходят."
+      about="Выпуск документов и судьба писем — по мере того как они уходят"
       to="/mailing"
       linkLabel="Все письма"
     >
-      {quiet ? (
-        <Empty>
-          Пока ничего не идёт. Здесь появятся выпуск документов и письма —
-          сразу, как только вы их запустите.
-        </Empty>
-      ) : (
+      {
         <div className="grid gap-4">
           {running && (
             <Rows>
@@ -140,8 +138,8 @@ export function Happening({ data }: { data: Overview }) {
             </Rows>
           )}
         </div>
-      )}
-    </Block>
+      }
+    </Card>
   );
 }
 
@@ -168,7 +166,7 @@ function Counter({
     <li>
       <Link
         to={mailListPath(id)}
-        className="block min-w-36 rounded-[var(--radius-card)] bg-[var(--surface)] px-4 py-3 shadow-[var(--ring-line)] transition-colors hover:bg-[var(--accent-soft)]"
+        className="hairline block min-w-36 rounded-xl px-4 py-3 transition-colors hover:bg-[var(--accent-soft)]"
       >
         <span
           className={`block text-2xl font-semibold tabular-nums ${

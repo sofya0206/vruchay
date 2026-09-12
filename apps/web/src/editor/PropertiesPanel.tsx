@@ -27,7 +27,6 @@ import { describeSize, type SheetElement, type ShapeElement, type TextProps } fr
 import type { DocumentDetail } from '../api/types';
 import { PageSizePicker, type PageSizeValue } from '../documents/PageSizePicker';
 import { EventFields, type EventValues } from './EventFields';
-import { VerifySettings } from './VerifySettings';
 import { ColorField } from './ColorField';
 import { FONTS } from './fonts-list';
 import { MIXED, commonTextProps, commonValue, type AlignKind } from './selection';
@@ -93,9 +92,6 @@ export function PropertiesPanel(props: Props) {
               </div>
             )}
             <EventFields doc={doc} onSave={onSaveEvent} onDraft={onEventDraft} />
-            <div className="mt-6">
-              <VerifySettings doc={doc} onSave={onSaveEvent} />
-            </div>
           </>
         ) : (
           <>

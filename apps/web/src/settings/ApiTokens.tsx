@@ -26,12 +26,14 @@ export function ApiTokens() {
     <section>
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 font-serif text-xl"
+        className="flex items-center gap-2 text-lg font-medium"
         aria-expanded={open}
       >
-        <KeyRound size={18} className="text-[var(--text-muted)]" />
+        <KeyRound size={18} className="text-[var(--accent)]" />
         Доступ для программ
-        <span className="text-sm text-[var(--text-muted)]">{open ? 'скрыть' : 'показать'}</span>
+        <span className="rounded-full bg-[var(--surface-sunken)] px-2 py-0.5 text-xs font-normal text-[var(--text-muted)]">
+          {open ? 'скрыть' : 'показать'}
+        </span>
       </button>
       <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)]">
         Нужно, только если вы подключаете сервис к своей программе или сайту. Для обычной работы

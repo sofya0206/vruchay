@@ -1,6 +1,7 @@
 import { ArrowUpRight, ShieldAlert, Trash2 } from 'lucide-react';
 import type { RegistryRow } from '../api/registry';
-import { StateChip } from './StateChip';
+import { StatusChip } from '../ui/Field';
+import { Checkbox } from '../ui/Checkbox';
 import {
   formatDate,
   mailLabel,
@@ -30,17 +31,15 @@ export function RegistryTable({ rows, selected, onToggle, onToggleAll, onOpen }:
   const allChecked = rows.length > 0 && rows.every((r) => selected.has(r.fileId));
 
   return (
-    <div className="overflow-x-auto rounded-2xl bg-[var(--surface)] ring-1 ring-[var(--line)]">
+    <div className="card overflow-x-auto">
       <table className="w-full min-w-[64rem] border-collapse text-sm">
         <thead>
           <tr className="border-b border-[var(--line)] text-left text-xs tracking-wide text-[var(--text-muted)] uppercase">
             <th className="w-10 px-3 py-3">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={allChecked}
                 onChange={onToggleAll}
                 aria-label="Отметить все на странице"
-                className="size-4 accent-[var(--accent)]"
               />
             </th>
             <th className="px-3 py-3 font-medium">Получатель</th>
@@ -73,12 +72,10 @@ export function RegistryTable({ rows, selected, onToggle, onToggleAll, onOpen }:
                 className="cursor-pointer border-b border-[var(--line)] last:border-0 hover:bg-[var(--surface-sunken)]"
               >
                 <td className="px-3 py-3 align-top" onClick={(e) => e.stopPropagation()}>
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={selected.has(row.fileId)}
                     onChange={() => onToggle(row.fileId)}
                     aria-label={`Отметить документ: ${row.name || row.code}`}
-                    className="size-4 accent-[var(--accent)]"
                   />
                 </td>
 
@@ -113,19 +110,19 @@ export function RegistryTable({ rows, selected, onToggle, onToggleAll, onOpen }:
                 </td>
 
                 <td className="px-3 py-3 align-top">
-                  <StateChip tone={mailTone(row.mail?.status)}>
+                  <StatusChip tone={mailTone(row.mail?.status)}>
                     {mailLabel(row.mail?.status)}
-                  </StateChip>
+                  </StatusChip>
                   {row.mail?.error && (
                     <p className="mt-1 max-w-48 text-xs text-[var(--danger)]">{row.mail.error}</p>
                   )}
                 </td>
 
                 <td className="px-3 py-3 align-top">
-                  <StateChip tone={stateTone(row)}>
+                  <StatusChip tone={stateTone(row)}>
                     {row.state === 'revoked' && <ShieldAlert size={12} />}
                     {stateLabel(row)}
-                  </StateChip>
+                  </StatusChip>
                   {row.replacedBy && (
                     <a
                       href={row.replacedBy.verifyPath}

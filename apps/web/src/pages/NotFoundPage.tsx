@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
-import { Award, ArrowLeft } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
+import { Brand } from '../shell/Brand';
 import { Button } from '../ui/Button';
 import { Meta } from '../seo/Meta';
 
@@ -34,9 +35,7 @@ export function NotFoundPage() {
             <div className="absolute -right-2.5 -bottom-2.5 -z-10 h-full w-full rotate-[2deg] rounded-xl bg-[var(--surface-sunken)] ring-1 ring-[var(--line)]" />
             <div className="rotate-[-1.5deg] rounded-xl bg-[var(--surface)] p-8 shadow-[0_20px_60px_-20px_rgba(20,32,26,0.35)] ring-1 ring-[var(--line)] transition-transform duration-300 hover:rotate-0">
               <div className="rounded-lg border border-[var(--award)]/30 px-6 py-8">
-                <span className="mx-auto grid h-9 w-9 place-items-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]">
-                  <Award size={18} strokeWidth={1.75} />
-                </span>
+                <Brand size={36} className="mx-auto" />
                 <p className="mt-5 text-[10px] tracking-[0.25em] text-[var(--text-muted)] uppercase">
                   Награждается
                 </p>

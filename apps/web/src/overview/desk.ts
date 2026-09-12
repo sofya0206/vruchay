@@ -1,5 +1,52 @@
-import type { OverviewJob } from '../api/overview';
+import type { Overview, OverviewJob } from '../api/overview';
 import type { LogItem } from '../mailing/api';
+
+export interface FirstStep {
+  id: 'material' | 'issue' | 'mail';
+  label: string;
+  hint: string;
+  to: string;
+  done: boolean;
+}
+
+/**
+ * Первые шаги организации — три галочки на главной.
+ *
+ * Считаются по тому, что уже сделано, а не по тому, что нажали: шаг
+ * «выпустить» отмечен, когда в реестре появился первый документ, даже
+ * если выпустили его через API, минуя кабинет. Порядок — тот, в котором
+ * работа идёт в жизни: собрать лист, выпустить, разослать.
+ */
+export function firstSteps(data: Pick<Overview, 'materials' | 'issuedTotal' | 'emailsSent'>): FirstStep[] {
+  return [
+    {
+      id: 'material',
+      label: 'Соберите документ',
+      hint: 'Загрузите бланк и поставьте поля: фамилию, место, дату',
+      to: '/documents?new=1',
+      done: data.materials > 0,
+    },
+    {
+      id: 'issue',
+      label: 'Выпустите документы',
+      hint: 'Подставьте имена из списка — файлы соберутся сами',
+      to: '/documents',
+      done: data.issuedTotal > 0,
+    },
+    {
+      id: 'mail',
+      label: 'Разошлите письма',
+      hint: 'Каждый получит свой документ на почту',
+      to: '/mailing?list=new',
+      done: data.emailsSent > 0,
+    },
+  ];
+}
+
+/** Все шаги пройдены — блоку на главной больше нечего сказать. */
+export function allStepsDone(steps: FirstStep[]): boolean {
+  return steps.every((step) => step.done);
+}
 
 /*
  * Выборки для блоков рабочего стола.

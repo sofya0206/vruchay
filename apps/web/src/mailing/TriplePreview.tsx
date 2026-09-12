@@ -9,7 +9,7 @@ import type { RecipientTable } from '../api/recipients';
 import { SheetRenderer } from '../render/SheetRenderer';
 import { parseBody, type Run } from '../mail/email-body';
 import { Button } from '../ui/Button';
-import { Dialog } from './Dialog';
+import { Dialog } from '../ui/Dialog';
 import { fillVariables, previewValues } from './letter-preview';
 import type { LetterKind } from './api';
 

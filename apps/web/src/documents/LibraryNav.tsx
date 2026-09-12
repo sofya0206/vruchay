@@ -20,6 +20,8 @@ import {
   useRenameFolder,
   type Folder as FolderItem,
 } from '../api/folders';
+import { ConfirmDialog } from '../ui/Dialog';
+import { SectionLayout } from '../ui/SectionLayout';
 
 /**
  * Рамка раздела «Награждение»: колонка разделов слева, панель сверху,
@@ -114,6 +116,8 @@ export function LibraryNav({ archiveCount }: { archiveCount?: number | null }) {
   const [menu, setMenu] = useState<{ x: number; y: number; folder: FolderItem | null } | null>(
     null,
   );
+  /** Папка, удаление которой ждёт подтверждения. */
+  const [deleting, setDeleting] = useState<FolderItem | null>(null);
 
   const folders = useFolders();
   const create = useCreateFolder();
@@ -219,8 +223,28 @@ export function LibraryNav({ archiveCount }: { archiveCount?: number | null }) {
           onNewDocument={() => startDocument(menu.folder)}
           onNewFolder={startFolder}
           onRename={() => menu.folder && setRenamingId(menu.folder.id)}
-          onDelete={() => menu.folder && remove.mutate(menu.folder.id)}
+          onDelete={() => setDeleting(menu.folder)}
         />
+      )}
+
+      {deleting && (
+        <ConfirmDialog
+          title={`Удалить папку «${deleting.name}»?`}
+          confirmLabel="Удалить папку"
+          danger
+          pending={remove.isPending}
+          onClose={() => setDeleting(null)}
+          onConfirm={() =>
+            remove.mutate(deleting.id, {
+              onSuccess: () => {
+                setDeleting(null);
+                if (openFolderId === deleting.id) navigate('/documents');
+              },
+            })
+          }
+        >
+          Материалы останутся — вернутся в «Мои документы».
+        </ConfirmDialog>
       )}
     </nav>
   );
@@ -290,7 +314,7 @@ function ContextMenu({
         // Меню у правого или нижнего края уехало бы за экран, поэтому
         // упираем его в край с небольшим полем.
         style={{ left: Math.min(x, window.innerWidth - 240), top: Math.min(y, window.innerHeight - 200) }}
-        className="fixed z-50 w-56 overflow-hidden rounded-lg bg-[var(--surface)] py-1 shadow-lg ring-1 ring-[var(--line)]"
+        className="card fixed z-50 w-56 overflow-hidden py-1 shadow-lg"
       >
         <p className="truncate px-3 pt-1 pb-2 text-xs text-[var(--text-muted)]">
           {folder ? folder.name : 'Мои документы'}
@@ -315,11 +339,6 @@ function ContextMenu({
             <MenuItem icon={<Trash2 size={14} />} danger onClick={run(onDelete)}>
               Удалить папку
             </MenuItem>
-            {/* Сказано прямо: иначе «Удалить папку» читается как «удалить
-                вместе со всем, что внутри», и нажать на него страшно. */}
-            <p className="px-3 pt-1 pb-2 text-xs text-[var(--text-muted)]">
-              Материалы останутся — вернутся в «Мои документы»
-            </p>
           </>
         )}
       </div>
@@ -359,7 +378,7 @@ function FolderRow({
         type="button"
         onClick={onMenu}
         aria-label={`Меню папки «${folder.name}»`}
-        className="px-2 py-2 text-[var(--text-muted)] opacity-0 transition-opacity group-hover:opacity-100 hover:text-[var(--text)] focus-visible:opacity-100"
+        className="px-2 py-2 text-[var(--text-muted)] transition-opacity hover:text-[var(--text)] md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
       >
         <MoreHorizontal size={15} strokeWidth={1.75} />
       </button>
@@ -484,7 +503,7 @@ function FolderNameForm({
         aria-label="Название папки"
         placeholder="Название папки"
         className={
-          'w-full rounded-md bg-[var(--surface-sunken)] px-2 py-1.5 text-[13px] outline-none ring-1 ' +
+          'w-full rounded-lg bg-[var(--surface-sunken)] px-2 py-1.5 text-[13px] outline-none ring-1 ' +
           (error ? 'ring-[var(--danger)]' : 'ring-[var(--accent)]')
         }
       />
@@ -496,14 +515,14 @@ function FolderNameForm({
 /** Общий вид строки колонки: значок, подпись, число внутри. */
 function rowClass(active: boolean, nested = false): string {
   return (
-    'flex items-center gap-2.5 rounded-lg border-l-2 py-2 text-sm whitespace-nowrap ' +
+    'flex items-center gap-2.5 rounded-lg py-2 text-sm whitespace-nowrap ' +
     'transition-colors ' +
     // Вложенные папки: отступ слева и мельче кегль — иначе колонка
     // читается как один плоский список из восьми равноправных строк.
     (nested ? 'px-3 md:pl-8 md:text-[13px] ' : 'px-3 ') +
     (active
-      ? 'border-[var(--accent)] bg-[var(--accent-soft)] font-medium text-[var(--accent)]'
-      : 'border-transparent text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]')
+      ? 'bg-[var(--accent-soft)] font-medium text-[var(--accent)]'
+      : 'text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]')
   );
 }
 
@@ -578,12 +597,10 @@ function RootRow({
 }
 
 /**
- * Общая рамка раздела библиотеки.
+ * Рама библиотеки — общая `SectionLayout` с колонкой папок.
  *
- * `head` — левая часть верхней панели (название списка), `tools` — то,
- * что стоит перед кнопкой создания (поиск), `bar` — нижняя строка
- * состояния. Кнопку создания рамка рисует сама: она обязана стоять
- * на одном месте во всех списках раздела.
+ * «Создать» — одна кнопка: в колонке на широком экране, в панели — только
+ * на телефоне, где колонки нет.
  */
 export function LibraryLayout({
   archiveCount,
@@ -599,38 +616,25 @@ export function LibraryLayout({
   children: ReactNode;
 }) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-      <aside className="border-b border-[var(--line)] md:w-60 md:shrink-0 md:border-r md:border-b-0">
-        {/* --app-header — высота шапки кабинета вместе с её линией. Колонка
-            встаёт ровно под шапку и дальше стоит на месте, пока список
-            прокручивается. Числом высоту не пишем: шапку правят, и колонка
-            должна ехать за ней. */}
-        <div className="p-3 md:sticky md:top-[var(--app-header)] md:max-h-[calc(100vh-var(--app-header))] md:overflow-y-auto">
-          {/* На телефоне колонка стоит над панелью, и две кнопки «Создать»
-              оказались бы подряд одна под другой — здесь остаётся та,
-              что в панели. */}
+    <SectionLayout
+      column={
+        <>
           <div className="hidden md:block">
-            <CreateLink label="Создать" className="w-full" />
+            <CreateLink label="Создать документ" className="w-full" />
           </div>
           <LibraryNav archiveCount={archiveCount} />
-        </div>
-      </aside>
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        <div className="z-10 flex flex-wrap items-center gap-3 border-b border-[var(--line)] bg-[var(--surface)] px-6 py-3 md:sticky md:top-[var(--app-header)]">
-          <div className="min-w-0 flex-1">{head}</div>
+        </>
+      }
+      head={head}
+      tools={
+        <>
           {tools}
-          <CreateLink label="Создать документ" />
-        </div>
-
-        <main className="min-w-0 flex-1 px-6 py-6">{children}</main>
-
-        {bar && (
-          <div className="sticky bottom-0 z-10 flex flex-wrap items-center gap-3 border-t border-[var(--line)] bg-[var(--surface)] px-6 py-2.5 text-sm">
-            {bar}
-          </div>
-        )}
-      </div>
-    </div>
+          <CreateLink label="Создать" className="md:hidden" />
+        </>
+      }
+      bar={bar}
+    >
+      {children}
+    </SectionLayout>
   );
 }

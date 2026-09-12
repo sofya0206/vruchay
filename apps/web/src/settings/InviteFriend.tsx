@@ -17,7 +17,7 @@ export function InviteFriend() {
 
   return (
     <section>
-      <h2 className="flex items-center gap-2 font-serif text-xl">
+      <h2 className="flex items-center gap-2 text-lg font-medium">
         <Gift size={18} className="text-[var(--accent)]" />
         Пригласить друга
       </h2>
@@ -153,7 +153,7 @@ function Progress({ data }: { data: ReferralSummary }) {
 function Stat({ value, label, accent }: { value: number; label: string; accent?: boolean }) {
   return (
     <div>
-      <div className={`font-serif text-2xl ${accent ? 'text-[var(--accent)]' : ''}`}>{value}</div>
+      <div className={`text-xl font-medium ${accent ? 'text-[var(--accent)]' : ''}`}>{value}</div>
       <div className="text-sm text-[var(--text-muted)]">{label}</div>
     </div>
   );

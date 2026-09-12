@@ -3,7 +3,6 @@ import {
   Ban,
   CheckCheck,
   CheckCircle2,
-  CircleHelp,
   Columns3,
   Download,
   Eye,
@@ -12,17 +11,13 @@ import {
   ListChecks,
   ListX,
   LoaderCircle,
-  Mail,
   Play,
   Plus,
   Rows3,
-  ShieldCheck,
-  Sparkles,
   Table2,
   Trash2,
   X,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import {
   useGeneration,
   useJobFailures,
@@ -44,8 +39,9 @@ import { DownloadDialog } from './DownloadDialog';
 import { InviteNudge } from '../referral/InviteNudge';
 import { DocumentChrome, ToolButton, ToolDivider } from '../editor/DocumentChrome';
 import { useDocumentFileMenu } from '../editor/DocumentFileMenu';
-import type { MenuDef } from '../editor/MenuBar';
-import { Dialog } from '../mailing/Dialog';
+import type { MenuEntry } from '../editor/DocumentChrome';
+import { IconButton } from '../ui/IconButton';
+import { Dialog } from '../ui/Dialog';
 import type { DocumentDetail } from '../api/types';
 import type { WorkspaceTab } from '../mailing/workspace-tabs';
 
@@ -68,7 +64,6 @@ export function RecipientsTable({
   onGoToRegistry: () => void;
 }) {
   const documentId = doc.id;
-  const navigate = useNavigate();
   const fileMenu = useDocumentFileMenu(doc);
   const table = useRecipients(documentId);
   const m = useRecipientMutations(documentId);
@@ -283,88 +278,44 @@ export function RecipientsTable({
    * колонки сервис не умеет. Пункт, за которым нет действия, хуже
    * отсутствующего.
    */
-  const menus: MenuDef[] = [
-    { id: 'file', label: 'Файл', entries: fileMenu.entries },
+  const actions: MenuEntry[] = [
+    ...fileMenu.entries,
+    { separator: true },
     {
-      id: 'insert',
-      label: 'Вставка',
-      entries: [
-        {
-          icon: <Rows3 size={16} />,
-          label: 'Добавить строку',
-          disabled: m.addRow.isPending,
-          onSelect: () => m.addRow.mutate(),
-        },
-        {
-          icon: <Columns3 size={16} />,
-          label: 'Добавить колонку',
-          onSelect: () => setAddingColumn(true),
-        },
-      ],
+      icon: <FileSpreadsheet size={16} />,
+      label: m.parseFile.isPending ? 'Читаем файл…' : 'Загрузить файл XLS',
+      disabled: m.parseFile.isPending,
+      onSelect: () => xlsInput.current?.click(),
     },
     {
-      id: 'data',
-      label: 'Данные',
-      entries: [
-        {
-          icon: <FileSpreadsheet size={16} />,
-          label: m.parseFile.isPending ? 'Читаем файл…' : 'Загрузить файл XLS',
-          disabled: m.parseFile.isPending,
-          onSelect: () => xlsInput.current?.click(),
-        },
-        { separator: true },
-        {
-          icon: <CheckCircle2 size={16} />,
-          label: 'Отметить все строки',
-          disabled: rows.length === 0,
-          onSelect: () => m.setChecked.mutate({ checked: true }),
-        },
-        {
-          icon: <ListX size={16} />,
-          label: 'Снять отметку со всех строк',
-          disabled: rows.length === 0,
-          onSelect: () => m.setChecked.mutate({ checked: false }),
-        },
-        { separator: true },
-        {
-          icon: <ListChecks size={16} />,
-          label: 'Проверить строки',
-          disabled: checkedCount === 0,
-          onSelect: () => onOpen('check'),
-        },
-        {
-          icon: <Sparkles size={16} />,
-          label: 'Правила награждения',
-          onSelect: () => onOpen('rules'),
-        },
-        {
-          icon: <Mail size={16} />,
-          label: 'Письмо участнику',
-          onSelect: () => onOpen('mail'),
-        },
-        {
-          icon: <ShieldCheck size={16} />,
-          label: 'Подлинность документа',
-          onSelect: () => onOpen('verify'),
-        },
-        { separator: true },
-        {
-          icon: <Table2 size={16} />,
-          label: 'Выданное по материалу',
-          onSelect: onGoToRegistry,
-        },
-      ],
+      icon: <Rows3 size={16} />,
+      label: 'Добавить строку',
+      disabled: m.addRow.isPending,
+      onSelect: () => m.addRow.mutate(),
     },
     {
-      id: 'help',
-      label: 'Справка',
-      entries: [
-        {
-          icon: <CircleHelp size={16} />,
-          label: 'Показать справку',
-          onSelect: () => navigate('/docs'),
-        },
-      ],
+      icon: <Columns3 size={16} />,
+      label: 'Добавить колонку',
+      onSelect: () => setAddingColumn(true),
+    },
+    { separator: true },
+    {
+      icon: <CheckCircle2 size={16} />,
+      label: 'Отметить все строки',
+      disabled: rows.length === 0,
+      onSelect: () => m.setChecked.mutate({ checked: true }),
+    },
+    {
+      icon: <ListX size={16} />,
+      label: 'Снять отметку со всех строк',
+      disabled: rows.length === 0,
+      onSelect: () => m.setChecked.mutate({ checked: false }),
+    },
+    { separator: true },
+    {
+      icon: <Table2 size={16} />,
+      label: 'Выданное по материалу',
+      onSelect: onGoToRegistry,
     },
   ];
 
@@ -482,13 +433,14 @@ export function RecipientsTable({
   );
 
   return (
-    /* Во всю высоту окна: страница таблицы рисуется сама по себе, без
-       оболочки кабинета, и высоту ей задать больше некому. */
-    <div className="flex h-full min-h-0 flex-col">
+    /* Точным счётом, а не `h-full`: оболочка кабинета не задаёт высоту
+       своей колонке (иначе колонка разделов теряла прилипание на длинных
+       страницах), и опереться на неё через `h-full` больше не на что. */
+    <div className="flex h-[calc(100dvh-var(--app-header))] min-h-0 flex-col">
       <DocumentChrome
         documentId={documentId}
         title={doc.title}
-        menus={menus}
+        actions={actions}
         tab="table"
         toolbar={toolbar}
         action={
@@ -716,13 +668,14 @@ export function RecipientsTable({
                   >
                     <span className="inline-flex items-center gap-1.5">
                       {columnTitle(col)}
-                      <button
+                      <IconButton
+                        size="sm"
+                        label={`Удалить колонку ${columnTitle(col)}`}
                         onClick={() => m.deleteColumn.mutate(col.id)}
-                        aria-label={`Удалить колонку ${columnTitle(col)}`}
-                        className="opacity-0 transition-opacity group-hover:opacity-100 hover:text-[var(--danger)]"
+                        className="size-6 opacity-0 group-hover:opacity-100 hover:text-[var(--danger)]"
                       >
                         <X size={12} />
-                      </button>
+                      </IconButton>
                     </span>
                     <span className="block font-mono text-xs font-normal text-[var(--text-muted)]">
                       %{col.name}
@@ -769,13 +722,14 @@ export function RecipientsTable({
                     </td>
                   ))}
                   <td className="border-b border-[var(--line)] px-2 text-center">
-                    <button
+                    <IconButton
+                      size="sm"
+                      label="Удалить строку"
                       onClick={() => m.deleteRow.mutate(row.id)}
-                      aria-label="Удалить строку"
-                      className="text-[var(--text-muted)] opacity-0 transition-opacity group-hover:opacity-100 hover:text-[var(--danger)]"
+                      className="size-7 opacity-0 group-hover:opacity-100 hover:text-[var(--danger)]"
                     >
                       <Trash2 size={14} />
-                    </button>
+                    </IconButton>
                   </td>
                 </tr>
               ))}

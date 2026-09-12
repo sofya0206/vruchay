@@ -40,7 +40,7 @@ export function MailDomains() {
   return (
     <section className="space-y-4">
       <header>
-        <h2 className="font-serif text-xl">Домен для отправки</h2>
+        <h2 className="text-lg font-medium">Домен для отправки</h2>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
           Настраивать не обязательно: письма уже уходят, отправителем в них стоит название
           вашей организации. Свой домен нужен, если хотите, чтобы и адрес был вашим.

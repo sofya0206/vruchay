@@ -268,7 +268,7 @@ function StartScreen({
   return (
     <div className="mx-auto max-w-2xl space-y-5 p-8">
       <div>
-        <h2 className="font-serif text-xl">Правила награждения</h2>
+        <h2 className="text-lg font-medium">Правила награждения</h2>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
           «Первое место — диплом победителя, снятым ничего, остальным грамота участника».
           Набор сохраняется и переиспользуется на следующем соревновании.

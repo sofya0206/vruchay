@@ -4,6 +4,7 @@ import { useTeam, useTeamMutations, type TeamMember, type TeamRole } from '../ap
 import { useMe } from '../auth/useAuth';
 import { Button } from '../ui/Button';
 import { Input, Label, Select } from '../ui/Field';
+import { ConfirmDialog } from '../ui/Dialog';
 
 /** Понятные названия ролей: слово «роль» человеку ничего не говорит. */
 const ROLE_TITLE: Record<TeamRole, string> = {
@@ -30,6 +31,7 @@ export function Team() {
   const team = useTeam();
   const m = useTeamMutations();
   const [adding, setAdding] = useState(false);
+  const [removing, setRemoving] = useState<TeamMember | null>(null);
 
   const members = team.data?.members ?? [];
   const myRole = members.find((x) => x.email === me.data?.email)?.role;
@@ -37,7 +39,7 @@ export function Team() {
 
   return (
     <section>
-      <h2 className="font-serif text-xl">Кто работает в организации</h2>
+      <h2 className="text-lg font-medium">Кто работает в организации</h2>
       <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)]">
         Добавьте коллег, чтобы каждый входил под своим именем и паролем. Так видно, кто
         какие грамоты выпустил, и не приходится передавать один пароль на всех.
@@ -52,16 +54,7 @@ export function Team() {
             member={member}
             canManage={canManage && member.role !== 'owner' && member.email !== me.data?.email}
             onRole={(role) => m.setRole.mutate({ userId: member.userId, role })}
-            onRemove={() => {
-              if (
-                window.confirm(
-                  `Убрать ${member.name || member.email} из организации? ` +
-                    `Выпущенные им документы останутся в реестре.`,
-                )
-              ) {
-                m.remove.mutate(member.userId);
-              }
-            }}
+            onRemove={() => setRemoving(member)}
             onResend={() => m.resend.mutate(member.userId)}
             resent={m.resend.isSuccess && m.resend.variables === member.userId}
           />
@@ -93,6 +86,21 @@ export function Team() {
         <p className="mt-4 text-sm text-[var(--text-muted)]">
           Добавлять сотрудников может владелец или управляющий.
         </p>
+      )}
+
+      {removing && (
+        <ConfirmDialog
+          title={`Убрать ${removing.name || removing.email} из организации?`}
+          confirmLabel="Убрать"
+          danger
+          pending={m.remove.isPending}
+          onClose={() => setRemoving(null)}
+          onConfirm={() =>
+            m.remove.mutate(removing.userId, { onSuccess: () => setRemoving(null) })
+          }
+        >
+          Выпущенные им документы останутся в реестре.
+        </ConfirmDialog>
       )}
     </section>
   );

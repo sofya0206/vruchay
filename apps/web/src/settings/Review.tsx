@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Check, MessageSquareQuote, Trash2 } from 'lucide-react';
 import { useMyReview, useReviewMutations, type MyReview } from '../api/reviews';
 import { Button } from '../ui/Button';
-import { Input, Label } from '../ui/Field';
+import { Input, Label, Textarea } from '../ui/Field';
 
 /**
  * Отзыв о сервисе.
@@ -21,7 +21,7 @@ export function Review() {
 
   return (
     <section>
-      <h2 className="flex items-center gap-2 font-serif text-xl">
+      <h2 className="flex items-center gap-2 text-lg font-medium">
         <MessageSquareQuote size={18} className="text-[var(--accent)]" />
         Отзыв о сервисе
       </h2>
@@ -118,14 +118,14 @@ function ReviewForm({ existing }: { existing: MyReview | null }) {
 
         <div>
           <Label>Что скажете</Label>
-          <textarea
+          <Textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
             rows={6}
             maxLength={2000}
             spellCheck
             placeholder="Что делали раньше, что изменилось, сколько времени стало занимать награждение."
-            className="w-full rounded-xl bg-[var(--surface)] px-3 py-2 text-sm ring-1 ring-[var(--line)] focus:ring-2 focus:ring-[var(--accent)] focus:outline-none"
+            className="text-sm"
           />
           <p className="mt-1.5 text-sm text-[var(--text-muted)]">
             {tooShort

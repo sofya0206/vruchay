@@ -5,7 +5,7 @@ import { api, ApiError } from '../api/client';
 import type { RegistryFilters, RevokePreview, RevokeTarget } from '../api/registry';
 import { Button } from '../ui/Button';
 import { Input, Label, Textarea } from '../ui/Field';
-import { Dialog } from '../mailing/Dialog';
+import { Dialog } from '../ui/Dialog';
 import { plural } from './registry-format';
 
 /**

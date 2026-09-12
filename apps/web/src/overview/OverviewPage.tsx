@@ -1,46 +1,46 @@
 import { useState } from 'react';
+import { Plus } from 'lucide-react';
 import { useOverview } from '../api/overview';
 import { useMe } from '../auth/useAuth';
+import { Button } from '../ui/Button';
 import { Loading } from '../ui/Loading';
+import { PageHeader } from '../ui/PageHeader';
+import { allStepsDone, firstSteps } from './desk';
 import { DocsLinks } from './DocsLinks';
+import { FirstSteps } from './FirstSteps';
+import { protocolTitle } from './format';
 import { Happening } from './Happening';
+import { Metrics } from './Metrics';
 import { MyDocuments } from './MyDocuments';
 import { RegistryBlock } from './RegistryBlock';
-import { SiteEmbed } from './SiteEmbed';
-import { Welcome } from './Welcome';
-import { markWelcomeSeen, welcomeSeen } from './welcome-seen';
+import { markStepsHidden, stepsHidden } from './steps-hidden';
+import { useCreateMaterial } from './useCreateMaterial';
 
 /**
- * Рабочий стол кабинета — полоса из четырёх блоков, которую листают.
+ * Главная кабинета — стол, отвечающий на один вопрос: что делать дальше.
  *
- * Главная перестала быть оглавлением. Плитки разделов отвечали на вопрос
- * «что здесь есть», которого никто не задаёт дважды: человек приходит
- * делать одну из четырёх работ, и полоса выложена в том порядке, в котором
- * эти работы идут в жизни организации.
+ * Сверху вниз, по убыванию частоты:
  *
- * 1. Мои документы — то, над чем работали, и кнопка завести новое.
- * 2. Сейчас происходит — выпуск и судьба писем: единственное на главной,
- *    что меняется само.
- * 3. Добавьте на свой сайт — выдача документов посетителям, развёрнутая
- *    настройкой, а не ссылкой.
- * 4. Реестр — поиск по фамилии и последние выданные.
+ * 1. Приветствие и одна большая кнопка — завести документ. Это то, ради
+ *    чего сюда приходят чаще всего, и кнопка не должна искаться.
+ * 2. Первые шаги — три галочки для новой организации; уходят, как только
+ *    всё пройдено или человек их убрал.
+ * 3. Цифры — сколько выдано и сколько осталось.
+ * 4. Что идёт прямо сейчас — только когда идёт; в тишине блока нет.
+ * 5. Последние документы карточками и поиск по реестру одной строкой.
  *
- * Полоса не помещается в экран намеренно. Помещалась она только пока
- * состояла из ссылок; как только на ней встала работа, экран кончился —
- * и это правильнее, чем держать работу за ссылками ради одного экрана.
- *
- * У новой организации перед этим стоит входное обучение: пока ничего
- * не выпущено, рабочий стол показывать нечему.
+ * Всё остальное — настройки сайта, аналитика, полный реестр — за ссылками
+ * и в колонке разделов слева: на главной не должно быть ничего, что нужно
+ * реже раза в день.
  */
 export function OverviewPage() {
   const me = useMe();
   const overview = useOverview();
+  const create = useCreateMaterial();
   // Нажатие в этой же вкладке: localStorage мы уже прочитали и второй раз
   // за ним не пойдём, поэтому закрытие держим и в состоянии страницы.
-  const [dismissed, setDismissed] = useState(false);
+  const [hidden, setHidden] = useState(false);
 
-  // Ждём и того, кто вошёл: без почты не сказать, видел ли этот человек
-  // обучение, а показать его на миг и убрать — хуже, чем секунда загрузки.
   if (overview.isPending || me.isPending) return <Loading />;
 
   if (overview.isError || !overview.data) {
@@ -55,46 +55,49 @@ export function OverviewPage() {
 
   const data = overview.data;
   const email = me.data?.email;
-  // Обучение — по материалам, а не по выпущенному: организация, у которой
-  // материал есть, а документов ещё нет, уже начала работать, и рассказ
-  // о том, как здесь выпускают документы, ей только мешает.
-  const welcome = data.materials === 0 && !dismissed && !welcomeSeen(email);
+  const name = me.data?.name?.trim().split(/\s+/)[0];
+  const showSteps = !allStepsDone(firstSteps(data)) && !hidden && !stepsHidden(email);
 
-  function onDone() {
-    markWelcomeSeen(email);
-    setDismissed(true);
+  function hideSteps() {
+    markStepsHidden(email);
+    setHidden(true);
   }
 
-  // Обучение живёт в своей обёртке: ему нужна вся высота окна, а рабочему
-  // столу — только высота содержимого. Ширина у обеих одна и та же, что
-  // и у шапки: разойдись она — логотип и разделы встали бы не по краю.
-  if (welcome) {
-    return (
-      <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-6 py-8">
-        <Welcome onDone={onDone} />
-      </main>
-    );
-  }
-
-  // Полоса прижата к левому краю, а не поставлена колонкой по центру:
-  // первая строка страницы должна начинаться там же, где «Главная»
-  // в шапке над ней. Но и во всю ширину монитора её не растягиваем —
-  // список из пяти фамилий на двух тысячах пикселей нечитаем.
   return (
-    <>
-      <main className="w-full max-w-6xl px-6 pt-8 pb-12">
-        {/* Линия между блоками — единственное, что их разделяет: рамка
-            у каждого превратила бы полосу обратно в набор карточек. */}
-        <div className="divide-y divide-[var(--line)]">
-          <MyDocuments data={data} />
+    <div className="flex flex-1 flex-col bg-[var(--surface-sunken)]">
+      <main className="w-full max-w-6xl px-4 pt-6 pb-10 sm:px-6 sm:pt-8">
+        <PageHeader
+          title={name ? `Здравствуйте, ${name}` : 'Здравствуйте'}
+          about="Загрузите бланк, добавьте список получателей — выпустим всё разом."
+          actions={
+            <Button
+              variant="primary"
+              size="lg"
+              icon={<Plus size={18} />}
+              disabled={create.isPending}
+              onClick={() => create.mutate(protocolTitle())}
+            >
+              Создать документ
+            </Button>
+          }
+        />
+
+        {create.isError && (
+          <p role="alert" className="mb-4 text-sm text-[var(--danger)]">
+            Не удалось создать документ. Попробуйте ещё раз или откройте «Документы».
+          </p>
+        )}
+
+        <div className="grid gap-4 sm:gap-6">
+          {showSteps && <FirstSteps data={data} onHide={hideSteps} />}
+          <Metrics data={data} />
           <Happening data={data} />
-          <SiteEmbed />
+          <MyDocuments data={data} />
           <RegistryBlock />
         </div>
       </main>
-      {/* Снаружи `main`: подвал должен прижиматься к низу окна, а внутри
-          страницы он прижимался бы к концу текста. */}
+      {/* Подвал прижат к низу окна, а не к концу текста. */}
       <DocsLinks />
-    </>
+    </div>
   );
 }
