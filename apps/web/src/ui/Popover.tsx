@@ -41,7 +41,15 @@ export function Popover({
   width?: 'anchor' | number;
   children: ReactNode;
 }) {
-  const [box, setBox] = useState<{ left: number; top: number; width: number } | null>(null);
+  const [box, setBox] = useState<{
+    left?: number;
+    right?: number;
+    top?: number;
+    bottom?: number;
+    width?: number;
+    room: number;
+    sheet: boolean;
+  } | null>(null);
 
   useLayoutEffect(() => {
     if (!open) return;
@@ -49,30 +57,68 @@ export function Popover({
     const place = () => {
       const trigger = anchor.current;
       if (!trigger) return;
+
+      /*
+       * На сенсорном экране слой становится нижним листом во всю ширину:
+       * дотянуться большим пальцем до списка у верхнего края телефона
+       * нельзя. Спрашиваем браузер прямо здесь, а не классом: встроенные
+       * стили положения всё равно сильнее классов, а в предварительную
+       * отрисовку слой не попадает — закрытый он ничего не рисует.
+       */
+      if (window.matchMedia('(pointer: coarse)').matches) {
+        setBox({ left: 0, right: 0, bottom: 0, room: window.innerHeight * 0.6, sheet: true });
+        return;
+      }
+
       const rect = trigger.getBoundingClientRect();
       const w = width === 'anchor' || width === undefined ? rect.width : width;
 
       /*
        * Упор в край окна считаем руками — библиотеки размещения в проекте
-       * нет, а случай ровно один: не дать слою уехать за правый край и
-       * перевернуть его вверх, когда внизу не осталось места.
+       * нет, а случаев ровно два: не дать слою уехать за правый край
+       * и перевернуть его вверх, когда внизу не осталось места.
        */
       const left = Math.max(8, Math.min(rect.left, window.innerWidth - w - 8));
-      const below = window.innerHeight - rect.bottom;
-      const top = below < 220 && rect.top > below ? rect.top - 4 : rect.bottom + 4;
+      const below = window.innerHeight - rect.bottom - 8;
+      const above = rect.top - 8;
 
-      setBox({ left, top, width: w });
+      /*
+       * Переворачиваем по настоящей высоте слоя, когда она уже известна.
+       * На первом проходе слоя ещё нет — берём осторожную оценку, а сразу
+       * после отрисовки считаем заново: иначе календарь у нижнего края
+       * окна оставался бы внизу и прокручивался вместо того, чтобы
+       * раскрыться вверх, где место есть.
+       */
+      const height = panelRef.current?.offsetHeight ?? 240;
+      const up = below < height && above > below;
+
+      /*
+       * Вверх переворачиваем через bottom, а не через top. С top слой
+       * по-прежнему рос бы вниз — от верхнего края поля, — и поле у низа
+       * окна открывало бы список за экраном. Высоту слоя на этот момент
+       * ещё никто не знает, а bottom её знать и не требует.
+       */
+      setBox({
+        left,
+        width: w,
+        room: up ? above : below,
+        sheet: false,
+        ...(up ? { bottom: window.innerHeight - rect.top + 4 } : { top: rect.bottom + 4 }),
+      });
     };
 
     place();
+    // Второй проход — уже с измеренным слоем (см. про высоту выше).
+    const again = requestAnimationFrame(place);
     // Захват нужен, чтобы ловить прокрутку вложенных колонок, а не только окна.
     window.addEventListener('scroll', place, true);
     window.addEventListener('resize', place);
     return () => {
+      cancelAnimationFrame(again);
       window.removeEventListener('scroll', place, true);
       window.removeEventListener('resize', place);
     };
-  }, [open, anchor, width]);
+  }, [open, anchor, width, panelRef]);
 
   if (!open || !box) return null;
 
@@ -84,12 +130,22 @@ export function Popover({
       aria-labelledby={labelledBy}
       aria-activedescendant={activeDescendant}
       className={
-        'fixed z-50 max-h-72 overflow-auto rounded-xl bg-[var(--surface)] py-1 ' +
-        'shadow-lg ring-1 ring-[var(--line)] ' +
-        'pointer-coarse:inset-x-0 pointer-coarse:top-auto pointer-coarse:bottom-0 ' +
-        'pointer-coarse:max-h-[60vh] pointer-coarse:w-auto pointer-coarse:rounded-b-none'
+        'fixed z-50 overflow-auto bg-[var(--surface)] py-1 shadow-lg ring-1 ring-[var(--line)] ' +
+        (box.sheet ? 'rounded-t-2xl pb-2' : 'rounded-xl')
       }
-      style={{ left: box.left, top: box.top, width: box.width }}
+      /*
+       * Предел высоты — по месту, которое реально осталось, а не постоянное
+       * число: у длинного списка шрифтов прокрутка уместна, а календарь от
+       * постоянного предела обрезался посреди месяца.
+       */
+      style={{
+        left: box.left,
+        right: box.right,
+        top: box.top,
+        bottom: box.bottom,
+        width: box.width,
+        maxHeight: Math.max(180, box.room),
+      }}
       /*
        * Нажатие внутри слоя не уводит фокус.
        *
