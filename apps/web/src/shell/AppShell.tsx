@@ -23,7 +23,10 @@ import { TopNav } from './TopNav';
  */
 export function AppShell() {
   const { pathname } = useLocation();
-  const inMaterial = /^\/(documents|mailing)\/[^/]+/.test(pathname);
+  // Материал — это /documents/<id> и /mailing/<id>. Архив живёт по
+  // /documents/archive и материалом не является: у него, как у любого
+  // раздела, должна быть полоса.
+  const inMaterial = /^\/(documents|mailing)\/(?!archive(\/|$))[^/]+/.test(pathname);
 
   return (
     <div className="flex min-h-full flex-col">
