@@ -242,7 +242,7 @@ export function LibraryNav({ archiveCount }: { archiveCount?: number | null }) {
       {/* На узком экране колонка превратилась бы в две трети экрана телефона,
           поэтому там это лента, которая прокручивается вбок. */}
       <div className="flex gap-1 overflow-x-auto md:block md:overflow-visible">
-        <ul className="flex gap-1 md:flex-col md:gap-0">
+        <ul className="flex gap-1 md:flex-col">
           <RootRow
             active={onDocuments && !openFolderId}
             expanded={expanded}
@@ -487,6 +487,9 @@ function ContextMenu({
  * Счётчик и «…» стоят в одном месте друг над другом и меняются
  * прозрачностью, а не появлением: строка не должна дёргаться от того,
  * что по ней провели мышью.
+ *
+ * Вложенность держится одним отступом: направляющая линия вдоль папок
+ * рябила в глазах и спорила с рамкой колонки.
  */
 function FolderRow({
   folder,
@@ -544,11 +547,6 @@ function FolderRow({
       onContextMenu={onMenu}
       className={cn(
         'group relative flex items-center md:cursor-grab md:active:cursor-grabbing',
-        /* Направляющая линия вложенности: папки читаются как ветка «Моих
-           документов». Стоит по центру значка родителя — 16 точек от края
-           колонки. На узком экране колонка это лента вбок, там её нет. */
-        'md:before:absolute md:before:inset-y-0 md:before:left-4 md:before:w-px md:before:content-[""]',
-        active ? 'md:before:bg-[var(--accent)]' : 'md:before:bg-[var(--line)]',
         dragging && 'opacity-40',
         /* Куда ляжет папка — линия на границе, а не рамка вокруг строки:
            рамка показывала «эта папка», хотя вопрос был «между какими». */
@@ -563,15 +561,12 @@ function FolderRow({
         aria-current={active ? 'page' : undefined}
         {...triggerProps}
         className={cn(
-          columnRowClass({ nested: true }),
+          columnRowClass({ active, nested: true }),
           /* Постоянное место под счётчик и «…»: без него ширина имени
              менялась бы от того, есть ли у папки материалы. Обязательно
              с `md:` — базовый `pr-*` проиграл бы `md:px-2` из общего
              стиля, и счётчик лёг бы прямо на имя. */
           'pr-7 md:pr-7',
-          // У вложенной строки плашка активности снова читается как блок —
-          // здесь хватает цвета текста и подкрашенной направляющей.
-          active && 'bg-transparent hover:bg-transparent',
         )}
       >
         <Folder size={14} strokeWidth={1.75} className="shrink-0" />
