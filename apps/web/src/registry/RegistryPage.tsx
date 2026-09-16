@@ -29,6 +29,7 @@ import { DocumentHistory } from './DocumentHistory';
 import { AnalyticsPanel } from './AnalyticsPanel';
 import { AnalyticsPage } from '../analytics/AnalyticsPage';
 import { plural } from './registry-format';
+import { Tooltip } from '../ui/Tooltip';
 
 const PAGE_SIZE = 50;
 
@@ -232,26 +233,29 @@ export function RegistryPage() {
           {selected.size > 0 && (
             <div className="mt-3 rounded-xl bg-[var(--surface-sunken)] p-3">
               <div className="flex flex-wrap items-center gap-2">
-              <Button
-                size="sm"
-                variant="primary"
-                icon={<Send size={14} />}
-                disabled={pending || selected.size > RESEND_MAX}
-                title={
+              <Tooltip
+                label={
                   selected.size > RESEND_MAX
                     ? `За раз переотправляем не больше ${RESEND_MAX} писем`
                     : undefined
                 }
-                onClick={() =>
-                  run(
-                    resend,
-                    { fileIds: ids },
-                    (r) => `Поставлено писем в очередь: ${r.queued ?? 0}`,
-                  )
-                }
               >
-                Переотправить
-              </Button>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  icon={<Send size={14} />}
+                  disabled={pending || selected.size > RESEND_MAX}
+                  onClick={() =>
+                    run(
+                      resend,
+                      { fileIds: ids },
+                      (r) => `Поставлено писем в очередь: ${r.queued ?? 0}`,
+                    )
+                  }
+                >
+                  Переотправить
+                </Button>
+              </Tooltip>
               <Button
                 size="sm"
                 icon={<RefreshCw size={14} />}

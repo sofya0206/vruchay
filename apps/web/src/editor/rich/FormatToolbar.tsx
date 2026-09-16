@@ -24,6 +24,7 @@ import { FONTS, WEIGHTS } from '../fonts-list';
 import { ColorPicker } from '../../ui/ColorPicker';
 import { NumberField } from '../../ui/NumberField';
 import { Select } from '../../ui/Select';
+import { useTooltip } from '../../ui/Tooltip';
 
 /**
  * Панель оформления над правящимся блоком.
@@ -282,10 +283,12 @@ function Tool({
   disabled?: boolean;
   children: React.ReactNode;
 }) {
+  const { triggerProps, tooltip } = useTooltip(title);
+
   return (
     <button
       type="button"
-      title={title}
+      {...triggerProps}
       aria-label={title}
       aria-pressed={active}
       disabled={disabled}
@@ -297,6 +300,7 @@ function Tool({
       }`}
     >
       {children}
+      {tooltip}
     </button>
   );
 }

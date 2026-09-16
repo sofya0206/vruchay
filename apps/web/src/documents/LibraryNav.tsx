@@ -18,7 +18,6 @@ import {
   Folder,
   FolderOpen,
   FolderPlus,
-  GripVertical,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -33,7 +32,9 @@ import {
   type Folder as FolderItem,
 } from '../api/folders';
 import { ConfirmDialog } from '../ui/Dialog';
-import { SectionLayout } from '../ui/SectionLayout';
+import { SectionLayout, columnRowClass } from '../ui/SectionLayout';
+import { cn } from '../ui/cn';
+import { useTooltip } from '../ui/Tooltip';
 
 /**
  * Рамка раздела «Награждение»: колонка разделов слева, панель сверху,
@@ -170,6 +171,21 @@ export function LibraryNav({ archiveCount }: { archiveCount?: number | null }) {
     reorder.mutate(ids, { onSettled: () => setDragOrder(null) });
   };
 
+  /**
+   * С какой стороны целевой папки рисовать линию вставки.
+   *
+   * Тащим вверх — папка встанет перед целью, вниз — после неё. Линия
+   * поверху и линия понизу у соседних строк совпали бы, поэтому сторону
+   * считаем от направления, а не рисуем всегда сверху.
+   */
+  const insertSide = (targetId: string): 'before' | 'after' | null => {
+    if (!dragId || overId !== targetId || dragId === targetId) return null;
+    const from = list.findIndex((f) => f.id === dragId);
+    const to = list.findIndex((f) => f.id === targetId);
+    if (from === -1 || to === -1) return null;
+    return to < from ? 'before' : 'after';
+  };
+
   const endDrag = () => {
     setDragId(null);
     setOverId(null);
@@ -226,7 +242,7 @@ export function LibraryNav({ archiveCount }: { archiveCount?: number | null }) {
       {/* На узком экране колонка превратилась бы в две трети экрана телефона,
           поэтому там это лента, которая прокручивается вбок. */}
       <div className="flex gap-1 overflow-x-auto md:block md:overflow-visible">
-        <ul className="flex gap-1 md:flex-col">
+        <ul className="flex gap-1 md:flex-col md:gap-0">
           <RootRow
             active={onDocuments && !openFolderId}
             expanded={expanded}
@@ -258,7 +274,7 @@ export function LibraryNav({ archiveCount }: { archiveCount?: number | null }) {
                   active={onDocuments && openFolderId === folder.id}
                   onMenu={(e) => openMenu(e, folder)}
                   dragging={dragId === folder.id}
-                  over={overId === folder.id && dragId !== folder.id}
+                  over={insertSide(folder.id)}
                   onDragStart={() => setDragId(folder.id)}
                   onDragEnter={() => setOverId(folder.id)}
                   onDrop={(sourceId) => dropOn(sourceId, folder.id)}
@@ -285,7 +301,7 @@ export function LibraryNav({ archiveCount }: { archiveCount?: number | null }) {
               <button
                 type="button"
                 onClick={startFolder}
-                className="flex w-full items-center gap-2.5 rounded-lg py-2 pr-3 pl-8 text-left text-sm text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
+                className={cn(columnRowClass({ nested: true }), 'w-full text-left')}
               >
                 <FolderPlus size={14} strokeWidth={1.75} className="shrink-0" />
                 <span>Папка</span>
@@ -463,11 +479,14 @@ function ContextMenu({
 /**
  * Строка папки: ссылка плюс «…», открывающее то же меню, что правая кнопка.
  *
- * Счётчик и «…» лежат в одном месте друг над другом, а не в затылок:
- * колонка узкая, и два места под цифру и кнопку съедали у названия
- * четверть строки — «Корпоративные благодарности» и «Корпоративные
- * пропуска» превращались в одинаковое «Корпор…». Под указателем цифра
- * уступает место кнопке: пока человек тянется к меню, число ему не нужно.
+ * Имя — в одну строку с многоточием. Три строки, стоявшие здесь раньше,
+ * ради длинных названий растягивали строку до 68 точек при 32 у соседей:
+ * подсветка получалась крупнее самой папки. Целиком имя показывает
+ * подсказка, и только когда оно действительно не поместилось.
+ *
+ * Счётчик и «…» стоят в одном месте друг над другом и меняются
+ * прозрачностью, а не появлением: строка не должна дёргаться от того,
+ * что по ней провели мышью.
  */
 function FolderRow({
   folder,
@@ -484,12 +503,21 @@ function FolderRow({
   active: boolean;
   onMenu: (e: MouseEvent<HTMLElement>) => void;
   dragging: boolean;
-  over: boolean;
+  /** С какой стороны ляжет папка, если отпустить здесь. */
+  over: 'before' | 'after' | null;
   onDragStart: () => void;
   onDragEnter: () => void;
   onDrop: (sourceId: string) => void;
   onDragEnd: () => void;
 }) {
+  const name = useRef<HTMLSpanElement>(null);
+  const { triggerProps, tooltip } = useTooltip(folder.name, {
+    onlyWhenTruncated: true,
+    describes: true,
+    placement: 'right',
+    measure: name,
+  });
+
   const handleDragStart = (e: DragEvent<HTMLLIElement>) => {
     // Без этого Firefox не начинает перетаскивание вовсе.
     e.dataTransfer.setData('text/plain', folder.id);
@@ -514,43 +542,47 @@ function FolderRow({
       }}
       onDragEnd={onDragEnd}
       onContextMenu={onMenu}
-      className={`${rowClass(active, true)} group relative gap-0 px-0 md:pl-0 ${
-        dragging ? 'opacity-40' : ''
-      } ${over ? 'ring-2 ring-[var(--accent)] ring-inset' : ''}`}
+      className={cn(
+        'group relative flex items-center md:cursor-grab md:active:cursor-grabbing',
+        /* Направляющая линия вложенности: папки читаются как ветка «Моих
+           документов». Стоит по центру значка родителя — 16 точек от края
+           колонки. На узком экране колонка это лента вбок, там её нет. */
+        'md:before:absolute md:before:inset-y-0 md:before:left-4 md:before:w-px md:before:content-[""]',
+        active ? 'md:before:bg-[var(--accent)]' : 'md:before:bg-[var(--line)]',
+        dragging && 'opacity-40',
+        /* Куда ляжет папка — линия на границе, а не рамка вокруг строки:
+           рамка показывала «эта папка», хотя вопрос был «между какими». */
+        over &&
+          'after:absolute after:inset-x-2 after:z-10 after:h-0.5 after:rounded-full after:bg-[var(--accent)] after:content-[""]',
+        over === 'before' && 'after:-top-px',
+        over === 'after' && 'after:-bottom-px',
+      )}
     >
       <Link
         to={`/documents?folder=${folder.id}`}
         aria-current={active ? 'page' : undefined}
-        title={folder.name}
-        className="flex min-w-0 flex-1 items-start gap-2 py-2 pr-8 pl-3 md:pl-5"
+        {...triggerProps}
+        className={cn(
+          columnRowClass({ nested: true }),
+          /* Постоянное место под счётчик и «…»: без него ширина имени
+             менялась бы от того, есть ли у папки материалы. Обязательно
+             с `md:` — базовый `pr-*` проиграл бы `md:px-2` из общего
+             стиля, и счётчик лёг бы прямо на имя. */
+          'pr-7 md:pr-7',
+          // У вложенной строки плашка активности снова читается как блок —
+          // здесь хватает цвета текста и подкрашенной направляющей.
+          active && 'bg-transparent hover:bg-transparent',
+        )}
       >
-        {/* Ручка занимает место значка папки: два значка подряд в строке
-            шириной в слово — это уже не подсказка, а теснота. */}
-        <Folder
-          size={14}
-          strokeWidth={1.75}
-          className="mt-px shrink-0 md:group-hover:hidden"
-        />
-        <GripVertical
-          size={14}
-          strokeWidth={1.75}
-          aria-hidden
-          className="mt-px hidden shrink-0 cursor-grab text-[var(--text-muted)] md:group-hover:block"
-        />
-        {/* Две строки вместо многоточия: колонка узкая, и в одну строку
-            «Корпоративные благодарности» и «Корпоративные пропуска»
-            превращались в одинаковое «Корпоратив…» — папки становились
-            неразличимы ровно там, где по ним выбирают. Папок в колонке
-            единицы, лишняя строка стоит дешевле, чем неразличимое имя.
-            Переносим по словам: разрыв посреди слова читается хуже
-            многоточия, ради которого всё и затевалось. */}
-        <span className="min-w-0 leading-snug whitespace-normal md:line-clamp-3 md:flex-1">
+        <Folder size={14} strokeWidth={1.75} className="shrink-0" />
+        <span ref={name} className="min-w-0 md:flex-1 md:truncate">
           {folder.name}
         </span>
       </Link>
+      {tooltip}
 
       {folder.count ? (
-        <span className="tabular pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs text-[var(--text-muted)] md:group-hover:hidden">
+        <span className="tabular pointer-events-none absolute right-2 text-xs text-[var(--text-muted)] transition-opacity md:group-hover:opacity-0">
           {folder.count}
         </span>
       ) : null}
@@ -559,7 +591,7 @@ function FolderRow({
         type="button"
         onClick={onMenu}
         aria-label={`Меню папки «${folder.name}»`}
-        className="absolute top-1/2 right-0 -translate-y-1/2 px-2 py-2 text-[var(--text-muted)] hover:text-[var(--text)] md:hidden md:group-hover:block md:focus-visible:block"
+        className="absolute right-0 px-1.5 py-1.5 text-[var(--text-muted)] transition-opacity hover:text-[var(--text)] focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100"
       >
         <MoreHorizontal size={15} strokeWidth={1.75} />
       </button>
@@ -653,7 +685,7 @@ function FolderNameForm({
         e.preventDefault();
         submit();
       }}
-      className="px-3 py-1 md:pl-8"
+      className="px-3 py-1 md:pr-2 md:pl-5"
     >
       <input
         ref={input}
@@ -698,19 +730,6 @@ function FolderNameForm({
   );
 }
 
-/** Общий вид строки колонки: значок, подпись, число внутри. */
-function rowClass(active: boolean, nested = false): string {
-  return (
-    'flex items-center gap-2.5 rounded-lg py-2 text-sm whitespace-nowrap ' +
-    'transition-colors ' +
-    // Вложенные папки: отступ слева и мельче кегль — иначе колонка
-    // читается как один плоский список из восьми равноправных строк.
-    (nested ? 'px-3 md:pl-8 md:text-[13px] ' : 'px-3 ') +
-    (active
-      ? 'bg-[var(--accent-soft)] font-medium text-[var(--accent)]'
-      : 'text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]')
-  );
-}
 
 function Row({ item }: { item: Item }) {
   return (
@@ -718,7 +737,7 @@ function Row({ item }: { item: Item }) {
       <Link
         to={item.to}
         aria-current={item.active ? 'page' : undefined}
-        className={rowClass(item.active, item.nested)}
+        className={columnRowClass({ active: item.active, nested: item.nested })}
       >
         <item.icon size={item.nested ? 14 : 16} strokeWidth={1.75} className="shrink-0" />
         <span className="md:flex-1 md:truncate">{item.label}</span>
@@ -755,12 +774,14 @@ function RootRow({
   onMenu: (e: MouseEvent<HTMLElement>) => void;
 }) {
   return (
-    <li className={`${rowClass(active)} gap-0 px-0`} onContextMenu={onMenu}>
+    /* Подсветка живёт на ссылке, а не на строке: иначе она затекает под
+       уголок, и наведение на список выглядит как наведение на кнопку. */
+    <li className="group flex items-center" onContextMenu={onMenu}>
       <Link
         to="/documents"
         onClick={onCollapse}
         aria-current={active ? 'page' : undefined}
-        className="flex flex-1 items-center gap-2.5 px-3 py-2"
+        className={columnRowClass({ active })}
       >
         <FolderOpen size={16} strokeWidth={1.75} className="shrink-0" />
         <span className="md:flex-1 md:truncate">Мои документы</span>
@@ -770,7 +791,7 @@ function RootRow({
         onClick={onToggle}
         aria-expanded={expanded}
         aria-label={expanded ? 'Свернуть папки' : 'Показать папки'}
-        className="px-2 py-2 text-[var(--text-muted)] hover:text-[var(--text)]"
+        className="shrink-0 px-2 py-2 text-[var(--text-muted)] hover:text-[var(--text)]"
       >
         <ChevronDown
           size={15}

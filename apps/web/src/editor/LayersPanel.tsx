@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   ChevronDown,
   ChevronUp,
@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { richDocToPlainText, type SheetElement, type SheetLayout } from '@gramota/shared';
 import { layersTopDown, moveLayer, reorderLayers } from './selection';
+import { useTooltip } from '../ui/Tooltip';
 
 /**
  * Панель слоёв: все блоки листа сверху вниз, как они лежат друг на друге.
@@ -89,9 +90,7 @@ export function LayersPanel({
           >
             <GripVertical size={14} className="shrink-0 cursor-grab text-[var(--text-muted)]" />
             <span className="shrink-0 text-[var(--text-muted)]">{icon(el)}</span>
-            <span className="min-w-0 flex-1 truncate" title={title(el)}>
-              {title(el)}
-            </span>
+            <LayerName name={title(el)} />
             <span className="flex shrink-0 items-center gap-0.5 opacity-60 group-hover:opacity-100">
               <Small
                 title="На слой выше"
@@ -139,6 +138,26 @@ export function LayersPanel({
   );
 }
 
+/**
+ * Имя слоя: в панели оно обрезается, и целиком его показывает подсказка —
+ * но только когда обрезано, иначе плашка всплывала бы над каждой строкой.
+ */
+function LayerName({ name }: { name: string }) {
+  const text = useRef<HTMLSpanElement>(null);
+  const { triggerProps, tooltip } = useTooltip(name, {
+    onlyWhenTruncated: true,
+    describes: true,
+    measure: text,
+  });
+
+  return (
+    <span ref={text} className="min-w-0 flex-1 truncate" {...triggerProps}>
+      {name}
+      {tooltip}
+    </span>
+  );
+}
+
 function Small({
   title,
   pressed,
@@ -150,10 +169,12 @@ function Small({
   onClick: (e: React.MouseEvent) => void;
   children: React.ReactNode;
 }) {
+  const { triggerProps, tooltip } = useTooltip(title);
+
   return (
     <button
       type="button"
-      title={title}
+      {...triggerProps}
       aria-label={title}
       aria-pressed={pressed}
       onClick={onClick}
@@ -162,6 +183,7 @@ function Small({
       }`}
     >
       {children}
+      {tooltip}
     </button>
   );
 }

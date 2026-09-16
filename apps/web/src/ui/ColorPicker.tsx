@@ -67,7 +67,6 @@ export function ColorPicker({
         aria-label={label}
         aria-haspopup="dialog"
         aria-expanded={open}
-        title={label}
         onClick={() => setOpen((v) => !v)}
         className={cn(
           'shrink-0 rounded-lg ring-1 ring-[var(--line-strong)] transition-shadow',
@@ -133,7 +132,6 @@ function Palette({
             key={hex}
             type="button"
             aria-label={hex}
-            title={hex}
             onClick={() => apply(hex)}
             className={cn(
               'h-6 rounded-md ring-1 transition-shadow',

@@ -94,7 +94,6 @@ export function SideNav({ collapsed, onToggle }: { collapsed: boolean; onToggle:
             type="button"
             onClick={onToggle}
             aria-label={collapsed ? 'Развернуть разделы' : 'Свернуть разделы'}
-            title={collapsed ? 'Развернуть разделы' : 'Свернуть разделы'}
             className={cn(
               'flex h-11 items-center gap-3 rounded-xl text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]',
               collapsed ? 'justify-center' : 'px-3',

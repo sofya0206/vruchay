@@ -6,6 +6,7 @@ import {
   type MergeFieldNode,
 } from '@gramota/shared';
 import { markStyle } from '../../render/RichText';
+import { useTooltip } from '../../ui/Tooltip';
 
 /**
  * Фишка поля внутри живого редактора.
@@ -50,6 +51,17 @@ export function MergeFieldView({ node, selected, getPos }: ReactNodeViewProps) {
           : 'chip-field';
   const shown = field.state === 'ok' ? field.text : (attrs.fallback ?? label);
 
+  /* Откуда берётся значение — здесь же, где поле правят. В самом листе
+     (`render/RichText.tsx`) подсказки нет: он идёт в печать и в миниатюры. */
+  const { triggerProps, tooltip } = useTooltip(
+    field.state === 'unknown'
+      ? `Колонка «${label}» не найдена — её переименовали или удалили`
+      : system
+        ? `Подставит сервис: ${label}`
+        : `Из таблицы: ${label}`,
+    { describes: true },
+  );
+
   return (
     <NodeViewWrapper
       as="span"
@@ -59,13 +71,7 @@ export function MergeFieldView({ node, selected, getPos }: ReactNodeViewProps) {
       data-selected={selected ? 'true' : undefined}
       // Марки на узле поля рисует обёртка TipTap; здесь — только свои.
       style={markStyle(undefined)}
-      title={
-        field.state === 'unknown'
-          ? `Колонка «${label}» не найдена — её переименовали или удалили`
-          : system
-            ? `Подставит сервис: ${label}`
-            : `Из таблицы: ${label}`
-      }
+      {...triggerProps}
       onClick={(e: React.MouseEvent) => {
         e.preventDefault();
         const pos = getPos();
@@ -73,6 +79,7 @@ export function MergeFieldView({ node, selected, getPos }: ReactNodeViewProps) {
       }}
     >
       {shown}
+      {tooltip}
     </NodeViewWrapper>
   );
 }
