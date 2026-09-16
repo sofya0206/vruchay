@@ -45,3 +45,11 @@ export function useRenameFolder() {
 export function useDeleteFolder() {
   return useFolderMutation((id: string) => api.delete<Folder>(`/folders/${id}`));
 }
+
+/**
+ * Новый порядок папок — весь список целиком, в том виде, в каком колонка
+ * стоит после перетаскивания. Сервер расставляет позиции по номерам в нём.
+ */
+export function useReorderFolders() {
+  return useFolderMutation((ids: string[]) => api.patch<Folder[]>('/folders/order', { ids }));
+}

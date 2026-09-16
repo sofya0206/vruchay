@@ -11,6 +11,8 @@ import {
   CreateFolderDto,
   updateFolderSchema,
   UpdateFolderDto,
+  reorderFoldersSchema,
+  ReorderFoldersDto,
 } from './folders.dto';
 
 const uuidParam = new ZodValidationPipe(uuidSchema);
@@ -38,6 +40,19 @@ export class FoldersController {
     @Body(new ZodValidationPipe(createFolderSchema)) dto: CreateFolderDto,
   ) {
     return this.folders.create(user.orgId, dto.name);
+  }
+
+  /*
+   * Стоит выше `:id` намеренно: Nest разбирает маршруты сверху вниз, и
+   * ниже слово «order» попало бы в параметр `:id` и разбилось бы о проверку
+   * идентификатора — перестановка отвечала бы «некорректный идентификатор».
+   */
+  @Patch('order')
+  reorder(
+    @CurrentUser() user: SessionUser,
+    @Body(new ZodValidationPipe(reorderFoldersSchema)) dto: ReorderFoldersDto,
+  ) {
+    return this.folders.reorder(user.orgId, dto.ids);
   }
 
   @Patch(':id')
