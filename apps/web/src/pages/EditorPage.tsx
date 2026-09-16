@@ -14,6 +14,7 @@ import {
   Magnet,
   Paintbrush,
   Printer,
+  Proportions,
   Redo2,
   SlidersHorizontal,
   SquareDashed,
@@ -58,6 +59,7 @@ import { FIELD_DRAG_TYPE, FieldsPanel } from '../editor/FieldsPanel';
 import { InlineTextEditor } from '../editor/rich/InlineTextEditor';
 import { useLayoutHistory } from '../editor/useLayoutHistory';
 import { FitPageDialog } from '../editor/FitPageDialog';
+import { PageSizeDialog } from '../editor/PageSizeDialog';
 import { ResizeDialog } from '../editor/ResizeDialog';
 import { fitPageToImage, readImageSize, type PageFit } from '../editor/fit-page';
 import { backgroundDpi, BLEED_MM, POOR_DPI, PRINT_DPI, resizeLayout, SAFE_MARGIN_MM, type ResizeMode } from '../editor/page-fit';
@@ -320,6 +322,9 @@ export function EditorPage() {
 
   /** Что предложить, если бланк не тех пропорций, что лист. */
   const [fit, setFit] = useState<PageFit | null>(null);
+
+  /** Открыт ли выбор формата листа из панели инструментов. */
+  const [sizeOpen, setSizeOpen] = useState(false);
 
   const resizePage = useMutation({
     mutationFn: (size: { widthMm: number; heightMm: number }) =>
@@ -1102,6 +1107,10 @@ export function EditorPage() {
 
       <ToolDivider />
 
+      <ToolButton title="Формат листа" onClick={() => setSizeOpen(true)}>
+        <Proportions size={16} />
+      </ToolButton>
+
       {/* Масштаб — одним списком, как в любом редакторе: «вписать» и
           круглые проценты. Текущее значение — подпись закрытой кнопки,
           в сам список не входит: список — не состояние, а команды. */}
@@ -1601,6 +1610,19 @@ export function EditorPage() {
       />
 
       {fileMenu.dialogs}
+
+      {sizeOpen && (
+        <PageSizeDialog
+          current={{ widthMm: page.pageWidthMm, heightMm: page.pageHeightMm }}
+          onApply={(size) => {
+            setSizeOpen(false);
+            // Что делать с блоками — вопрос следующего диалога, он же
+            // и применяет размер: тот же путь, что из панели свойств.
+            setResizeTo(size);
+          }}
+          onClose={() => setSizeOpen(false)}
+        />
+      )}
 
       {resizeTo && (
         <ResizeDialog

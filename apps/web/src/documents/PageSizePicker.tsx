@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { PAGE_FORMATS, matchFormat, orientationOf, rotate } from '@gramota/shared';
 import { Label } from '../ui/Field';
 import { NumberField } from '../ui/NumberField';
@@ -16,6 +17,11 @@ export interface PageSizeValue {
  * «A4 альбомная» он знает по принтеру, а «297 на 210» ему пришлось бы
  * вспоминать. Поля с миллиметрами показываются лишь после выбора «свой»,
  * чтобы не пугать теми, кому они не нужны.
+ *
+ * Режим «свой» — отдельное состояние, а не вывод из текущих миллиметров.
+ * Выводить его из совпадения с пресетом нельзя: у нового документа размеры
+ * всегда равны A4, и выбор «Свой размер» тут же откатывался бы обратно
+ * на «A4» — в режим ввода миллиметров было не попасть вовсе.
  */
 export function PageSizePicker({
   value,
@@ -26,17 +32,22 @@ export function PageSizePicker({
 }) {
   const format = matchFormat(value);
   const orientation = orientationOf(value);
-  const custom = !format;
+  // Режим включается выбором в списке, но и нестандартные миллиметры,
+  // пришедшие снаружи, показываем как «свой»: иначе список соврал бы.
+  const [customMode, setCustomMode] = useState(() => !matchFormat(value));
+  const custom = customMode || !format;
 
   const pickFormat = (id: string) => {
     if (id === 'custom') {
-      // Не сбрасываем размеры: человек переключился, чтобы подправить
+      // Размеры не трогаем: человек переключился, чтобы подправить
       // имеющееся, а не начать с нуля.
-      onChange({ ...value });
+      setCustomMode(true);
       return;
     }
     const chosen = PAGE_FORMATS.find((f) => f.id === id);
-    if (chosen) onChange(rotate(chosen, orientation));
+    if (!chosen) return;
+    setCustomMode(false);
+    onChange(rotate(chosen, orientation));
   };
 
   return (
@@ -44,7 +55,7 @@ export function PageSizePicker({
       <div className="min-w-32">
         <Label>Формат</Label>
         <Select
-          value={custom ? 'custom' : format.id}
+          value={format && !customMode ? format.id : 'custom'}
           onChange={pickFormat}
           aria-label="Формат"
           options={[
