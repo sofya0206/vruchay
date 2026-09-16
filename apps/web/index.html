@@ -7,14 +7,15 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Вручай" />
     <!--
-      Вкладка без значка — по решению владельца.
+      Знак во вкладке — тот же, что в шапке и на заставке (public/icon.svg).
 
-      Пустой `data:` вместо удалённой строки: без неё браузер сам пошёл бы
-      за `/favicon.ico`, получил бы страницу приложения вместо картинки
-      и всё равно нарисовал бы что-то своё. Значок установленного
-      приложения это не трогает — он берётся из манифеста.
+      Вторая строка не про старые браузеры, а про клиентов, которые берут
+      значок по адресу `/favicon.ico`, не читая разметку: без файла они
+      рисуют собственную заглушку — цветной квадрат с чужим символом.
+      Оба файла делает `scripts/make-icons.mjs` из того же icon.svg.
     -->
-    <link rel="icon" href="data:," />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="alternate icon" href="/favicon.ico" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>Вручай</title>
 
