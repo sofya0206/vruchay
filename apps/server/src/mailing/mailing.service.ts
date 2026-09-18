@@ -383,13 +383,18 @@ export class MailingService {
    * тот же перевод понадобится выгрузке и поддержке, а два разных списка
    * причин разъедутся на второй правке.
    */
-  async log(orgId: string, filters: { documentId?: string; problemsOnly?: boolean }) {
+  async log(
+    orgId: string,
+    filters: { documentId?: string; problemsOnly?: boolean; search?: string },
+  ) {
     if (filters.documentId) await this.assertDocument(orgId, filters.documentId);
 
+    const search = filters.search?.trim();
     const where: Prisma.EmailWhereInput = {
       orgId,
       ...(filters.documentId ? { documentId: filters.documentId } : {}),
       ...(filters.problemsOnly ? { status: { in: ['bounced', 'failed'] } } : {}),
+      ...(search ? { OR: await this.searchConditions(orgId, search) } : {}),
     };
 
     const emails = await this.prisma.email.findMany({
@@ -399,6 +404,7 @@ export class MailingService {
       select: {
         id: true,
         documentId: true,
+        templateId: true,
         toEmail: true,
         subject: true,
         status: true,
@@ -414,6 +420,15 @@ export class MailingService {
       emails.map((e) => e.documentId).filter((id): id is string => Boolean(id)),
     );
 
+    // У рассылки без документа материала нет — в строке журнала стоит
+    // её название, иначе такие письма выглядели бы ничьими.
+    const mailingNames = await this.mailingNames(
+      orgId,
+      emails
+        .filter((e) => !e.documentId && e.templateId)
+        .map((e) => e.templateId as string),
+    );
+
     const counts = await this.prisma.email.groupBy({
       by: ['status'],
       where: { orgId, ...(filters.documentId ? { documentId: filters.documentId } : {}) },
@@ -426,7 +441,9 @@ export class MailingService {
         return {
           id: email.id,
           documentId: email.documentId,
-          documentTitle: email.documentId ? (titles.get(email.documentId) ?? '') : '',
+          documentTitle: email.documentId
+            ? (titles.get(email.documentId) ?? '')
+            : (mailingNames.get(email.templateId ?? '') ?? ''),
           toEmail: email.toEmail,
           subject: email.subject,
           status: email.status,
@@ -496,6 +513,49 @@ export class MailingService {
       select: { id: true, title: true },
     });
     return new Map(docs.map((d) => [d.id, d.title]));
+  }
+
+  /**
+   * Поиск по всем письмам организации, а не по показанным двумстам.
+   *
+   * Человек помнит одно из четырёх: адрес, слово из темы, материал или
+   * рассылку. Материалы и рассылки ищутся по названию отдельно, а в
+   * условие письма попадают их идентификаторы: связи «письмо → шаблон
+   * без материала» в запросе Prisma не выразить одной строкой.
+   */
+  private async searchConditions(
+    orgId: string,
+    search: string,
+  ): Promise<Prisma.EmailWhereInput[]> {
+    const contains = { contains: search, mode: 'insensitive' as const };
+    const [documents, mailings] = await Promise.all([
+      this.prisma.document.findMany({
+        where: { orgId, title: contains },
+        select: { id: true },
+        take: 100,
+      }),
+      this.prisma.emailTemplate.findMany({
+        where: { orgId, documentId: null, name: contains },
+        select: { id: true },
+        take: 100,
+      }),
+    ]);
+
+    return [
+      { toEmail: contains },
+      { subject: contains },
+      ...(documents.length ? [{ documentId: { in: documents.map((d) => d.id) } }] : []),
+      ...(mailings.length ? [{ templateId: { in: mailings.map((m) => m.id) } }] : []),
+    ];
+  }
+
+  private async mailingNames(orgId: string, templateIds: string[]) {
+    if (templateIds.length === 0) return new Map<string, string>();
+    const templates = await this.prisma.emailTemplate.findMany({
+      where: { id: { in: [...new Set(templateIds)] }, orgId, documentId: null },
+      select: { id: true, name: true },
+    });
+    return new Map(templates.map((t) => [t.id, t.name ?? '']));
   }
 
   /** Расчёт рассылки: одинаковый для проверки и для отправки. */
@@ -576,7 +636,7 @@ export class MailingService {
    * отзывают ссылкой в письме, и порядок здесь решает всё. Записи
    * перебираем по возрастанию, поэтому поздняя перекрывает раннюю.
    */
-  private async consentedAddresses(orgId: string): Promise<Set<string>> {
+  async consentedAddresses(orgId: string): Promise<Set<string>> {
     const consents = await this.prisma.consent.findMany({
       where: { orgId, purpose: 'marketing' },
       orderBy: { createdAt: 'asc' },

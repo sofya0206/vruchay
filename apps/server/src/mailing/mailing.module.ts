@@ -3,6 +3,8 @@ import { MailModule } from '../mail/mail.module';
 import { MailingController } from './mailing.controller';
 import { UnsubscribeController } from './unsubscribe.controller';
 import { MailingService } from './mailing.service';
+import { TextMailingService } from './text-mailing.service';
+import { MailStatsService } from './mail-stats.service';
 
 /**
  * Раздел «Рассылка».
@@ -13,6 +15,6 @@ import { MailingService } from './mailing.service';
 @Module({
   imports: [MailModule],
   controllers: [MailingController, UnsubscribeController],
-  providers: [MailingService],
+  providers: [MailingService, TextMailingService, MailStatsService],
 })
 export class MailingModule {}

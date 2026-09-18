@@ -43,6 +43,11 @@ export interface PlanInput {
    */
   alreadySent: Set<string>;
   /**
+   * Как объяснить повтор. У рассылки без документа материала нет,
+   * и «по этому материалу» в её отчёте сбивало бы с толку.
+   */
+  alreadySentReason?: string;
+  /**
    * Кто дал согласие на рекламу. null — согласие не требуется, это
    * транзакционная отправка. Пустое множество и null — разные вещи:
    * первое означает «рекламу слать некому».
@@ -146,7 +151,7 @@ function refusal(candidate: Candidate, input: PlanInput, seen: Set<string>): str
   if (!isValidEmail(candidate.email)) return `некорректный адрес «${candidate.email}»`;
   if (seen.has(candidate.email)) return 'адрес уже есть в этой рассылке';
   if (input.alreadySent.has(candidate.email)) {
-    return 'по этому материалу письмо на этот адрес уже уходило';
+    return input.alreadySentReason ?? 'по этому материалу письмо на этот адрес уже уходило';
   }
   if (input.consented && !input.consented.has(candidate.email)) {
     return 'нет согласия на рекламную рассылку';

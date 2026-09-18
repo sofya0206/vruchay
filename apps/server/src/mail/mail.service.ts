@@ -551,7 +551,9 @@ export class MailService {
     const row = email.rowId
       ? await this.prisma.recipientRow.findUnique({ where: { id: email.rowId } })
       : null;
-    const data = (row?.data as Record<string, string>) ?? {};
+    // Письму без строки таблицы — рассылке списком адресов — известен
+    // только сам адрес. Его и отдаём: %email в тексте не должен пропадать.
+    const data = (row?.data as Record<string, string>) ?? { email: email.toEmail };
 
     try {
       // Уведомление о сроке уходит без файла: документ у человека уже есть.
