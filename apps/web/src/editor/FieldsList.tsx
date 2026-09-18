@@ -1,18 +1,21 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import {
   AtSign,
   Building2,
   CalendarDays,
-  ChevronRight,
+  ChevronDown,
+  FileText,
   Flag,
   Hash,
   LoaderCircle,
   MapPin,
+  Medal,
   Plus,
   Search,
   ShieldCheck,
   Type,
   UserRound,
+  UsersRound,
   X,
   type LucideIcon,
 } from 'lucide-react';
@@ -20,13 +23,14 @@ import { Button } from '../ui/Button';
 import { cn } from '../ui/cn';
 import type { FieldInfo } from './fields';
 import {
-  fieldGroup,
-  fieldIcon,
+  fieldEntries,
   GROUP_ORDER,
   GROUP_TITLES,
-  matchesQuery,
+  filterEntries,
+  type FieldEntry,
   type FieldGroup,
   type FieldIcon,
+  type FieldVariant,
 } from './field-meta';
 
 /** Формат перетаскивания поля на холст — свой, чтобы не путать с текстом. */
@@ -38,10 +42,25 @@ const ICONS: Record<FieldIcon, LucideIcon> = {
   email: AtSign,
   date: CalendarDays,
   number: Hash,
+  medal: Medal,
   code: ShieldCheck,
   org: Building2,
   event: Flag,
   place: MapPin,
+};
+
+/*
+ * Цвет секции. Секции одного вида на белом сливались: свернул — и уже
+ * не понять, где кончаются получатели и начинается документ. Цвет
+ * держит границу и после сворачивания: синий — люди из таблицы,
+ * фиолетовый — мероприятие, серо-синий — то, что сервис считает сам.
+ * Статусных зелёного, жёлтого и красного здесь нет намеренно: они
+ * в кабинете значат «готово», «внимание» и «сломано».
+ */
+const GROUP_STYLE: Record<FieldGroup, { color: string; icon: LucideIcon }> = {
+  recipient: { color: '#127ee3', icon: UsersRound },
+  event: { color: '#7a5af8', icon: Flag },
+  document: { color: '#5b6b86', icon: FileText },
 };
 
 /** Что делает клик по полю на этой вкладке. */
@@ -53,17 +72,24 @@ export interface FieldAction {
   run: (field: FieldInfo) => void | Promise<void>;
 }
 
+function plural(n: number, forms: [string, string, string]): string {
+  const m10 = n % 10;
+  const m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return forms[0];
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return forms[1];
+  return forms[2];
+}
+
 /**
  * Список полей документа.
  *
- * Строка устроена как в Google Docs и Figma: значок типа, название
- * и справа образец значения — «Место … 1», «Дата выдачи … 04.08.2026».
- * Ключ `%name` в строке не показываем: на листе поле стоит фишкой
- * с тем же названием, и шифр рядом с ним — лишний шум. Действие
- * появляется под указателем на месте образца, в покое строка чистая.
+ * Три секции карточками своего цвета; внутри одна строка на значение.
+ * У строки с несколькими записями (дата словами, ФИО в падеже) нажатие
+ * раскрывает записи с живыми примерами — выбирают глазами, какой вид
+ * встанет в документ. Строка с одной записью вставляет сразу.
  *
- * Новое поле заводится внизу списка, а не в другом разделе: за ним
- * раньше приходилось уходить в «Получателей» и возвращаться.
+ * Ключ `%name` в строке не показываем: на листе поле стоит фишкой
+ * с тем же названием, и шифр рядом с ним — лишний шум.
  */
 export function FieldsList({
   fields,
@@ -86,17 +112,17 @@ export function FieldsList({
 }) {
   const [query, setQuery] = useState('');
   const [collapsed, setCollapsed] = useState<Set<FieldGroup>>(new Set());
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [done, setDone] = useState<string | null>(null);
   const [fresh, setFresh] = useState<string | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
 
-  const visible = useMemo(
-    () => fields.filter((f) => matchesQuery(f, samples[f.source], query)),
-    [fields, samples, query],
-  );
-  const groups = GROUP_ORDER.map((group) => ({
+  const entries = useMemo(() => fieldEntries(fields), [fields]);
+  const visible = useMemo(() => filterEntries(entries, samples, query), [entries, samples, query]);
+  const searching = query.trim() !== '';
+  const sections = GROUP_ORDER.map((group) => ({
     group,
-    items: visible.filter((f) => fieldGroup(f) === group),
+    items: visible.filter((e) => e.group === group),
   })).filter((g) => g.items.length > 0);
 
   useEffect(() => {
@@ -123,10 +149,24 @@ export function FieldsList({
     if (!onCreate) return;
     const field = await onCreate(title);
     setQuery('');
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      next.delete('recipient');
+      return next;
+    });
     setFresh(field.source);
   }
 
-  const searching = query.trim() !== '';
+  const toggle = <T,>(set: (fn: (prev: Set<T>) => Set<T>) => void, key: T) =>
+    set((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
+  const labelFor = (field: FieldInfo) =>
+    done === field.source && action.doneLabel ? action.doneLabel : action.label;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -146,7 +186,7 @@ export function FieldsList({
                 e.stopPropagation();
                 setQuery('');
               }
-              if (e.key === 'Enter' && visible[0]) void run(visible[0]);
+              if (e.key === 'Enter' && visible[0]) void run(visible[0].variants[0].field);
             }}
             placeholder="Найти поле"
             className="h-8 w-full rounded-lg bg-[var(--surface)] pl-8 pr-8 text-[13px] text-[var(--text)] outline-none ring-1 ring-[var(--line)] transition-shadow placeholder:text-[var(--text-muted)] focus:ring-2 focus:ring-[var(--focus)] [&::-webkit-search-cancel-button]:hidden"
@@ -166,59 +206,71 @@ export function FieldsList({
 
       {notice && <div className="shrink-0 px-3 pb-2">{notice}</div>}
 
-      <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-2">
-        {groups.map(({ group, items }) => {
+      <div ref={scroller} className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 pb-3">
+        {sections.map(({ group, items }) => {
           const open = searching || !collapsed.has(group);
+          const style = GROUP_STYLE[group];
+          const GroupIcon = style.icon;
           return (
-            <section key={group} className="pt-1">
+            <section
+              key={group}
+              style={{ '--group': style.color } as CSSProperties}
+              className="overflow-hidden rounded-xl bg-[var(--surface)] ring-1 ring-[color-mix(in_srgb,var(--group)_22%,transparent)]"
+            >
               <button
                 type="button"
                 aria-expanded={open}
                 disabled={searching}
-                onClick={() =>
-                  setCollapsed((prev) => {
-                    const next = new Set(prev);
-                    if (next.has(group)) next.delete(group);
-                    else next.add(group);
-                    return next;
-                  })
-                }
-                className="flex h-7 w-full items-center gap-1 rounded-md px-1.5 text-xs font-medium text-[var(--text-muted)] transition-colors hover:text-[var(--text)] disabled:hover:text-[var(--text-muted)]"
+                onClick={() => toggle(setCollapsed, group)}
+                className="field-row flex h-10 w-full items-center gap-2.5 bg-[color-mix(in_srgb,var(--group)_8%,var(--surface))] px-3 text-left transition-colors hover:bg-[color-mix(in_srgb,var(--group)_12%,var(--surface))]"
               >
-                <ChevronRight
-                  size={14}
-                  className={cn('shrink-0 transition-transform duration-150', open && 'rotate-90')}
+                <span className="grid size-6 shrink-0 place-items-center rounded-md bg-[var(--group)] text-white">
+                  <GroupIcon size={14} strokeWidth={2} />
+                </span>
+                <span className="shrink-0 text-[13px] font-semibold text-[var(--text)]">{GROUP_TITLES[group]}</span>
+                {/* Свёрнутая секция показывает, что в ней: иначе закрытые
+                    карточки одинаковы, и искать приходится открывая все. */}
+                <span className="min-w-0 flex-1 truncate text-xs text-[var(--text-muted)]">
+                  {open ? '' : items.map((e) => e.title).join(', ')}
+                </span>
+                <span className="shrink-0 text-xs tabular-nums text-[color-mix(in_srgb,var(--group)_80%,var(--text))]">
+                  {items.length} {plural(items.length, ['поле', 'поля', 'полей'])}
+                </span>
+                <ChevronDown
+                  size={16}
+                  className={cn(
+                    'shrink-0 text-[var(--text-muted)] transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:transition-none',
+                    !open && '-rotate-90',
+                  )}
                 />
-                {GROUP_TITLES[group]}
-                <span className="ml-auto tabular-nums">{items.length}</span>
               </button>
-              {open && (
-                <ul>
-                  {items.map((f) => (
-                    <Row
-                      key={f.source}
-                      field={f}
-                      sample={samples[f.source]}
-                      label={done === f.source && action.doneLabel ? action.doneLabel : action.label}
-                      fresh={fresh === f.source}
+              <Collapse open={open}>
+                <ul className="border-t border-[color-mix(in_srgb,var(--group)_16%,transparent)] p-1">
+                  {items.map((entry) => (
+                    <EntryRow
+                      key={entry.id}
+                      entry={entry}
+                      samples={samples}
+                      open={searching || expanded.has(entry.id)}
+                      onToggle={() => toggle(setExpanded, entry.id)}
+                      fresh={fresh === entry.id}
                       draggable={draggable}
-                      onRun={() => void run(f)}
+                      labelFor={labelFor}
+                      onRun={(field) => void run(field)}
                     />
                   ))}
                 </ul>
-              )}
+              </Collapse>
             </section>
           );
         })}
 
-        {groups.length === 0 && (
+        {sections.length === 0 && (
           <div className="px-2 py-6 text-center">
             <p className="text-[13px] text-[var(--text-muted)]">
               {searching ? `Нет полей «${query.trim()}»` : 'Полей пока нет'}
             </p>
-            {searching && onCreate && (
-              <CreateFromQuery title={query.trim()} onCreate={create} />
-            )}
+            {searching && onCreate && <CreateFromQuery title={query.trim()} onCreate={create} />}
           </div>
         )}
       </div>
@@ -228,54 +280,169 @@ export function FieldsList({
   );
 }
 
-function Row({
-  field,
-  sample,
-  label,
+/**
+ * Плавное раскрытие без замера высоты: строка сетки тянется от 0fr до 1fr.
+ * Скрытое содержимое `inert` — Tab не проваливается в свёрнутую секцию.
+ */
+function Collapse({ open, children }: { open: boolean; children: ReactNode }) {
+  return (
+    <div
+      className={cn(
+        'grid transition-[grid-template-rows] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:transition-none',
+        open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+      )}
+    >
+      <div className="min-h-0 overflow-hidden" inert={!open}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// Рамку фокуса рисует общее правило кабинета; `field-row` только утапливает
+// её внутрь строки (index.css) — снаружи её обрезал бы край карточки.
+const rowClass =
+  'field-row group relative flex w-full items-center gap-2.5 rounded-lg px-2 text-left transition-colors ' +
+  'hover:bg-[color-mix(in_srgb,var(--group)_7%,transparent)] focus-visible:bg-[color-mix(in_srgb,var(--group)_7%,transparent)]';
+
+/** Синяя «Вставить» на месте образца — только под указателем. */
+function ActionPill({ label }: { label: string }) {
+  return (
+    <span
+      aria-hidden
+      className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded-md bg-[var(--accent)] px-2 text-xs font-medium leading-5 text-[var(--accent-contrast)] opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100"
+    >
+      {label}
+    </span>
+  );
+}
+
+const sampleClass =
+  'min-w-8 flex-1 truncate text-right text-xs leading-5 text-[color-mix(in_srgb,var(--text-muted)_70%,transparent)]';
+
+function dragProps(draggable: boolean, field: FieldInfo) {
+  return {
+    draggable,
+    onDragStart: (e: React.DragEvent) => {
+      e.dataTransfer.setData(FIELD_DRAG_TYPE, JSON.stringify({ source: field.source, fieldId: field.fieldId }));
+      e.dataTransfer.effectAllowed = 'copy';
+    },
+  };
+}
+
+function sampleOf(field: FieldInfo, samples: Record<string, string>): string {
+  // У проверочного кода образца нет: он появляется в момент выпуска.
+  return samples[field.source] ?? (field.source === 'code' ? 'при выпуске' : '');
+}
+
+function EntryRow({
+  entry,
+  samples,
+  open,
+  onToggle,
   fresh,
   draggable,
+  labelFor,
   onRun,
 }: {
-  field: FieldInfo;
-  sample: string | undefined;
-  label: string;
+  entry: FieldEntry;
+  samples: Record<string, string>;
+  open: boolean;
+  onToggle: () => void;
   fresh: boolean;
   draggable: boolean;
-  onRun: () => void;
+  labelFor: (field: FieldInfo) => string;
+  onRun: (field: FieldInfo) => void;
 }) {
-  const Icon = ICONS[fieldIcon(field)];
-  // У проверочного кода образца нет: он появляется в момент выпуска.
-  const shown = sample ?? (field.source === 'code' ? 'при выпуске' : '');
+  const Icon = ICONS[entry.icon];
+  const main = entry.variants[0].field;
+  const icon = <Icon size={16} strokeWidth={1.75} className="shrink-0 text-[var(--group)]" aria-hidden />;
+  const title = <span className="min-w-0 truncate text-[13px] leading-5 text-[var(--text)]">{entry.title}</span>;
+
+  // Единственная запись без подписи — обычное поле. Запись с подписью,
+  // даже одна (поиск оставил только «кому»), показывается раскрытой:
+  // иначе строка «ФИО» вставила бы дательный падеж молча.
+  if (entry.variants.length === 1 && !entry.variants[0].label) {
+    return (
+      <li data-field={entry.id}>
+        <button
+          type="button"
+          {...dragProps(draggable, main)}
+          onClick={() => onRun(main)}
+          className={cn(rowClass, 'h-9', fresh && 'bg-[var(--accent-soft)] hover:bg-[var(--accent-soft)]')}
+        >
+          {icon}
+          {title}
+          <span className={cn(sampleClass, 'transition-opacity duration-150 group-hover:opacity-0 group-focus-visible:opacity-0')}>
+            {sampleOf(main, samples)}
+          </span>
+          <ActionPill label={labelFor(main)} />
+        </button>
+      </li>
+    );
+  }
 
   return (
-    <li data-field={field.source}>
-      <button
-        type="button"
-        draggable={draggable}
-        onDragStart={(e) => {
-          e.dataTransfer.setData(FIELD_DRAG_TYPE, JSON.stringify({ source: field.source, fieldId: field.fieldId }));
-          e.dataTransfer.effectAllowed = 'copy';
-        }}
-        onClick={onRun}
-        className={cn(
-          'group relative flex h-8 w-full items-center gap-2.5 rounded-md px-2 text-left outline-none transition-colors',
-          'hover:bg-[var(--row-hover)] focus-visible:bg-[var(--row-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--focus)]',
-          fresh && 'bg-[var(--accent-soft)] hover:bg-[var(--accent-soft)]',
-        )}
-      >
-        <Icon size={15} strokeWidth={1.75} className="shrink-0 text-[var(--text-muted)]" aria-hidden />
-        {/* Название берёт свою ширину первым, образец — что осталось:
-            при нехватке места сокращается пример, а не имя поля. */}
-        <span className="min-w-0 truncate text-[13px] leading-5 text-[var(--text)]">{field.title}</span>
-        <span className="min-w-8 flex-1 truncate text-right text-xs leading-5 text-[color-mix(in_srgb,var(--text-muted)_70%,transparent)] transition-opacity group-hover:opacity-0 group-focus-visible:opacity-0">
-          {shown}
+    <li data-field={entry.id}>
+      <button type="button" aria-expanded={open} onClick={onToggle} className={cn(rowClass, 'h-9')}>
+        {icon}
+        {title}
+        <span className={cn(sampleClass, 'transition-opacity duration-150', open && 'opacity-0')}>
+          {sampleOf(main, samples)}
         </span>
-        <span
-          aria-hidden
-          className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded-md bg-[var(--accent)] px-2 text-xs font-medium leading-5 text-[var(--accent-contrast)] opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
-        >
-          {label}
+        {/* Только стрелка, без числа записей: «Место  1  2» читалось
+            как два значения, а не как значение и счётчик. */}
+        <ChevronDown
+          size={14}
+          className={cn(
+            'shrink-0 text-[var(--text-muted)] transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:transition-none',
+            !open && '-rotate-90',
+          )}
+        />
+      </button>
+      <Collapse open={open}>
+        {/* Записи — со своим примером слева: выбирают глазами, как будет
+            выглядеть в документе, а подпись справа только уточняет. */}
+        <ul className="mb-1 ml-[17px] border-l-2 border-[color-mix(in_srgb,var(--group)_28%,transparent)] pl-1.5">
+          {entry.variants.map((variant) => (
+            <VariantRow
+              key={variant.field.source}
+              variant={variant}
+              sample={sampleOf(variant.field, samples)}
+              draggable={draggable}
+              label={labelFor(variant.field)}
+              onRun={() => onRun(variant.field)}
+            />
+          ))}
+        </ul>
+      </Collapse>
+    </li>
+  );
+}
+
+function VariantRow({
+  variant,
+  sample,
+  draggable,
+  label,
+  onRun,
+}: {
+  variant: FieldVariant;
+  sample: string;
+  draggable: boolean;
+  label: string;
+  onRun: () => void;
+}) {
+  return (
+    <li>
+      <button type="button" {...dragProps(draggable, variant.field)} onClick={onRun} className={cn(rowClass, 'h-8')}>
+        {/* Подпись записи видна всегда — она и отличает соседние строки;
+            при нехватке места сокращается пример. */}
+        <span className="min-w-0 flex-1 truncate text-[13px] leading-5 text-[var(--text)]">{sample || variant.label}</span>
+        <span className="shrink-0 text-xs leading-5 text-[color-mix(in_srgb,var(--text-muted)_70%,transparent)] transition-opacity duration-150 group-hover:opacity-0 group-focus-visible:opacity-0">
+          {sample ? variant.label : ''}
         </span>
+        <ActionPill label={label} />
       </button>
     </li>
   );
