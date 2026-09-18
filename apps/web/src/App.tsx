@@ -1,6 +1,7 @@
-import type { ReactNode } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { useEffect, type ReactNode } from 'react';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useMe } from './auth/useAuth';
+import { clearReturnPath, readReturnPath, rememberReturnPath } from './auth/session-lost';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { ConfirmEmailPage } from './pages/ConfirmEmailPage';
@@ -110,7 +111,7 @@ export function App() {
         <Route path="/org/:slug" element={<IssuerPage />} />
         {publicRoutes()}
         <Route path="/docs/*" element={<KnowledgeBasePage />} />
-        <Route path="*" element={<NotFoundPage />} />
+        <Route path="*" element={<CabinetOrNotFound />} />
       </Routes>
     );
   }
@@ -189,7 +190,7 @@ export function App() {
         <Route path="/docs/*" element={<KnowledgeBasePage embedded />} />
       </Route>
 
-      <Route path="/login" element={<Navigate to="/" replace />} />
+      <Route path="/login" element={<AfterLogin />} />
       {/* Вошедшему на этих страницах делать нечего: адрес уже подтверждён,
           организация есть. Отправляем в кабинет, а не показываем формы. */}
       <Route path="/register" element={<Navigate to="/" replace />} />
@@ -205,4 +206,31 @@ export function App() {
       </Routes>
     </>
   );
+}
+
+/**
+ * Вошли — туда, где были, когда вход пропал: к тому же материалу, а не
+ * на главную искать его заново. Обычный вход ведёт на главную.
+ */
+function AfterLogin() {
+  const to = readReturnPath() ?? '/';
+  useEffect(clearReturnPath, []);
+  return <Navigate to={to} replace />;
+}
+
+/** Разделы кабинета: их адрес без входа — повод войти, а не «не найдено». */
+const CABINET_PREFIXES = ['/documents', '/mailing', '/registry', '/settings', '/billing', '/invoices', '/analytics', '/integrations'];
+
+/**
+ * Ссылка на материал из письма коллеги или вкладка, открытая вчера,
+ * без входа показывали «Страница не найдена». Теперь — вход, а после
+ * него та самая страница.
+ */
+function CabinetOrNotFound() {
+  const { pathname, search } = useLocation();
+  const cabinet = CABINET_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+  useEffect(() => {
+    if (cabinet) rememberReturnPath(pathname + search);
+  }, [cabinet, pathname, search]);
+  return cabinet ? <Navigate to="/login" replace /> : <NotFoundPage />;
 }

@@ -93,7 +93,7 @@ export function LayersPanel({
             <LayerName name={title(el)} />
             <span className="flex shrink-0 items-center gap-0.5 opacity-60 group-hover:opacity-100">
               <Small
-                title="На слой выше"
+                title="Переместить вперёд"
                 onClick={(e) => {
                   e.stopPropagation();
                   onChange(moveLayer(layout, el.id, 'up'));
@@ -102,7 +102,7 @@ export function LayersPanel({
                 <ChevronUp size={13} />
               </Small>
               <Small
-                title="На слой ниже"
+                title="Переместить назад"
                 onClick={(e) => {
                   e.stopPropagation();
                   onChange(moveLayer(layout, el.id, 'down'));
@@ -111,7 +111,7 @@ export function LayersPanel({
                 <ChevronDown size={13} />
               </Small>
               <Small
-                title={el.locked ? 'Снять замок' : 'Запереть от сдвига'}
+                title={el.locked ? 'Разблокировать' : 'Заблокировать'}
                 pressed={el.locked}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -212,7 +212,7 @@ export function title(el: SheetElement): string {
       return text || 'Текст';
     }
     case 'image':
-      return 'Изображение';
+      return 'Картинка';
     case 'qr':
       return 'QR-код';
     case 'link':

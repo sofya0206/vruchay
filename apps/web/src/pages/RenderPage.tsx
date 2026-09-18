@@ -9,6 +9,8 @@ interface RenderData {
   pageWidthMm: number;
   pageHeightMm: number;
   sheets: { layout: SheetLayout; backgroundUrl: string | null }[];
+  /** Подписанные ссылки на картинки блоков по `fileId`. */
+  images?: Record<string, string>;
   data: Record<string, string>;
   /** Адрес проверки подлинности этого экземпляра — для QR на листе. */
   verifyUrl?: string | null;
@@ -167,6 +169,18 @@ export function RenderPage() {
       // бракованный документ хуже, чем не печатать. Заставка приложения
       // однажды уже уехала в грамоты непрозрачным слоем поверх фамилии,
       // и заметили это не мы, а награждённые.
+      // Картинка блока — логотип, подпись, печать — без которой лист
+      // уйдёт получателю неполным. Только блоки-картинки: QR рисуется
+      // позже и мог ещё не успеть, а отказ фона останавливал бы выпуск,
+      // который до сих пор проходил.
+      const broken = [...document.querySelectorAll<HTMLImageElement>('img[data-sheet-image]')].filter(
+        (img) => img.naturalWidth === 0,
+      );
+      if (broken.length) {
+        window.__RENDER_ERROR__ = `Не загрузились картинки на листе: ${broken.length}`;
+        return;
+      }
+
       const overlay = overlayProblem(document, sheetPoints());
       if (overlay) {
         window.__RENDER_ERROR__ = `Лист закрыт посторонним слоем: ${overlay}`;
@@ -193,6 +207,7 @@ export function RenderPage() {
             pageWidthMm={state.pageWidthMm}
             pageHeightMm={state.pageHeightMm}
             backgroundUrl={sheet.backgroundUrl}
+            imageUrls={state.images ?? {}}
             verifyUrl={state.verifyUrl}
             data={state.data}
           />

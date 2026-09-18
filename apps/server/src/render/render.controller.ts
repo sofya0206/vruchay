@@ -4,6 +4,7 @@ import { issuedAtOf, mergeVariables } from '@gramota/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { baseUrl, type Env } from '../config/env';
+import { imageFileIds } from '../documents/layout-images';
 import { verifyRenderToken } from './render-token';
 import { verifyUrl } from '../verify/verify-url';
 import { expiresAtFor } from '../verify/expiry';
@@ -60,10 +61,28 @@ export class RenderController {
       })),
     );
 
+    // Картинки блоков — ссылками, как фон: сессии у браузера воркера нет,
+    // и постоянный адрес кабинета ему не открыть. Только файлы организации
+    // этого материала — `fileId` в макете приходит с клиента. Не нашедшаяся
+    // картинка не получает ссылки, и страница печати откажется печатать лист.
+    const imageIds = [...new Set(doc.sheets.flatMap((sheet) => imageFileIds(sheet.layout)))];
+    const imageFiles = imageIds.length
+      ? await this.prisma.file.findMany({
+          where: { id: { in: imageIds }, orgId: doc.orgId, kind: 'asset', deletedAt: null },
+          select: { id: true, s3Key: true },
+        })
+      : [];
+    const images = Object.fromEntries(
+      await Promise.all(
+        imageFiles.map(async (file) => [file.id, await this.storage.presignedGetUrl(file.s3Key)] as const),
+      ),
+    );
+
     return {
       pageWidthMm: doc.pageWidthMm,
       pageHeightMm: doc.pageHeightMm,
       sheets,
+      images,
       // Служебные переменные подмешиваем здесь, а не в макете: у страницы
       // печати нет ни часов в нужном поясе, ни названия организации,
       // ни порядкового номера строки.

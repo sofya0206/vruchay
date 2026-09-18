@@ -13,8 +13,12 @@ import {
   ArrowUpToLine,
   Bold,
   CaseUpper,
+  Eye,
+  EyeOff,
   Group,
   Italic,
+  Lock,
+  LockOpen,
   MousePointerSquareDashed,
   Paintbrush,
   Pipette,
@@ -128,7 +132,7 @@ export function PropertiesPanel(props: Props) {
 
       {single && (
         <label className="block">
-          <Label>Название в слоях</Label>
+          <Label>Название слоя</Label>
           <Input
             value={single.name ?? ''}
             placeholder="по содержимому"
@@ -190,25 +194,29 @@ export function PropertiesPanel(props: Props) {
       </div>
 
       <div className="flex flex-wrap gap-1.5">
+        {/* Как в Canva и PowerPoint: значок — состояние, подпись — действие.
+            Если часть выбранных заблокирована, кнопка блокирует все. */}
         <Toggle active={locked === true} onClick={() => props.onElement({ locked: locked !== true })}>
-          {locked === true ? 'Заперт' : locked === MIXED ? 'Замок: смешанное' : 'Запереть от сдвига'}
+          {locked === true ? <Lock size={13} /> : <LockOpen size={13} />}
+          {locked === true ? 'Разблокировать' : 'Заблокировать'}
         </Toggle>
         <Toggle active={hidden === true} onClick={() => props.onElement({ hidden: hidden !== true })}>
-          {hidden === true ? 'Скрыт' : 'Скрыть'}
+          {hidden === true ? <EyeOff size={13} /> : <Eye size={13} />}
+          {hidden === true ? 'Показать' : 'Скрыть'}
         </Toggle>
       </div>
 
       {/* Выравнивание: одного блока — по листу, нескольких — между собой. */}
       <div>
-        <Label>{elements.length > 1 ? 'Выровнять между собой' : 'Выровнять по листу'}</Label>
+        <Label>{elements.length > 1 ? 'Выровнять выделенные' : 'Выровнять по листу'}</Label>
         <div className="flex gap-1">
           {(
             [
               ['left', AlignStartVertical, 'По левому краю'],
-              ['hcenter', AlignHorizontalJustifyCenter, 'По центру по горизонтали'],
+              ['hcenter', AlignHorizontalJustifyCenter, 'По центру'],
               ['right', AlignEndVertical, 'По правому краю'],
               ['top', ArrowUpToLine, 'По верхнему краю'],
-              ['vcenter', AlignVerticalJustifyCenter, 'По центру по вертикали'],
+              ['vcenter', AlignVerticalJustifyCenter, 'По середине'],
               ['bottom', ArrowDownToLine, 'По нижнему краю'],
             ] as const
           ).map(([kind, Icon, title]) => (
@@ -270,7 +278,7 @@ export function PropertiesPanel(props: Props) {
       )}
 
       <Button variant="danger" icon={<Trash2 size={15} />} onClick={props.onDelete} className="w-full">
-        {elements.length > 1 ? `Удалить блоки (${elements.length})` : 'Удалить блок'}
+        {elements.length > 1 ? `Удалить (${elements.length})` : 'Удалить'}
       </Button>
     </div>
   );
@@ -415,9 +423,9 @@ function TextSection({
         <div className="mt-1.5 flex gap-1">
           {(
             [
-              ['top', 'Вверх'],
-              ['middle', 'По центру'],
-              ['bottom', 'Вниз'],
+              ['top', 'Сверху'],
+              ['middle', 'Посередине'],
+              ['bottom', 'Снизу'],
             ] as const
           ).map(([value, label]) => (
             <Toggle key={value} active={p.verticalAlign === value} onClick={() => onChange({ verticalAlign: value })}>
@@ -428,7 +436,7 @@ function TextSection({
       </div>
 
       <div>
-        <Label>Начертание блока</Label>
+        <Label>Начертание</Label>
         <div className="flex gap-1">
           <IconToggle active={bool('bold')} onClick={() => onChange({ bold: !bool('bold') })} title="Полужирный (Ctrl+B)">
             <Bold size={16} />
@@ -439,7 +447,7 @@ function TextSection({
           <IconToggle active={bool('underline')} onClick={() => onChange({ underline: !bool('underline') })} title="Подчёркнутый (Ctrl+U)">
             <Underline size={16} />
           </IconToggle>
-          <IconToggle active={bool('uppercase')} onClick={() => onChange({ uppercase: !bool('uppercase') })} title="ПРОПИСНЫМИ">
+          <IconToggle active={bool('uppercase')} onClick={() => onChange({ uppercase: !bool('uppercase') })} title="Все прописные">
             <CaseUpper size={16} />
           </IconToggle>
         </div>
@@ -450,14 +458,14 @@ function TextSection({
           Тень
         </Toggle>
         <Toggle active={bool('autoFit')} onClick={() => onChange({ autoFit: !bool('autoFit') })}>
-          Уменьшать кегль, если не влезает
+          Сжать текст при переполнении
         </Toggle>
       </div>
 
       {/* Обводка нужна там, где текст ложится на пёстрый фон и сливается
           с ним. Толщину даём в миллиметрах, как и всё остальное в макете. */}
       <div>
-        <Label>Обводка букв</Label>
+        <Label>Контур текста</Label>
         <div className="flex items-center gap-2">
           <NumberField
             min={0}
@@ -474,14 +482,14 @@ function TextSection({
               value={(shown(p.strokeColor as string | typeof MIXED) as string) ?? '#ffffff'}
               onChange={(strokeColor) => onChange({ strokeColor })}
               disabled={p.strokeWidth === 0}
-              label="Цвет обводки"
+              label="Цвет контура"
             />
           </div>
         </div>
       </div>
 
       <div>
-        <Label>Рамка и заливка блока</Label>
+        <Label>Граница и заливка</Label>
         <div className="flex items-center gap-2">
           <NumberField
             min={0}
@@ -498,7 +506,7 @@ function TextSection({
               value={(shown(p.borderColor as string | typeof MIXED) as string) ?? '#000000'}
               onChange={(borderColor) => onChange({ borderColor })}
               disabled={p.borderWidth === 0}
-              label="Цвет рамки"
+              label="Цвет границы"
             />
           </div>
         </div>
@@ -517,14 +525,14 @@ function TextSection({
       {/* Стиль с блока на блок: пипетка снимает, кисть применяет. И «на все» —
           один шрифт и цвет на все текстовые блоки листа одной кнопкой. */}
       <div className="flex flex-wrap gap-1.5">
-        <Button size="sm" variant="ghost" icon={<Pipette size={14} />} onClick={onCopyStyle} title="Снять оформление с этого блока">
-          Снять стиль
+        <Button size="sm" variant="ghost" icon={<Pipette size={14} />} onClick={onCopyStyle} title="Запомнить оформление этого блока">
+          Копировать стиль
         </Button>
-        <Button size="sm" variant="ghost" icon={<Paintbrush size={14} />} onClick={onPasteStyle} disabled={!hasStyleClipboard} title="Применить снятое оформление">
-          Применить стиль
+        <Button size="sm" variant="ghost" icon={<Paintbrush size={14} />} onClick={onPasteStyle} disabled={!hasStyleClipboard} title="Перенести скопированное оформление на выделенные блоки">
+          Вставить стиль
         </Button>
         <Button size="sm" variant="ghost" onClick={onApplyStyleToAll} title="Шрифт и цвет этого блока — на все текстовые блоки листа">
-          Шрифт и цвет — на все
+          Применить ко всем
         </Button>
       </div>
     </div>
@@ -565,7 +573,7 @@ function ShapeSection({
       </div>
       <div className="grid grid-cols-2 gap-2">
         <label className="block">
-          <Label>Обводка, мм</Label>
+          <Label>Контур, мм</Label>
           <NumberField
             min={0}
             max={20}
@@ -588,7 +596,7 @@ function ShapeSection({
         </label>
       </div>
       <div>
-        <Label>Цвет обводки</Label>
+        <Label>Цвет контура</Label>
         <ColorField value={stroke === MIXED ? '#000000' : (stroke ?? '#000000')} onChange={(value) => onChange({ stroke: value })} />
       </div>
       {kind !== 'line' && (
@@ -638,7 +646,7 @@ function Toggle({ active, onClick, children }: { active: boolean; onClick: () =>
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className={`rounded-lg px-2.5 py-1.5 text-xs ring-1 transition-colors ${
+      className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs ring-1 transition-colors ${
         active
           ? 'bg-[var(--accent-soft)] text-[var(--accent)] ring-[var(--accent)]/40'
           : 'text-[var(--text-muted)] ring-[var(--line-strong)] hover:bg-[var(--surface-sunken)]'
