@@ -18,6 +18,7 @@ import { Select } from '../ui/Select';
 import { Loading } from '../ui/Loading';
 import { RuleCard } from './RuleCard';
 import { PreviewPanel } from './PreviewPanel';
+import { Tooltip } from '../ui/Tooltip';
 
 interface Props {
   documentId: string;
@@ -297,15 +298,16 @@ function StartScreen({
       )}
 
       <div className="flex flex-wrap gap-2">
-        <Button
-          variant="primary"
-          icon={<Wand2 size={15} />}
-          onClick={onSuggest}
-          disabled={!hasColumns || suggesting}
-          title={hasColumns ? undefined : 'Сначала загрузите протокол на вкладке «Получатели»'}
-        >
-          Собрать по колонкам протокола
-        </Button>
+        <Tooltip label={hasColumns ? undefined : 'Сначала загрузите протокол на вкладке «Получатели»'}>
+          <Button
+            variant="primary"
+            icon={<Wand2 size={15} />}
+            onClick={onSuggest}
+            disabled={!hasColumns || suggesting}
+          >
+            Собрать по колонкам протокола
+          </Button>
+        </Tooltip>
         {/* Второй кнопкой это читалось как выбор из двух равных, хотя
             пустой набор нужен редко. Остаётся, но тихо. */}
         <button

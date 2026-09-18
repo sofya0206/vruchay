@@ -104,6 +104,32 @@ export function ColumnList({ children, className = '' }: { children: ReactNode; 
 }
 
 /**
+ * Общий вид строки колонки — один на документы, письма, настройки
+ * и интеграции.
+ *
+ * Собирается через `cn`, а не склейкой строк: у Tailwind порядок классов
+ * в атрибуте ничего не решает, побеждает тот, что стоит позже в собранном
+ * CSS. Библиотека склеивала строкой и передавала `px-0` поверх `px-3` —
+ * отступ не отменялся, а складывался с отступом внутренней ссылки, и до
+ * значка папки выходило 52 точки вместо двадцати.
+ *
+ * Высота 32 точки на широком экране: строка списка, а не кнопка. На узком
+ * колонка превращается в ленту, которую листают пальцем, — там остаётся
+ * 36, иначе в строку не попасть.
+ */
+export function columnRowClass({ active, nested }: { active?: boolean; nested?: boolean } = {}): string {
+  return cn(
+    'flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-3 py-2 text-sm whitespace-nowrap transition-colors md:px-2 md:py-1.5',
+    // Вложенная строка отступает на ширину значка родителя: папки читаются
+    // как ветка «Моих документов», а не как второй плоский список.
+    nested && 'md:pl-5 md:text-[13px]',
+    active
+      ? 'bg-[var(--accent-soft)] font-medium text-[var(--accent)]'
+      : 'text-[var(--text-muted)] hover:bg-[var(--row-hover)] hover:text-[var(--text)]',
+  );
+}
+
+/**
  * Строка колонки — ссылка на список. Активность считается снаружи:
  * у папок один адрес и разный `?folder=`, о котором `NavLink` не знает.
  */
@@ -137,13 +163,7 @@ export function ColumnRow({
         end
         aria-current={active ? 'page' : undefined}
         onContextMenu={onContextMenu}
-        className={cn(
-          'flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-3 py-2 text-sm whitespace-nowrap transition-colors',
-          nested && 'md:pl-8',
-          active
-            ? 'bg-[var(--accent-soft)] font-medium text-[var(--accent)]'
-            : 'text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]',
-        )}
+        className={columnRowClass({ active, nested })}
       >
         <Icon size={16} strokeWidth={1.75} className={cn('shrink-0', !active && tint)} />
         <span className="md:flex-1 md:truncate">{children}</span>

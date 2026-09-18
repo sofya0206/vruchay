@@ -1,4 +1,9 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -72,6 +77,43 @@ export class FoldersService {
     const folder = await this.getOrFail(orgId, id);
     await this.prisma.documentFolder.delete({ where: { id } });
     return folder;
+  }
+
+  /**
+   * Новый порядок папок: место в колонке — это `position` по номеру в списке.
+   *
+   * Список принимается только целиком и только свой. Чужой идентификатор
+   * посреди своих — это не «пропустим лишнее», а попытка узнать, есть ли
+   * такая папка у соседней организации; отвечаем 404, как и на прямое
+   * обращение к чужой папке. Ровно так же отвечаем на неполный список:
+   * расставить половину папок нельзя — остальные встали бы на чужие места.
+   *
+   * Все обновления идут одной транзакцией: колонка, застрявшая на середине
+   * перестановки, показала бы порядок, которого человек не выбирал.
+   */
+  async reorder(orgId: string, ids: string[]) {
+    const unique = new Set(ids);
+    if (unique.size !== ids.length) {
+      throw new BadRequestException('Папка не может стоять в списке дважды');
+    }
+
+    const own = await this.prisma.documentFolder.findMany({
+      where: { orgId },
+      select: { id: true },
+    });
+    const mine = new Set(own.map((f) => f.id));
+    const allMine = ids.every((id) => mine.has(id));
+    if (!allMine || ids.length !== own.length) {
+      throw new NotFoundException('Папка не найдена');
+    }
+
+    await this.prisma.$transaction(
+      ids.map((id, position) =>
+        this.prisma.documentFolder.update({ where: { id }, data: { position } }),
+      ),
+    );
+
+    return this.list(orgId);
   }
 
   private async getOrFail(orgId: string, id: string) {

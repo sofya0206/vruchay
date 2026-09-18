@@ -6,6 +6,7 @@ import { Button } from '../ui/Button';
 import { Input, Label } from '../ui/Field';
 import { parseBody, toHtml, toText, wrapSelection, type Run } from './email-body';
 import { Checkbox } from '../ui/Checkbox';
+import { useTooltip } from '../ui/Tooltip';
 
 interface EmailTemplate {
   id: string;
@@ -316,15 +317,18 @@ function FormatButton({
   title: string;
   children: React.ReactNode;
 }) {
+  const { triggerProps, tooltip } = useTooltip(title);
+
   return (
     <button
       type="button"
       onClick={onClick}
-      title={title}
+      {...triggerProps}
       aria-label={title}
       className="grid h-8 w-8 place-items-center rounded-lg text-[var(--text-muted)] ring-1 ring-[var(--line)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
     >
       {children}
+      {tooltip}
     </button>
   );
 }

@@ -26,6 +26,7 @@ import { useEffect, useState } from 'react';
 import { describeSize, type SheetElement, type ShapeElement, type TextProps } from '@gramota/shared';
 import type { DocumentDetail } from '../api/types';
 import { PageSizePicker, type PageSizeValue } from '../documents/PageSizePicker';
+import { useTooltip } from '../ui/Tooltip';
 import { EventFields, type EventValues } from './EventFields';
 import { ColorField } from './ColorField';
 import { FONTS } from './fonts-list';
@@ -659,11 +660,13 @@ function IconToggle({
   title: string;
   children: React.ReactNode;
 }) {
+  const { triggerProps, tooltip } = useTooltip(title);
+
   return (
     <button
       type="button"
       onClick={onClick}
-      title={title}
+      {...triggerProps}
       aria-label={title}
       aria-pressed={active}
       className={`grid h-9 flex-1 place-items-center rounded-lg ring-1 transition-colors ${
@@ -673,6 +676,7 @@ function IconToggle({
       }`}
     >
       {children}
+      {tooltip}
     </button>
   );
 }

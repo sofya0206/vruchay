@@ -1,8 +1,18 @@
-import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent,
+  type MouseEvent,
+  type ReactNode,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Archive,
+  ArrowDown,
+  ArrowUp,
   ChevronDown,
   FileText,
   Folder,
@@ -18,10 +28,13 @@ import {
   useDeleteFolder,
   useFolders,
   useRenameFolder,
+  useReorderFolders,
   type Folder as FolderItem,
 } from '../api/folders';
 import { ConfirmDialog } from '../ui/Dialog';
-import { SectionLayout } from '../ui/SectionLayout';
+import { SectionLayout, columnRowClass } from '../ui/SectionLayout';
+import { cn } from '../ui/cn';
+import { useTooltip } from '../ui/Tooltip';
 
 /**
  * Рамка раздела «Награждение»: колонка разделов слева, панель сверху,
@@ -123,6 +136,72 @@ export function LibraryNav({ archiveCount }: { archiveCount?: number | null }) {
   const create = useCreateFolder();
   const rename = useRenameFolder();
   const remove = useDeleteFolder();
+  const reorder = useReorderFolders();
+
+  /**
+   * Порядок, в котором колонка стоит прямо сейчас, пока сервер ещё не
+   * ответил. Без него папка после отпускания прыгала бы на старое место
+   * и возвращалась обратно — жест выглядел бы как сбой.
+   */
+  const [dragOrder, setDragOrder] = useState<string[] | null>(null);
+  /** Папка, которую тащат, и та, над которой её держат. */
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+
+  const list = useMemo(() => {
+    const rows = folders.data ?? [];
+    if (!dragOrder) return rows;
+    const by = new Map(rows.map((f) => [f.id, f]));
+    const moved = dragOrder.map((id) => by.get(id)).filter((f): f is FolderItem => !!f);
+    // Папку могли завести в соседней вкладке, пока здесь тащили: она встаёт
+    // в конец, а не пропадает из колонки.
+    return [...moved, ...rows.filter((f) => !dragOrder.includes(f.id))];
+  }, [folders.data, dragOrder]);
+
+  /** Переставить папку на новое место и отправить весь порядок целиком. */
+  const moveFolder = (id: string, to: number) => {
+    const ids = list.map((f) => f.id);
+    const from = ids.indexOf(id);
+    if (from === -1 || to < 0 || to >= ids.length || from === to) return;
+    ids.splice(to, 0, ...ids.splice(from, 1));
+    setDragOrder(ids);
+    // Порядок с сервера вернётся в `folders.data`, и своя копия больше
+    // не нужна: держать её дольше — значит показывать вчерашнюю колонку,
+    // если перестановка не удалась.
+    reorder.mutate(ids, { onSettled: () => setDragOrder(null) });
+  };
+
+  /**
+   * С какой стороны целевой папки рисовать линию вставки.
+   *
+   * Тащим вверх — папка встанет перед целью, вниз — после неё. Линия
+   * поверху и линия понизу у соседних строк совпали бы, поэтому сторону
+   * считаем от направления, а не рисуем всегда сверху.
+   */
+  const insertSide = (targetId: string): 'before' | 'after' | null => {
+    if (!dragId || overId !== targetId || dragId === targetId) return null;
+    const from = list.findIndex((f) => f.id === dragId);
+    const to = list.findIndex((f) => f.id === targetId);
+    if (from === -1 || to === -1) return null;
+    return to < from ? 'before' : 'after';
+  };
+
+  const endDrag = () => {
+    setDragId(null);
+    setOverId(null);
+  };
+
+  /**
+   * Кто куда лёг, берём из самого переноса, а не из состояния: между началом
+   * жеста и отпусканием React мог не успеть перерисоваться, и обработчик
+   * отпускания достался бы от прошлого кадра — с пустым `dragId`. Состояние
+   * отвечает только за подсветку, где ошибка стоит подсветки, а не жеста.
+   */
+  const dropOn = (sourceId: string, targetId: string) => {
+    if (!sourceId || sourceId === targetId) return endDrag();
+    moveFolder(sourceId, list.findIndex((f) => f.id === targetId));
+    endDrag();
+  };
 
   /*
    * Открытая папка обязана быть видна, даже если дерево было сложено:
@@ -172,7 +251,7 @@ export function LibraryNav({ archiveCount }: { archiveCount?: number | null }) {
             onMenu={(e) => openMenu(e, null)}
           />
           {expanded &&
-            (folders.data ?? []).map((folder) =>
+            list.map((folder) =>
               renamingId === folder.id ? (
                 <li key={folder.id}>
                   <FolderNameForm
@@ -194,6 +273,12 @@ export function LibraryNav({ archiveCount }: { archiveCount?: number | null }) {
                   folder={folder}
                   active={onDocuments && openFolderId === folder.id}
                   onMenu={(e) => openMenu(e, folder)}
+                  dragging={dragId === folder.id}
+                  over={insertSide(folder.id)}
+                  onDragStart={() => setDragId(folder.id)}
+                  onDragEnter={() => setOverId(folder.id)}
+                  onDrop={(sourceId) => dropOn(sourceId, folder.id)}
+                  onDragEnd={endDrag}
                 />
               ),
             )}
@@ -205,6 +290,22 @@ export function LibraryNav({ archiveCount }: { archiveCount?: number | null }) {
                 onCancel={() => setCreating(false)}
                 onSubmit={(name) => create.mutate(name, { onSuccess: () => setCreating(false) })}
               />
+            </li>
+          )}
+          {/* Завести папку было можно только правой кнопкой по «Моим
+              документам». Правую кнопку в вебе почти никто не пробует, и
+              первая папка не заводилась вовсе — поэтому здесь есть строка,
+              которую видно. */}
+          {expanded && !creating && (
+            <li className="hidden md:block">
+              <button
+                type="button"
+                onClick={startFolder}
+                className={cn(columnRowClass({ nested: true }), 'w-full text-left')}
+              >
+                <FolderPlus size={14} strokeWidth={1.75} className="shrink-0" />
+                <span>Папка</span>
+              </button>
             </li>
           )}
           {archive.map((item) => (
@@ -224,6 +325,9 @@ export function LibraryNav({ archiveCount }: { archiveCount?: number | null }) {
           onNewFolder={startFolder}
           onRename={() => menu.folder && setRenamingId(menu.folder.id)}
           onDelete={() => setDeleting(menu.folder)}
+          position={menu.folder ? list.findIndex((f) => f.id === menu.folder!.id) : -1}
+          total={list.length}
+          onMove={(to) => menu.folder && moveFolder(menu.folder.id, to)}
         />
       )}
 
@@ -271,6 +375,9 @@ function ContextMenu({
   onNewFolder,
   onRename,
   onDelete,
+  position,
+  total,
+  onMove,
 }: {
   x: number;
   y: number;
@@ -280,6 +387,10 @@ function ContextMenu({
   onNewFolder: () => void;
   onRename: () => void;
   onDelete: () => void;
+  /** Который по счёту стоит папка сейчас; -1 — меню корня. */
+  position: number;
+  total: number;
+  onMove: (to: number) => void;
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -333,6 +444,24 @@ function ContextMenu({
         {folder && (
           <>
             <div className="my-1 border-t border-[var(--line)]" />
+            {/* Перетаскивание мышью недоступно с клавиатуры, а на сенсорном
+                экране требует точности, которой там нет. Те же два шага
+                словами — здесь. */}
+            <MenuItem
+              icon={<ArrowUp size={14} />}
+              disabled={position <= 0}
+              onClick={run(() => onMove(position - 1))}
+            >
+              Выше
+            </MenuItem>
+            <MenuItem
+              icon={<ArrowDown size={14} />}
+              disabled={position < 0 || position >= total - 1}
+              onClick={run(() => onMove(position + 1))}
+            >
+              Ниже
+            </MenuItem>
+            <div className="my-1 border-t border-[var(--line)]" />
             <MenuItem icon={<Pencil size={14} />} onClick={run(onRename)}>
               Переименовать
             </MenuItem>
@@ -347,38 +476,117 @@ function ContextMenu({
   );
 }
 
-/** Строка папки: ссылка плюс «…», открывающее то же меню, что правая кнопка. */
+/**
+ * Строка папки: ссылка плюс «…», открывающее то же меню, что правая кнопка.
+ *
+ * Имя — в одну строку с многоточием. Три строки, стоявшие здесь раньше,
+ * ради длинных названий растягивали строку до 68 точек при 32 у соседей:
+ * подсветка получалась крупнее самой папки. Целиком имя показывает
+ * подсказка, и только когда оно действительно не поместилось.
+ *
+ * Счётчик и «…» стоят в одном месте друг над другом и меняются
+ * прозрачностью, а не появлением: строка не должна дёргаться от того,
+ * что по ней провели мышью.
+ *
+ * Вложенность держится одним отступом: направляющая линия вдоль папок
+ * рябила в глазах и спорила с рамкой колонки.
+ */
 function FolderRow({
   folder,
   active,
   onMenu,
+  dragging,
+  over,
+  onDragStart,
+  onDragEnter,
+  onDrop,
+  onDragEnd,
 }: {
   folder: FolderItem;
   active: boolean;
   onMenu: (e: MouseEvent<HTMLElement>) => void;
+  dragging: boolean;
+  /** С какой стороны ляжет папка, если отпустить здесь. */
+  over: 'before' | 'after' | null;
+  onDragStart: () => void;
+  onDragEnter: () => void;
+  onDrop: (sourceId: string) => void;
+  onDragEnd: () => void;
 }) {
+  const name = useRef<HTMLSpanElement>(null);
+  const { triggerProps, tooltip } = useTooltip(folder.name, {
+    onlyWhenTruncated: true,
+    describes: true,
+    placement: 'right',
+    measure: name,
+  });
+
+  const handleDragStart = (e: DragEvent<HTMLLIElement>) => {
+    // Без этого Firefox не начинает перетаскивание вовсе.
+    e.dataTransfer.setData('text/plain', folder.id);
+    e.dataTransfer.effectAllowed = 'move';
+    onDragStart();
+  };
+
   return (
     <li
-      className={`${rowClass(active, true)} group gap-0 px-0 md:pl-0`}
+      draggable
+      onDragStart={handleDragStart}
+      onDragEnter={onDragEnter}
+      onDragOver={(e) => {
+        // Пока перетаскивание не отменено, браузер считает строку запретной
+        // зоной и курсор показывает перечёркнутый круг.
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        onDrop(e.dataTransfer.getData('text/plain'));
+      }}
+      onDragEnd={onDragEnd}
       onContextMenu={onMenu}
+      className={cn(
+        'group relative flex items-center md:cursor-grab md:active:cursor-grabbing',
+        dragging && 'opacity-40',
+        /* Куда ляжет папка — линия на границе, а не рамка вокруг строки:
+           рамка показывала «эта папка», хотя вопрос был «между какими». */
+        over &&
+          'after:absolute after:inset-x-2 after:z-10 after:h-0.5 after:rounded-full after:bg-[var(--accent)] after:content-[""]',
+        over === 'before' && 'after:-top-px',
+        over === 'after' && 'after:-bottom-px',
+      )}
     >
       <Link
         to={`/documents?folder=${folder.id}`}
         aria-current={active ? 'page' : undefined}
-        className="flex min-w-0 flex-1 items-center gap-2.5 py-2 pl-3 md:pl-8"
+        {...triggerProps}
+        className={cn(
+          columnRowClass({ active, nested: true }),
+          /* Постоянное место под счётчик и «…»: без него ширина имени
+             менялась бы от того, есть ли у папки материалы. Обязательно
+             с `md:` — базовый `pr-*` проиграл бы `md:px-2` из общего
+             стиля, и счётчик лёг бы прямо на имя. */
+          'pr-7 md:pr-7',
+        )}
       >
         <Folder size={14} strokeWidth={1.75} className="shrink-0" />
-        <span className="min-w-0 md:flex-1 md:truncate">{folder.name}</span>
-        {folder.count ? (
-          <span className="tabular shrink-0 text-xs text-[var(--text-muted)]">{folder.count}</span>
-        ) : null}
+        <span ref={name} className="min-w-0 md:flex-1 md:truncate">
+          {folder.name}
+        </span>
       </Link>
+      {tooltip}
+
+      {folder.count ? (
+        <span className="tabular pointer-events-none absolute right-2 text-xs text-[var(--text-muted)] transition-opacity md:group-hover:opacity-0">
+          {folder.count}
+        </span>
+      ) : null}
 
       <button
         type="button"
         onClick={onMenu}
         aria-label={`Меню папки «${folder.name}»`}
-        className="px-2 py-2 text-[var(--text-muted)] transition-opacity hover:text-[var(--text)] md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
+        className="absolute right-0 px-1.5 py-1.5 text-[var(--text-muted)] transition-opacity hover:text-[var(--text)] focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100"
       >
         <MoreHorizontal size={15} strokeWidth={1.75} />
       </button>
@@ -390,20 +598,25 @@ function MenuItem({
   icon,
   children,
   danger = false,
+  disabled = false,
   onClick,
 }: {
   icon: ReactNode;
   children: ReactNode;
   danger?: boolean;
+  /** Крайняя папка никуда не двигается — пункт виден, но не нажимается:
+      исчезающий пункт менял бы высоту меню от папки к папке. */
+  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
       role="menuitem"
+      disabled={disabled}
       onClick={onClick}
       className={
-        'flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--surface-sunken)] ' +
+        'flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors disabled:pointer-events-none disabled:opacity-40 hover:bg-[var(--surface-sunken)] ' +
         (danger ? 'text-[var(--danger)]' : 'text-[var(--text)]')
       }
     >
@@ -467,7 +680,7 @@ function FolderNameForm({
         e.preventDefault();
         submit();
       }}
-      className="px-3 py-1 md:pl-8"
+      className="px-3 py-1 md:pr-2 md:pl-5"
     >
       <input
         ref={input}
@@ -512,19 +725,6 @@ function FolderNameForm({
   );
 }
 
-/** Общий вид строки колонки: значок, подпись, число внутри. */
-function rowClass(active: boolean, nested = false): string {
-  return (
-    'flex items-center gap-2.5 rounded-lg py-2 text-sm whitespace-nowrap ' +
-    'transition-colors ' +
-    // Вложенные папки: отступ слева и мельче кегль — иначе колонка
-    // читается как один плоский список из восьми равноправных строк.
-    (nested ? 'px-3 md:pl-8 md:text-[13px] ' : 'px-3 ') +
-    (active
-      ? 'bg-[var(--accent-soft)] font-medium text-[var(--accent)]'
-      : 'text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]')
-  );
-}
 
 function Row({ item }: { item: Item }) {
   return (
@@ -532,7 +732,7 @@ function Row({ item }: { item: Item }) {
       <Link
         to={item.to}
         aria-current={item.active ? 'page' : undefined}
-        className={rowClass(item.active, item.nested)}
+        className={columnRowClass({ active: item.active, nested: item.nested })}
       >
         <item.icon size={item.nested ? 14 : 16} strokeWidth={1.75} className="shrink-0" />
         <span className="md:flex-1 md:truncate">{item.label}</span>
@@ -569,12 +769,14 @@ function RootRow({
   onMenu: (e: MouseEvent<HTMLElement>) => void;
 }) {
   return (
-    <li className={`${rowClass(active)} gap-0 px-0`} onContextMenu={onMenu}>
+    /* Подсветка живёт на ссылке, а не на строке: иначе она затекает под
+       уголок, и наведение на список выглядит как наведение на кнопку. */
+    <li className="group flex items-center" onContextMenu={onMenu}>
       <Link
         to="/documents"
         onClick={onCollapse}
         aria-current={active ? 'page' : undefined}
-        className="flex flex-1 items-center gap-2.5 px-3 py-2"
+        className={columnRowClass({ active })}
       >
         <FolderOpen size={16} strokeWidth={1.75} className="shrink-0" />
         <span className="md:flex-1 md:truncate">Мои документы</span>
@@ -584,7 +786,7 @@ function RootRow({
         onClick={onToggle}
         aria-expanded={expanded}
         aria-label={expanded ? 'Свернуть папки' : 'Показать папки'}
-        className="px-2 py-2 text-[var(--text-muted)] hover:text-[var(--text)]"
+        className="shrink-0 px-2 py-2 text-[var(--text-muted)] hover:text-[var(--text)]"
       >
         <ChevronDown
           size={15}

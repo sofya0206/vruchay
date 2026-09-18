@@ -1,6 +1,7 @@
 import { useId, useMemo, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from './cn';
+import { useTooltip } from './Tooltip';
 import { Popover } from './Popover';
 import { useDismiss } from './useDismiss';
 
@@ -58,6 +59,9 @@ export function Select<T extends string = string>({
   const panel = useRef<HTMLDivElement>(null);
   const search = useRef({ text: '', at: 0 });
   const id = useId();
+  /* Своя подсказка вместо браузерной: у списка она объясняет горячие
+     клавиши, которых больше нигде не видно. */
+  const tip = useTooltip(title);
 
   useDismiss(open, () => setOpen(false), trigger, panel);
 
@@ -170,8 +174,8 @@ export function Select<T extends string = string>({
         aria-controls={open ? `${id}-list` : undefined}
         aria-activedescendant={open && options[active] ? `${id}-${active}` : undefined}
         aria-label={rest['aria-label']}
-        title={title}
         disabled={disabled}
+        {...tip.triggerProps}
         onClick={() => show(!open)}
         onKeyDown={onKeyDown}
         className={cn(
@@ -208,6 +212,7 @@ export function Select<T extends string = string>({
             open && 'rotate-180',
           )}
         />
+        {tip.tooltip}
       </button>
 
       {open && (

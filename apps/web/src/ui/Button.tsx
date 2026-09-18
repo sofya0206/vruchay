@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import { useTooltip } from './Tooltip';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
 type Size = 'sm' | 'md' | 'lg';
@@ -38,12 +39,29 @@ export function Button({
   icon,
   children,
   className = '',
+  title,
   ...rest
 }: Props) {
+  /*
+   * `title` не уходит в разметку, а становится своей подсказкой: через
+   * `...rest` он раньше протекал в DOM с любой кнопки, и рядом с кнопкой
+   * всплывала системная плашка — та самая, от которой уходим.
+   *
+   * Выключенная кнопка событий указателя не получает, поэтому объяснение
+   * «почему недоступно» вешается снаружи, обёрткой `<Tooltip>`, — здесь
+   * его показать нечем.
+   */
+  const { triggerProps, tooltip } = useTooltip(rest.disabled ? undefined : title);
+
   return (
-    <button className={`${base} ${sizes[size]} ${variants[variant]} ${className}`} {...rest}>
+    <button
+      className={`${base} ${sizes[size]} ${variants[variant]} ${className}`}
+      {...rest}
+      {...triggerProps}
+    >
       {icon}
       {children}
+      {tooltip}
     </button>
   );
 }

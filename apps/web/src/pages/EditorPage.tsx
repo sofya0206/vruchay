@@ -60,6 +60,7 @@ import { InlineTextEditor } from '../editor/rich/InlineTextEditor';
 import { useLayoutHistory } from '../editor/useLayoutHistory';
 import { FitPageDialog } from '../editor/FitPageDialog';
 import { PageSizeDialog } from '../editor/PageSizeDialog';
+import { Tooltip } from '../ui/Tooltip';
 import { ResizeDialog } from '../editor/ResizeDialog';
 import { fitPageToImage, readImageSize, type PageFit } from '../editor/fit-page';
 import { backgroundDpi, BLEED_MM, POOR_DPI, PRINT_DPI, resizeLayout, SAFE_MARGIN_MM, type ResizeMode } from '../editor/page-fit';
@@ -1368,12 +1369,10 @@ export function EditorPage() {
                   <div
                     className="pointer-events-none absolute border border-dashed border-red-400/70"
                     style={{ inset: px(BLEED_MM) }}
-                    title="Обрез 3 мм"
                   />
                   <div
                     className="pointer-events-none absolute border border-dashed border-[var(--accent)]/70"
                     style={{ inset: px(SAFE_MARGIN_MM) }}
-                    title="Безопасное поле 5 мм"
                   />
                 </>
               )}
@@ -1720,19 +1719,25 @@ function Segment({
   title?: string;
   children: React.ReactNode;
 }) {
+  /*
+   * Подсказка снаружи кнопки, а не на ней: она объясняет, почему вкладка
+   * недоступна, а выключенная кнопка событий указателя не получает —
+   * на ней самой объяснение не показалось бы никогда.
+   */
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      title={title}
-      aria-pressed={active}
-      className={`rounded-md px-2.5 py-1 text-sm transition-colors disabled:opacity-50 ${
-        active ? 'bg-[var(--accent-soft)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text)]'
-      }`}
-    >
-      {children}
-    </button>
+    <Tooltip label={title}>
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        aria-pressed={active}
+        className={`rounded-md px-2.5 py-1 text-sm transition-colors disabled:opacity-50 ${
+          active ? 'bg-[var(--accent-soft)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text)]'
+        }`}
+      >
+        {children}
+      </button>
+    </Tooltip>
   );
 }
 
