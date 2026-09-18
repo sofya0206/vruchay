@@ -171,13 +171,13 @@ export class BackupWatchService implements OnModuleInit, OnModuleDestroy {
         `<p style="font-size:15px">Проверка резервных копий базы не прошла.</p>
          <p><b>${escape(state.reason)}</b></p>
          ${state.key ? `<p>Последняя найденная копия: <code>${escape(state.key)}</code></p>` : ''}
-         <p style="color:#5f6b64;font-size:13px">
+         <p style="color:#36394a;font-size:13px">
            Что проверить на сервере:<br>
            1. журнал: <code>tail -50 /var/log/vruchay-backup.log</code><br>
            2. запуск руками: <code>/opt/vruchay/src/scripts/backup.sh</code><br>
            3. расписание: <code>crontab -l</code>
          </p>
-         <p style="color:#5f6b64;font-size:13px">
+         <p style="color:#36394a;font-size:13px">
            Это письмо приходит, только когда что-то не так. Молчание означает,
            что копии снимаются.
          </p>`,

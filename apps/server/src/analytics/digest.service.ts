@@ -287,7 +287,7 @@ export function digestLetter(params: {
   const table = rows
     .map(
       ([label, value]) =>
-        `<tr><td style="padding:6px 16px 6px 0;color:#5f6b64">${e(label)}</td>` +
+        `<tr><td style="padding:6px 16px 6px 0;color:#36394a">${e(label)}</td>` +
         `<td style="padding:6px 0;font-size:18px;font-weight:600">${e(value)}</td></tr>`,
     )
     .join('');
@@ -297,14 +297,14 @@ export function digestLetter(params: {
     html:
       // Jost первым, дальше системный запас: почтовые клиенты веб-шрифты
       // почти поголовно вырезают, подключать его файлом здесь бессмысленно.
-      `<div style="font:15px/1.6 Jost,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#1c2420">` +
+      `<div style="font:15px/1.6 Jost,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#091135">` +
       `<p>Что происходило у организации «${e(params.orgName)}» за ${e(numbers.title)}.</p>` +
       `<table style="border-collapse:collapse;margin:16px 0">${table}</table>` +
-      `<p style="color:#5f6b64">Проверка по QR — единственное свидетельство, что выданный ` +
+      `<p style="color:#36394a">Проверка по QR — единственное свидетельство, что выданный ` +
       `документ живёт: его сканировали работодатель, приёмная комиссия или судья. ` +
       `Кто и откуда проверял, мы не собираем.</p>` +
-      `<p><a href="${e(params.analyticsUrl)}" style="color:#2f6b4f">Открыть «Аналитику» в кабинете</a></p>` +
-      `<p style="font-size:13px;color:#5f6b64">Это служебное письмо о вашей организации, ` +
+      `<p><a href="${e(params.analyticsUrl)}" style="color:#127ee3">Открыть «Аналитику» в кабинете</a></p>` +
+      `<p style="font-size:13px;color:#36394a">Это служебное письмо о вашей организации, ` +
       `а не рассылка: оно приходит раз в месяц владельцу аккаунта.</p>` +
       `</div>`,
   };

@@ -73,8 +73,8 @@ export function renderLetterBody(letter: Letter): string {
   if (!signature) return letter.bodyHtml;
   return (
     letter.bodyHtml +
-    '<div style="margin-top:24px;padding-top:16px;border-top:1px solid #e5e5e5;' +
-    'color:#555;font-size:14px">' +
+    '<div style="margin-top:24px;padding-top:16px;border-top:1px solid #e1e9f0;' +
+    'color:#36394a;font-size:14px">' +
     signature +
     '</div>'
   );
@@ -89,12 +89,12 @@ export function renderLetterBody(letter: Letter): string {
  */
 function marketingFooter(advertiserName: string, unsubscribeUrl: string): string {
   return (
-    '<hr style="margin:24px 0;border:none;border-top:1px solid #e5e5e5">' +
-    '<p style="font-size:12px;color:#6b7280;margin:0 0 8px">' +
+    '<hr style="margin:24px 0;border:none;border-top:1px solid #e1e9f0">' +
+    '<p style="font-size:12px;color:#36394a;margin:0 0 8px">' +
     `Реклама. ${escapeHtml(advertiserName)}` +
     '</p>' +
-    '<p style="font-size:12px;color:#6b7280;margin:0">' +
-    `<a href="${escapeHtml(unsubscribeUrl)}" style="color:#6b7280">Отписаться от рассылки</a>` +
+    '<p style="font-size:12px;color:#36394a;margin:0">' +
+    `<a href="${escapeHtml(unsubscribeUrl)}" style="color:#36394a">Отписаться от рассылки</a>` +
     '</p>'
   );
 }

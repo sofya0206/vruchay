@@ -9,6 +9,7 @@ import { SmtpProvider } from './smtp.provider';
 import {
   escapeHtml,
   isValidEmail,
+  mailButton,
   renderHtmlTemplate,
   renderSubject,
   sanitizeEmailHtml,
@@ -931,7 +932,7 @@ export class MailService {
       html:
         `<p style="font-size:15px">Ваш код подтверждения:</p>` +
         `<p style="font-size:28px;letter-spacing:.2em;font-weight:600">${escapeHtml(code)}</p>` +
-        `<p style="font-size:13px;color:#5f6b64">Код действует 10 минут. ` +
+        `<p style="font-size:13px;color:#36394a">Код действует 10 минут. ` +
         `Если вы не запрашивали документ, просто проигнорируйте это письмо.</p>`,
     });
   }
@@ -982,16 +983,14 @@ export class MailService {
       throw new BadRequestException('Отправка писем не настроена — ссылку выслать некуда');
     }
 
-    const safeUrl = escapeHtml(url);
     await this.providerFor('smtp').send({
       from: { email: sender.email, name: sender.displayName },
       to,
       subject: 'Подтвердите адрес, чтобы получить документ',
       html:
         `<p style="font-size:15px">Нажмите, чтобы подтвердить адрес — и мы пришлём документ:</p>` +
-        `<p><a href="${safeUrl}" style="display:inline-block;padding:12px 22px;background:#1f5d3f;` +
-        `color:#fff;border-radius:10px;text-decoration:none;font-size:15px">Подтвердить и получить документ</a></p>` +
-        `<p style="font-size:13px;color:#5f6b64">Ссылка действует 10 минут. ` +
+        mailButton(url, 'Подтвердить и получить документ') +
+        `<p style="font-size:13px;color:#36394a">Ссылка действует 10 минут. ` +
         `Если вы не запрашивали документ, просто проигнорируйте это письмо.</p>`,
     });
   }

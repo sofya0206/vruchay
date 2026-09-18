@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { escapeHtml, isValidEmail, renderHtmlTemplate, renderSubject } from './mail-template';
+import {
+  escapeHtml,
+  isValidEmail,
+  mailButton,
+  renderHtmlTemplate,
+  renderSubject,
+} from './mail-template';
 
 describe('экранирование', () => {
   it('обезвреживает разметку в данных получателя', () => {
@@ -91,5 +97,22 @@ describe('парные формы в письме', () => {
     expect(html).not.toContain('<script>');
     // Пол по такому «имени» не определяется — печатаем как написано.
     expect(html).toContain('награждён(а)');
+  });
+});
+
+describe('кнопка в письме', () => {
+  it('не ниже 44px — письма открывают с телефона', () => {
+    const html = mailButton('https://vruchay.ru/confirm', 'Войти');
+    const style = /<a [^>]*style="([^"]*)"/.exec(html)![1];
+    const px = (prop: string) => Number(new RegExp(`${prop}:(\\d+)px`).exec(style)![1]);
+    // Отступы у строчной ссылки высоту не добавляют — только у inline-block.
+    expect(style).toContain('display:inline-block');
+    expect(px('padding') * 2 + px('line-height')).toBeGreaterThanOrEqual(44);
+  });
+
+  it('экранирует адрес и подпись', () => {
+    const html = mailButton('https://vruchay.ru/?a=1&b="2"', '<b>Войти</b>');
+    expect(html).toContain('href="https://vruchay.ru/?a=1&amp;b=&quot;2&quot;"');
+    expect(html).toContain('&lt;b&gt;Войти&lt;/b&gt;');
   });
 });
