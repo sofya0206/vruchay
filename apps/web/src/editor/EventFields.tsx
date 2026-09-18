@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CalendarDays, Check } from 'lucide-react';
+import { Check } from 'lucide-react';
 import type { DocumentDetail } from '../api/types';
 import { Input, Label } from '../ui/Field';
 import { DateField } from '../ui/DateField';
@@ -95,16 +95,10 @@ export function EventFields({
 
   return (
     <div className="space-y-4">
-      <div>
-        <h3 className="flex items-center gap-2 font-medium">
-          <CalendarDays size={16} className="text-[var(--text-muted)]" />
-          О мероприятии
-        </h3>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Заполните один раз — подставится во все документы этого материала. Чтобы напечатать
-          на бланке, вставьте нужную переменную через «Вставить».
-        </p>
-      </div>
+      {/* Заголовок не нужен: его роль играет вкладка «Мероприятие» над панелью. */}
+      <p className="text-sm text-[var(--text-muted)]">
+        Заполните один раз — подставится во все документы материала.
+      </p>
 
       {FIELDS.map((f) => (
         <div key={f.key}>

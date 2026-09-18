@@ -1,4 +1,3 @@
-import { ShieldCheck } from 'lucide-react';
 import { useRecipients } from '../api/recipients';
 import { Checkbox } from '../ui/Checkbox';
 import type { DocumentDetail } from '../api/types';
@@ -46,11 +45,6 @@ export function VerifySettings({
 
   return (
     <div className="space-y-3">
-      <h3 className="flex items-center gap-2 font-medium">
-        <ShieldCheck size={16} className="text-[var(--text-muted)]" />
-        Проверка по QR
-      </h3>
-
       <Checkbox
         checked={doc.verifyEnabled}
         onChange={(checked) => onSave({ verifyEnabled: checked })}

@@ -17,12 +17,15 @@ export function Tabs<T extends string>({
   value,
   onChange,
   label,
+  stretch = false,
   className = '',
 }: {
   items: TabItem<T>[];
   value: T;
   onChange: (id: T) => void;
   label: string;
+  /** Вкладки делят ширину поровну — для узкой боковой панели. */
+  stretch?: boolean;
   className?: string;
 }) {
   const root = useRef<HTMLDivElement>(null);
@@ -43,7 +46,8 @@ export function Tabs<T extends string>({
       aria-label={label}
       onKeyDown={onKey}
       className={cn(
-        'inline-flex max-w-full gap-0.5 overflow-x-auto rounded-lg bg-[var(--surface-sunken)] p-0.5',
+        stretch ? 'flex w-full' : 'inline-flex max-w-full',
+        'gap-0.5 overflow-x-auto rounded-lg bg-[var(--surface-sunken)] p-0.5',
         className,
       )}
     >
@@ -59,7 +63,8 @@ export function Tabs<T extends string>({
             tabIndex={active ? 0 : -1}
             onClick={() => onChange(tab.id)}
             className={cn(
-              'h-9 shrink-0 rounded-[6px] px-3.5 text-sm font-medium whitespace-nowrap transition-colors',
+              'h-9 rounded-[6px] px-3.5 text-sm font-medium whitespace-nowrap transition-colors',
+              stretch ? 'min-w-0 flex-1' : 'shrink-0',
               active
                 ? 'bg-[var(--surface)] text-[var(--text)] shadow-sm'
                 : 'text-[var(--text-muted)] hover:text-[var(--text)]',

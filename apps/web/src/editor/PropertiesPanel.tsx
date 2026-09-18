@@ -334,7 +334,7 @@ function DocumentSettings({
           value={tab}
           onChange={setPicked}
           label="Настройки материала"
-          className="w-full"
+          stretch
         />
       )}
       {tab === 'event' && <EventFields doc={doc} onSave={onSaveEvent} onDraft={onEventDraft} />}
