@@ -107,7 +107,7 @@ export function TwoFactor() {
               <img
                 src={qr}
                 alt="QR-код для приложения проверки подлинности"
-                className="rounded-lg bg-white p-2"
+                className="rounded-lg bg-[var(--sheet-paper)] p-2"
                 width={220}
                 height={220}
               />

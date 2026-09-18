@@ -299,9 +299,9 @@ function Preview({
 
       {/* Белый фон и тёмный текст независимо от темы кабинета: письмо
           человек откроет в почте, а не здесь. */}
-      <div className="mt-2 rounded-lg bg-white px-4 py-3 text-[15px] leading-relaxed text-[#1a1a1a]">
+      <div className="mt-2 rounded-lg bg-[var(--sheet-paper)] px-4 py-3 text-[15px] leading-relaxed text-[var(--sheet-ink)]">
         {paragraphs.length === 0 ? (
-          <p className="text-sm text-neutral-400">Письмо пустое</p>
+          <p className="text-sm text-[var(--sheet-ink-muted)]">Письмо пустое</p>
         ) : (
           paragraphs.map((runs, i) => (
             <p key={i} className={i > 0 ? 'mt-3' : undefined}>

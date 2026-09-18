@@ -153,7 +153,7 @@ export function ImportDialog({
   const bound = countBound(result.columns);
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-[var(--scrim)] p-4">
       <div className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-2xl bg-[var(--surface)] ring-1 ring-[var(--line)]">
         <header className="flex items-center gap-3 border-b border-[var(--line)] px-5 py-4">
           <h2 className="text-lg font-semibold">Проверьте, что распознано</h2>

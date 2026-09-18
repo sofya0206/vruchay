@@ -46,14 +46,23 @@ export function applyDensity(density: UiDensity): void {
   }
 }
 
-/** Тема из прошлого посещения — до того, как ответит сервер. */
-export function applyStoredTheme(): void {
+/** Тема из прошлого посещения; без хранилища — как в системе. */
+export function readStoredTheme(): UiTheme {
   try {
     const stored: unknown = localStorage.getItem(THEME_KEY);
-    if (isTheme(stored)) applyTheme(stored);
+    return isTheme(stored) ? stored : 'system';
+  } catch {
+    return 'system';
+  }
+}
+
+/** Тема и плотность из прошлого посещения — до того, как ответит сервер. */
+export function applyStoredTheme(): void {
+  applyTheme(readStoredTheme());
+  try {
     if (localStorage.getItem(DENSITY_KEY) === 'compact') applyDensity('compact');
   } catch {
-    // Нет хранилища — остаются системная тема и обычная плотность.
+    // Нет хранилища — остаётся обычная плотность.
   }
 }
 

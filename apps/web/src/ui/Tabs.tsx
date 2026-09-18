@@ -61,7 +61,7 @@ export function Tabs<T extends string>({
             className={cn(
               'h-9 shrink-0 rounded-[6px] px-3.5 text-sm font-medium whitespace-nowrap transition-colors',
               active
-                ? 'bg-[var(--surface)] text-[var(--text)] shadow-[0_1px_2px_rgba(12,43,100,0.08)]'
+                ? 'bg-[var(--surface)] text-[var(--text)] shadow-sm'
                 : 'text-[var(--text-muted)] hover:text-[var(--text)]',
             )}
           >

@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { App } from './App';
 import { hideSplash } from './render/hide-splash';
 import { applyStoredTheme } from './settings/preferences';
+import { ThemeProvider } from './settings/theme';
 import './index.css';
 
 // Тему ставим до первой отрисовки: ответ сервера придёт позже, и кабинет
@@ -20,9 +21,11 @@ const queryClient = new QueryClient({
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
+      <ThemeProvider>
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </ThemeProvider>
     </QueryClientProvider>
   </StrictMode>,
 );
