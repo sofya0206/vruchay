@@ -1780,6 +1780,7 @@ export function EditorPage() {
                     elements={selectedElements}
                     page={pageBox}
                     doc={doc.data}
+                    layout={layout}
                     onSaveEvent={(values) => saveEvent.mutate(values)}
                     onEventDraft={setEventDraft}
                     onResizePage={(size) => setResizeTo(size)}

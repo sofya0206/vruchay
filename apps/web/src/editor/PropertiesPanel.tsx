@@ -28,7 +28,7 @@ import {
   Ungroup,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { describeSize, isSafeHrefTemplate, type SheetElement, type ShapeElement, type TextProps } from '@gramota/shared';
+import { describeSize, extractVariables, isSafeHrefTemplate, type SheetElement, type SheetLayout, type ShapeElement, type TextProps } from '@gramota/shared';
 
 type QrElement = Extract<SheetElement, { type: 'qr' }>;
 type LinkElement = Extract<SheetElement, { type: 'link' }>;
@@ -36,6 +36,8 @@ import type { DocumentDetail } from '../api/types';
 import { PageSizePicker, type PageSizeValue } from '../documents/PageSizePicker';
 import { useTooltip } from '../ui/Tooltip';
 import { EventFields, type EventValues } from './EventFields';
+import { VerifySettings } from './VerifySettings';
+import { Tabs } from '../ui/Tabs';
 import { ColorField } from './ColorField';
 import { FONTS } from './fonts-list';
 import { MIXED, commonTextProps, commonValue, type AlignKind } from './selection';
@@ -67,6 +69,8 @@ interface Props {
   onDelete: () => void;
   /** Материал целиком — для его собственных настроек, когда блок не выбран. */
   doc?: DocumentDetail;
+  /** Макет листа: по нему видно, вставлены ли переменные мероприятия. */
+  layout?: SheetLayout;
   onSaveEvent?: (
     values: Partial<Record<keyof EventValues, string | null>> & { verifyEnabled?: boolean; verifyFields?: string[] },
   ) => void;
@@ -98,14 +102,13 @@ export function PropertiesPanel(props: Props) {
     return (
       <div>
         {doc && onSaveEvent ? (
-          <>
-            {props.onResizePage && (
-              <div className="mb-6">
-                <PageSettings doc={doc} onResize={props.onResizePage} />
-              </div>
-            )}
-            <EventFields doc={doc} onSave={onSaveEvent} onDraft={onEventDraft} />
-          </>
+          <DocumentSettings
+            doc={doc}
+            layout={props.layout ?? []}
+            onSaveEvent={onSaveEvent}
+            onEventDraft={onEventDraft}
+            onResizePage={props.onResizePage}
+          />
         ) : (
           <>
             <MousePointerSquareDashed size={22} className="mb-3 text-[var(--text-muted)]" strokeWidth={1.5} />
@@ -293,6 +296,59 @@ export function PropertiesPanel(props: Props) {
       <Button variant="danger" icon={<Trash2 size={15} />} onClick={props.onDelete} className="w-full">
         {elements.length > 1 ? `Удалить (${elements.length})` : 'Удалить'}
       </Button>
+    </div>
+  );
+}
+
+/** Переменные, которые заполняет раздел «О мероприятии». */
+const EVENT_VARIABLES = new Set(['event', 'event_date', 'event_place', 'hours', 'date', 'date_long', 'year']);
+
+type DocTab = 'sheet' | 'event' | 'verify';
+
+/**
+ * Настройки материала без выбранного блока — вкладками, а не одной
+ * простынёй: лист, мероприятие и проверка по QR — разные заботы.
+ * Вкладка мероприятия появляется, когда на листе есть хоть одна его
+ * переменная: пока их нет, заполнять нечего.
+ */
+function DocumentSettings({
+  doc,
+  layout,
+  onSaveEvent,
+  onEventDraft,
+  onResizePage,
+}: {
+  doc: DocumentDetail;
+  layout: SheetLayout;
+  onSaveEvent: NonNullable<Props['onSaveEvent']>;
+  onEventDraft?: Props['onEventDraft'];
+  onResizePage?: Props['onResizePage'];
+}) {
+  const [picked, setPicked] = useState<DocTab>('sheet');
+  const hasEventVars = extractVariables(layout).some((name) => EVENT_VARIABLES.has(name));
+  const tab: DocTab = picked === 'event' && !hasEventVars ? 'sheet' : picked;
+  const items: Array<{ id: DocTab; label: string }> = [
+    { id: 'sheet', label: 'Лист' },
+    ...(hasEventVars ? [{ id: 'event' as const, label: 'Мероприятие' }] : []),
+    { id: 'verify', label: 'Проверка' },
+  ];
+
+  return (
+    <div className="space-y-5">
+      <Tabs items={items} value={tab} onChange={setPicked} label="Настройки материала" className="w-full" />
+      {tab === 'sheet' && (
+        <>
+          {onResizePage && <PageSettings doc={doc} onResize={onResizePage} />}
+          {!hasEventVars && (
+            <p className="text-sm text-[var(--text-muted)]">
+              Вставьте на лист название, даты или место мероприятия через «Вставить» — здесь появятся их
+              настройки.
+            </p>
+          )}
+        </>
+      )}
+      {tab === 'event' && <EventFields doc={doc} onSave={onSaveEvent} onDraft={onEventDraft} />}
+      {tab === 'verify' && <VerifySettings doc={doc} onSave={onSaveEvent} />}
     </div>
   );
 }
@@ -514,14 +570,18 @@ function TextSection({
             className="w-20"
           />
           <span className="text-sm text-[var(--text-muted)]">мм</span>
-          <div className="min-w-0 flex-1">
-            <ColorField
-              value={(shown(p.borderColor as string | typeof MIXED) as string) ?? '#000000'}
-              onChange={(borderColor) => onChange({ borderColor })}
-              disabled={p.borderWidth === 0}
-              label="Цвет границы"
-            />
-          </div>
+        </div>
+        <div className="mt-2">
+          <Label>Цвет обводки</Label>
+          <ColorField
+            value={(shown(p.borderColor as string | typeof MIXED) as string) ?? '#000000'}
+            onChange={(borderColor) => onChange({ borderColor })}
+            disabled={p.borderWidth === 0}
+            label="Цвет обводки"
+          />
+          {p.borderWidth === 0 && (
+            <p className="mt-1 text-xs text-[var(--text-muted)]">Задайте толщину больше 0, чтобы выбрать цвет.</p>
+          )}
         </div>
         <div className="mt-1.5 flex items-center gap-2">
           <Toggle active={p.background != null && p.background !== MIXED} onClick={() => onChange({ background: p.background ? null : '#ffffff' })}>
