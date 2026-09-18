@@ -568,22 +568,6 @@ function ShapeSection({
 
   return (
     <div className="space-y-4 border-t border-[var(--line)] pt-4">
-      <div>
-        <Label>Фигура</Label>
-        <div className="flex gap-1">
-          {(
-            [
-              ['line', 'Линия'],
-              ['rect', 'Прямоугольник'],
-              ['ellipse', 'Овал'],
-            ] as const
-          ).map(([value, label]) => (
-            <Toggle key={value} active={kind === value} onClick={() => onChange({ kind: value })}>
-              {label}
-            </Toggle>
-          ))}
-        </div>
-      </div>
       <div className="grid grid-cols-2 gap-2">
         <label className="block">
           <Label>Контур, мм</Label>

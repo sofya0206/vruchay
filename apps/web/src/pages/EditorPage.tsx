@@ -42,6 +42,7 @@ import {
 type QrElement = Extract<SheetElement, { type: 'qr' }>;
 type LinkElement = Extract<SheetElement, { type: 'link' }>;
 import { InsertMenu, type InsertKind } from '../editor/InsertMenu';
+import { CanvasMenu } from '../editor/CanvasMenu';
 import { DocumentChrome, ToolButton, ToolDivider } from '../editor/DocumentChrome';
 import { useDocumentFileMenu } from '../editor/DocumentFileMenu';
 import { SheetTabs } from '../editor/SheetTabs';
@@ -241,6 +242,8 @@ export function EditorPage() {
   /** Тащат ли над холстом файл: лист подсвечивается, куда он ляжет. */
   const [fileOver, setFileOver] = useState(false);
   const clipboard = useRef<SheetElement[]>([]);
+  /** Меню по правому клику на пустом месте: где показать и куда вставлять. */
+  const [canvasMenu, setCanvasMenu] = useState<{ x: number; y: number; mm: { x: number; y: number } } | null>(null);
   const liveEditor = useRef<Editor | null>(null);
 
   // Адреса уехавших вкладок: `?view=table` и соседние. Разбираются
@@ -975,7 +978,14 @@ export function EditorPage() {
    * в одном месте, и новый блок гарантированно такой же, каким его увидит
    * печать. Иначе редактор и рендер разошлись бы на первом же новом поле.
    */
-  function addElement(what: InsertKind) {
+  /** Точка листа в мм под указателем — для вставки туда, куда кликнули. */
+  function pointOnSheet(e: { clientX: number; clientY: number }) {
+    const rect = sheetRef.current?.getBoundingClientRect();
+    if (!rect) return null;
+    return { x: (e.clientX - rect.left) / (PX_PER_MM * zoom), y: (e.clientY - rect.top) / (PX_PER_MM * zoom) };
+  }
+
+  function addElement(what: InsertKind, at?: { x: number; y: number } | null) {
     const size =
       what.type === 'text'
         ? { w: 120, h: 20 }
@@ -1005,8 +1015,8 @@ export function EditorPage() {
       {
         id: crypto.randomUUID(),
         type: what.type,
-        x: page.pageWidthMm / 2 - size.w / 2,
-        y: page.pageHeightMm / 2 - size.h / 2,
+        x: at ? clamp(at.x, 0, page.pageWidthMm - size.w) : page.pageWidthMm / 2 - size.w / 2,
+        y: at ? clamp(at.y, 0, page.pageHeightMm - size.h) : page.pageHeightMm / 2 - size.h / 2,
         w: size.w,
         h: size.h,
         rotation: 0,
@@ -1019,6 +1029,7 @@ export function EditorPage() {
     setSelected(new Set([el.id]));
     // Блок, вставленный из панели полей, не уводит из неё к свойствам.
     if (!fieldsOpen) setOtherPanel('props');
+    return el;
   }
 
   /**
@@ -1438,6 +1449,19 @@ export function EditorPage() {
               className={`relative shadow-[var(--shadow-sheet)] ${fileOver ? 'ring-2 ring-[var(--accent)]' : ''}`}
               style={{ width: px(page.pageWidthMm), height: px(page.pageHeightMm) }}
               onPointerDown={startMarquee}
+              // Двойной клик по пустому месту — новый текст прямо там,
+              // как в Miro и Excalidraw. По блокам событие не доходит.
+              onDoubleClick={(e) => {
+                if (dataMode) return;
+                const el = addElement({ type: 'text' }, pointOnSheet(e));
+                if (el?.type === 'text') setEditingId(el.id);
+              }}
+              onContextMenu={(e) => {
+                if (dataMode) return;
+                e.preventDefault();
+                const mm = pointOnSheet(e);
+                if (mm) setCanvasMenu({ x: e.clientX, y: e.clientY, mm });
+              }}
             >
               <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}>
                 <SheetRenderer
@@ -1535,6 +1559,8 @@ export function EditorPage() {
                         }
                       }}
                       onContextMenu={(e) => {
+                        // Меню вставки — только для пустого места листа.
+                        e.stopPropagation();
                         if (el.type !== 'text' || el.locked) return;
                         // Слой жестов лежит поверх текста, поэтому фишку под
                         // указателем ищем по координатам, а не по цели события.
@@ -1831,6 +1857,16 @@ export function EditorPage() {
         />
       )}
 
+      {canvasMenu && (
+        <CanvasMenu
+          at={canvasMenu}
+          canPaste={clipboard.current.length > 0}
+          onInsert={(what) => addElement(what, canvasMenu.mm)}
+          onImage={pickImage}
+          onPaste={() => cloneInto(clipboard.current)}
+          onClose={() => setCanvasMenu(null)}
+        />
+      )}
       {resizeTo && (
         <ResizeDialog
           from={{ widthMm: page.pageWidthMm, heightMm: page.pageHeightMm }}
