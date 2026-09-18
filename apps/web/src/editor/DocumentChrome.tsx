@@ -1,10 +1,9 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCheck, ChevronRight, MoreHorizontal, Variable } from 'lucide-react';
+import { CheckCheck, ChevronRight, MoreHorizontal } from 'lucide-react';
 import { MATERIAL_TABS, materialTabPath, workspacePath, type MaterialTab } from '../mailing/workspace-tabs';
 import { IconButton } from '../ui/IconButton';
 import { Menu, MenuDivider, MenuItem } from '../ui/Menu';
-import { toggleFieldsPanel, useFieldsPanelOpen } from './fields-sidebar-store';
 
 /** Пункт меню «…» либо разделитель между смысловыми группами. */
 export type MenuEntry =
@@ -97,7 +96,6 @@ export function DocumentChrome({
         </nav>
 
         <div className="flex shrink-0 items-center gap-1 pl-2">
-          <FieldsButton />
           {action ?? (
             <Link
               to={workspacePath(documentId)}
@@ -143,33 +141,6 @@ export function DocumentChrome({
         </div>
       )}
     </header>
-  );
-}
-
-/**
- * «Поля» — с подписью, а не одним значком.
- *
- * Кнопка стоит на каждой вкладке и должна читаться с первого взгляда:
- * значок `{x}` без слова опознаёт только тот, кто уже знает, что за ним.
- * Панель одна на весь материал, поэтому и состояние общее — открытая
- * на листе, она остаётся открытой в письме.
- */
-function FieldsButton() {
-  const open = useFieldsPanelOpen();
-  return (
-    <button
-      type="button"
-      aria-pressed={open}
-      onClick={toggleFieldsPanel}
-      className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-medium transition-colors ${
-        open
-          ? 'bg-[var(--accent-soft)] text-[var(--accent)]'
-          : 'text-[var(--text-muted)] hover:bg-[var(--row-hover)] hover:text-[var(--text)]'
-      }`}
-    >
-      <Variable size={16} strokeWidth={1.75} />
-      Поля
-    </button>
   );
 }
 

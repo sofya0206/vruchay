@@ -39,6 +39,7 @@ import { DownloadDialog } from './DownloadDialog';
 import { InviteNudge } from '../referral/InviteNudge';
 import { DocumentChrome, ToolButton, ToolDivider } from '../editor/DocumentChrome';
 import { FieldsSidebar } from '../editor/FieldsSidebar';
+import { FieldsToggle } from '../editor/FieldsToggle';
 import { useFieldsPanelOpen } from '../editor/fields-sidebar-store';
 import { useDocumentFileMenu } from '../editor/DocumentFileMenu';
 import type { MenuEntry } from '../editor/DocumentChrome';
@@ -374,6 +375,7 @@ export function RecipientsTable({
       </ToolButton>
 
       <div className="ml-auto flex items-center gap-2">
+        <FieldsToggle />
         <span className="tabular text-sm text-[var(--text-muted)]">
           отмечено {checkedCount} из {rows.length}
         </span>

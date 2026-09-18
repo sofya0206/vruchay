@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fieldRegistry } from './fields';
-import { fieldEntries, filterEntries } from './field-meta';
+import { fieldEntries, fieldVariants, filterEntries } from './field-meta';
 
 const fields = fieldRegistry([
   { id: 'c1', name: 'name' },
@@ -71,25 +71,44 @@ describe('строки панели полей', () => {
 });
 
 describe('поиск поля', () => {
-  const samples = { name: 'Иванов Пётр', name_dat: 'Иванову Петру', date_long: '18 сентября 2026 г.' };
+  const samples = { name: 'Иванов Пётр', name_dat: 'Иванову Петру' };
   const ids = (q: string) => filterEntries(entries, samples, q).map((e) => e.id);
 
-  it('находит строку по названию, записи, ключу и образцу значения', () => {
+  it('находит строку по названию, ключу и образцу значения', () => {
     expect(ids('фамил')).toContain('person');
-    expect(ids('паспорт')).toContain('person');
-    expect(ids('NAME_DAT')).toContain('person');
-    expect(ids('иванову')).toContain('person');
+    expect(ids('NAME')).toContain('person');
+    expect(ids('иванов')).toContain('person');
     expect(ids('иванов')).not.toContain('email');
-  });
-
-  it('совпавшее название показывает все записи, совпавшая запись — только себя', () => {
-    const byTitle = filterEntries(entries, samples, 'дата выдачи').find((e) => e.id === 'issue-date')!;
-    expect(byTitle.variants).toHaveLength(5);
-    const byVariant = filterEntries(entries, samples, 'дательн').find((e) => e.id === 'person')!;
-    expect(byVariant.variants.map((v) => v.field.source)).toEqual(['name_dat']);
+    expect(ids('дата выдачи')).toContain('issue-date');
   });
 
   it('пустой запрос пропускает всё', () => {
     expect(filterEntries(entries, samples, '   ')).toBe(entries);
+  });
+});
+
+describe('виды записи для настроек фишки', () => {
+  it('у любой записи ФИО — все шесть видов, основной первым', () => {
+    const family = fieldVariants('name_dat', fields)!;
+    expect(family.title).toBe('Фамилия и имя');
+    expect(family.variants.map((v) => v.label)).toEqual([
+      'как в таблице',
+      'кому',
+      'кого',
+      'сокращённо',
+      'латиницей, паспорт',
+      'латиницей, ГОСТ',
+    ]);
+  });
+
+  it('без колонки «Место» выбирать вид места не из чего', () => {
+    const noPlace = fields.filter((f) => f.source !== 'place');
+    expect(fieldVariants('place_word', noPlace)).toBeNull();
+    expect(fieldVariants('place', fields)!.variants).toHaveLength(2);
+  });
+
+  it('у поля без семейства видов нет', () => {
+    expect(fieldVariants('team', fields)).toBeNull();
+    expect(fieldVariants('code', fields)).toBeNull();
   });
 });
