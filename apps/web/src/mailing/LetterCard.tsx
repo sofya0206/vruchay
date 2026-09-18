@@ -11,20 +11,11 @@ import { toHtml, toText, wrapSelection } from '../mail/email-body';
 import { TriplePreview } from './TriplePreview';
 import { useMailingTemplate, useSaveTemplate, useTestSend, type Audience, type LetterKind } from './api';
 import { Checkbox } from '../ui/Checkbox';
+import { DEFAULT_LETTER } from '../mail/letter-defaults';
 
 /** Что уйдёт участнику, если письмо не настраивали. */
 const DEFAULTS: Record<LetterKind, { subject: string; body: string }> = {
-  transactional: {
-    subject: 'Ваш документ, %name',
-    body: [
-      'Здравствуйте, %name!',
-      '',
-      'Поздравляем! Ваш документ во вложении к этому письму.',
-      '',
-      'С уважением,',
-      'оргкомитет',
-    ].join('\n'),
-  },
+  transactional: DEFAULT_LETTER,
   marketing: {
     subject: 'Приглашаем на следующие мероприятия',
     body: [

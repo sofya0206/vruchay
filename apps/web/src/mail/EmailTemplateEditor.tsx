@@ -4,6 +4,7 @@ import { Bold, Check, Italic, Paperclip } from 'lucide-react';
 import { api } from '../api/client';
 import { Button } from '../ui/Button';
 import { Input, Label } from '../ui/Field';
+import { DEFAULT_LETTER } from './letter-defaults';
 import { insertToken, parseBody, toHtml, toText, wrapSelection, type Run } from './email-body';
 import { Checkbox } from '../ui/Checkbox';
 import { useTooltip } from '../ui/Tooltip';
@@ -17,16 +18,6 @@ interface EmailTemplate {
   attachGeneratedFile: boolean;
 }
 
-/** Что придёт участнику, если письмо не настраивали. */
-const DEFAULT_SUBJECT = 'Ваш документ, %name';
-const DEFAULT_BODY = [
-  'Здравствуйте, %name!',
-  '',
-  'Поздравляем! Ваш документ во вложении к этому письму.',
-  '',
-  'С уважением,',
-  'оргкомитет',
-].join('\n');
 
 /**
  * Письмо, которое получит участник вместе с документом.
@@ -90,8 +81,8 @@ export function EmailTemplateEditor({
 
   useEffect(() => {
     if (template.data === undefined) return;
-    setSubject(template.data?.subject ?? DEFAULT_SUBJECT);
-    setBody(template.data ? toText(template.data.bodyHtml) : DEFAULT_BODY);
+    setSubject(template.data?.subject ?? DEFAULT_LETTER.subject);
+    setBody(template.data ? toText(template.data.bodyHtml) : DEFAULT_LETTER.body);
     setAttach(template.data?.attachGeneratedFile ?? true);
   }, [template.data]);
 
@@ -166,7 +157,7 @@ export function EmailTemplateEditor({
             lastField.current = 'subject';
             subjectRef.current = e.currentTarget;
           }}
-          placeholder={DEFAULT_SUBJECT}
+          placeholder={DEFAULT_LETTER.subject}
         />
       </div>
 
