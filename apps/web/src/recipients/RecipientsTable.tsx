@@ -84,6 +84,7 @@ export function RecipientsTable({
    * элемент не меняется, пока захват удерживает событие.
    */
   function startColumnDrag(e: React.PointerEvent, columnId: string) {
+    if (e.button !== 0) return;
     e.preventDefault();
     const handle = e.currentTarget as HTMLElement;
     // Захват держит события на ручке, даже когда палец ушёл с неё;
@@ -728,18 +729,26 @@ export function RecipientsTable({
                     <th
                       key={col.id}
                       data-col={col.id}
-                      className={`group border-r border-b border-[var(--line)] px-3 py-2 text-left text-sm font-medium ${
-                        dragCol && overCol === col.id && overCol !== dragCol ? 'bg-[var(--accent-soft)]' : ''
-                      } ${dragCol === col.id ? 'opacity-50' : ''}`}
+                      // Тянуть можно за весь заголовок, как в Airtable и Notion;
+                      // ручка слева лишь подсказывает, что это возможно.
+                      onPointerDown={(e) => {
+                        if ((e.target as HTMLElement).closest('button')) return;
+                        startColumnDrag(e, col.id);
+                      }}
+                      className={`group relative cursor-grab touch-none border-r border-b border-[var(--line)] px-3 py-2 text-left text-sm font-medium select-none active:cursor-grabbing ${
+                        dragCol === col.id ? 'opacity-40' : ''
+                      }`}
                     >
+                      {/* Линия вставки у левого края целевой колонки. */}
+                      {dragCol && overCol === col.id && overCol !== dragCol && (
+                        <span className="pointer-events-none absolute inset-y-1 -left-px w-0.5 rounded bg-[var(--accent)]" />
+                      )}
                       <span className="inline-flex items-center gap-1.5">
                         {/* Ручка: колонки переставляются перетаскиванием, мышью
                             и пальцем — указательные события работают и там, и там. */}
                         <span
-                          role="button"
-                          aria-label={`Переставить колонку ${columnTitle(col)}`}
-                          onPointerDown={(e) => startColumnDrag(e, col.id)}
-                          className="-ml-1 cursor-grab touch-none text-[var(--text-muted)] opacity-0 group-hover:opacity-100 active:cursor-grabbing"
+                          aria-hidden
+                          className="-ml-1 text-[var(--text-muted)] opacity-0 transition-opacity group-hover:opacity-100"
                         >
                           <GripVertical size={13} />
                         </span>
