@@ -27,11 +27,13 @@ import {
   type HeaderChoice,
   type ParsedSheet,
   type RecipientColumn,
+  type RecipientRow,
   type SendResult,
 } from '../api/recipients';
 import { PreviewDialog } from './PreviewDialog';
 import { Button } from '../ui/Button';
-import { Input, Label, StatusChip } from '../ui/Field';
+import { Field, Input, StatusChip } from '../ui/Field';
+import { cn } from '../ui/cn';
 import { ProgressBar } from '../ui/Progress';
 import { Outcome } from '../ui/Outcome';
 import { ImportDialog } from './ImportDialog';
@@ -134,6 +136,8 @@ export function RecipientsTable({
   const [newColumn, setNewColumn] = useState('');
   /** Открыто ли окно новой колонки: поле переехало из панели в меню «Вставка». */
   const [addingColumn, setAddingColumn] = useState(false);
+  /** Отказ сервера на новую колонку — под полем окна, а не в общей полосе за ним. */
+  const [columnError, setColumnError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState(false);
   const [asking, setAsking] = useState(false);
@@ -240,6 +244,7 @@ export function RecipientsTable({
 
   const { columns, rows, checkedCount } = table.data;
   const allChecked = rows.length > 0 && rows.every((r) => r.checked);
+  const widths = Object.fromEntries(columns.map((col) => [col.name, fitChars(rows, col.name)]));
   // Задание стоит «в очереди», но за ним никто не пришёл: пакет не доехал
   // до очереди, и сам собой он не тронется. Сервис поднимет такое задание
   // сторожем в течение нескольких минут, но человеку у экрана незачем
@@ -317,6 +322,32 @@ export function RecipientsTable({
     } catch (err) {
       setError((err as Error).message);
     }
+  }
+
+  /*
+   * Новая колонка из окна.
+   *
+   * Имя колонки становится переменной %имя, поэтому сервер пускает только
+   * латиницу и объясняет отказ сам. Без onError его ответ пропадал: окно
+   * молча стояло с «Командой» в поле. Набранное не стираем — его правят,
+   * а не набирают заново.
+   */
+  function submitColumn() {
+    const name = newColumn.trim();
+    if (!name || m.addColumn.isPending) return;
+    setColumnError(null);
+    m.addColumn.mutate(name, {
+      onSuccess: () => {
+        setNewColumn('');
+        setAddingColumn(false);
+      },
+      onError: (err) => setColumnError(err.message),
+    });
+  }
+
+  function closeAddColumn() {
+    setAddingColumn(false);
+    setColumnError(null);
   }
 
   /*
@@ -735,7 +766,9 @@ export function RecipientsTable({
                         if ((e.target as HTMLElement).closest('button')) return;
                         startColumnDrag(e, col.id);
                       }}
-                      className={`group relative cursor-grab touch-none border-r border-b border-[var(--line)] px-3 py-2 text-left text-sm font-medium select-none active:cursor-grabbing ${
+                      // В одну строку: в узкой колонке «E-mail» рвался по дефису,
+                      // а «Фамилия, имя, отчество» раздувал шапку на три строки.
+                      className={`group relative cursor-grab touch-none border-r border-b border-[var(--line)] px-3 py-2 text-left text-sm font-medium whitespace-nowrap select-none active:cursor-grabbing ${
                         dragCol === col.id ? 'opacity-40' : ''
                       }`}
                     >
@@ -787,7 +820,18 @@ export function RecipientsTable({
                       <td key={col.id} className="border-r border-b border-[var(--line)] p-0">
                         <input
                           defaultValue={row.data[col.name] ?? ''}
+                          size={widths[col.name]}
+                          // Нижний предел: когда шапки не влезают и таблица уезжает
+                          // вбок, колонка иначе сжималась до ширины заголовка
+                          // и почта превращалась в «a@exam…».
+                          style={{ minWidth: `calc(${Math.min(widths[col.name], 12)}ch + 1.5rem)` }}
+                          // Фамилии и названия организаций проверка орфографии
+                          // подчёркивает сплошь — красное в каждой строке ничего не значит.
+                          spellCheck={false}
                           onBlur={(e) => {
+                            // Иначе ячейка так и остаётся прокрученной к концу
+                            // и показывает «ФУ, г. Екатеринбург» без начала.
+                            e.currentTarget.scrollLeft = 0;
                             const value = e.target.value;
                             if (value !== (row.data[col.name] ?? '')) {
                               trackSave(
@@ -798,7 +842,9 @@ export function RecipientsTable({
                               );
                             }
                           }}
-                          className="w-full bg-transparent px-3 py-1.5 outline-none focus:bg-[var(--surface)] focus:ring-2 focus:ring-[var(--focus)]"
+                          // Рамка внутри ячейки: снаружи она легла бы на линии
+                          // соседних клеток, а верх ушёл бы под прилипшую шапку.
+                          className="w-full truncate bg-transparent px-3 py-1.5 outline-none focus:bg-[var(--surface)] focus:ring-2 focus:ring-[var(--focus)] focus:ring-inset"
                         />
                       </td>
                     ))}
@@ -883,50 +929,44 @@ export function RecipientsTable({
       {addingColumn && (
         <Dialog
           title="Добавить колонку"
-          onClose={() => setAddingColumn(false)}
+          onClose={closeAddColumn}
           footer={
             <>
               <Button
                 variant="primary"
                 disabled={!newColumn.trim() || m.addColumn.isPending}
-                onClick={() =>
-                  m.addColumn.mutate(newColumn.trim(), {
-                    onSuccess: () => {
-                      setNewColumn('');
-                      setAddingColumn(false);
-                    },
-                  })
-                }
+                onClick={submitColumn}
               >
                 {m.addColumn.isPending ? 'Добавляем…' : 'Добавить'}
               </Button>
-              <Button variant="ghost" onClick={() => setAddingColumn(false)}>
+              <Button variant="ghost" onClick={closeAddColumn}>
                 Отмена
               </Button>
             </>
           }
         >
-          <Label>Имя переменной</Label>
-          <Input
-            autoFocus
-            value={newColumn}
-            onChange={(e) => setNewColumn(e.target.value)}
-            placeholder="team"
-            className="font-mono"
-            onKeyDown={(e) => {
-              if (e.key !== 'Enter' || !newColumn.trim()) return;
-              m.addColumn.mutate(newColumn.trim(), {
-                onSuccess: () => {
-                  setNewColumn('');
-                  setAddingColumn(false);
-                },
-              });
-            }}
-          />
-          <p className="mt-2 text-sm text-[var(--text-muted)]">
-            Так колонка будет называться в макете: напишете на листе %{newColumn.trim() || 'team'} —
-            подставится её значение.
-          </p>
+          <Field
+            label="Имя переменной"
+            error={columnError}
+            help={
+              <>
+                Так колонка будет называться в макете: напишете на листе %
+                {newColumn.trim() || 'team'} — подставится её значение.
+              </>
+            }
+          >
+            <Input
+              autoFocus
+              value={newColumn}
+              onChange={(e) => {
+                setNewColumn(e.target.value);
+                setColumnError(null);
+              }}
+              placeholder="team"
+              className={cn('font-mono', columnError && 'ring-[var(--danger)] focus:ring-[var(--danger)]')}
+              onKeyDown={(e) => e.key === 'Enter' && submitColumn()}
+            />
+          </Field>
         </Dialog>
       )}
 
@@ -959,4 +999,18 @@ function columnTitle(column: RecipientColumn): string {
     email: 'Адрес почты',
   };
   return column.title?.trim() || known[column.name] || column.name;
+}
+
+/**
+ * Желаемая ширина колонки в знаках — по самому длинному значению.
+ *
+ * Поле ввода без размера держит одну ширину на всех, около двадцати знаков:
+ * фамилии обрезались на полуслове, а колонки с двузначными номерами стояли
+ * такими же широкими. Размер лишь просит место — если всем не хватает,
+ * таблица делит ширину пропорционально этим просьбам.
+ */
+function fitChars(rows: RecipientRow[], name: string): number {
+  let longest = 0;
+  for (const row of rows) longest = Math.max(longest, (row.data[name] ?? '').length);
+  return Math.min(Math.max(longest + 1, 4), 36);
 }
