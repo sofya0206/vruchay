@@ -1,17 +1,12 @@
-import { useId } from 'react';
-
 /**
- * Знак «Вручай»: печать с галочкой на сине-фиолетовом градиенте.
+ * Знак «Вручай»: буква «В», нарисованная кривыми, на сплошном фоне.
  *
  * Один рисунок на шапку, вход, посадочную и иконку приложения
- * (`public/icon.svg`, заставка в `index.html` — тот же контур). Печать —
- * потому что сервис не рисует грамоты, а удостоверяет: документ выдан,
- * и это можно проверить.
+ * (`public/icon.svg`, заставка в `index.html` — тот же контур). Буква,
+ * а не системный шрифт — иначе на 16 px вкладки браузера контур смазывается
+ * в зависимости от того, чем браузер её отрисовал.
  */
 export function Brand({ size = 44, className = '' }: { size?: number; className?: string }) {
-  const id = useId();
-  const gradient = `brand-${id}`;
-
   return (
     <svg
       width={size}
@@ -21,22 +16,9 @@ export function Brand({ size = 44, className = '' }: { size?: number; className?
       className={className}
       style={{ borderRadius: size * 0.27 }}
     >
-      <defs>
-        <linearGradient id={gradient} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#0f77ff" />
-          <stop offset="1" stopColor="#6d5df6" />
-        </linearGradient>
-      </defs>
-      <rect width="24" height="24" fill={`url(#${gradient})`} />
-      <circle cx="12" cy="12" r="6.6" fill="none" stroke="#ffffff" strokeWidth="1.9" />
-      <path
-        d="M8.7 12.3l2.2 2.2 4.6-4.9"
-        fill="none"
-        stroke="#ffffff"
-        strokeWidth="2.1"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <rect width="24" height="24" fill="#4A3FCE" />
+      <path d="M7.5,6.19 H13.5 A2.77,2.77 0 0 1 13.5,11.72 H7.5 Z" fill="#fff" />
+      <path d="M7.5,11.72 H13.69 A2.95,2.95 0 0 1 13.69,17.63 H7.5 Z" fill="#fff" />
     </svg>
   );
 }

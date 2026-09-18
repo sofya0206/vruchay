@@ -1,4 +1,69 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # Правила работы над проектом
+
+## Архитектура
+
+Монорепозиторий pnpm (`pnpm-workspace.yaml`): `apps/*` + `packages/*`,
+зависимости рабочего пространства внедряются (`injectWorkspacePackages: true`),
+Fastify закреплён одной версией на всё дерево (`pnpm-workspace.yaml` → `overrides`).
+
+- **`packages/shared`** (`@gramota/shared`) — контракт между редактором, превью
+  и серверным рендером: схема макета листа (`src/schema/layout.ts`, версия —
+  `schemaVersion`), правила наград и разрядов (`src/awards/`), склонение ФИО
+  и транслитерация (`petrovich`), измерение текста по метрикам шрифтов
+  (`src/fonts/measure.ts` — то, что второй Chromium-тест в README сверяет
+  с реальным браузером), Zod-схемы валидации. Собирается в CJS и ESM
+  (`tsconfig.cjs.json` / `tsconfig.esm.json`) — `pnpm --filter @gramota/shared build`
+  нужно перед тем, как сервер или веб увидят изменения (в dev `pnpm dev`
+  собирает всё параллельно, но после `git pull`/переключения веток может
+  понадобиться ручная пересборка).
+- **`apps/server`** (`@gramota/server`) — NestJS 11 на Fastify-адаптере
+  (`src/main.ts`), Prisma + PostgreSQL, BullMQ + Redis, Playwright для рендера
+  PDF. Модули в `src/*` по предметной области (`documents`, `recipients`,
+  `awards`, `generation`, `render`, `mailing`, `verify`, `registry`, `tilda`,
+  `payments`, `org`, `team`, …), собраны в `src/app.module.ts`. Генерация PDF —
+  очередь: `generation/generation.processor.ts` (воркер BullMQ) вызывает
+  `generation/pdf-renderer.ts`, который печатает лист в Playwright/Chromium
+  по одноразовому подписанному токену (`render/render-token.ts` →
+  `render/render.controller.ts`, отдельный `RenderModule` — то, что открывает
+  Chromium, а не браузер посетителя). Авторизация — сессии Fastify
+  (`@fastify/secure-session`) плюс guard'ы в `auth/` (`auth.guard.ts` —
+  залогинен, `roles.guard.ts` — роль в организации, `platform-only.guard.ts`,
+  `humans-only.guard.ts`); принадлежность объекта организации проверяется
+  в каждом сервисе по `orgId` из `current-user.decorator.ts`, а не по телу
+  запроса (см. правило BOLA/IDOR выше). Публичные маршруты (Тильда, проверка
+  по QR) — под rate-limit из `common/throttle.guard.ts`.
+- **`apps/web`** (`@gramota/web`) — React 19 + Vite + Tailwind 4. Структура
+  `src/*` зеркалит серверные предметные области (`documents`, `recipients`,
+  `awards`, `verify`, `registry`, `billing`, …) плюс `editor/` (редактор
+  макета листа на контракте из `packages/shared`, `editor/rich` — Tiptap для
+  текстовых полей), `shell/` (каркас кабинета, навигация), `landing/` и
+  `public/` (посадочная и публичные страницы вне кабинета), `render/` —
+  страница, которую по токену печатает серверный Playwright. Сборка —
+  `tsc --noEmit` → `vite build` → `prerender.mjs` (пререндер посадочной для
+  SEO); PWA — `vite-plugin-pwa`.
+- **Инфраструктура для разработки** — `docker-compose.dev.yml`: `postgres`,
+  `redis`, `minio` (S3-совместимое хранилище), `mailpit` (почтовый шлюз для
+  писем). Прод — `docker-compose.prod.yml`, миграции там отдельная разовая
+  служба перед стартом приложения и воркера.
+
+## Основные команды
+
+```bash
+pnpm install                                        # из корня, один раз
+pnpm dev                                             # server:3000 + web:5173 параллельно
+pnpm --filter @gramota/server test                   # тесты одного пакета (vitest run)
+pnpm --filter @gramota/server test <путь-или-имя>     # один файл/тест — обычные флаги vitest
+pnpm --filter @gramota/server exec prisma migrate dev # новая миграция после правки schema.prisma
+pnpm lint && pnpm -r test && pnpm -r build            # перед коммитом (см. ниже — обязательно nest build)
+```
+
+Остальные команды — Chromium-тесты, тесты против настоящей базы, интеграционные
+сценарии, порядок «локально → выкат» — описаны ниже в разделах «Тесты против
+настоящей базы» и «Порядок работы».
 
 ## Безопасность — Secure by Design (обязательно, без исключений)
 
