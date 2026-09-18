@@ -9,8 +9,9 @@ import type { FieldInfo } from './fields';
  * свалка: «Дата выдачи», «Дата выдачи словами», «…цифрами (ISO)»,
  * «…по-английски» — четыре строки про одну и ту же дату. Человек думает
  * «сюда пойдёт дата», а не «сюда пойдёт дата по-английски». Поэтому
- * одно значение — одна строка, а запись (словами, падеж, латиница)
- * выбирается внутри неё, как формат даты в любом табличном редакторе.
+ * в панели одно значение — одна строка, а вид записи (словами, падеж,
+ * латиница) выбирается уже на листе, в настройках самой фишки, — как
+ * формат ячейки в табличном редакторе.
  */
 
 export type FieldGroup = 'recipient' | 'event' | 'document';
@@ -174,13 +175,7 @@ export function fieldEntries(fields: FieldInfo[]): FieldEntry[] {
   return entries;
 }
 
-/**
- * Поиск: «иванов» находит ФИО по образцу, «словами» — дату по записи.
- *
- * Совпало название строки — показываем её целиком. Совпала только
- * запись — только эти записи: на «дат» ФИО не должно раскрываться
- * всеми шестью падежами из-за одного «дательного».
- */
+/** Поиск по названию, ключу и образцу: «иванов» находит ФИО. */
 export function filterEntries(
   entries: FieldEntry[],
   samples: Record<string, string>,
@@ -189,16 +184,26 @@ export function filterEntries(
   const q = query.trim().toLocaleLowerCase('ru-RU');
   if (!q) return entries;
   const has = (s: string) => s.toLocaleLowerCase('ru-RU').includes(q);
-  const result: FieldEntry[] = [];
-  for (const entry of entries) {
-    if (has(entry.title)) {
-      result.push(entry);
-      continue;
-    }
-    const variants = entry.variants.filter(
-      (v) => has(v.label) || has(v.field.title) || has(v.field.source) || has(samples[v.field.source] ?? ''),
-    );
-    if (variants.length) result.push({ ...entry, variants });
-  }
-  return result;
+  return entries.filter((entry) => {
+    const main = entry.variants[0].field;
+    return has(entry.title) || has(main.title) || has(main.source) || has(samples[main.source] ?? '');
+  });
+}
+
+/**
+ * Виды записи поля — для настроек фишки на листе.
+ *
+ * Только те, что есть в документе: без колонки «Место» нечего писать
+ * словом. Одна запись — выбирать не из чего, и секции «Вид» не будет.
+ */
+export function fieldVariants(source: string, fields: FieldInfo[]): { title: string; variants: FieldVariant[] } | null {
+  const family = FAMILIES.find((f) => f.members.some(([key]) => key === source));
+  if (!family) return null;
+  const byKey = new Map(fields.map((f) => [f.source, f]));
+  const variants = family.members
+    .filter(([key]) => byKey.has(key))
+    .map(([key, label]) => ({ field: byKey.get(key)!, label }));
+  if (variants.length < 2) return null;
+  const main = byKey.get(family.members[0][0]);
+  return { title: main && main.kind === 'column' ? main.title : family.title, variants };
 }

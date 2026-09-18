@@ -104,9 +104,9 @@ export function DocumentWorkspacePage() {
             </div>
           )}
         </div>
-        {fieldsOpen && (
-          <FieldsSidebar documentId={id} target={tab === 'mail' ? (fieldTarget ?? undefined) : undefined} />
-        )}
+        {/* Поля вставляют в письмо; на правилах, проверке и подлинности
+            вставлять некуда — там и кнопки нет. */}
+        {fieldsOpen && tab === 'mail' && <FieldsSidebar documentId={id} target={fieldTarget ?? undefined} />}
       </div>
 
       {fileMenu.dialogs}

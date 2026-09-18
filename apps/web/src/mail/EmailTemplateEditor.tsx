@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bold, Check, Italic, Paperclip, Variable } from 'lucide-react';
+import { Bold, Check, Italic, Paperclip } from 'lucide-react';
 import { api } from '../api/client';
 import { Button } from '../ui/Button';
 import { Input, Label } from '../ui/Field';
@@ -8,7 +8,7 @@ import { insertToken, parseBody, toHtml, toText, wrapSelection, type Run } from 
 import { Checkbox } from '../ui/Checkbox';
 import { useTooltip } from '../ui/Tooltip';
 import type { FieldTarget } from '../editor/FieldsSidebar';
-import { setFieldsPanelOpen } from '../editor/fields-sidebar-store';
+import { FieldsToggle } from '../editor/FieldsToggle';
 
 interface EmailTemplate {
   id: string;
@@ -186,14 +186,7 @@ export function EmailTemplateEditor({
           </FormatButton>
           {/* Поля — общей панелью справа, как на листе: вставка идёт
               туда, где стоял курсор, в тему или в текст. */}
-          <button
-            type="button"
-            onClick={() => setFieldsPanelOpen(true)}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-sm text-[var(--text-muted)] ring-1 ring-[var(--line)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
-          >
-            <Variable size={15} strokeWidth={1.75} />
-            Поле
-          </button>
+          <FieldsToggle />
           <span className="ml-2 text-xs text-[var(--text-muted)]">
             Пустая строка — новый абзац. Адрес сайта сам станет ссылкой.
           </span>

@@ -58,6 +58,7 @@ import { SheetRenderer } from '../render/SheetRenderer';
 import { PropertiesPanel } from '../editor/PropertiesPanel';
 import { LayersPanel } from '../editor/LayersPanel';
 import { FIELD_DRAG_TYPE, FieldsList } from '../editor/FieldsList';
+import { FieldsToggle } from '../editor/FieldsToggle';
 import { setFieldsPanelOpen, useFieldsPanelOpen } from '../editor/fields-sidebar-store';
 import { InlineTextEditor } from '../editor/rich/InlineTextEditor';
 import { useLayoutHistory } from '../editor/useLayoutHistory';
@@ -158,6 +159,8 @@ export function EditorPage() {
   const navigate = useNavigate();
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
   const [editingId, setEditingId] = useState<string | null>(null);
+  /** Настройки какого поля открыть при входе в правку — по правой кнопке. */
+  const [openField, setOpenField] = useState<number | null>(null);
   const [zoom, setZoom] = useState(1);
   const [saved, setSaved] = useState<'saved' | 'saving' | 'dirty' | 'error'>('saved');
   const [viewMode, setViewMode] = useState<'placeholders' | 'data'>('placeholders');
@@ -964,7 +967,9 @@ export function EditorPage() {
       next = selected.has(el.id) ? selected : expandToGroups(layout, [el.id]);
     }
     setSelected(next);
-    if (el.locked) return;
+    // Правая кнопка только выделяет: перетаскивают левой, а правой
+    // открывают настройки поля (onContextMenu на слое жестов).
+    if (el.locked || e.button !== 0) return;
     const boxes: Record<string, Box> = {};
     for (const item of layout) {
       if (next.has(item.id) && !item.locked) boxes[item.id] = { x: item.x, y: item.y, w: item.w, h: item.h };
@@ -1143,43 +1148,7 @@ export function EditorPage() {
       />
 
       <div className="ml-auto flex items-center gap-2">
-        {/* Два взгляда на лист: заготовка с фишками полей и настоящая строка
-            таблицы. Второй — чтобы увидеть, как ляжет длинная фамилия, не
-            выпуская ничего. */}
-        <div className="flex items-center gap-1 rounded-lg p-0.5 ring-1 ring-[var(--line)]">
-          <Segment active={!dataMode} onClick={() => setViewMode('placeholders')}>
-            Заготовка
-          </Segment>
-          <Segment
-            active={dataMode}
-            onClick={() => setViewMode('data')}
-            disabled={rowCount === 0}
-            title={rowCount === 0 ? 'Список пока пустой' : undefined}
-          >
-            Данные строки
-          </Segment>
-          {dataMode && rowCount > 0 && (
-            <span className="tabular flex items-center gap-0.5 pl-1 text-sm text-[var(--text-muted)]">
-              <button
-                type="button"
-                aria-label="Предыдущая строка"
-                onClick={() => setRowIndex((i) => Math.max(0, i - 1))}
-                className="rounded p-0.5 hover:bg-[var(--surface-sunken)]"
-              >
-                <ChevronLeft size={14} />
-              </button>
-              {safeRow + 1} / {rowCount}
-              <button
-                type="button"
-                aria-label="Следующая строка"
-                onClick={() => setRowIndex((i) => Math.min(rowCount - 1, i + 1))}
-                className="rounded p-0.5 hover:bg-[var(--surface-sunken)]"
-              >
-                <ChevronRight size={14} />
-              </button>
-            </span>
-          )}
-        </div>
+        <FieldsToggle />
 
         <StatusChip
           tone={
@@ -1346,7 +1315,9 @@ export function EditorPage() {
                         liveEditor.current = editor;
                       }}
                       onChange={(richDoc) => setDoc(element.id, richDoc, false)}
+                      openField={openField}
                       onDone={(richDoc) => {
+                        setOpenField(null);
                         liveEditor.current = null;
                         setDoc(element.id, richDoc, true);
                         setEditingId(null);
@@ -1407,7 +1378,26 @@ export function EditorPage() {
                       onPointerDown={(e) => startMove(e, el)}
                       onDoubleClick={(e) => {
                         e.stopPropagation();
-                        if (el.type === 'text' && !el.locked) setEditingId(el.id);
+                        if (el.type === 'text' && !el.locked) {
+                          setOpenField(null);
+                          setEditingId(el.id);
+                        }
+                      }}
+                      onContextMenu={(e) => {
+                        if (el.type !== 'text' || el.locked) return;
+                        // Слой жестов лежит поверх текста, поэтому фишку под
+                        // указателем ищем по координатам, а не по цели события.
+                        const chips = Array.from(
+                          document.querySelectorAll(`[data-element-id="${CSS.escape(el.id)}"] [data-field]`),
+                        );
+                        const hit = document
+                          .elementsFromPoint(e.clientX, e.clientY)
+                          .find((node) => chips.includes(node));
+                        if (!hit) return;
+                        e.preventDefault();
+                        setSelected(new Set([el.id]));
+                        setOpenField(chips.indexOf(hit));
+                        setEditingId(el.id);
                       }}
                       onDragOver={(e) => {
                         if (el.type === 'text' && e.dataTransfer.types.includes(FIELD_DRAG_TYPE)) e.preventDefault();
@@ -1542,6 +1532,15 @@ export function EditorPage() {
             </div>
             {panel === 'fields' ? (
               <FieldsList
+                header={
+                  <SheetView
+                    dataMode={dataMode}
+                    onMode={(mode) => setViewMode(mode)}
+                    row={safeRow}
+                    rowCount={rowCount}
+                    onRow={setRowIndex}
+                  />
+                }
                 fields={fields}
                 samples={previewData}
                 action={{ label: 'Вставить', run: insertField }}
@@ -1739,38 +1738,72 @@ function Ruler({ axis, lengthMm, zoom }: { axis: 'x' | 'y'; lengthMm: number; zo
   );
 }
 
-function Segment({
-  active,
-  onClick,
-  disabled,
-  title,
-  children,
+/**
+ * Что показывать на листе — в шапке панели полей.
+ *
+ * Раньше это был переключатель «Заготовка / Данные строки» на панели
+ * инструментов, рядом с отдельной кнопкой «Поля»: две кнопки про одни
+ * и те же поля. Слово «заготовка» не объясняло, что на листе окажутся
+ * названия полей, — теперь так и написано.
+ */
+function SheetView({
+  dataMode,
+  onMode,
+  row,
+  rowCount,
+  onRow,
 }: {
-  active: boolean;
-  onClick: () => void;
-  disabled?: boolean;
-  title?: string;
-  children: React.ReactNode;
+  dataMode: boolean;
+  onMode: (mode: 'placeholders' | 'data') => void;
+  row: number;
+  rowCount: number;
+  onRow: (row: number) => void;
 }) {
-  /*
-   * Подсказка снаружи кнопки, а не на ней: она объясняет, почему вкладка
-   * недоступна, а выключенная кнопка событий указателя не получает —
-   * на ней самой объяснение не показалось бы никогда.
-   */
+  const option = (active: boolean) =>
+    `h-7 rounded-md px-2 text-[13px] transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+      active
+        ? 'bg-[var(--surface)] font-medium text-[var(--text)] shadow-[var(--shadow-sm,0_1px_2px_rgba(12,43,100,0.12))]'
+        : 'text-[var(--text-muted)] hover:text-[var(--text)]'
+    }`;
   return (
-    <Tooltip label={title}>
-      <button
-        type="button"
-        onClick={onClick}
-        disabled={disabled}
-        aria-pressed={active}
-        className={`rounded-md px-2.5 py-1 text-sm transition-colors disabled:opacity-50 ${
-          active ? 'bg-[var(--accent-soft)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text)]'
-        }`}
-      >
-        {children}
-      </button>
-    </Tooltip>
+    <div className="shrink-0 border-b border-[var(--line)] px-3 pb-3 pt-2.5">
+      <p className="mb-1.5 text-xs font-medium text-[var(--text-muted)]">На листе показывать</p>
+      <div role="radiogroup" aria-label="На листе показывать" className="grid grid-cols-2 gap-0.5 rounded-lg bg-[var(--surface-sunken)] p-0.5">
+        <button type="button" role="radio" aria-checked={!dataMode} onClick={() => onMode('placeholders')} className={option(!dataMode)}>
+          Названия полей
+        </button>
+        <Tooltip label={rowCount === 0 ? 'Список получателей пока пустой' : undefined}>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={dataMode}
+            disabled={rowCount === 0}
+            onClick={() => onMode('data')}
+            className={`w-full ${option(dataMode)}`}
+          >
+            Данные из таблицы
+          </button>
+        </Tooltip>
+      </div>
+      {dataMode && rowCount > 0 && (
+        <div className="mt-2 flex items-center justify-between">
+          <IconButton size="sm" label="Предыдущая строка" disabled={row === 0} onClick={() => onRow(Math.max(0, row - 1))}>
+            <ChevronLeft size={16} />
+          </IconButton>
+          <span className="tabular text-[13px] text-[var(--text-muted)]">
+            Строка {row + 1} из {rowCount}
+          </span>
+          <IconButton
+            size="sm"
+            label="Следующая строка"
+            disabled={row >= rowCount - 1}
+            onClick={() => onRow(Math.min(rowCount - 1, row + 1))}
+          >
+            <ChevronRight size={16} />
+          </IconButton>
+        </div>
+      )}
+    </div>
   );
 }
 
