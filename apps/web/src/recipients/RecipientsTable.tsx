@@ -31,7 +31,8 @@ import {
 } from '../api/recipients';
 import { PreviewDialog } from './PreviewDialog';
 import { Button } from '../ui/Button';
-import { Input, Label, StatusChip } from '../ui/Field';
+import { Field, Input, StatusChip } from '../ui/Field';
+import { cn } from '../ui/cn';
 import { ProgressBar } from '../ui/Progress';
 import { Outcome } from '../ui/Outcome';
 import { ImportDialog } from './ImportDialog';
@@ -92,6 +93,8 @@ export function RecipientsTable({
   const [newColumn, setNewColumn] = useState('');
   /** Открыто ли окно новой колонки: поле переехало из панели в меню «Вставка». */
   const [addingColumn, setAddingColumn] = useState(false);
+  /** Отказ сервера на новую колонку — под полем окна, а не в общей полосе за ним. */
+  const [columnError, setColumnError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState(false);
   const [asking, setAsking] = useState(false);
@@ -275,6 +278,32 @@ export function RecipientsTable({
     } catch (err) {
       setError((err as Error).message);
     }
+  }
+
+  /*
+   * Новая колонка из окна.
+   *
+   * Имя колонки становится переменной %имя, поэтому сервер пускает только
+   * латиницу и объясняет отказ сам. Без onError его ответ пропадал: окно
+   * молча стояло с «Командой» в поле. Набранное не стираем — его правят,
+   * а не набирают заново.
+   */
+  function submitColumn() {
+    const name = newColumn.trim();
+    if (!name || m.addColumn.isPending) return;
+    setColumnError(null);
+    m.addColumn.mutate(name, {
+      onSuccess: () => {
+        setNewColumn('');
+        setAddingColumn(false);
+      },
+      onError: (err) => setColumnError(err.message),
+    });
+  }
+
+  function closeAddColumn() {
+    setAddingColumn(false);
+    setColumnError(null);
   }
 
   /*
@@ -820,50 +849,44 @@ export function RecipientsTable({
       {addingColumn && (
         <Dialog
           title="Добавить колонку"
-          onClose={() => setAddingColumn(false)}
+          onClose={closeAddColumn}
           footer={
             <>
               <Button
                 variant="primary"
                 disabled={!newColumn.trim() || m.addColumn.isPending}
-                onClick={() =>
-                  m.addColumn.mutate(newColumn.trim(), {
-                    onSuccess: () => {
-                      setNewColumn('');
-                      setAddingColumn(false);
-                    },
-                  })
-                }
+                onClick={submitColumn}
               >
                 {m.addColumn.isPending ? 'Добавляем…' : 'Добавить'}
               </Button>
-              <Button variant="ghost" onClick={() => setAddingColumn(false)}>
+              <Button variant="ghost" onClick={closeAddColumn}>
                 Отмена
               </Button>
             </>
           }
         >
-          <Label>Имя переменной</Label>
-          <Input
-            autoFocus
-            value={newColumn}
-            onChange={(e) => setNewColumn(e.target.value)}
-            placeholder="team"
-            className="font-mono"
-            onKeyDown={(e) => {
-              if (e.key !== 'Enter' || !newColumn.trim()) return;
-              m.addColumn.mutate(newColumn.trim(), {
-                onSuccess: () => {
-                  setNewColumn('');
-                  setAddingColumn(false);
-                },
-              });
-            }}
-          />
-          <p className="mt-2 text-sm text-[var(--text-muted)]">
-            Так колонка будет называться в макете: напишете на листе %{newColumn.trim() || 'team'} —
-            подставится её значение.
-          </p>
+          <Field
+            label="Имя переменной"
+            error={columnError}
+            help={
+              <>
+                Так колонка будет называться в макете: напишете на листе %
+                {newColumn.trim() || 'team'} — подставится её значение.
+              </>
+            }
+          >
+            <Input
+              autoFocus
+              value={newColumn}
+              onChange={(e) => {
+                setNewColumn(e.target.value);
+                setColumnError(null);
+              }}
+              placeholder="team"
+              className={cn('font-mono', columnError && 'ring-[var(--danger)] focus:ring-[var(--danger)]')}
+              onKeyDown={(e) => e.key === 'Enter' && submitColumn()}
+            />
+          </Field>
         </Dialog>
       )}
 
