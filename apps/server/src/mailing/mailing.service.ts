@@ -278,7 +278,7 @@ export class MailingService {
     // вложения и оставить его гадать, потеряется ли оно и у участника.
     const missingFile = template.attachGeneratedFile && !fileId;
     const notice = missingFile
-      ? '<p style="font-size:13px;color:#8a5a00;background:#fff6e5;border-radius:8px;' +
+      ? '<p style="font-size:13px;color:#091135;background:#fdf1df;border-radius:8px;' +
         'padding:10px 12px;margin:0 0 16px">' +
         'Проверочное письмо: документ по первой строке ещё не выпущен, поэтому вложения ' +
         'в этом письме нет. Участнику письмо уйдёт с документом.' +

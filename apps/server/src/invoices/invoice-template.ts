@@ -50,21 +50,23 @@ export function renderInvoiceHtml(data: InvoiceData, seller: SellerRequisites): 
 <html lang="ru"><head><meta charset="utf-8">
 <style>
   @page { size: A4; }
-  body { font: 11pt/1.45 "PT Sans", "Helvetica Neue", Arial, sans-serif; color: #16211c; }
+  /* Цвета — из UI-кита кабинета числами. Фона у страницы нет: счёт
+     печатают, а линии таблиц тёмные, чтобы не пропали на ч/б принтере. */
+  body { font: 11pt/1.45 "PT Sans", "Helvetica Neue", Arial, sans-serif; color: #091135; }
   h1 { font-size: 17pt; margin: 0 0 4mm; }
   table { width: 100%; border-collapse: collapse; }
-  .bank td { border: 1px solid #16211c; padding: 2mm 3mm; vertical-align: top; font-size: 10pt; }
-  .bank .label { color: #5f6b64; font-size: 8.5pt; display: block; }
-  .items th, .items td { border: 1px solid #16211c; padding: 2mm 3mm; font-size: 10pt; }
-  .items th { background: #f2f1ec; font-weight: 600; text-align: left; }
+  .bank td { border: 1px solid #091135; padding: 2mm 3mm; vertical-align: top; font-size: 10pt; }
+  .bank .label { color: #36394a; font-size: 8.5pt; display: block; }
+  .items th, .items td { border: 1px solid #091135; padding: 2mm 3mm; font-size: 10pt; }
+  .items th { background: #f5f3ff; font-weight: 600; text-align: left; }
   .num { text-align: right; white-space: nowrap; }
   .total { margin-top: 4mm; text-align: right; font-size: 11pt; }
   .total strong { font-size: 13pt; }
   .words { margin-top: 3mm; }
-  .purpose { margin-top: 6mm; border: 1px solid #16211c; padding: 3mm; background: #f7f6f2; font-size: 10pt; }
+  .purpose { margin-top: 6mm; border: 1px solid #127ee3; padding: 3mm; background: #eaf3fe; font-size: 10pt; }
   .sign { margin-top: 14mm; }
-  .sign-line { display: inline-block; width: 60mm; border-bottom: 1px solid #16211c; }
-  .muted { color: #5f6b64; }
+  .sign-line { display: inline-block; width: 60mm; border-bottom: 1px solid #091135; }
+  .muted { color: #36394a; }
 </style></head>
 <body>
 

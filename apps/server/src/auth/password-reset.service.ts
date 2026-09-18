@@ -8,7 +8,7 @@ import { MailService } from '../mail/mail.service';
 import { InjectRedis } from '../common/redis.module';
 import { hashPassword, validatePasswordStrength } from './password';
 import { maskEmail } from '../common/redact';
-import { escapeHtml } from '../mail/mail-template';
+import { escapeHtml, mailButton } from '../mail/mail-template';
 import type { SessionUser } from './auth.service';
 
 /**
@@ -82,15 +82,11 @@ export class PasswordResetService {
       'Вручай — восстановление пароля',
       `<p style="font-size:15px">Здравствуйте!</p>
        <p>Вы запросили новый пароль для входа в «Вручай». Нажмите кнопку и придумайте новый:</p>
-       <p style="margin:24px 0">
-         <a href="${escapeHtml(link)}"
-            style="background:#1F5D3F;color:#fff;padding:12px 24px;border-radius:8px;
-                   text-decoration:none;font-size:15px">Придумать новый пароль</a>
-       </p>
-       <p style="font-size:13px;color:#5f6b64">Ссылка действует один час и сработает один раз.
+       ${mailButton(link, 'Придумать новый пароль')}
+       <p style="font-size:13px;color:#36394a">Ссылка действует один час и сработает один раз.
        Если кнопка не работает, откройте адрес вручную:<br>
        <span style="word-break:break-all">${escapeHtml(link)}</span></p>
-       <p style="font-size:13px;color:#5f6b64">Если вы не просили новый пароль, просто удалите
+       <p style="font-size:13px;color:#36394a">Если вы не просили новый пароль, просто удалите
        это письмо — старый продолжит работать, и в вашу учётную запись никто не войдёт.</p>`,
     );
 

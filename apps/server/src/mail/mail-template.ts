@@ -22,6 +22,23 @@ export function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (ch) => HTML_ESCAPES[ch]);
 }
 
+/**
+ * Кнопка-ссылка в служебном письме.
+ *
+ * Цвета — из UI-кита кабинета (apps/web/src/index.css), числами: почтовые
+ * программы не читают ни внешних стилей, ни переменных. Высота 48px набрана
+ * отступами и высотой строки, а не min-height, которую почта теряет:
+ * письма открывают с телефона, и в кнопку надо попасть пальцем.
+ */
+export function mailButton(href: string, label: string): string {
+  return (
+    '<p style="margin:24px 0">' +
+    `<a href="${escapeHtml(href)}" style="display:inline-block;padding:14px 24px;` +
+    'font-size:16px;line-height:20px;font-weight:500;color:#ffffff;background:#127ee3;' +
+    `border-radius:8px;text-decoration:none">${escapeHtml(label)}</a></p>`
+  );
+}
+
 /** Подстановка переменных в HTML: значения экранируются, шаблон — нет. */
 export function renderHtmlTemplate(template: string, data: Record<string, string>): string {
   const escaped = Object.fromEntries(
