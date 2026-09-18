@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ChevronDown,
   ChevronUp,
@@ -37,6 +37,7 @@ export function LayersPanel({
   onChange: (next: SheetLayout) => void;
 }) {
   const [dragging, setDragging] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
   const layers = layersTopDown(layout);
 
@@ -82,17 +83,34 @@ export function LayersPanel({
               setOver(null);
             }}
             onClick={(e) => onSelect(el.id, e.shiftKey || e.metaKey || e.ctrlKey)}
-            className={`group flex items-center gap-1.5 rounded-lg px-1.5 py-1 text-sm ${
+            onDoubleClick={() => setRenaming(el.id)}
+            className={`group relative flex items-center gap-1.5 rounded-lg px-1.5 py-1 text-sm ${
               active ? 'bg-[var(--accent-soft)]' : 'hover:bg-[var(--surface-sunken)]'
-            } ${over === el.id && dragging !== el.id ? 'ring-1 ring-[var(--accent)]' : ''} ${
-              el.hidden ? 'opacity-50' : ''
-            }`}
+            } ${dragging === el.id ? 'opacity-40' : el.hidden ? 'opacity-50' : ''}`}
           >
+            {/* Линия вставки над строкой — как в Figma: видно, куда ляжет слой. */}
+            {over === el.id && dragging !== el.id && (
+              <span className="pointer-events-none absolute inset-x-1 -top-0.5 h-0.5 rounded bg-[var(--accent)]" />
+            )}
             <GripVertical size={14} className="shrink-0 cursor-grab text-[var(--text-muted)]" />
             <span className="shrink-0 text-[var(--text-muted)]">{icon(el)}</span>
-            <LayerName name={title(el)} />
-            <span className="flex shrink-0 items-center gap-0.5 opacity-60 group-hover:opacity-100">
+            {renaming === el.id ? (
+              <RenameField
+                value={el.name ?? ''}
+                placeholder={title(el)}
+                onDone={(name) => {
+                  setRenaming(null);
+                  if ((name || null) !== (el.name ?? null)) patch(el.id, { name: name || null });
+                }}
+              />
+            ) : (
+              <LayerName name={title(el)} />
+            )}
+            {/* Стрелки — только при наведении; замок и глаз остаются видны,
+                пока включены: так сразу видно, что заперто и что скрыто. */}
+            <span className="flex shrink-0 items-center gap-0.5">
               <Small
+                hover
                 title="Переместить вперёд"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -102,6 +120,7 @@ export function LayersPanel({
                 <ChevronUp size={13} />
               </Small>
               <Small
+                hover
                 title="Переместить назад"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -111,7 +130,7 @@ export function LayersPanel({
                 <ChevronDown size={13} />
               </Small>
               <Small
-                title={el.locked ? 'Разблокировать' : 'Заблокировать'}
+                title={el.locked ? 'Заперт — не двигается и не растягивается. Нажмите, чтобы отпереть' : 'Не заперт. Нажмите, чтобы запереть'}
                 pressed={el.locked}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -121,7 +140,7 @@ export function LayersPanel({
                 {el.locked ? <Lock size={13} /> : <LockOpen size={13} />}
               </Small>
               <Small
-                title={el.hidden ? 'Показать' : 'Скрыть'}
+                title={el.hidden ? 'Скрыт. Нажмите, чтобы показать' : 'Виден. Нажмите, чтобы скрыть'}
                 pressed={el.hidden}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -158,18 +177,57 @@ function LayerName({ name }: { name: string }) {
   );
 }
 
+/** Имя слоя правится на месте, по двойному клику — как в Figma. */
+function RenameField({
+  value,
+  placeholder,
+  onDone,
+}: {
+  value: string;
+  placeholder: string;
+  onDone: (name: string) => void;
+}) {
+  const [draft, setDraft] = useState(value);
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => input.current?.select(), []);
+
+  return (
+    <input
+      ref={input}
+      autoFocus
+      value={draft}
+      placeholder={placeholder}
+      maxLength={100}
+      aria-label="Имя слоя"
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => onDone(draft.trim())}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') onDone(draft.trim());
+        if (e.key === 'Escape') onDone(value);
+        e.stopPropagation();
+      }}
+      onClick={(e) => e.stopPropagation()}
+      className="min-w-0 flex-1 rounded bg-[var(--surface)] px-1.5 py-0.5 text-sm ring-1 ring-[var(--focus)] outline-none"
+    />
+  );
+}
+
 function Small({
   title,
   pressed,
+  hover,
   onClick,
   children,
 }: {
   title: string;
   pressed?: boolean;
+  /** Показывать только при наведении на строку (и с клавиатуры). */
+  hover?: boolean;
   onClick: (e: React.MouseEvent) => void;
   children: React.ReactNode;
 }) {
   const { triggerProps, tooltip } = useTooltip(title);
+  const quiet = hover || !pressed;
 
   return (
     <button
@@ -178,9 +236,9 @@ function Small({
       aria-label={title}
       aria-pressed={pressed}
       onClick={onClick}
-      className={`grid h-6 w-6 place-items-center rounded ${
+      className={`grid h-6 w-6 place-items-center rounded transition-opacity ${
         pressed ? 'text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text)]'
-      }`}
+      } ${quiet ? 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100' : ''}`}
     >
       {children}
       {tooltip}

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import {
+import { GripVertical,
   Ban,
   CheckCheck,
   CheckCircle2,
@@ -76,6 +76,48 @@ export function RecipientsTable({
   const fieldsOpen = useFieldsPanelOpen();
   const table = useRecipients(documentId);
   const m = useRecipientMutations(documentId);
+  const [dragCol, setDragCol] = useState<string | null>(null);
+  const [overCol, setOverCol] = useState<string | null>(null);
+
+  /**
+   * Перетаскивание колонки за ручку в шапке. Указательные события
+   * вместо HTML5 drag-and-drop: тот не работает с пальца и на тачпаде
+   * ведёт себя как попало. Цель ищем по координатам — под пальцем
+   * элемент не меняется, пока захват удерживает событие.
+   */
+  function startColumnDrag(e: React.PointerEvent, columnId: string) {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const handle = e.currentTarget as HTMLElement;
+    // Захват держит события на ручке, даже когда палец ушёл с неё;
+    // без активного указателя (автотест) браузер бросает исключение.
+    try {
+      handle.setPointerCapture(e.pointerId);
+    } catch {
+      /* без захвата события всё равно всплывают до ручки */
+    }
+    setDragCol(columnId);
+    let target: string | null = null;
+    const onMove = (ev: PointerEvent) => {
+      const th = document.elementFromPoint(ev.clientX, ev.clientY)?.closest<HTMLElement>('th[data-col]');
+      target = th?.dataset.col ?? null;
+      setOverCol(target);
+    };
+    const onUp = () => {
+      handle.removeEventListener('pointermove', onMove);
+      handle.removeEventListener('pointerup', onUp);
+      handle.removeEventListener('pointercancel', onUp);
+      setDragCol(null);
+      setOverCol(null);
+      if (!target || target === columnId) return;
+      const order = columns.map((c) => c.id).filter((id) => id !== columnId);
+      order.splice(order.indexOf(target), 0, columnId);
+      m.reorderColumns.mutate(order);
+    };
+    handle.addEventListener('pointermove', onMove);
+    handle.addEventListener('pointerup', onUp);
+    handle.addEventListener('pointercancel', onUp);
+  }
   const [jobId, setJobId] = useState<string | null>(null);
   const { job, start, cancel, resume } = useGeneration(documentId, jobId);
   const send = useSend(documentId);
@@ -717,11 +759,32 @@ export function RecipientsTable({
                   {columns.map((col) => (
                     <th
                       key={col.id}
+                      data-col={col.id}
+                      // Тянуть можно за весь заголовок, как в Airtable и Notion;
+                      // ручка слева лишь подсказывает, что это возможно.
+                      onPointerDown={(e) => {
+                        if ((e.target as HTMLElement).closest('button')) return;
+                        startColumnDrag(e, col.id);
+                      }}
                       // В одну строку: в узкой колонке «E-mail» рвался по дефису,
                       // а «Фамилия, имя, отчество» раздувал шапку на три строки.
-                      className="group border-r border-b border-[var(--line)] px-3 py-2 text-left text-sm font-medium whitespace-nowrap"
+                      className={`group relative cursor-grab touch-none border-r border-b border-[var(--line)] px-3 py-2 text-left text-sm font-medium whitespace-nowrap select-none active:cursor-grabbing ${
+                        dragCol === col.id ? 'opacity-40' : ''
+                      }`}
                     >
+                      {/* Линия вставки у левого края целевой колонки. */}
+                      {dragCol && overCol === col.id && overCol !== dragCol && (
+                        <span className="pointer-events-none absolute inset-y-1 -left-px w-0.5 rounded bg-[var(--accent)]" />
+                      )}
                       <span className="inline-flex items-center gap-1.5">
+                        {/* Ручка: колонки переставляются перетаскиванием, мышью
+                            и пальцем — указательные события работают и там, и там. */}
+                        <span
+                          aria-hidden
+                          className="-ml-1 text-[var(--text-muted)] opacity-0 transition-opacity group-hover:opacity-100"
+                        >
+                          <GripVertical size={13} />
+                        </span>
                         {columnTitle(col)}
                         <IconButton
                           size="sm"

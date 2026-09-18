@@ -64,6 +64,32 @@ export class RecipientsService {
     }
   }
 
+  /**
+   * Перестановка колонок: `order` — идентификаторы слева направо.
+   * Чужой или несуществующий идентификатор — «не найдена», как и везде.
+   * Колонки, которых в `order` нет, остаются за переставленными
+   * в прежнем порядке: список с клиента может отстать от базы.
+   */
+  async reorderColumns(orgId: string, documentId: string, order: string[]) {
+    await this.assertDocument(orgId, documentId);
+    const columns = await this.prisma.recipientColumn.findMany({
+      where: { documentId },
+      orderBy: { position: 'asc' },
+      select: { id: true },
+    });
+    const known = new Set(columns.map((c) => c.id));
+    if (order.some((id) => !known.has(id))) throw new NotFoundException('Колонка не найдена');
+    const rest = columns.map((c) => c.id).filter((id) => !order.includes(id));
+    const next = [...new Set([...order, ...rest])];
+    // Пара документ+позиция уникальна, поэтому в один проход не обойтись:
+    // сначала уводим все позиции в отрицательные, потом расставляем заново.
+    await this.prisma.$transaction([
+      ...next.map((id, i) => this.prisma.recipientColumn.update({ where: { id }, data: { position: -1 - i } })),
+      ...next.map((id, position) => this.prisma.recipientColumn.update({ where: { id }, data: { position } })),
+    ]);
+    return { order: next };
+  }
+
   async renameColumn(orgId: string, documentId: string, columnId: string, name: string) {
     await this.assertDocument(orgId, documentId);
     const column = await this.prisma.recipientColumn.findFirst({

@@ -13,12 +13,8 @@ import {
   ArrowUpToLine,
   Bold,
   CaseUpper,
-  Eye,
-  EyeOff,
   Group,
   Italic,
-  Lock,
-  LockOpen,
   MousePointerSquareDashed,
   Paintbrush,
   Pipette,
@@ -122,8 +118,6 @@ export function PropertiesPanel(props: Props) {
   const shapes = elements.filter((el): el is ShapeElement => el.type === 'shape');
   const qrs = elements.filter((el): el is QrElement => el.type === 'qr');
   const common = commonTextProps(elements);
-  const locked = commonValue(elements.map((el) => el.locked));
-  const hidden = commonValue(elements.map((el) => el.hidden));
   const rotation = commonValue(elements.map((el) => el.rotation));
   const opacity = commonValue(elements.map((el) => el.opacity));
   const grouped = elements.some((el) => el.groupId);
@@ -134,19 +128,6 @@ export function PropertiesPanel(props: Props) {
         <p className="text-sm text-[var(--text-muted)]">
           Выбрано блоков: {elements.length}. Изменения применяются ко всем.
         </p>
-      )}
-
-      {single && (
-        <label className="block">
-          <Label>Название слоя</Label>
-          <Input
-            value={single.name ?? ''}
-            placeholder="по содержимому"
-            maxLength={100}
-            onChange={(e) => props.onElement({ name: e.target.value || null }, false)}
-            onBlur={(e) => props.onElement({ name: e.target.value || null })}
-          />
-        </label>
       )}
 
       {/* Положение и размер — числами, в миллиметрах. Пиксели здесь
@@ -197,19 +178,6 @@ export function PropertiesPanel(props: Props) {
             onChange={(raw) => props.onElement({ opacity: clampNumber(raw, 0, 100, 100) / 100 })}
           />
         </label>
-      </div>
-
-      <div className="flex flex-wrap gap-1.5">
-        {/* Как в Canva и PowerPoint: значок — состояние, подпись — действие.
-            Если часть выбранных заблокирована, кнопка блокирует все. */}
-        <Toggle active={locked === true} onClick={() => props.onElement({ locked: locked !== true })}>
-          {locked === true ? <Lock size={13} /> : <LockOpen size={13} />}
-          {locked === true ? 'Разблокировать' : 'Заблокировать'}
-        </Toggle>
-        <Toggle active={hidden === true} onClick={() => props.onElement({ hidden: hidden !== true })}>
-          {hidden === true ? <EyeOff size={13} /> : <Eye size={13} />}
-          {hidden === true ? 'Показать' : 'Скрыть'}
-        </Toggle>
       </div>
 
       {/* Выравнивание: одного блока — по листу, нескольких — между собой. */}
@@ -287,6 +255,21 @@ export function PropertiesPanel(props: Props) {
         <p className="text-sm text-[var(--text-muted)]">
           У картинки нет настроек, кроме положения, размера и прозрачности.
         </p>
+      )}
+
+      {/* Имя слоя — внизу: оно нужно редко, а наверху отвлекало от
+          положения и оформления. Пусто — слой зовётся по содержимому. */}
+      {single && (
+        <label className="block border-t border-[var(--line)] pt-4">
+          <Label>Имя слоя</Label>
+          <Input
+            value={single.name ?? ''}
+            placeholder="по содержимому"
+            maxLength={100}
+            onChange={(e) => props.onElement({ name: e.target.value || null }, false)}
+            onBlur={(e) => props.onElement({ name: e.target.value || null })}
+          />
+        </label>
       )}
 
       <Button variant="danger" icon={<Trash2 size={15} />} onClick={props.onDelete} className="w-full">

@@ -13,6 +13,10 @@ import {
   ImageUp,
   Layers,
   LoaderCircle,
+  Eye,
+  EyeOff,
+  Lock,
+  LockOpen,
   Magnet,
   Paintbrush,
   Printer,
@@ -536,6 +540,8 @@ export function EditorPage() {
     () => layout.filter((el) => selected.has(el.id)),
     [layout, selected],
   );
+  const allLocked = selectedElements.length > 0 && selectedElements.every((el) => el.locked);
+  const allHidden = selectedElements.length > 0 && selectedElements.every((el) => el.hidden);
 
   const rows = recipients.data?.rows ?? [];
   const rowCount = rows.length;
@@ -1248,6 +1254,29 @@ export function EditorPage() {
       >
         <Printer size={16} />
       </ToolButton>
+
+      {/* Замок и глаз выделенного блока — здесь, как в контекстной панели
+          Canva: значок показывает состояние, подпись в панели свойств
+          была лишней. Если заперта часть выделенных — запираются все. */}
+      {selectedElements.length > 0 && (
+        <>
+          <ToolDivider />
+          <ToolButton
+            title={allLocked ? 'Отпереть: блок снова двигается' : 'Запереть: не двигать и не растягивать'}
+            active={allLocked}
+            onClick={() => patchElements(selected, (el) => ({ ...el, locked: !allLocked }))}
+          >
+            {allLocked ? <Lock size={16} /> : <LockOpen size={16} />}
+          </ToolButton>
+          <ToolButton
+            title={allHidden ? 'Показать на листе' : 'Скрыть с листа'}
+            active={allHidden}
+            onClick={() => patchElements(selected, (el) => ({ ...el, hidden: !allHidden }))}
+          >
+            {allHidden ? <EyeOff size={16} /> : <Eye size={16} />}
+          </ToolButton>
+        </>
+      )}
 
       <ToolDivider />
 
