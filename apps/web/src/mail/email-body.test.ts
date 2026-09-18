@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseBody, toHtml, toText, wrapSelection } from './email-body';
+import { insertToken, parseBody, toHtml, toText, wrapSelection } from './email-body';
 
 /*
  * Перевод идёт в обе стороны: человек правит текст, сервер хранит разметку.
@@ -146,5 +146,23 @@ describe('кнопки начертания', () => {
     expect(r.text).toBe('Текст__');
     expect(r.selectionStart).toBe(6);
     expect(r.selectionEnd).toBe(6);
+  });
+});
+
+describe('insertToken', () => {
+  it('вставляет поле на место курсора', () => {
+    expect(insertToken('Здравствуйте, !', 14, 14, 'name')).toEqual({ text: 'Здравствуйте, %name!', caret: 19 });
+  });
+
+  it('не даёт полю слиться с латиницей или цифрой справа', () => {
+    expect(insertToken('за 1 место', 3, 3, 'place').text).toBe('за %place 1 место');
+  });
+
+  it('отделяет пробелом от слова слева', () => {
+    expect(insertToken('грамота', 7, 7, 'name').text).toBe('грамота %name');
+  });
+
+  it('заменяет выделенный кусок', () => {
+    expect(insertToken('Привет, Иван!', 8, 12, 'name').text).toBe('Привет, %name!');
   });
 });

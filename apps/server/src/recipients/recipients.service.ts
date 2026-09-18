@@ -7,6 +7,7 @@ import {
   type SheetLayout,
 } from '@gramota/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { suggestColumnName } from '../import/column-names';
 import type { AddColumnDto, ImportDto, UpdateRowDto } from './recipients.dto';
 
 /** Первые две колонки создаются вместе с документом: по ним работает вся выдача. */
@@ -45,14 +46,19 @@ export class RecipientsService {
 
   async addColumn(orgId: string, documentId: string, dto: AddColumnDto) {
     await this.assertDocument(orgId, documentId);
-    const position = await this.prisma.recipientColumn.count({ where: { documentId } });
+    const existing = await this.prisma.recipientColumn.findMany({
+      where: { documentId },
+      select: { name: true },
+    });
+    // Схема пропускает только имя или название: без одного есть другое.
+    const name = dto.name ?? suggestColumnName(dto.title!, new Set(existing.map((c) => c.name)));
     try {
       return await this.prisma.recipientColumn.create({
-        data: { documentId, name: dto.name, position },
+        data: { documentId, name, title: dto.title ?? null, position: existing.length },
       });
     } catch (err) {
       if (isUniqueViolation(err)) {
-        throw new BadRequestException(`Колонка «${dto.name}» уже есть`);
+        throw new BadRequestException(`Колонка «${dto.title ?? name}» уже есть`);
       }
       throw err;
     }

@@ -193,3 +193,14 @@ export function applyMatches(layout: SheetLayout, matches: FieldMatch[]): SheetL
     return { ...el, props: { ...el.props, doc } };
   });
 }
+
+/** Поле из только что заведённой колонки — чтобы сразу вставить его. */
+export function fieldFromColumn(column: { id: string; name: string; title?: string | null }): FieldInfo {
+  return {
+    source: column.name,
+    fieldId: column.id,
+    title: column.title?.trim() || KNOWN_COLUMN_TITLES[column.name] || column.name,
+    hint: 'из таблицы',
+    kind: 'column',
+  };
+}

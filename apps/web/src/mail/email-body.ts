@@ -167,3 +167,25 @@ export function wrapSelection(
     selectionEnd: end + 1,
   };
 }
+
+/**
+ * Вставить `%поле` на место выделения.
+ *
+ * Пробел справа ставим, если сразу за курсором латиница, цифра или
+ * подчёркивание: иначе `%place` и «1» слились бы в `%place1` — другое,
+ * несуществующее поле, и в письме напечатался бы сам ключ. Слева — если
+ * перед курсором буква или цифра: «за%place» читается как опечатка.
+ */
+export function insertToken(
+  text: string,
+  from: number,
+  to: number,
+  name: string,
+): { text: string; caret: number } {
+  const before = text.slice(0, from);
+  const after = text.slice(to);
+  const lead = /[\p{L}\p{N}]$/u.test(before) ? ' ' : '';
+  const tail = /^[A-Za-z0-9_]/.test(after) ? ' ' : '';
+  const token = `${lead}%${name}${tail}`;
+  return { text: before + token + after, caret: from + token.length };
+}

@@ -1,12 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bold, Check, Italic, Paperclip } from 'lucide-react';
+import { Bold, Check, Italic, Paperclip, Variable } from 'lucide-react';
 import { api } from '../api/client';
 import { Button } from '../ui/Button';
 import { Input, Label } from '../ui/Field';
-import { parseBody, toHtml, toText, wrapSelection, type Run } from './email-body';
+import { insertToken, parseBody, toHtml, toText, wrapSelection, type Run } from './email-body';
 import { Checkbox } from '../ui/Checkbox';
 import { useTooltip } from '../ui/Tooltip';
+import type { FieldTarget } from '../editor/FieldsSidebar';
+import { setFieldsPanelOpen } from '../editor/fields-sidebar-store';
 
 interface EmailTemplate {
   id: string;
@@ -41,13 +43,23 @@ const DEFAULT_BODY = [
  * набор тегов, и произвольная вёрстка разъехалась бы в Outlook незаметно
  * для отправителя.
  */
-export function EmailTemplateEditor({ documentId }: { documentId: string }) {
+export function EmailTemplateEditor({
+  documentId,
+  onFieldTarget,
+}: {
+  documentId: string;
+  /** Отдать рамке материала вставку поля — для панели «Поля». */
+  onFieldTarget?: (target: FieldTarget | null) => void;
+}) {
   const qc = useQueryClient();
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [attach, setAttach] = useState(true);
   const [saved, setSaved] = useState(false);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
+  /** Где стоял курсор последним — в теме или в тексте. */
+  const lastField = useRef<'subject' | 'body'>('body');
+  const subjectRef = useRef<HTMLInputElement | null>(null);
 
   /**
    * Начертание для выделенного куска.
@@ -99,21 +111,41 @@ export function EmailTemplateEditor({ documentId }: { documentId: string }) {
 
   const variables = columns.data?.columns.map((c) => c.name) ?? [];
 
-  /** Переменная вставляется туда, где стоит курсор, а не в конец текста. */
-  function insert(name: string) {
-    const field = bodyRef.current;
-    const token = `%${name}`;
+  /**
+   * Переменная вставляется туда, где стоит курсор, а не в конец текста —
+   * и в то поле, где он стоял: в теме письма имя нужно не реже, чем в тексте.
+   */
+  const insert = useCallback((name: string) => {
+    const inSubject = lastField.current === 'subject';
+    const field = inSubject ? subjectRef.current : bodyRef.current;
+    const set = inSubject ? setSubject : setBody;
     if (!field) {
-      setBody((b) => b + token);
+      set((v) => insertToken(v, v.length, v.length, name).text);
       return;
     }
-    const { selectionStart: from, selectionEnd: to } = field;
-    setBody(body.slice(0, from) + token + body.slice(to));
+    const from = field.selectionStart ?? field.value.length;
+    const to = field.selectionEnd ?? from;
+    const next = insertToken(field.value, from, to, name);
+    set(next.text);
     requestAnimationFrame(() => {
       field.focus();
-      field.setSelectionRange(from + token.length, from + token.length);
+      field.setSelectionRange(next.caret, next.caret);
     });
-  }
+  }, []);
+
+  const target = useMemo<FieldTarget>(
+    () => ({
+      insert: (field) => insert(field.source),
+      columnsOnly: true,
+    }),
+    [insert],
+  );
+
+  useEffect(() => {
+    if (!onFieldTarget) return;
+    onFieldTarget(target);
+    return () => onFieldTarget(null);
+  }, [onFieldTarget, target]);
 
   return (
     <div className="mx-auto max-w-3xl space-y-5 p-6">
@@ -130,6 +162,10 @@ export function EmailTemplateEditor({ documentId }: { documentId: string }) {
         <Input
           value={subject}
           onChange={(e) => setSubject(e.target.value)}
+          onFocus={(e) => {
+            lastField.current = 'subject';
+            subjectRef.current = e.currentTarget;
+          }}
           placeholder={DEFAULT_SUBJECT}
         />
       </div>
@@ -148,6 +184,16 @@ export function EmailTemplateEditor({ documentId }: { documentId: string }) {
           <FormatButton onClick={() => applyFormat('_')} title="Курсив">
             <Italic size={15} />
           </FormatButton>
+          {/* Поля — общей панелью справа, как на листе: вставка идёт
+              туда, где стоял курсор, в тему или в текст. */}
+          <button
+            type="button"
+            onClick={() => setFieldsPanelOpen(true)}
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-sm text-[var(--text-muted)] ring-1 ring-[var(--line)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
+          >
+            <Variable size={15} strokeWidth={1.75} />
+            Поле
+          </button>
           <span className="ml-2 text-xs text-[var(--text-muted)]">
             Пустая строка — новый абзац. Адрес сайта сам станет ссылкой.
           </span>
@@ -155,6 +201,7 @@ export function EmailTemplateEditor({ documentId }: { documentId: string }) {
 
         <textarea
           ref={bodyRef}
+          onFocus={() => (lastField.current = 'body')}
           value={body}
           onChange={(e) => setBody(e.target.value)}
           rows={10}
@@ -162,26 +209,6 @@ export function EmailTemplateEditor({ documentId }: { documentId: string }) {
           className="w-full rounded-xl bg-[var(--surface)] px-3 py-2 text-sm ring-1 ring-[var(--line)] focus:ring-2 focus:ring-[var(--accent)] focus:outline-none"
         />
       </div>
-
-      {variables.length > 0 && (
-        <div className="rounded-xl bg-[var(--surface-sunken)] p-3">
-          <p className="text-xs text-[var(--text-muted)]">
-            Подставить данные получателя — нажмите, чтобы добавить в текст:
-          </p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {variables.map((name) => (
-              <button
-                key={name}
-                type="button"
-                onClick={() => insert(name)}
-                className="rounded-lg bg-[var(--surface)] px-2 py-1 font-mono text-xs ring-1 ring-[var(--line)] hover:ring-[var(--accent)]"
-              >
-                %{name}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Убрано под спойлер: нужно редко — когда документ вручают на бумаге,
           а письмо служит уведомлением. На виду эта галочка только пугала:
