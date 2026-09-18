@@ -38,6 +38,9 @@ import {
   type TextElement,
   type TextProps,
 } from '@gramota/shared';
+
+type QrElement = Extract<SheetElement, { type: 'qr' }>;
+type LinkElement = Extract<SheetElement, { type: 'link' }>;
 import { InsertMenu, type InsertKind } from '../editor/InsertMenu';
 import { DocumentChrome, ToolButton, ToolDivider } from '../editor/DocumentChrome';
 import { useDocumentFileMenu } from '../editor/DocumentFileMenu';
@@ -591,6 +594,26 @@ export function EditorPage() {
       patchElements(
         selected,
         (el) => (el.type === 'shape' ? { ...el, props: { ...el.props, ...patch } } : el),
+        commit,
+      ),
+    [patchElements, selected],
+  );
+
+  const patchQrProps = useCallback(
+    (patch: Partial<QrElement['props']>, commit = true) =>
+      patchElements(
+        selected,
+        (el) => (el.type === 'qr' ? { ...el, props: { ...el.props, ...patch } } : el),
+        commit,
+      ),
+    [patchElements, selected],
+  );
+
+  const patchLinkProps = useCallback(
+    (patch: Partial<LinkElement['props']>, commit = true) =>
+      patchElements(
+        selected,
+        (el) => (el.type === 'link' ? { ...el, props: { ...el.props, ...patch } } : el),
         commit,
       ),
     [patchElements, selected],
@@ -1730,6 +1753,8 @@ export function EditorPage() {
                     onResizePage={(size) => setResizeTo(size)}
                     onTextProps={patchTextProps}
                     onShapeProps={patchShapeProps}
+                    onQrProps={patchQrProps}
+                    onLinkProps={patchLinkProps}
                     onElement={(patch, commit) => patchElements(selected, (el) => ({ ...el, ...patch }) as SheetElement, commit)}
                     onBox={(elementId, box) => {
                       const safe = { ...box, w: Math.max(box.w, 5), h: Math.max(box.h, 5) };
