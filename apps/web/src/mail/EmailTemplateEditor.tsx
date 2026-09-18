@@ -139,8 +139,14 @@ export function EmailTemplateEditor({
   }, [onFieldTarget, target]);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5 p-6">
-      <header>
+    /* По левому краю и без потолка на весь блок: у соседних вкладок
+       материала содержимое стоит слева, и центрированная колонка при
+       переходе к письму уезжала в сторону, а с открытой панелью полей —
+       ещё раз. Узкая колонка нужна только тексту: длинную строку темы
+       и абзац письма неудобно читать шире 3xl, остальное живёт на своей
+       ширине. */
+    <div className="space-y-5 p-6">
+      <header className="max-w-3xl">
         <h2 className="text-lg font-medium">Письмо участнику</h2>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
           Так выглядит письмо, которое придёт вместе с документом. Отправителем участник
@@ -148,7 +154,7 @@ export function EmailTemplateEditor({
         </p>
       </header>
 
-      <div>
+      <div className="max-w-3xl">
         <Label>Тема письма</Label>
         <Input
           value={subject}
@@ -161,7 +167,7 @@ export function EmailTemplateEditor({
         />
       </div>
 
-      <div>
+      <div className="max-w-3xl">
         <Label>Текст письма</Label>
 
         {/* Кнопки, а не разметка руками: человек выделяет кусок и нажимает,
@@ -197,7 +203,7 @@ export function EmailTemplateEditor({
       {/* Убрано под спойлер: нужно редко — когда документ вручают на бумаге,
           а письмо служит уведомлением. На виду эта галочка только пугала:
           непонятно, зачем снимать то, ради чего всё и затевалось. */}
-      <details className="rounded-xl bg-[var(--surface-sunken)] px-4 py-3">
+      <details className="max-w-3xl rounded-xl bg-[var(--surface-sunken)] px-4 py-3">
         <summary className="cursor-pointer text-sm text-[var(--text-muted)]">
           Дополнительно
         </summary>
@@ -277,7 +283,7 @@ function Preview({
   const paragraphs = parseBody(fill(body));
 
   return (
-    <div className="rounded-xl bg-[var(--surface-sunken)] p-4">
+    <div className="max-w-3xl rounded-xl bg-[var(--surface-sunken)] p-4">
       <p className="text-xs text-[var(--text-muted)]">Как увидит участник</p>
       <p className="mt-2 font-medium">{fill(subject)}</p>
 
