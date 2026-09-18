@@ -208,10 +208,7 @@ export class DocumentsController {
     return this.documents.deleteSheet(user.orgId, id, sheetId);
   }
 
-  /**
-   * Загрузка фона листа. Тип файла определяется по сигнатуре, а не по заголовку
-   * Content-Type и не по расширению из формы — им нельзя доверять.
-   */
+  /** Загрузка фона листа. */
   @Post(':id/sheets/:sheetId/background')
   async uploadBackground(
     @CurrentUser() user: SessionUser,
@@ -219,26 +216,68 @@ export class DocumentsController {
     @Param('sheetId', uuidParam) sheetId: string,
     @Req() req: FastifyRequest,
   ) {
-    const part = await req.file({ limits: { fileSize: MAX_IMAGE_BYTES, files: 1 } });
-    if (!part) throw new BadRequestException('Файл не передан');
+    const { body, image, filename } = await readImagePart(req);
+    return this.documents.setBackground(user.orgId, id, sheetId, body, image, filename);
+  }
 
-    let body: Buffer;
-    try {
-      body = await part.toBuffer();
-    } catch {
-      throw new BadRequestException(
-        `Файл слишком большой, максимум ${Math.round(MAX_IMAGE_BYTES / 1024 / 1024)} МБ`,
-      );
-    }
-
-    const image = detectImageType(body);
-    if (!image) throw new BadRequestException('Поддерживаются только изображения PNG и JPEG');
-
-    return this.documents.setBackground(user.orgId, id, sheetId, body, image, part.filename ?? '');
+  /**
+   * Картинка для блока на листе: логотип, подпись, печать. Тот же разбор,
+   * что у бланка, но файл не привязан к листу — его `fileId` ложится
+   * в элемент `image` макета, а сам макет сохраняется обычным путём.
+   */
+  @Post(':id/assets')
+  async uploadAsset(
+    @CurrentUser() user: SessionUser,
+    @Param('id', uuidParam) id: string,
+    @Req() req: FastifyRequest,
+  ) {
+    const { body, image, filename } = await readImagePart(req);
+    return this.documents.addAsset(user.orgId, id, body, image, filename);
   }
 
   @Get('files/:fileId/url')
   fileUrl(@CurrentUser() user: SessionUser, @Param('fileId', uuidParam) fileId: string) {
     return this.documents.backgroundUrl(user.orgId, fileId).then((url) => ({ url }));
   }
+
+  /**
+   * Файл по постоянному адресу — для `<img>` блока-картинки.
+   *
+   * Подписанная ссылка живёт пятнадцать минут, а макет хранит только
+   * `fileId`: холст, превью и миниатюры в списке ставят этот адрес,
+   * и сервер каждый раз переадресует на свежую ссылку. Кеш короче
+   * срока ссылки — иначе браузер пошёл бы по уже истёкшей.
+   */
+  @Get('files/:fileId/raw')
+  async fileRaw(
+    @CurrentUser() user: SessionUser,
+    @Param('fileId', uuidParam) fileId: string,
+    @Res() reply: FastifyReply,
+  ) {
+    const url = await this.documents.backgroundUrl(user.orgId, fileId);
+    return reply.header('cache-control', 'private, max-age=300').redirect(url, 302);
+  }
+}
+
+/**
+ * Одна картинка из multipart-формы. Тип файла определяется по сигнатуре, а не
+ * по заголовку Content-Type и не по расширению из формы — им нельзя доверять.
+ */
+async function readImagePart(req: FastifyRequest) {
+  const part = await req.file({ limits: { fileSize: MAX_IMAGE_BYTES, files: 1 } });
+  if (!part) throw new BadRequestException('Файл не передан');
+
+  let body: Buffer;
+  try {
+    body = await part.toBuffer();
+  } catch {
+    throw new BadRequestException(
+      `Файл слишком большой, максимум ${Math.round(MAX_IMAGE_BYTES / 1024 / 1024)} МБ`,
+    );
+  }
+
+  const image = detectImageType(body);
+  if (!image) throw new BadRequestException('Поддерживаются только изображения PNG и JPEG');
+
+  return { body, image, filename: part.filename ?? '' };
 }

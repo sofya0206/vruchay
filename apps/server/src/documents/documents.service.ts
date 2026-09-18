@@ -7,6 +7,7 @@ import { buildS3Key } from '../storage/s3-key';
 import { AllowedImage } from '../common/image-type';
 import { DEFAULT_COLUMNS } from '../recipients/recipients.service';
 import { CreateDocumentDto, ListDocumentsDto, UpdateDocumentDto } from './documents.dto';
+import { imageFileIds } from './layout-images';
 
 /**
  * Макет для превью в списке.
@@ -378,7 +379,8 @@ export class DocumentsService {
   }
 
   async updateSheetLayout(orgId: string, documentId: string, sheetId: string, layout: SheetLayout) {
-    await this.getSheetOrFail(orgId, documentId, sheetId);
+    const sheet = await this.getSheetOrFail(orgId, documentId, sheetId);
+    await this.assertOwnImages(orgId, layout, sheet.layout);
     return this.prisma.sheet.update({
       where: { id: sheetId },
       data: { layout, schemaVersion: CURRENT_LAYOUT_SCHEMA_VERSION },
@@ -419,11 +421,53 @@ export class DocumentsService {
     const sheet = await this.getSheetOrFail(orgId, documentId, sheetId);
     const previousFileId = sheet.backgroundFileId;
 
+    const file = await this.storeImage(orgId, documentId, 'background', body, image, originalName);
+    await this.prisma.sheet.update({
+      where: { id: sheetId },
+      data: { backgroundFileId: file.id },
+    });
+
+    if (previousFileId) await this.removeFile(previousFileId);
+
+    return { fileId: file.id, url: await this.storage.presignedGetUrl(file.s3Key) };
+  }
+
+  /**
+   * Картинка для блока на листе. К листу не привязана: блок с её `fileId`
+   * приедет в макете обычным сохранением. Файл остаётся и тогда, когда
+   * блок удалили, — иначе «Отменить» вернуло бы блок без картинки;
+   * убирается он вместе с материалом.
+   */
+  async addAsset(
+    orgId: string,
+    documentId: string,
+    body: Buffer,
+    image: AllowedImage,
+    originalName: string,
+  ) {
+    const doc = await this.prisma.document.findFirst({
+      where: { id: documentId, orgId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!doc) throw new NotFoundException('Документ не найден');
+
+    const file = await this.storeImage(orgId, documentId, 'asset', body, image, originalName);
+    return { fileId: file.id, url: await this.storage.presignedGetUrl(file.s3Key) };
+  }
+
+  private async storeImage(
+    orgId: string,
+    documentId: string,
+    kind: 'background' | 'asset',
+    body: Buffer,
+    image: AllowedImage,
+    originalName: string,
+  ) {
     const file = await this.prisma.file.create({
       data: {
         orgId,
         documentId,
-        kind: 'background',
+        kind,
         // Ключ временный: настоящий строится из id, который база выдаёт только сейчас.
         s3Key: '',
         sizeBytes: body.length,
@@ -433,24 +477,31 @@ export class DocumentsService {
       },
     });
 
-    const s3Key = buildS3Key({
-      orgId,
-      documentId,
-      kind: 'background',
-      fileId: file.id,
-      ext: image.ext,
-    });
-
+    const s3Key = buildS3Key({ orgId, documentId, kind, fileId: file.id, ext: image.ext });
     await this.storage.put(s3Key, body, image.mime);
     await this.prisma.file.update({ where: { id: file.id }, data: { s3Key } });
-    await this.prisma.sheet.update({
-      where: { id: sheetId },
-      data: { backgroundFileId: file.id },
+    return { id: file.id, s3Key };
+  }
+
+  /**
+   * Картинки макета — только файлы своей организации.
+   *
+   * Макет приходит с клиента, и `fileId` в нём — просто строка: без
+   * проверки в него можно вписать чужой файл, и печать вывела бы его
+   * на лист. Проверяем только появившиеся в этом сохранении: прежние
+   * прошли проверку, когда их добавляли, а файл копии материала лежит
+   * у исходника и мог уйти вместе с ним — сохранение из-за этого
+   * вставать не должно.
+   */
+  private async assertOwnImages(orgId: string, layout: SheetLayout, previous: unknown) {
+    const before = new Set(imageFileIds(previous));
+    const added = imageFileIds(layout).filter((id) => !before.has(id));
+    if (!added.length) return;
+
+    const found = await this.prisma.file.count({
+      where: { id: { in: added }, orgId, kind: 'asset', deletedAt: null },
     });
-
-    if (previousFileId) await this.removeFile(previousFileId);
-
-    return { fileId: file.id, url: await this.storage.presignedGetUrl(s3Key) };
+    if (found !== added.length) throw new NotFoundException('Картинка не найдена');
   }
 
   async backgroundUrl(orgId: string, fileId: string): Promise<string> {

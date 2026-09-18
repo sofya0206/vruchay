@@ -68,6 +68,7 @@ import { Tooltip } from '../ui/Tooltip';
 import { Button } from '../ui/Button';
 import { ResizeDialog } from '../editor/ResizeDialog';
 import { fitPageToImage, readImageSize, type PageFit } from '../editor/fit-page';
+import { insertedImageBox } from '../editor/image-box';
 import { backgroundDpi, BLEED_MM, POOR_DPI, PRINT_DPI, resizeLayout, SAFE_MARGIN_MM, type ResizeMode } from '../editor/page-fit';
 import {
   applyMatches,
@@ -118,6 +119,18 @@ const HANDLES: ResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 const CORNERS: ResizeHandle[] = ['nw', 'ne', 'se', 'sw'];
 /** Шаг сетки в мм — и шаг прилипания к ней, когда сетка включена. */
 const GRID_MM = 5;
+/** С какого расстояния на экране блок прилипает к направляющей. */
+const SNAP_PX = 6;
+/**
+ * Короче этого блок на экране считается тесным: ручки уходят за рамку,
+ * иначе они закрывали бы его и вместо сдвига получалось растягивание.
+ */
+const TIGHT_PX = 40;
+
+/** Размер листа в мм — или ничего, пока документ не загружен. */
+function pageBoxOf(doc: { pageWidthMm: number; pageHeightMm: number } | undefined) {
+  return doc ? { w: doc.pageWidthMm, h: doc.pageHeightMm } : null;
+}
 /** Сдвиг стрелками: пункт и десять пунктов, как просит бриф, — в миллиметрах. */
 const NUDGE_MM = 25.4 / 72;
 
@@ -128,8 +141,10 @@ interface GestureBase {
   moved: boolean;
 }
 type Gesture =
-  | (GestureBase & { kind: 'move'; boxes: Record<string, Box> })
-  | (GestureBase & { kind: 'resize'; id: string; handle: ResizeHandle; box: Box })
+  /** `lines` — направляющие: считаются один раз на жест, остальные блоки стоят на месте. */
+  | (GestureBase & { kind: 'move'; boxes: Record<string, Box>; lines?: SnapLine[] })
+  /** `keepRatio` — угол тянет с сохранением пропорций: у картинки всегда, у прочих с Shift. */
+  | (GestureBase & { kind: 'resize'; id: string; handle: ResizeHandle; box: Box; keepRatio: boolean })
   | (GestureBase & { kind: 'scale'; handle: ResizeHandle; frame: Rect; boxes: Record<string, Box>; sizes: Record<string, number> })
   | (GestureBase & { kind: 'rotate'; id: string; center: { x: number; y: number } })
   | (GestureBase & { kind: 'marquee'; additive: boolean; base: ReadonlySet<string> });
@@ -218,6 +233,9 @@ export function EditorPage() {
   const sheetRef = useRef<HTMLDivElement>(null);
   const gesture = useRef<Gesture | null>(null);
   const backgroundInput = useRef<HTMLInputElement>(null);
+  const imageInput = useRef<HTMLInputElement>(null);
+  /** Тащат ли над холстом файл: лист подсвечивается, куда он ляжет. */
+  const [fileOver, setFileOver] = useState(false);
   const clipboard = useRef<SheetElement[]>([]);
   const liveEditor = useRef<Editor | null>(null);
 
@@ -244,7 +262,7 @@ export function EditorPage() {
     setActiveSheetId(null);
   }, [id]);
   const history = useLayoutHistory([]);
-  const { reset, beginGesture, endGesture } = history;
+  const { reset, beginGesture, endGesture, setLayout } = history;
 
   /*
    * Макет с сервера кладём в историю только при смене листа — и через
@@ -326,6 +344,11 @@ export function EditorPage() {
       void background.refetch();
     },
     onError: () => setSaved('error'),
+  });
+
+  const uploadImage = useMutation({
+    mutationFn: (file: File) => api.upload<{ fileId: string; url: string }>(`/documents/${id}/assets`, file),
+    onSuccess: clearSaveError,
   });
 
   /** Что предложить, если бланк не тех пропорций, что лист. */
@@ -655,13 +678,39 @@ export function EditorPage() {
     [zoom],
   );
 
-  useEffect(() => {
-    if (!doc.data) return;
-    const page = { w: doc.data.pageWidthMm, h: doc.data.pageHeightMm };
+  /*
+   * Всё, что жест читает на каждом кадре, — через ref, а не через
+   * зависимости эффекта. Иначе каждое движение мыши (оно меняет макет)
+   * снимало и заново вешало обработчики на окно — на каждом кадре.
+   */
+  const live = useRef({ layout, zoom, showGrid, snapping, page: pageBoxOf(doc.data), updateBoxes, patchElements, pointToMm });
+  useLayoutEffect(() => {
+    live.current = { layout, zoom, showGrid, snapping, page: pageBoxOf(doc.data), updateBoxes, patchElements, pointToMm };
+  });
 
-    function onMove(e: PointerEvent) {
+  useEffect(() => {
+    /*
+     * Мышь присылает движения чаще, чем экран обновляется, — на 120 Гц
+     * вдвое чаще. Пересчитывать макет на каждое значит перерисовывать
+     * редактор по нескольку раз за кадр; берём последнее за кадр.
+     */
+    let frameId = 0;
+    let pending: PointerEvent | null = null;
+    let shownGuides: SnapLine[] = [];
+
+    const showGuides = (next: SnapLine[]) => {
+      const same =
+        next.length === shownGuides.length &&
+        next.every((line, i) => line.axis === shownGuides[i].axis && line.at === shownGuides[i].at);
+      if (same) return;
+      shownGuides = next;
+      setGuides(next);
+    };
+
+    function apply(e: PointerEvent) {
       const g = gesture.current;
-      if (!g) return;
+      const { layout, zoom, showGrid, snapping, page, updateBoxes, patchElements, pointToMm } = live.current;
+      if (!g || !page) return;
 
       if (g.kind === 'marquee') {
         const from = pointToMm(g.startX, g.startY);
@@ -692,19 +741,26 @@ export function EditorPage() {
           const snapped = snapToGrid(frame, GRID_MM);
           next = next.map((b) => ({ ...b, x: b.x + snapped.x - frame.x, y: b.y + snapped.y - frame.y }));
         } else if (snapping && !e.altKey) {
+          g.lines ??= snapCandidates(layout, new Set(ids), page);
           const frame = boundingBox(next)!;
-          const result = snapBox(frame, snapCandidates(layout, new Set(ids), page));
+          // Порог — в пикселях экрана: в миллиметрах он на мелком масштабе
+          // не срабатывал вовсе, а на крупном держал блок у линии слишком долго.
+          const result = snapBox(frame, g.lines, SNAP_PX / (PX_PER_MM * zoom));
           next = next.map((b) => ({ ...b, x: b.x + result.box.x - frame.x, y: b.y + result.box.y - frame.y }));
           active = result.active;
         }
-        setGuides(active);
+        showGuides(active);
         updateBoxes(Object.fromEntries(ids.map((k, i) => [k, next[i]])), false);
         return;
       }
 
       if (g.kind === 'resize') {
-        let next = resizeBox(g.box, g.handle, dx, dy, page.w, page.h);
-        if (showGrid) next = snapToGrid(next, GRID_MM);
+        const proportional = g.handle.length === 2 && (g.keepRatio || e.shiftKey);
+        let next = proportional
+          ? scaleGroup([g.box], g.box, g.handle, dx, dy, page).boxes[0]
+          : resizeBox(g.box, g.handle, dx, dy, page.w, page.h);
+        // Сетка округляет стороны порознь — пропорции она бы сломала.
+        if (showGrid && !proportional) next = snapToGrid(next, GRID_MM);
         updateBoxes({ [g.id]: next }, false);
         return;
       }
@@ -714,7 +770,7 @@ export function EditorPage() {
         const { boxes, scale } = scaleGroup(ids.map((k) => g.boxes[k]), g.frame, g.handle, dx, dy, page);
         const next = Object.fromEntries(ids.map((k, i) => [k, boxes[i]]));
         // Кегли — в той же пропорции: композиция уменьшается целиком.
-        history.setLayout(
+        setLayout(
           (prev) =>
             prev.map((el) =>
               next[el.id]
@@ -734,23 +790,41 @@ export function EditorPage() {
       }
     }
 
+    function flush() {
+      frameId = 0;
+      const e = pending;
+      pending = null;
+      if (e) apply(e);
+    }
+
+    function onMove(e: PointerEvent) {
+      if (!gesture.current) return;
+      pending = e;
+      if (!frameId) frameId = requestAnimationFrame(flush);
+    }
+
     function onUp() {
+      // Последнее движение — сразу, а не в следующем кадре: иначе блок
+      // встал бы на шаг раньше того места, где его отпустили.
+      if (frameId) cancelAnimationFrame(frameId);
+      flush();
       const g = gesture.current;
       if (g?.kind === 'marquee') setMarquee(null);
       // Без этого перетаскивание не попадало бы в автосохранение:
       // промежуточные кадры намеренно не двигают счётчик версии.
       else if (g?.moved) endGesture();
-      setGuides([]);
+      showGuides([]);
       gesture.current = null;
     }
 
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
     return () => {
+      if (frameId) cancelAnimationFrame(frameId);
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
     };
-  }, [doc.data, zoom, layout, showGrid, snapping, updateBoxes, patchElements, beginGesture, endGesture, pointToMm, history]);
+  }, [beginGesture, endGesture, setLayout]);
 
   /* ────────────────────────────── горячие клавиши ──────────────────────── */
 
@@ -920,6 +994,29 @@ export function EditorPage() {
   }
 
   /**
+   * Картинка отдельным блоком: сначала файл на сервер, потом блок с его
+   * `fileId`. Наоборот нельзя — макет с картинкой, которой ещё нет,
+   * сервер не сохранит. `at` — куда бросили файл; без него — середина листа.
+   */
+  async function addImage(file: File, at?: { x: number; y: number }) {
+    const size = await readImageSize(file).catch(() => null);
+    const uploaded = await uploadImage.mutateAsync(file).catch(() => null);
+    if (!uploaded) return;
+
+    const box = insertedImageBox(size, pageBox, at);
+    const elementId = crypto.randomUUID();
+    history.setLayout((prev) => {
+      const maxZ = Math.max(-1, ...prev.map((el) => el.z));
+      const [el] = sheetLayout.parse([
+        { id: elementId, type: 'image', ...box, rotation: 0, z: maxZ + 1, props: { fileId: uploaded.fileId } },
+      ]);
+      return [...prev, el];
+    });
+    setSelected(new Set([elementId]));
+    if (!fieldsOpen) setOtherPanel('props');
+  }
+
+  /**
    * Смена размера листа с подстройкой блоков — по выбранному в диалоге
    * способу. Вылезшие блоки после этого выделены: человек сразу видит,
    * что поправить, а не ищет их по листу.
@@ -1001,6 +1098,7 @@ export function EditorPage() {
 
   const hasBackground = Boolean(sheet.backgroundFileId);
   const pickBackground = () => backgroundInput.current?.click();
+  const pickImage = () => imageInput.current?.click();
 
   /*
    * Меню «…» листа: действия над материалом целиком и редкие правки.
@@ -1017,20 +1115,20 @@ export function EditorPage() {
     { separator: true },
     {
       icon: <SquareDashed size={16} />,
-      label: 'Выделить все блоки',
+      label: 'Выделить всё',
       shortcut: 'Ctrl+A',
       onSelect: () => setSelected(new Set(selectableIds(layout))),
     },
     {
       icon: <CopyPlus size={16} />,
-      label: 'Дублировать блок',
+      label: 'Дублировать',
       shortcut: 'Ctrl+D',
       disabled: selectedElements.length === 0,
       onSelect: () => cloneInto(selectedElements),
     },
     {
       icon: <Paintbrush size={16} />,
-      label: 'Скопировать оформление',
+      label: 'Копировать стиль',
       disabled: !selectedElements.some((el) => el.type === 'text'),
       onSelect: () => {
         const source = selectedElements.find((el): el is TextElement => el.type === 'text');
@@ -1039,14 +1137,14 @@ export function EditorPage() {
     },
     {
       icon: <Paintbrush size={16} />,
-      label: 'Применить оформление',
+      label: 'Вставить стиль',
       disabled: styleClipboard === null || selected.size === 0,
       onSelect: () => styleClipboard && patchTextProps(styleClipboard),
     },
     { separator: true },
     {
       icon: <Trash2 size={16} />,
-      label: 'Удалить блок',
+      label: 'Удалить',
       shortcut: 'Delete',
       danger: true,
       disabled: selected.size === 0,
@@ -1064,7 +1162,7 @@ export function EditorPage() {
       <ToolButton title="Отменить (Ctrl+Z)" onClick={history.undo} disabled={!history.canUndo}>
         <Undo2 size={16} />
       </ToolButton>
-      <ToolButton title="Вернуть (Ctrl+Shift+Z)" onClick={history.redo} disabled={!history.canRedo}>
+      <ToolButton title="Повторить (Ctrl+Shift+Z)" onClick={history.redo} disabled={!history.canRedo}>
         <Redo2 size={16} />
       </ToolButton>
 
@@ -1077,6 +1175,8 @@ export function EditorPage() {
         onBackground={pickBackground}
         backgroundLoading={uploadBackground.isPending}
         hasBackground={hasBackground}
+        onImage={pickImage}
+        imageLoading={uploadImage.isPending}
       />
       <ToolButton
         title={hasBackground ? 'Заменить бланк' : 'Загрузить бланк'}
@@ -1089,21 +1189,21 @@ export function EditorPage() {
       <ToolDivider />
 
       <ToolButton
-        title="Сетка 5 мм и прилипание к ней"
+        title="Сетка 5 мм"
         active={showGrid}
         onClick={() => setShowGrid((v) => !v)}
       >
         <Grid3x3 size={16} />
       </ToolButton>
       <ToolButton
-        title="Прилипание к краям и центрам (Alt — временно выключить)"
+        title="Привязка к краям и центрам (Alt — отключить на время)"
         active={snapping}
         onClick={() => setSnapping((v) => !v)}
       >
         <Magnet size={16} />
       </ToolButton>
       <ToolButton
-        title="Безопасные поля печати: обрез 3 мм, поле принтера 5 мм"
+        title="Поля печати: обрез 3 мм, поле принтера 5 мм"
         active={showSafeArea}
         onClick={() => setShowSafeArea((v) => !v)}
       >
@@ -1203,16 +1303,27 @@ export function EditorPage() {
           e.target.value = '';
         }}
       />
+      <input
+        ref={imageInput}
+        type="file"
+        accept="image/png,image/jpeg"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void addImage(file);
+          e.target.value = '';
+        }}
+      />
 
       {/* Разговор про бланк — строкой под панелью, а не в самой панели:
           в ряду значков длинная фраза ломала строку и сдвигала всё
           остальное. */}
-      {uploadBackground.isError && (
+      {(uploadBackground.error ?? uploadImage.error) && (
         <p
           role="alert"
           className="shrink-0 border-b border-[var(--line)] bg-[var(--danger-soft)] px-4 py-2 text-sm text-[var(--danger)]"
         >
-          {(uploadBackground.error as Error).message}
+          {(uploadBackground.error ?? uploadImage.error)!.message}
         </p>
       )}
       {backgroundNote && (
@@ -1230,6 +1341,8 @@ export function EditorPage() {
       <div className="flex min-h-0 flex-1">
         <div
           ref={containerRef}
+          // Граница для панели оформления текста: за холст она не выходит.
+          data-canvas
           className="relative grid flex-1 place-items-center overflow-auto bg-[var(--surface-sunken)] p-6"
           style={panning ? { cursor: pan.current ? 'grabbing' : 'grab' } : undefined}
           onPointerDownCapture={(e) => {
@@ -1247,6 +1360,24 @@ export function EditorPage() {
           }}
           onPointerUpCapture={() => {
             pan.current = null;
+          }}
+          // Файл, брошенный на холст, становится картинкой в точке броска.
+          // Перетаскивание поля из панели сюда не попадает: у него нет файлов.
+          onDragOver={(e) => {
+            if (!e.dataTransfer.types.includes('Files')) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+            if (!fileOver) setFileOver(true);
+          }}
+          onDragLeave={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFileOver(false);
+          }}
+          onDrop={(e) => {
+            const file = e.dataTransfer.files[0];
+            if (!file) return;
+            e.preventDefault();
+            setFileOver(false);
+            void addImage(file, pointToMm(e.clientX, e.clientY));
           }}
         >
           {!sheet.backgroundFileId && layout.length === 0 && (
@@ -1276,7 +1407,7 @@ export function EditorPage() {
 
             <div
               ref={sheetRef}
-              className="relative shadow-[var(--shadow-sheet)]"
+              className={`relative shadow-[var(--shadow-sheet)] ${fileOver ? 'ring-2 ring-[var(--accent)]' : ''}`}
               style={{ width: px(page.pageWidthMm), height: px(page.pageHeightMm) }}
               onPointerDown={startMarquee}
             >
@@ -1417,7 +1548,9 @@ export function EditorPage() {
                     >
                       {single?.id === el.id && !el.locked && !editing && (
                         <>
-                          {HANDLES.map((handle) => (
+                          {/* У картинки только углы: сторона растянула бы рамку,
+                              а картинка в ней осталась бы прежней формы. */}
+                          {(el.type === 'image' ? CORNERS : HANDLES).map((handle) => (
                             <span
                               key={handle}
                               onPointerDown={(e) => {
@@ -1430,10 +1563,11 @@ export function EditorPage() {
                                   startX: e.clientX,
                                   startY: e.clientY,
                                   box: { x: el.x, y: el.y, w: el.w, h: el.h },
+                                  keepRatio: el.type === 'image',
                                   moved: false,
                                 };
                               }}
-                              style={handleStyle(handle)}
+                              style={handleStyle(handle, { x: px(el.w) < TIGHT_PX, y: px(el.h) < TIGHT_PX })}
                               className="absolute h-2.5 w-2.5 rounded-full border border-[var(--surface)] bg-[var(--focus)]"
                             />
                           ))}
@@ -1690,9 +1824,22 @@ export function EditorPage() {
   );
 }
 
-function handleStyle(handle: ResizeHandle): React.CSSProperties {
-  const vertical = handle.includes('n') ? '-5px' : handle.includes('s') ? 'calc(100% - 5px)' : 'calc(50% - 5px)';
-  const horizontal = handle.includes('w') ? '-5px' : handle.includes('e') ? 'calc(100% - 5px)' : 'calc(50% - 5px)';
+/**
+ * Ручка стоит на рамке, половиной внутри блока. По тесной стороне —
+ * целиком снаружи: на мелком масштабе строка в 20 мм занимает 14 пикселей,
+ * и ручки по 10 закрывали её всю — вместо сдвига блок растягивался.
+ */
+function handleStyle(handle: ResizeHandle, tight: { x: boolean; y: boolean } = { x: false, y: false }): React.CSSProperties {
+  const vertical = handle.includes('n')
+    ? tight.y ? '-11px' : '-5px'
+    : handle.includes('s')
+      ? tight.y ? 'calc(100% + 1px)' : 'calc(100% - 5px)'
+      : 'calc(50% - 5px)';
+  const horizontal = handle.includes('w')
+    ? tight.x ? '-11px' : '-5px'
+    : handle.includes('e')
+      ? tight.x ? 'calc(100% + 1px)' : 'calc(100% - 5px)'
+      : 'calc(50% - 5px)';
   const cursors: Record<ResizeHandle, string> = {
     nw: 'nwse-resize',
     n: 'ns-resize',

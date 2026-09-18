@@ -4,6 +4,7 @@ import {
   ChevronRight,
   Circle,
   Image as ImageIcon,
+  ImagePlus,
   Link2,
   Minus,
   Plus,
@@ -23,7 +24,7 @@ export type InsertKind =
  * Меню «Вставить» вместо отдельной кнопки на каждый тип блока.
  *
  * Кнопка «Текст» рядом с кнопкой «Фон» читалась как выбор из двух, хотя
- * на лист можно положить ещё QR-код, ссылку и фигуры. Собранные в одном
+ * на лист можно положить ещё картинку, QR-код, ссылку и фигуры. Собранные в одном
  * месте, они видны все сразу — и это ровно та связка, которую человек
  * знает по любому текстовому редактору.
  */
@@ -33,6 +34,8 @@ export function InsertMenu({
   onBackground,
   backgroundLoading = false,
   hasBackground = false,
+  onImage,
+  imageLoading = false,
   iconOnly = false,
 }: {
   onInsert: (what: InsertKind) => void;
@@ -44,6 +47,10 @@ export function InsertMenu({
   backgroundLoading?: boolean;
   /** Есть ли уже бланк: от этого зависит подсказка первого шага. */
   hasBackground?: boolean;
+  /** Выбор картинки для отдельного блока — тоже системным окном. */
+  onImage: () => void;
+  /** Загружается ли картинка прямо сейчас. */
+  imageLoading?: boolean;
   /**
    * Значком без подписи — для панели под меню.
    *
@@ -95,8 +102,8 @@ export function InsertMenu({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        title={iconOnly ? 'Вставить блок' : undefined}
-        aria-label={iconOnly ? 'Вставить блок' : undefined}
+        title={iconOnly ? 'Вставить' : undefined}
+        aria-label={iconOnly ? 'Вставить' : undefined}
         className={
           iconOnly
             ? `grid h-8 w-8 place-items-center rounded-lg transition-colors ${
@@ -177,6 +184,17 @@ export function InsertMenu({
             )}
           </div>
 
+          <Item
+            icon={<ImagePlus size={15} />}
+            label={imageLoading ? 'Загружаем картинку…' : 'Картинка'}
+            hint="Логотип, подпись, печать — PNG или JPEG"
+            disabled={imageLoading}
+            onClick={() => {
+              setOpen(false);
+              setSubmenu(null);
+              onImage();
+            }}
+          />
           <Item
             icon={<QrCode size={15} />}
             label="QR-код"
