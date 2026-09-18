@@ -338,9 +338,18 @@ h2 {
   font-variant-numeric: tabular-nums;
 }
 
-:where(a, button, input, select, textarea):focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
+/*
+ * В базовом слое, а не вне слоёв: иначе правило перебивало `outline-none`
+ * у любого поля — стили вне слоёв сильнее утилит Tailwind при любой
+ * специфичности. Поле со своей рамкой фокуса (поля кита, ячейки таблицы,
+ * название в шапке) рисовало две: свою и эту, на 2 px снаружи, — а в таблице
+ * верх внешней ещё и срезала прилипшая шапка.
+ */
+@layer base {
+  :where(a, button, input, select, textarea):focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
 }
 
 /*
