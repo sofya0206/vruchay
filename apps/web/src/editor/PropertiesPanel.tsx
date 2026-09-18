@@ -22,6 +22,7 @@ import {
   MousePointerSquareDashed,
   Paintbrush,
   Pipette,
+  Square,
   Trash2,
   Underline,
   Ungroup,
@@ -278,7 +279,7 @@ export function PropertiesPanel(props: Props) {
       )}
 
       {qrs.length > 0 && texts.length === 0 && shapes.length === 0 && (
-        <QrSection qrs={qrs} onChange={props.onQrProps} />
+        <QrSection qrs={qrs} onChange={props.onQrProps} page={props.page} onBox={props.onBox} />
       )}
 
       {single && single.type === 'link' && <LinkSection link={single} onChange={props.onLinkProps} />}
@@ -649,10 +650,15 @@ function ShapeSection({
 function QrSection({
   qrs,
   onChange,
+  page,
+  onBox,
 }: {
   qrs: QrElement[];
   onChange: (patch: Partial<QrElement['props']>, commit?: boolean) => void;
+  page: { w: number; h: number };
+  onBox: (id: string, box: Box) => void;
 }) {
+  const crooked = qrs.filter((q) => Math.abs(q.w - q.h) > 0.05);
   const template = commonValue(qrs.map((q) => q.props.template));
   const color = commonValue(qrs.map((q) => q.props.color));
   const custom = template !== MIXED && template !== '';
@@ -686,6 +692,24 @@ function QrSection({
         <Label>Цвет</Label>
         <ColorField value={color === MIXED ? '#000000' : (color ?? '#000000')} onChange={(value) => onChange({ color: value })} />
       </div>
+      {crooked.length > 0 && (
+        <Button
+          variant="secondary"
+          icon={<Square size={15} />}
+          className="w-full"
+          onClick={() => {
+            // Сторона — меньшая из двух, центр на месте: квадрат не вылезет за лист.
+            for (const q of crooked) {
+              const side = Math.min(q.w, q.h);
+              const x = Math.min(Math.max(q.x + (q.w - side) / 2, 0), page.w - side);
+              const y = Math.min(Math.max(q.y + (q.h - side) / 2, 0), page.h - side);
+              onBox(q.id, { x, y, w: side, h: side });
+            }
+          }}
+        >
+          Сделать квадратным
+        </Button>
+      )}
     </div>
   );
 }

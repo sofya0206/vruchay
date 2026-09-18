@@ -90,6 +90,7 @@ import {
   pxToMm,
   resizeBox,
   roundBox,
+  squareBox,
   type Box,
   type ResizeHandle,
 } from '../editor/geometry';
@@ -147,7 +148,7 @@ type Gesture =
   /** `lines` — направляющие: считаются один раз на жест, остальные блоки стоят на месте. */
   | (GestureBase & { kind: 'move'; boxes: Record<string, Box>; lines?: SnapLine[] })
   /** `keepRatio` — угол тянет с сохранением пропорций: у картинки всегда, у прочих с Shift. */
-  | (GestureBase & { kind: 'resize'; id: string; handle: ResizeHandle; box: Box; keepRatio: boolean })
+  | (GestureBase & { kind: 'resize'; id: string; handle: ResizeHandle; box: Box; keepRatio: boolean; square: boolean })
   | (GestureBase & { kind: 'scale'; handle: ResizeHandle; frame: Rect; boxes: Record<string, Box>; sizes: Record<string, number> })
   | (GestureBase & { kind: 'rotate'; id: string; center: { x: number; y: number } })
   | (GestureBase & { kind: 'marquee'; additive: boolean; base: ReadonlySet<string> });
@@ -474,6 +475,7 @@ export function EditorPage() {
     return () => observer.disconnect();
   }, [doc.data]);
 
+  const hasCanvas = Boolean(doc.data);
   // Ctrl+колёсико — масштаб, а не прокрутка страницы; пробел — панорамирование.
   useEffect(() => {
     const el = containerRef.current;
@@ -500,7 +502,9 @@ export function EditorPage() {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
     };
-  }, []);
+    // Холст появляется только после загрузки материала: с пустыми
+    // зависимостями колесо вешалось на null и зум не работал вовсе.
+  }, [hasCanvas]);
 
   // Выделение не переживает исчезновение блока: удалили — сняли.
   useEffect(() => {
@@ -784,6 +788,7 @@ export function EditorPage() {
           : resizeBox(g.box, g.handle, dx, dy, page.w, page.h);
         // Сетка округляет стороны порознь — пропорции она бы сломала.
         if (showGrid && !proportional) next = snapToGrid(next, GRID_MM);
+        if (g.square) next = squareBox(g.box, next, g.handle, page.w, page.h);
         updateBoxes({ [g.id]: next }, false);
         return;
       }
@@ -1587,6 +1592,7 @@ export function EditorPage() {
                                   startY: e.clientY,
                                   box: { x: el.x, y: el.y, w: el.w, h: el.h },
                                   keepRatio: el.type === 'image',
+                                  square: el.type === 'qr',
                                   moved: false,
                                 };
                               }}
