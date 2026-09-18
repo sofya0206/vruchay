@@ -22,12 +22,16 @@ import {
   MousePointerSquareDashed,
   Paintbrush,
   Pipette,
+  Square,
   Trash2,
   Underline,
   Ungroup,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { describeSize, type SheetElement, type ShapeElement, type TextProps } from '@gramota/shared';
+import { describeSize, isSafeHrefTemplate, type SheetElement, type ShapeElement, type TextProps } from '@gramota/shared';
+
+type QrElement = Extract<SheetElement, { type: 'qr' }>;
+type LinkElement = Extract<SheetElement, { type: 'link' }>;
 import type { DocumentDetail } from '../api/types';
 import { PageSizePicker, type PageSizeValue } from '../documents/PageSizePicker';
 import { useTooltip } from '../ui/Tooltip';
@@ -47,6 +51,8 @@ interface Props {
   page: { w: number; h: number };
   onTextProps: (patch: Partial<TextProps>, commit?: boolean) => void;
   onShapeProps: (patch: Partial<ShapeElement['props']>, commit?: boolean) => void;
+  onQrProps: (patch: Partial<QrElement['props']>, commit?: boolean) => void;
+  onLinkProps: (patch: Partial<LinkElement['props']>, commit?: boolean) => void;
   onElement: (patch: Partial<Pick<SheetElement, 'rotation' | 'opacity' | 'locked' | 'hidden' | 'name'>>, commit?: boolean) => void;
   onBox: (id: string, box: Box) => void;
   onAlign: (kind: AlignKind) => void;
@@ -115,6 +121,7 @@ export function PropertiesPanel(props: Props) {
   const single = elements.length === 1 ? elements[0] : null;
   const texts = elements.filter((el) => el.type === 'text');
   const shapes = elements.filter((el): el is ShapeElement => el.type === 'shape');
+  const qrs = elements.filter((el): el is QrElement => el.type === 'qr');
   const common = commonTextProps(elements);
   const locked = commonValue(elements.map((el) => el.locked));
   const hidden = commonValue(elements.map((el) => el.hidden));
@@ -271,9 +278,15 @@ export function PropertiesPanel(props: Props) {
         <ShapeSection shapes={shapes} onChange={props.onShapeProps} />
       )}
 
-      {single && single.type !== 'text' && single.type !== 'shape' && (
+      {qrs.length > 0 && texts.length === 0 && shapes.length === 0 && (
+        <QrSection qrs={qrs} onChange={props.onQrProps} page={props.page} onBox={props.onBox} />
+      )}
+
+      {single && single.type === 'link' && <LinkSection link={single} onChange={props.onLinkProps} />}
+
+      {single && single.type === 'image' && (
         <p className="text-sm text-[var(--text-muted)]">
-          У этого блока пока нет настроек, кроме положения и размера.
+          У картинки нет настроек, кроме положения, размера и прозрачности.
         </p>
       )}
 
@@ -555,22 +568,6 @@ function ShapeSection({
 
   return (
     <div className="space-y-4 border-t border-[var(--line)] pt-4">
-      <div>
-        <Label>Фигура</Label>
-        <div className="flex gap-1">
-          {(
-            [
-              ['line', 'Линия'],
-              ['rect', 'Прямоугольник'],
-              ['ellipse', 'Овал'],
-            ] as const
-          ).map(([value, label]) => (
-            <Toggle key={value} active={kind === value} onClick={() => onChange({ kind: value })}>
-              {label}
-            </Toggle>
-          ))}
-        </div>
-      </div>
       <div className="grid grid-cols-2 gap-2">
         <label className="block">
           <Label>Контур, мм</Label>
@@ -626,6 +623,114 @@ function ShapeSection({
           )}
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * QR: что кодировать и каким цветом. Пустой шаблон — адрес проверки
+ * подлинности экземпляра; свой шаблон принимает те же поля, что и текст.
+ */
+function QrSection({
+  qrs,
+  onChange,
+  page,
+  onBox,
+}: {
+  qrs: QrElement[];
+  onChange: (patch: Partial<QrElement['props']>, commit?: boolean) => void;
+  page: { w: number; h: number };
+  onBox: (id: string, box: Box) => void;
+}) {
+  const crooked = qrs.filter((q) => Math.abs(q.w - q.h) > 0.05);
+  const template = commonValue(qrs.map((q) => q.props.template));
+  const color = commonValue(qrs.map((q) => q.props.color));
+  const custom = template !== MIXED && template !== '';
+
+  return (
+    <div className="space-y-4 border-t border-[var(--line)] pt-4">
+      <div>
+        <Label>Содержимое QR</Label>
+        <div className="flex gap-1">
+          <Toggle active={!custom && template !== MIXED} onClick={() => onChange({ template: '' })}>
+            Проверка подлинности
+          </Toggle>
+          <Toggle active={custom} onClick={() => onChange({ template: 'https://' })}>
+            Свой адрес
+          </Toggle>
+        </div>
+      </div>
+      {(custom || template === MIXED) && (
+        <label className="block">
+          <Label>Адрес или текст</Label>
+          <Input
+            value={template === MIXED ? '' : template}
+            placeholder={template === MIXED ? MIXED_PLACEHOLDER : 'https://… или %code'}
+            onChange={(e) => onChange({ template: e.target.value }, false)}
+            onBlur={(e) => onChange({ template: e.target.value }, true)}
+          />
+          <p className="mt-1 text-xs text-[var(--text-muted)]">Поля вида %name подставятся при печати.</p>
+        </label>
+      )}
+      <div>
+        <Label>Цвет</Label>
+        <ColorField value={color === MIXED ? '#000000' : (color ?? '#000000')} onChange={(value) => onChange({ color: value })} />
+      </div>
+      {crooked.length > 0 && (
+        <Button
+          variant="secondary"
+          icon={<Square size={15} />}
+          className="w-full"
+          onClick={() => {
+            // Сторона — меньшая из двух, центр на месте: квадрат не вылезет за лист.
+            for (const q of crooked) {
+              const side = Math.min(q.w, q.h);
+              const x = Math.min(Math.max(q.x + (q.w - side) / 2, 0), page.w - side);
+              const y = Math.min(Math.max(q.y + (q.h - side) / 2, 0), page.h - side);
+              onBox(q.id, { x, y, w: side, h: side });
+            }
+          }}
+        >
+          Сделать квадратным
+        </Button>
+      )}
+    </div>
+  );
+}
+
+/** Ссылка-область: адрес правится здесь, а не повторной вставкой блока. */
+function LinkSection({
+  link,
+  onChange,
+}: {
+  link: LinkElement;
+  onChange: (patch: Partial<LinkElement['props']>, commit?: boolean) => void;
+}) {
+  const [draft, setDraft] = useState(link.props.url);
+  useEffect(() => setDraft(link.props.url), [link.id, link.props.url]);
+  const valid = isSafeHrefTemplate(draft);
+
+  return (
+    <div className="space-y-2 border-t border-[var(--line)] pt-4">
+      <label className="block">
+        <Label>Адрес ссылки</Label>
+        <Input
+          value={draft}
+          placeholder="https://…"
+          aria-invalid={!valid}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            if (isSafeHrefTemplate(e.target.value)) onChange({ url: e.target.value }, false);
+          }}
+          onBlur={() => {
+            if (valid) onChange({ url: draft }, true);
+            else setDraft(link.props.url);
+          }}
+        />
+      </label>
+      <p className={`text-xs ${valid ? 'text-[var(--text-muted)]' : 'text-[var(--danger)]'}`}>
+        {valid ? 'Область прозрачна на листе, в PDF кликается. Поля вида %code подставятся.' : 'Адрес должен начинаться с http:// или https://'}
+      </p>
     </div>
   );
 }

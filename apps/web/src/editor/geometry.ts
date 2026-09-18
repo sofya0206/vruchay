@@ -98,3 +98,31 @@ export function roundBox(box: Box): Box {
   const r = (v: number) => Math.round(v * 100) / 100;
   return { x: r(box.x), y: r(box.y), w: r(box.w), h: r(box.h) };
 }
+
+/**
+ * Квадрат из растянутой рамки — для QR: неравные стороны сплющивают узор,
+ * и телефон его хуже читает. Сторону берём с той оси, которую тянут
+ * (у угла — большую), противоположный край остаётся на месте.
+ */
+export function squareBox(start: Box, next: Box, handle: ResizeHandle, pageW: number, pageH: number): Box {
+  const horizontal = handle === 'e' || handle === 'w';
+  const vertical = handle === 'n' || handle === 's';
+  let side = horizontal ? next.w : vertical ? next.h : Math.max(next.w, next.h);
+  const right = start.x + start.w;
+  const bottom = start.y + start.h;
+  const x0 = handle.includes('w') ? right : start.x;
+  const y0 = handle.includes('n') ? bottom : start.y;
+  // Не вылезать за лист в ту сторону, куда растёт квадрат.
+  side = Math.min(
+    side,
+    handle.includes('w') ? x0 : pageW - x0,
+    handle.includes('n') ? y0 : pageH - y0,
+  );
+  side = Math.max(side, MIN_SIZE_MM);
+  return {
+    x: handle.includes('w') ? x0 - side : x0,
+    y: handle.includes('n') ? y0 - side : y0,
+    w: side,
+    h: side,
+  };
+}

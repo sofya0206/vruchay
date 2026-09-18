@@ -38,7 +38,11 @@ import {
   type TextElement,
   type TextProps,
 } from '@gramota/shared';
+
+type QrElement = Extract<SheetElement, { type: 'qr' }>;
+type LinkElement = Extract<SheetElement, { type: 'link' }>;
 import { InsertMenu, type InsertKind } from '../editor/InsertMenu';
+import { CanvasMenu } from '../editor/CanvasMenu';
 import { DocumentChrome, ToolButton, ToolDivider } from '../editor/DocumentChrome';
 import { useDocumentFileMenu } from '../editor/DocumentFileMenu';
 import { SheetTabs } from '../editor/SheetTabs';
@@ -87,6 +91,7 @@ import {
   pxToMm,
   resizeBox,
   roundBox,
+  squareBox,
   type Box,
   type ResizeHandle,
 } from '../editor/geometry';
@@ -144,7 +149,7 @@ type Gesture =
   /** `lines` — направляющие: считаются один раз на жест, остальные блоки стоят на месте. */
   | (GestureBase & { kind: 'move'; boxes: Record<string, Box>; lines?: SnapLine[] })
   /** `keepRatio` — угол тянет с сохранением пропорций: у картинки всегда, у прочих с Shift. */
-  | (GestureBase & { kind: 'resize'; id: string; handle: ResizeHandle; box: Box; keepRatio: boolean })
+  | (GestureBase & { kind: 'resize'; id: string; handle: ResizeHandle; box: Box; keepRatio: boolean; square: boolean })
   | (GestureBase & { kind: 'scale'; handle: ResizeHandle; frame: Rect; boxes: Record<string, Box>; sizes: Record<string, number> })
   | (GestureBase & { kind: 'rotate'; id: string; center: { x: number; y: number } })
   | (GestureBase & { kind: 'marquee'; additive: boolean; base: ReadonlySet<string> });
@@ -237,6 +242,8 @@ export function EditorPage() {
   /** Тащат ли над холстом файл: лист подсвечивается, куда он ляжет. */
   const [fileOver, setFileOver] = useState(false);
   const clipboard = useRef<SheetElement[]>([]);
+  /** Меню по правому клику на пустом месте: где показать и куда вставлять. */
+  const [canvasMenu, setCanvasMenu] = useState<{ x: number; y: number; mm: { x: number; y: number } } | null>(null);
   const liveEditor = useRef<Editor | null>(null);
 
   // Адреса уехавших вкладок: `?view=table` и соседние. Разбираются
@@ -471,6 +478,7 @@ export function EditorPage() {
     return () => observer.disconnect();
   }, [doc.data]);
 
+  const hasCanvas = Boolean(doc.data);
   // Ctrl+колёсико — масштаб, а не прокрутка страницы; пробел — панорамирование.
   useEffect(() => {
     const el = containerRef.current;
@@ -497,7 +505,9 @@ export function EditorPage() {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
     };
-  }, []);
+    // Холст появляется только после загрузки материала: с пустыми
+    // зависимостями колесо вешалось на null и зум не работал вовсе.
+  }, [hasCanvas]);
 
   // Выделение не переживает исчезновение блока: удалили — сняли.
   useEffect(() => {
@@ -591,6 +601,26 @@ export function EditorPage() {
       patchElements(
         selected,
         (el) => (el.type === 'shape' ? { ...el, props: { ...el.props, ...patch } } : el),
+        commit,
+      ),
+    [patchElements, selected],
+  );
+
+  const patchQrProps = useCallback(
+    (patch: Partial<QrElement['props']>, commit = true) =>
+      patchElements(
+        selected,
+        (el) => (el.type === 'qr' ? { ...el, props: { ...el.props, ...patch } } : el),
+        commit,
+      ),
+    [patchElements, selected],
+  );
+
+  const patchLinkProps = useCallback(
+    (patch: Partial<LinkElement['props']>, commit = true) =>
+      patchElements(
+        selected,
+        (el) => (el.type === 'link' ? { ...el, props: { ...el.props, ...patch } } : el),
         commit,
       ),
     [patchElements, selected],
@@ -761,6 +791,7 @@ export function EditorPage() {
           : resizeBox(g.box, g.handle, dx, dy, page.w, page.h);
         // Сетка округляет стороны порознь — пропорции она бы сломала.
         if (showGrid && !proportional) next = snapToGrid(next, GRID_MM);
+        if (g.square) next = squareBox(g.box, next, g.handle, page.w, page.h);
         updateBoxes({ [g.id]: next }, false);
         return;
       }
@@ -947,7 +978,14 @@ export function EditorPage() {
    * в одном месте, и новый блок гарантированно такой же, каким его увидит
    * печать. Иначе редактор и рендер разошлись бы на первом же новом поле.
    */
-  function addElement(what: InsertKind) {
+  /** Точка листа в мм под указателем — для вставки туда, куда кликнули. */
+  function pointOnSheet(e: { clientX: number; clientY: number }) {
+    const rect = sheetRef.current?.getBoundingClientRect();
+    if (!rect) return null;
+    return { x: (e.clientX - rect.left) / (PX_PER_MM * zoom), y: (e.clientY - rect.top) / (PX_PER_MM * zoom) };
+  }
+
+  function addElement(what: InsertKind, at?: { x: number; y: number } | null) {
     const size =
       what.type === 'text'
         ? { w: 120, h: 20 }
@@ -977,8 +1015,8 @@ export function EditorPage() {
       {
         id: crypto.randomUUID(),
         type: what.type,
-        x: page.pageWidthMm / 2 - size.w / 2,
-        y: page.pageHeightMm / 2 - size.h / 2,
+        x: at ? clamp(at.x, 0, page.pageWidthMm - size.w) : page.pageWidthMm / 2 - size.w / 2,
+        y: at ? clamp(at.y, 0, page.pageHeightMm - size.h) : page.pageHeightMm / 2 - size.h / 2,
         w: size.w,
         h: size.h,
         rotation: 0,
@@ -991,6 +1029,7 @@ export function EditorPage() {
     setSelected(new Set([el.id]));
     // Блок, вставленный из панели полей, не уводит из неё к свойствам.
     if (!fieldsOpen) setOtherPanel('props');
+    return el;
   }
 
   /**
@@ -1410,6 +1449,19 @@ export function EditorPage() {
               className={`relative shadow-[var(--shadow-sheet)] ${fileOver ? 'ring-2 ring-[var(--accent)]' : ''}`}
               style={{ width: px(page.pageWidthMm), height: px(page.pageHeightMm) }}
               onPointerDown={startMarquee}
+              // Двойной клик по пустому месту — новый текст прямо там,
+              // как в Miro и Excalidraw. По блокам событие не доходит.
+              onDoubleClick={(e) => {
+                if (dataMode) return;
+                const el = addElement({ type: 'text' }, pointOnSheet(e));
+                if (el?.type === 'text') setEditingId(el.id);
+              }}
+              onContextMenu={(e) => {
+                if (dataMode) return;
+                e.preventDefault();
+                const mm = pointOnSheet(e);
+                if (mm) setCanvasMenu({ x: e.clientX, y: e.clientY, mm });
+              }}
             >
               <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}>
                 <SheetRenderer
@@ -1507,6 +1559,8 @@ export function EditorPage() {
                         }
                       }}
                       onContextMenu={(e) => {
+                        // Меню вставки — только для пустого места листа.
+                        e.stopPropagation();
                         if (el.type !== 'text' || el.locked) return;
                         // Слой жестов лежит поверх текста, поэтому фишку под
                         // указателем ищем по координатам, а не по цели события.
@@ -1564,6 +1618,7 @@ export function EditorPage() {
                                   startY: e.clientY,
                                   box: { x: el.x, y: el.y, w: el.w, h: el.h },
                                   keepRatio: el.type === 'image',
+                                  square: el.type === 'qr',
                                   moved: false,
                                 };
                               }}
@@ -1730,6 +1785,8 @@ export function EditorPage() {
                     onResizePage={(size) => setResizeTo(size)}
                     onTextProps={patchTextProps}
                     onShapeProps={patchShapeProps}
+                    onQrProps={patchQrProps}
+                    onLinkProps={patchLinkProps}
                     onElement={(patch, commit) => patchElements(selected, (el) => ({ ...el, ...patch }) as SheetElement, commit)}
                     onBox={(elementId, box) => {
                       const safe = { ...box, w: Math.max(box.w, 5), h: Math.max(box.h, 5) };
@@ -1800,6 +1857,16 @@ export function EditorPage() {
         />
       )}
 
+      {canvasMenu && (
+        <CanvasMenu
+          at={canvasMenu}
+          canPaste={clipboard.current.length > 0}
+          onInsert={(what) => addElement(what, canvasMenu.mm)}
+          onImage={pickImage}
+          onPaste={() => cloneInto(clipboard.current)}
+          onClose={() => setCanvasMenu(null)}
+        />
+      )}
       {resizeTo && (
         <ResizeDialog
           from={{ widthMm: page.pageWidthMm, heightMm: page.pageHeightMm }}

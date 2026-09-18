@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fitZoom, moveBox, PX_PER_MM, pxToMm, resizeBox, roundBox } from './geometry';
+import { fitZoom, moveBox, PX_PER_MM, pxToMm, resizeBox, roundBox, squareBox } from './geometry';
 
 const A4 = { w: 297, h: 210 };
 const box = { x: 100, y: 80, w: 60, h: 20 };
@@ -76,5 +76,19 @@ describe('roundBox', () => {
       w: 4,
       h: 4,
     });
+  });
+});
+
+describe('squareBox', () => {
+  const start = { x: 50, y: 50, w: 30, h: 30 };
+  it('боковая ручка задаёт сторону, противоположный край на месте', () => {
+    expect(squareBox(start, { x: 50, y: 50, w: 40, h: 30 }, 'e', 297, 210)).toEqual({ x: 50, y: 50, w: 40, h: 40 });
+    expect(squareBox(start, { x: 40, y: 50, w: 40, h: 30 }, 'w', 297, 210)).toEqual({ x: 40, y: 50, w: 40, h: 40 });
+  });
+  it('угол берёт большую сторону и растёт от противоположного угла', () => {
+    expect(squareBox(start, { x: 40, y: 45, w: 40, h: 35 }, 'nw', 297, 210)).toEqual({ x: 40, y: 40, w: 40, h: 40 });
+  });
+  it('не выходит за лист', () => {
+    expect(squareBox(start, { x: 50, y: 50, w: 300, h: 30 }, 'e', 297, 210)).toEqual({ x: 50, y: 50, w: 160, h: 160 });
   });
 });
