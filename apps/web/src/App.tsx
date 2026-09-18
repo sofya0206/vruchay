@@ -6,6 +6,7 @@ import { RegisterPage } from './pages/RegisterPage';
 import { ConfirmEmailPage } from './pages/ConfirmEmailPage';
 import { DocumentsPage } from './pages/DocumentsPage';
 import { AppShell } from './shell/AppShell';
+import { StatesPage } from './pages/StatesPage';
 import { OverviewPage } from './overview/OverviewPage';
 import { EditorPage } from './pages/EditorPage';
 import { RenderPage } from './pages/RenderPage';
@@ -125,6 +126,8 @@ export function App() {
       <Route element={<AppShell />}>
         <Route path="/" element={<OverviewPage />} />
         <Route path="/documents" element={<DocumentsPage />} />
+        {/* Витрина состояний — только в разработке, в сборку не попадает. */}
+        {import.meta.env.DEV && <Route path="/dev/states" element={<StatesPage />} />}
         {/* Архив — свой адрес, а не переключатель внутри списка: на него
             можно сослаться, а «Назад» возвращает к рабочим. Статический
             сегмент стоит выше `/documents/:id` в разборе адреса, поэтому

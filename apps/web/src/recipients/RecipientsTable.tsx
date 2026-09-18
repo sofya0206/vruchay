@@ -32,6 +32,8 @@ import {
 import { PreviewDialog } from './PreviewDialog';
 import { Button } from '../ui/Button';
 import { Input, Label, StatusChip } from '../ui/Field';
+import { ProgressBar } from '../ui/Progress';
+import { Outcome } from '../ui/Outcome';
 import { ImportDialog } from './ImportDialog';
 import { planPaste } from './clipboard';
 import { GenerateDialog, type GenerateMode } from './GenerateDialog';
@@ -519,6 +521,21 @@ export function RecipientsTable({
               </button>
             </>
           )}
+        </div>
+      )}
+
+      {/* Ход выпуска: полоса, число, оценка времени. Чип в панели
+          остаётся коротким сигналом, полоса — тем, на что смотрят. */}
+      {job && running && (
+        <div className="border-b border-[var(--line)] px-4 py-3">
+          <ProgressBar done={job.done} failed={job.failed} total={job.total} />
+        </div>
+      )}
+
+      {/* Итог: три цветных счётчика вместо фразы. */}
+      {job?.status === 'done' && (
+        <div className="border-b border-[var(--line)] px-4 py-3">
+          <Outcome done={job.done} failed={job.failed} doneLabel="выпущено" />
         </div>
       )}
 

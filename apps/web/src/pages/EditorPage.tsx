@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { ErrorState } from '../ui/ErrorState';
 import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
@@ -850,6 +851,16 @@ export function EditorPage() {
   if (moved) return <Navigate to={moved} replace />;
 
   if (doc.isPending) return <div className="p-6 text-[var(--text-muted)]">Загрузка документа…</div>;
+  if (doc.isError) {
+    return (
+      <ErrorState
+        title="Документ не открылся"
+        onRetry={() => void doc.refetch()}
+        retrying={doc.isFetching}
+        code={String(doc.error)}
+      />
+    );
+  }
   if (!doc.data || !sheet) return <div className="p-6 text-[var(--text-muted)]">Документ не найден</div>;
 
   const page = doc.data;

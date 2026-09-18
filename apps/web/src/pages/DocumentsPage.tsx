@@ -16,6 +16,8 @@ import { useFolders } from '../api/folders';
 import { LibrarySortSelect, type LibrarySort } from '../documents/LibraryFilters';
 import { RenameDialog } from '../documents/RenameDialog';
 import { EmptyState } from '../ui/EmptyState';
+import { ErrorState } from '../ui/ErrorState';
+import { SkeletonCards } from '../ui/Skeleton';
 
 /**
  * Библиотека материалов.
@@ -306,7 +308,16 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
           </p>
         </div>
 
-        {documents.isPending && <p className="text-[var(--text-muted)]">Загрузка…</p>}
+        {documents.isPending && <SkeletonCards label="Открываем документы" />}
+
+        {documents.isError && (
+          <ErrorState
+            title="Документы не открылись"
+            onRetry={() => void documents.refetch()}
+            retrying={documents.isFetching}
+            code={String(documents.error)}
+          />
+        )}
 
         {nothingFound &&
           (trash ? (

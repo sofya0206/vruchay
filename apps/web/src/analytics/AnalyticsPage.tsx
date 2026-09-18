@@ -179,7 +179,7 @@ function Activation({
             <span
               className={`flex size-6 shrink-0 items-center justify-center rounded-full ${
                 step.done
-                  ? 'bg-[var(--accent)] text-[var(--accent-contrast)]'
+                  ? 'bg-[var(--accent-button)] text-[var(--accent-contrast)]'
                   : 'bg-[var(--surface-sunken)] text-[var(--text-muted)]'
               }`}
             >
