@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { CalendarRange, ChevronRight, RefreshCw, Search, Send } from 'lucide-react';
@@ -12,6 +12,11 @@ import { IconButton } from '../ui/IconButton';
 import { EmptyState } from '../ui/EmptyState';
 import { SectionTitle } from '../ui/SectionLayout';
 import { Loading } from '../ui/Loading';
+import { Tabs } from '../ui/Tabs';
+import { MailStats } from './MailStats';
+import { TextMailingForm } from './TextMailing';
+import { KindPicker } from './KindPicker';
+import { rangePeriod, statsRange, STATS_RANGES } from './mail-stats';
 import { LetterCard } from './LetterCard';
 import { MailingLogTable } from './MailingLogTable';
 import { MailLayout } from './MailNav';
@@ -61,8 +66,19 @@ import {
  * возвращает в предыдущую папку.
  */
 export function MailingPage() {
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const list = mailList(params.get('list'));
+  /** Новая рассылка: с документами или только текст — в адресе, как и папка. */
+  const mode = params.get('mode') === 'text' ? 'text' : 'documents';
+  const range = statsRange(params.get('range'));
+
+  /** Сменить параметр адреса, не трогая остальные. */
+  function setParam(key: string, value: string | null) {
+    const next = new URLSearchParams(params);
+    if (value === null) next.delete(key);
+    else next.set(key, value);
+    setParams(next, { replace: true });
+  }
 
   const [kind, setKind] = useState<LetterKind>('transactional');
   const [selected, setSelected] = useState<string[]>([]);
@@ -89,9 +105,21 @@ export function MailingPage() {
    * с папками считает он же, и без запроса колонка слева стояла бы пустой,
    * пока человек собирает рассылку.
    */
+  /*
+   * Ищет сервер — по всем письмам, а не по двумстам загруженным. Запрос
+   * уходит, когда человек перестал печатать; до ответа загруженные письма
+   * фильтруются тут же, чтобы список отзывался на каждую букву.
+   */
+  const [serverSearch, setServerSearch] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => setServerSearch(search.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   const log = useMailingLog({
     documentId: documentId || undefined,
     problemsOnly: list === 'undelivered',
+    search: serverSearch || undefined,
   });
 
   const audience = useAudience();
@@ -158,7 +186,7 @@ export function MailingPage() {
     }
   }
 
-  const letterFolder = list !== 'lists' && list !== 'new';
+  const letterFolder = list !== 'lists' && list !== 'new' && list !== 'stats';
 
   return (
     <>
@@ -180,7 +208,14 @@ export function MailingPage() {
           </SectionTitle>
         }
         tools={
-          letterFolder ? (
+          list === 'stats' ? (
+            <Tabs
+              label="Отрезок"
+              value={range}
+              onChange={(next) => setParam('range', next === '30' ? null : next)}
+              items={STATS_RANGES.map((r) => ({ id: r.id, label: r.label }))}
+            />
+          ) : letterFolder ? (
             <div className="flex items-center gap-2">
               <IconButton label="Обновить список писем" onClick={() => void refresh()}>
                 <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
@@ -235,7 +270,9 @@ export function MailingPage() {
           ) : undefined
         }
       >
-        {letterFolder ? (
+        {list === 'stats' ? (
+          <MailStats period={rangePeriod(range)} />
+        ) : letterFolder ? (
           log.isPending ? (
             <p className="text-[var(--text-muted)]">Загрузка…</p>
           ) : (
@@ -254,108 +291,128 @@ export function MailingPage() {
           <Lists documents={items} />
         ) : (
           <div className="max-w-3xl space-y-8">
-            <KindPicker
-              kind={kind}
-              onChange={(next) => {
-                setKind(next);
-                setAudiences({});
-                setSent(null);
-              }}
+            {/* Рассылка без документа — тот же поток и тот же выбор потока,
+                но без материалов: приглашения, переносы, напоминания. */}
+            <Tabs
+              label="Что рассылаем"
+              value={mode}
+              onChange={(next) => setParam('mode', next === 'text' ? 'text' : null)}
+              items={[
+                { id: 'documents', label: 'Документы' },
+                { id: 'text', label: 'Только текст' },
+              ]}
             />
 
-            <Step n={1} title="Что рассылаем" hint="Можно выбрать несколько материалов сразу">
-              {items.length === 0 ? (
-                <p className="text-sm text-[var(--text-muted)]">
-                  Материалов пока нет.{' '}
-                  <Link to="/documents" className="text-[var(--accent)] hover:underline">
-                    Создайте первый
-                  </Link>
-                  .
-                </p>
-              ) : (
-                <ul className="space-y-1">
-                  {items.map((doc) => (
-                    <li key={doc.id}>
-                      {/* Не одно название: одноимённых материалов в библиотеке
+            {mode === 'text' ? (
+              <TextMailingForm />
+            ) : (
+              <>
+                <KindPicker
+                  kind={kind}
+                  onChange={(next) => {
+                    setKind(next);
+                    setAudiences({});
+                    setSent(null);
+                  }}
+                />
+
+                <Step n={1} title="Что рассылаем" hint="Можно выбрать несколько материалов сразу">
+                  {items.length === 0 ? (
+                    <p className="text-sm text-[var(--text-muted)]">
+                      Материалов пока нет.{' '}
+                      <Link to="/documents" className="text-[var(--accent)] hover:underline">
+                        Создайте первый
+                      </Link>
+                      .
+                    </p>
+                  ) : (
+                    <ul className="space-y-1">
+                      {items.map((doc) => (
+                        <li key={doc.id}>
+                          {/* Не одно название: одноимённых материалов в библиотеке
                           бывает три подряд, а разослать не тому списку нельзя —
                           письмо не отзывается. */}
-                      <label className="flex items-start gap-3 rounded-xl px-3 py-2 hover:bg-[var(--surface-sunken)]">
-                        <Checkbox
-                          checked={selected.includes(doc.id)}
-                          onChange={() => toggle(doc.id)}
-                          className="mt-1"
+                          <label className="flex items-start gap-3 rounded-xl px-3 py-2 hover:bg-[var(--surface-sunken)]">
+                            <Checkbox
+                              checked={selected.includes(doc.id)}
+                              onChange={() => toggle(doc.id)}
+                              className="mt-1"
+                            />
+                            <span>
+                              <span className="block">{doc.title}</span>
+                              <span className="mt-0.5 block text-sm text-[var(--text-muted)]">
+                                {documentLine(doc)}
+                              </span>
+                            </span>
+                          </label>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </Step>
+
+                <Step
+                  n={2}
+                  title="Кому"
+                  hint="Основной способ — таблица получателей: по ней же выпускаются документы"
+                >
+                  <RecipientsPicker
+                    source={source}
+                    emails={emails}
+                    onSource={(next) => {
+                      setSource(next);
+                      setAudiences({});
+                    }}
+                    onEmails={(next) => {
+                      setEmails(next);
+                      setAudiences({});
+                    }}
+                  />
+                </Step>
+
+                {chosen.length > 0 && (
+                  <Step n={3} title="Письмо" hint="У каждого материала своё письмо и своя проверка">
+                    <div className="space-y-4">
+                      {chosen.map((doc) => (
+                        <LetterCard
+                          key={`${doc.id}-${kind}`}
+                          documentId={doc.id}
+                          title={doc.title}
+                          subtitle={documentLine(doc)}
+                          kind={kind}
+                          audience={audiences[doc.id]}
+                          checking={checking === doc.id}
+                          onCheck={() => void check(doc.id)}
                         />
-                        <span>
-                          <span className="block">{doc.title}</span>
-                          <span className="mt-0.5 block text-sm text-[var(--text-muted)]">
-                            {documentLine(doc)}
-                          </span>
-                        </span>
-                      </label>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Step>
+                      ))}
+                    </div>
+                  </Step>
+                )}
 
-            <Step
-              n={2}
-              title="Кому"
-              hint="Основной способ — таблица получателей: по ней же выпускаются документы"
-            >
-              <RecipientsPicker
-                source={source}
-                emails={emails}
-                onSource={(next) => {
-                  setSource(next);
-                  setAudiences({});
-                }}
-                onEmails={(next) => {
-                  setEmails(next);
-                  setAudiences({});
-                }}
-              />
-            </Step>
-
-            {chosen.length > 0 && (
-              <Step n={3} title="Письмо" hint="У каждого материала своё письмо и своя проверка">
-                <div className="space-y-4">
-                  {chosen.map((doc) => (
-                    <LetterCard
-                      key={`${doc.id}-${kind}`}
-                      documentId={doc.id}
-                      title={doc.title}
-                      subtitle={documentLine(doc)}
-                      kind={kind}
-                      audience={audiences[doc.id]}
-                      checking={checking === doc.id}
-                      onCheck={() => void check(doc.id)}
-                    />
-                  ))}
+                <div className="flex flex-wrap items-center gap-4">
+                  <Button
+                    variant="primary"
+                    icon={<Send size={16} />}
+                    disabled={chosen.length === 0 || send.isPending}
+                    onClick={() => setConfirm(true)}
+                  >
+                    Отправить
+                  </Button>
+                  {chosen.length === 0 && (
+                    <span className="text-sm text-[var(--text-muted)]">
+                      Сначала выберите материал
+                    </span>
+                  )}
+                  {send.isError && (
+                    <span className="text-sm text-[var(--danger)]">
+                      {(send.error as Error).message}
+                    </span>
+                  )}
                 </div>
-              </Step>
+
+                {sent && <SendReport result={sent} />}
+              </>
             )}
-
-            <div className="flex flex-wrap items-center gap-4">
-              <Button
-                variant="primary"
-                icon={<Send size={16} />}
-                disabled={chosen.length === 0 || send.isPending}
-                onClick={() => setConfirm(true)}
-              >
-                Отправить
-              </Button>
-              {chosen.length === 0 && (
-                <span className="text-sm text-[var(--text-muted)]">Сначала выберите материал</span>
-              )}
-              {send.isError && (
-                <span className="text-sm text-[var(--danger)]">
-                  {(send.error as Error).message}
-                </span>
-              )}
-            </div>
-
-            {sent && <SendReport result={sent} />}
           </div>
         )}
       </MailLayout>
@@ -449,59 +506,6 @@ function Lists({ documents }: { documents: DocumentSummary[] }) {
         </li>
       ))}
     </ul>
-  );
-}
-
-/**
- * Выбор потока.
- *
- * Первый шаг, а не настройка в глубине: от него зависит и текст письма,
- * и список получателей, и законность отправки. Объяснение рядом —
- * оператор не обязан помнить статьи, но обязан выбрать верно.
- */
-function KindPicker({
-  kind,
-  onChange,
-}: {
-  kind: LetterKind;
-  onChange: (kind: LetterKind) => void;
-}) {
-  const options: { id: LetterKind; title: string; hint: string }[] = [
-    {
-      id: 'transactional',
-      title: 'Выдача документа',
-      hint: 'Грамота, ссылка на неё, уведомление о сроке. Согласие не требуется.',
-    },
-    {
-      id: 'marketing',
-      title: 'Реклама',
-      hint: 'Приглашения и предложения. Только тем, кто дал согласие, — с отпиской.',
-    },
-  ];
-
-  return (
-    <div className="grid gap-3 sm:grid-cols-2">
-      {options.map((option) => (
-        <label
-          key={option.id}
-          className={`cursor-pointer rounded-2xl p-4 ring-1 transition-colors ${
-            kind === option.id
-              ? 'bg-[var(--accent-soft)] ring-[var(--accent)]'
-              : 'bg-[var(--surface)] ring-[var(--line)] hover:bg-[var(--surface-sunken)]'
-          }`}
-        >
-          <span className="flex items-center gap-2 font-medium">
-            <Radio
-              name="letter-kind"
-              checked={kind === option.id}
-              onChange={() => onChange(option.id)}
-            />
-            {option.title}
-          </span>
-          <span className="mt-1.5 block text-sm text-[var(--text-muted)]">{option.hint}</span>
-        </label>
-      ))}
-    </div>
   );
 }
 

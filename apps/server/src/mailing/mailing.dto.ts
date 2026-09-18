@@ -74,9 +74,55 @@ export const resendSchema = z.strictObject({
 
 export const logQuerySchema = z.strictObject({
   documentId: z.string().uuid().optional(),
+  /** Адрес, тема, материал или рассылка — что человек помнит. */
+  search: z.string().trim().max(200).optional(),
   /** Только недоставленные — с этого начинают разбор жалоб. */
   problemsOnly: z
     .enum(['true', 'false'])
     .optional()
     .transform((v) => v === 'true'),
+});
+
+/**
+ * Рассылка без документа: текст списку адресов.
+ *
+ * Вложения нет по определению — поле attachGeneratedFile сюда не пускаем,
+ * а не выставляем в false молча: лишнее поле означает, что клиент
+ * думает о другой рассылке, и об этом лучше узнать на входе.
+ */
+const textLetterFields = {
+  name: z.string().trim().min(1, 'Назовите рассылку').max(200),
+  subject: letterFields.subject,
+  bodyHtml: z.string().trim().min(1, 'Напишите текст письма').max(50_000),
+  senderId: letterFields.senderId,
+};
+
+export const textMailingSchema = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('transactional'), ...textLetterFields }),
+  z.strictObject({
+    kind: z.literal('marketing'),
+    ...textLetterFields,
+    advertiserName: templateSchema.options[1].shape.advertiserName,
+  }),
+]);
+
+export type TextMailingDto = z.infer<typeof textMailingSchema>;
+
+export const textRecipientsSchema = z.strictObject({
+  /** Список адресов целиком строкой: человек вставляет его как есть. */
+  emails: z.string().trim().min(1, 'Укажите хотя бы один адрес').max(60_000),
+});
+
+const isoDay = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Дата в виде ГГГГ-ММ-ДД')
+  // Круг через Date: «2026-02-31» Date.parse принимает и тихо превращает в март.
+  .refine((v) => {
+    const time = Date.parse(v);
+    return !Number.isNaN(time) && new Date(time).toISOString().slice(0, 10) === v;
+  }, 'Такой даты нет');
+
+export const statsQuerySchema = z.strictObject({
+  from: isoDay.optional(),
+  to: isoDay.optional(),
 });

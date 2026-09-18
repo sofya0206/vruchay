@@ -12,7 +12,14 @@ import type { LogItem, MailingLog } from './api';
  * жизнь одного письма, и три папки заставляли искать его по очереди.
  * Что именно с письмом — видно по чипу в строке.
  */
-export type MailList = 'all' | 'queued' | 'delivered' | 'undelivered' | 'lists' | 'new';
+export type MailList =
+  | 'all'
+  | 'queued'
+  | 'delivered'
+  | 'undelivered'
+  | 'stats'
+  | 'lists'
+  | 'new';
 
 export interface MailListInfo {
   id: MailList;
@@ -62,7 +69,8 @@ export const LETTER_LISTS: MailListInfo[] = [
 ];
 
 /** Папки, в которых лежат не письма, а работа с ними. */
-export const OTHER_LABELS: Record<'lists' | 'new', string> = {
+export const OTHER_LABELS: Record<'stats' | 'lists' | 'new', string> = {
+  stats: 'Сводка',
   lists: 'Списки получателей',
   new: 'Новая рассылка',
 };
@@ -72,7 +80,7 @@ export function letterList(id: MailList): MailListInfo | null {
 }
 
 export function mailListLabel(id: MailList): string {
-  return letterList(id)?.label ?? OTHER_LABELS[id as 'lists' | 'new'];
+  return letterList(id)?.label ?? OTHER_LABELS[id as keyof typeof OTHER_LABELS];
 }
 
 /**
@@ -82,7 +90,7 @@ export function mailListLabel(id: MailList): string {
  * письма — то, ради чего в раздел приходят чаще всего.
  */
 export function mailList(param: string | null): MailList {
-  const known: MailList[] = [...LETTER_LISTS.map((item) => item.id), 'lists', 'new'];
+  const known: MailList[] = [...LETTER_LISTS.map((item) => item.id), 'stats', 'lists', 'new'];
   return known.find((id) => id === param) ?? 'all';
 }
 

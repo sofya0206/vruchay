@@ -132,14 +132,21 @@ export function useTestSend() {
   });
 }
 
-export function useMailingLog(filters: { documentId?: string; problemsOnly: boolean }) {
+export function useMailingLog(filters: {
+  documentId?: string;
+  problemsOnly: boolean;
+  search?: string;
+}) {
   const params = new URLSearchParams();
   if (filters.documentId) params.set('documentId', filters.documentId);
   if (filters.problemsOnly) params.set('problemsOnly', 'true');
+  if (filters.search) params.set('search', filters.search);
   const query = params.toString();
 
   return useQuery({
-    queryKey: ['mailing-log', filters.documentId ?? '', filters.problemsOnly],
+    queryKey: ['mailing-log', filters.documentId ?? '', filters.problemsOnly, filters.search ?? ''],
+    // Пока идёт поиск, на экране остаются прежние письма, а не пустота.
+    placeholderData: (previous) => previous,
     queryFn: () => api.get<MailingLog>(`/mailing/log${query ? `?${query}` : ''}`),
     // Письма уходят очередью: журнал, открытый сразу после отправки,
     // показывал бы «в очереди» до перезагрузки страницы.
@@ -155,5 +162,126 @@ export function useResendFailed() {
         documentId,
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['mailing-log'] }),
+  });
+}
+
+// ─── Сводка по письмам ──────────────────────────────────────────────────────
+
+/** Воронка письма нарастающим итогом: прочитанное входит и в доставленные. */
+export interface Funnel {
+  total: number;
+  sent: number;
+  delivered: number;
+  opened: number;
+  failed: number;
+  queued: number;
+}
+
+export interface StatsDay extends Funnel {
+  /** «2026-09-15» по Москве. */
+  day: string;
+}
+
+export interface StatsSource extends Funnel {
+  id: string;
+  type: 'document' | 'mailing';
+  title: string;
+  eventName: string;
+}
+
+export interface MailStats {
+  from: string;
+  to: string;
+  totals: Funnel;
+  days: StatsDay[];
+  sources: StatsSource[];
+}
+
+export function useMailStats(period: { from: string; to: string }) {
+  return useQuery({
+    queryKey: ['mailing-stats', period.from, period.to],
+    queryFn: () => api.get<MailStats>(`/mailing/stats?from=${period.from}&to=${period.to}`),
+    // Письма доходят и открываются после отправки — сводка живёт.
+    refetchInterval: 30_000,
+  });
+}
+
+// ─── Рассылка без документа ─────────────────────────────────────────────────
+
+export interface TextMailing {
+  id: string;
+  name: string;
+  kind: LetterKind;
+  subject: string;
+  bodyHtml: string;
+  advertiserName: string | null;
+  senderId: string | null;
+  /** Письма уже ушли — текст заморожен. */
+  locked?: boolean;
+}
+
+export interface TextMailingDraft {
+  name: string;
+  kind: LetterKind;
+  subject: string;
+  bodyHtml: string;
+  advertiserName?: string;
+}
+
+export interface TextAudience {
+  refusal: string | null;
+  willSend: number;
+  skipped: SkippedRecipient[];
+}
+
+export interface TextSendResult {
+  name: string;
+  queued: number;
+  skipped: SkippedRecipient[];
+}
+
+export function useTextMailing(id: string | null) {
+  return useQuery({
+    queryKey: ['text-mailing', id],
+    queryFn: () => api.get<TextMailing>(`/mailing/text/${id}`),
+    enabled: Boolean(id),
+  });
+}
+
+/** Сохранить черновик: без id — создать, с id — переписать. */
+export function useSaveTextMailing() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, draft }: { id: string | null; draft: TextMailingDraft }) =>
+      id
+        ? api.patch<TextMailing>(`/mailing/text/${id}`, draft)
+        : api.post<TextMailing>('/mailing/text', draft),
+    onSuccess: (saved) => qc.setQueryData(['text-mailing', saved.id], saved),
+  });
+}
+
+export function useTextAudience() {
+  return useMutation({
+    mutationFn: ({ id, emails }: { id: string; emails: string }) =>
+      api.post<TextAudience>(`/mailing/text/${id}/audience`, { emails }),
+  });
+}
+
+export function useTextTest() {
+  return useMutation({
+    mutationFn: (id: string) => api.post<{ to: string }>(`/mailing/text/${id}/test`, {}),
+  });
+}
+
+export function useTextSend() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, emails }: { id: string; emails: string }) =>
+      api.post<TextSendResult>(`/mailing/text/${id}/send`, { emails }),
+    onSuccess: (_, { id }) => {
+      void qc.invalidateQueries({ queryKey: ['mailing-log'] });
+      void qc.invalidateQueries({ queryKey: ['mailing-stats'] });
+      void qc.invalidateQueries({ queryKey: ['text-mailing', id] });
+    },
   });
 }

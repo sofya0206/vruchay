@@ -49,10 +49,13 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Письма',
     to: '/mailing',
     icon: Mail,
-    children: LETTER_LISTS.map((l) => ({
-      to: l.id === 'all' ? '/mailing' : `/mailing?list=${l.id}`,
-      label: l.label,
-    })),
+    children: [
+      ...LETTER_LISTS.map((l) => ({
+        to: l.id === 'all' ? '/mailing' : `/mailing?list=${l.id}`,
+        label: l.label,
+      })),
+      { to: '/mailing?list=stats', label: 'Сводка' },
+    ],
   },
   {
     key: 'registry',
