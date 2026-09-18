@@ -4,6 +4,7 @@ import { CheckCheck, ChevronRight, MoreHorizontal } from 'lucide-react';
 import { MATERIAL_TABS, materialTabPath, workspacePath, type MaterialTab } from '../mailing/workspace-tabs';
 import { IconButton } from '../ui/IconButton';
 import { Menu, MenuDivider, MenuItem } from '../ui/Menu';
+import { DocumentTitle } from './DocumentTitle';
 
 /** Пункт меню «…» либо разделитель между смысловыми группами. */
 export type MenuEntry =
@@ -71,9 +72,7 @@ export function DocumentChrome({
             Документы
           </Link>
           <ChevronRight size={14} aria-hidden className="shrink-0 text-[var(--text-muted)]" />
-          <span className="truncate" title={title}>
-            {title}
-          </span>
+          <DocumentTitle documentId={documentId} title={title} />
         </h1>
 
         <span aria-hidden className="mx-2 h-5 w-px shrink-0 bg-[var(--line)]" />
