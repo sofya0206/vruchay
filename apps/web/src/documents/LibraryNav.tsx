@@ -1,6 +1,5 @@
 import {
   useEffect,
-  useMemo,
   useRef,
   useState,
   type DragEvent,
@@ -138,25 +137,19 @@ export function LibraryNav({ archiveCount }: { archiveCount?: number | null }) {
   const remove = useDeleteFolder();
   const reorder = useReorderFolders();
 
-  /**
-   * Порядок, в котором колонка стоит прямо сейчас, пока сервер ещё не
-   * ответил. Без него папка после отпускания прыгала бы на старое место
-   * и возвращалась обратно — жест выглядел бы как сбой.
-   */
-  const [dragOrder, setDragOrder] = useState<string[] | null>(null);
   /** Папка, которую тащат, и та, над которой её держат. */
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
+  /*
+   * Те же значения в ссылках — для обработчиков переноса. `dragover`
+   * приходит десятки раз в секунду, и читать состояние из замыкания
+   * прошлого кадра нельзя; а ставить состояние на каждое событие —
+   * значит перерисовывать колонку на каждое движение мыши.
+   */
+  const dragRef = useRef<string | null>(null);
+  const overRef = useRef<string | null>(null);
 
-  const list = useMemo(() => {
-    const rows = folders.data ?? [];
-    if (!dragOrder) return rows;
-    const by = new Map(rows.map((f) => [f.id, f]));
-    const moved = dragOrder.map((id) => by.get(id)).filter((f): f is FolderItem => !!f);
-    // Папку могли завести в соседней вкладке, пока здесь тащили: она встаёт
-    // в конец, а не пропадает из колонки.
-    return [...moved, ...rows.filter((f) => !dragOrder.includes(f.id))];
-  }, [folders.data, dragOrder]);
+  const list = folders.data ?? [];
 
   /** Переставить папку на новое место и отправить весь порядок целиком. */
   const moveFolder = (id: string, to: number) => {
@@ -164,11 +157,7 @@ export function LibraryNav({ archiveCount }: { archiveCount?: number | null }) {
     const from = ids.indexOf(id);
     if (from === -1 || to < 0 || to >= ids.length || from === to) return;
     ids.splice(to, 0, ...ids.splice(from, 1));
-    setDragOrder(ids);
-    // Порядок с сервера вернётся в `folders.data`, и своя копия больше
-    // не нужна: держать её дольше — значит показывать вчерашнюю колонку,
-    // если перестановка не удалась.
-    reorder.mutate(ids, { onSettled: () => setDragOrder(null) });
+    reorder(ids);
   };
 
   /**
@@ -186,21 +175,63 @@ export function LibraryNav({ archiveCount }: { archiveCount?: number | null }) {
     return to < from ? 'before' : 'after';
   };
 
+  const markOver = (id: string | null) => {
+    if (overRef.current === id) return;
+    overRef.current = id;
+    setOverId(id);
+  };
+
   const endDrag = () => {
+    dragRef.current = null;
+    overRef.current = null;
     setDragId(null);
     setOverId(null);
   };
 
-  /**
-   * Кто куда лёг, берём из самого переноса, а не из состояния: между началом
-   * жеста и отпусканием React мог не успеть перерисоваться, и обработчик
-   * отпускания достался бы от прошлого кадра — с пустым `dragId`. Состояние
-   * отвечает только за подсветку, где ошибка стоит подсветки, а не жеста.
+  /*
+   * Перенос принимает весь список, а не каждая строка отдельно.
+   *
+   * Между строками зазор в четыре точки. Когда бросок принимали строки,
+   * в зазоре браузер считал место запретным: курсор мигал «нельзя» при
+   * каждом переходе со строки на строку, а папка, отпущенная в зазоре,
+   * не ложилась никуда. Теперь зазор принадлежит строке, над которой
+   * курсор был последней, — линия вставки стоит на месте и не мигает.
+   *
+   * Над «Моими документами», кнопкой «Папка» и «Архивом» положить папку
+   * некуда — там линия гаснет, и курсор честно показывает запрет.
    */
-  const dropOn = (sourceId: string, targetId: string) => {
-    if (!sourceId || sourceId === targetId) return endDrag();
-    moveFolder(sourceId, list.findIndex((f) => f.id === targetId));
-    endDrag();
+  const dragHandlers = {
+    onDragOver: (e: DragEvent<HTMLUListElement>) => {
+      if (!dragRef.current) return;
+      const row = (e.target as HTMLElement).closest('li');
+      const folderId = row?.dataset.folderId;
+      if (row && !folderId) {
+        markOver(null);
+        return;
+      }
+      if (folderId) markOver(folderId);
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    },
+    onDragLeave: (e: DragEvent<HTMLUListElement>) => {
+      // Ушли за пределы списка — линия не должна висеть над последней
+      // строкой, обещая бросок, которого не будет. Проверяем по
+      // координатам: Safari не сообщает, куда ушёл указатель.
+      const box = e.currentTarget.getBoundingClientRect();
+      const inside =
+        e.clientX > box.left && e.clientX < box.right && e.clientY > box.top && e.clientY < box.bottom;
+      if (!inside) markOver(null);
+    },
+    onDrop: (e: DragEvent<HTMLUListElement>) => {
+      const source = dragRef.current;
+      const target = overRef.current;
+      if (!source) return;
+      e.preventDefault();
+      if (target && target !== source) {
+        moveFolder(source, list.findIndex((f) => f.id === target));
+      }
+      endDrag();
+    },
   };
 
   /*
@@ -242,7 +273,7 @@ export function LibraryNav({ archiveCount }: { archiveCount?: number | null }) {
       {/* На узком экране колонка превратилась бы в две трети экрана телефона,
           поэтому там это лента, которая прокручивается вбок. */}
       <div className="flex gap-1 overflow-x-auto md:block md:overflow-visible">
-        <ul className="flex gap-1 md:flex-col">
+        <ul className="flex gap-1 md:flex-col" {...dragHandlers}>
           <RootRow
             active={onDocuments && !openFolderId}
             expanded={expanded}
@@ -275,9 +306,10 @@ export function LibraryNav({ archiveCount }: { archiveCount?: number | null }) {
                   onMenu={(e) => openMenu(e, folder)}
                   dragging={dragId === folder.id}
                   over={insertSide(folder.id)}
-                  onDragStart={() => setDragId(folder.id)}
-                  onDragEnter={() => setOverId(folder.id)}
-                  onDrop={(sourceId) => dropOn(sourceId, folder.id)}
+                  onDragStart={() => {
+                    dragRef.current = folder.id;
+                    setDragId(folder.id);
+                  }}
                   onDragEnd={endDrag}
                 />
               ),
@@ -498,8 +530,6 @@ function FolderRow({
   dragging,
   over,
   onDragStart,
-  onDragEnter,
-  onDrop,
   onDragEnd,
 }: {
   folder: FolderItem;
@@ -509,8 +539,6 @@ function FolderRow({
   /** С какой стороны ляжет папка, если отпустить здесь. */
   over: 'before' | 'after' | null;
   onDragStart: () => void;
-  onDragEnter: () => void;
-  onDrop: (sourceId: string) => void;
   onDragEnd: () => void;
 }) {
   const name = useRef<HTMLSpanElement>(null);
@@ -531,18 +559,8 @@ function FolderRow({
   return (
     <li
       draggable
+      data-folder-id={folder.id}
       onDragStart={handleDragStart}
-      onDragEnter={onDragEnter}
-      onDragOver={(e) => {
-        // Пока перетаскивание не отменено, браузер считает строку запретной
-        // зоной и курсор показывает перечёркнутый круг.
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-      }}
-      onDrop={(e) => {
-        e.preventDefault();
-        onDrop(e.dataTransfer.getData('text/plain'));
-      }}
       onDragEnd={onDragEnd}
       onContextMenu={onMenu}
       className={cn(
@@ -552,13 +570,18 @@ function FolderRow({
            рамка показывала «эта папка», хотя вопрос был «между какими». */
         over &&
           'after:absolute after:inset-x-2 after:z-10 after:h-0.5 after:rounded-full after:bg-[var(--accent)] after:content-[""]',
-        over === 'before' && 'after:-top-px',
-        over === 'after' && 'after:-bottom-px',
+        // Ровно посередине четырёхточечного зазора: линия у края строки
+        // читалась как её подчёркивание, а не как место между двумя.
+        over === 'before' && 'after:-top-[3px]',
+        over === 'after' && 'after:-bottom-[3px]',
       )}
     >
       <Link
         to={`/documents?folder=${folder.id}`}
         aria-current={active ? 'page' : undefined}
+        /* Ссылка перетаскивается браузером сама по себе — как адрес, с
+           призраком из одного слова. Перетаскивать должна строка целиком. */
+        draggable={false}
         {...triggerProps}
         className={cn(
           columnRowClass({ active, nested: true }),
