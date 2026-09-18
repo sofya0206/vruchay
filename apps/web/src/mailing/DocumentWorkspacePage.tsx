@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
@@ -9,6 +10,7 @@ import { ValidationScreen } from '../validation/ValidationScreen';
 import { EmailTemplateEditor } from '../mail/EmailTemplateEditor';
 import { VerifyPanel } from '../verify/VerifyPanel';
 import { DocumentChrome } from '../editor/DocumentChrome';
+import type { FieldTarget } from '../editor/FieldsDrawer';
 import { useDocumentFileMenu } from '../editor/DocumentFileMenu';
 import { workspaceTab, type WorkspaceTab } from './workspace-tabs';
 
@@ -41,6 +43,8 @@ export function DocumentWorkspacePage() {
   });
 
   const fileMenu = useDocumentFileMenu(doc.data);
+  /** Куда вставляет панель полей: письмо отдаёт свою каретку. */
+  const [fieldTarget, setFieldTarget] = useState<FieldTarget | null>(null);
 
   /*
    * Вкладку держим в адресе, а не в состоянии.
@@ -75,7 +79,13 @@ export function DocumentWorkspacePage() {
     // на длинных страницах), поэтому опереться на неё через `h-full` больше
     // не на что.
     <div className="flex h-[calc(100dvh-var(--app-header))] min-h-0 flex-col">
-      <DocumentChrome documentId={id} title={page.title} actions={fileMenu.entries} tab={tab} />
+      <DocumentChrome
+        documentId={id}
+        title={page.title}
+        actions={fileMenu.entries}
+        tab={tab}
+        fieldTarget={tab === 'mail' ? (fieldTarget ?? undefined) : undefined}
+      />
 
       {tab === 'rules' ? (
         <RulesTab documentId={id} ruleSetId={page.ruleSetId ?? null} />
@@ -83,7 +93,7 @@ export function DocumentWorkspacePage() {
         <ValidationScreen documentId={id} onDone={() => open('table')} />
       ) : tab === 'mail' ? (
         <div className="min-h-0 flex-1 overflow-auto">
-          <EmailTemplateEditor documentId={id} />
+          <EmailTemplateEditor documentId={id} onFieldTarget={setFieldTarget} />
         </div>
       ) : (
         <div className="min-h-0 flex-1 overflow-auto">

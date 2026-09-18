@@ -22,7 +22,6 @@ import {
   Trash2,
   TriangleAlert,
   Undo2,
-  Variable,
   X,
 } from 'lucide-react';
 import type { Editor } from '@tiptap/core';
@@ -46,7 +45,8 @@ import { IconButton } from '../ui/IconButton';
 import { Select } from '../ui/Select';
 import { api } from '../api/client';
 import { useOrgProfile } from '../api/org';
-import { useRecipients } from '../api/recipients';
+import { useRecipientMutations } from '../api/recipients';
+import { useDocumentFields } from '../editor/useDocumentFields';
 import type { DocumentDetail } from '../api/types';
 import type { EventValues } from '../editor/EventFields';
 import { canvasPreviewData } from '../editor/preview-data';
@@ -66,8 +66,8 @@ import { fitPageToImage, readImageSize, type PageFit } from '../editor/fit-page'
 import { backgroundDpi, BLEED_MM, POOR_DPI, PRINT_DPI, resizeLayout, SAFE_MARGIN_MM, type ResizeMode } from '../editor/page-fit';
 import {
   applyMatches,
+  fieldFromColumn,
   fieldLabels,
-  fieldRegistry,
   knownFieldKeys,
   proposeMatches,
   type FieldInfo,
@@ -250,19 +250,10 @@ export function EditorPage() {
    * имена колонок становятся полями подстановки, а строки — образцом
    * на холсте, чтобы на месте поля стояла живая фамилия.
    */
-  const recipients = useRecipients(id);
+  const { recipients, columns, fields } = useDocumentFields(id);
+  const recipientMutations = useRecipientMutations(id);
   const org = useOrgProfile();
 
-  const columns = useMemo(
-    () => (recipients.data?.columns ?? []).map((c) => ({ id: c.id, name: c.name })),
-    [recipients.data],
-  );
-  const fields = useMemo<FieldInfo[]>(() => {
-    const registry = fieldRegistry(columns);
-    // Заголовки из загруженного файла — как назвал колонки сам человек.
-    const titles = new Map((recipients.data?.columns ?? []).map((c) => [c.name, c.title]));
-    return registry.map((f) => (f.kind === 'column' && titles.get(f.source) ? { ...f, title: titles.get(f.source)! } : f));
-  }, [columns, recipients.data]);
   const known = useMemo(() => knownFieldKeys(columns), [columns]);
   const labels = useMemo(() => fieldLabels(fields), [fields]);
 
@@ -611,6 +602,9 @@ export function EditorPage() {
     },
     [doc.data, history, layout],
   );
+
+  const canInsertIntoText =
+    editingId !== null || (selectedElements.length === 1 && selectedElements[0].type === 'text');
 
   const insertField = useCallback(
     (field: FieldInfo) => {
@@ -1055,13 +1049,6 @@ export function EditorPage() {
         hasBackground={hasBackground}
       />
       <ToolButton
-        title="Поля подстановки"
-        active={panel === 'fields'}
-        onClick={() => togglePanel('fields')}
-      >
-        <Variable size={16} />
-      </ToolButton>
-      <ToolButton
         title={hasBackground ? 'Заменить бланк' : 'Загрузить бланк'}
         onClick={pickBackground}
         disabled={uploadBackground.isPending}
@@ -1221,6 +1208,7 @@ export function EditorPage() {
         actions={actions}
         tab="sheet"
         toolbar={toolbar}
+        fields={{ open: panel === 'fields', onToggle: () => togglePanel('fields') }}
       />
 
       {/* Поле выбора файла спрятано и живёт отдельно от меню: меню
@@ -1579,6 +1567,14 @@ export function EditorPage() {
                   matches={matches}
                   onInsert={insertField}
                   onAutoMatch={() => history.setLayout(applyMatches(layout, matches))}
+                  hint={canInsertIntoText ? 'Клик вставит поле в выделенный текст.' : 'Клик добавит на лист текст с этим полем.'}
+                  onCreate={async (title) => {
+                    const column = await recipientMutations.addColumn.mutateAsync({ title });
+                    // В выделенный текст — сразу: ради этого поле обычно и
+                    // заводят. Без выделения новый блок посреди листа был бы
+                    // сюрпризом, поэтому поле просто появляется в списке.
+                    if (canInsertIntoText) insertField(fieldFromColumn(column));
+                  }}
                 />
               )}
               {panel === 'layers' && (

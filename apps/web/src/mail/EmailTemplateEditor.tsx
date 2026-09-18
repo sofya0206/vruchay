@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bold, Check, Italic, Paperclip } from 'lucide-react';
 import { api } from '../api/client';
@@ -7,6 +7,7 @@ import { Input, Label } from '../ui/Field';
 import { parseBody, toHtml, toText, wrapSelection, type Run } from './email-body';
 import { Checkbox } from '../ui/Checkbox';
 import { useTooltip } from '../ui/Tooltip';
+import type { FieldTarget } from '../editor/FieldsDrawer';
 
 interface EmailTemplate {
   id: string;
@@ -41,13 +42,23 @@ const DEFAULT_BODY = [
  * набор тегов, и произвольная вёрстка разъехалась бы в Outlook незаметно
  * для отправителя.
  */
-export function EmailTemplateEditor({ documentId }: { documentId: string }) {
+export function EmailTemplateEditor({
+  documentId,
+  onFieldTarget,
+}: {
+  documentId: string;
+  /** Отдать рамке материала вставку поля — для панели «Поля». */
+  onFieldTarget?: (target: FieldTarget | null) => void;
+}) {
   const qc = useQueryClient();
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [attach, setAttach] = useState(true);
   const [saved, setSaved] = useState(false);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
+  /** Где стоял курсор последним — в теме или в тексте. */
+  const lastField = useRef<'subject' | 'body'>('body');
+  const subjectRef = useRef<HTMLInputElement | null>(null);
 
   /**
    * Начертание для выделенного куска.
@@ -99,21 +110,42 @@ export function EmailTemplateEditor({ documentId }: { documentId: string }) {
 
   const variables = columns.data?.columns.map((c) => c.name) ?? [];
 
-  /** Переменная вставляется туда, где стоит курсор, а не в конец текста. */
-  function insert(name: string) {
-    const field = bodyRef.current;
+  /**
+   * Переменная вставляется туда, где стоит курсор, а не в конец текста —
+   * и в то поле, где он стоял: в теме письма имя нужно не реже, чем в тексте.
+   */
+  const insert = useCallback((name: string) => {
     const token = `%${name}`;
+    const inSubject = lastField.current === 'subject';
+    const field = inSubject ? subjectRef.current : bodyRef.current;
+    const set = inSubject ? setSubject : setBody;
     if (!field) {
-      setBody((b) => b + token);
+      set((v) => v + token);
       return;
     }
-    const { selectionStart: from, selectionEnd: to } = field;
-    setBody(body.slice(0, from) + token + body.slice(to));
+    const from = field.selectionStart ?? field.value.length;
+    const to = field.selectionEnd ?? from;
+    set((v) => v.slice(0, from) + token + v.slice(to));
     requestAnimationFrame(() => {
       field.focus();
       field.setSelectionRange(from + token.length, from + token.length);
     });
-  }
+  }, []);
+
+  const target = useMemo<FieldTarget>(
+    () => ({
+      hint: 'Клик вставит поле туда, где стоит курсор: в тему или в текст письма.',
+      insert: (field) => insert(field.source),
+      columnsOnly: true,
+    }),
+    [insert],
+  );
+
+  useEffect(() => {
+    if (!onFieldTarget) return;
+    onFieldTarget(target);
+    return () => onFieldTarget(null);
+  }, [onFieldTarget, target]);
 
   return (
     <div className="mx-auto max-w-3xl space-y-5 p-6">
@@ -130,6 +162,10 @@ export function EmailTemplateEditor({ documentId }: { documentId: string }) {
         <Input
           value={subject}
           onChange={(e) => setSubject(e.target.value)}
+          onFocus={(e) => {
+            lastField.current = 'subject';
+            subjectRef.current = e.currentTarget;
+          }}
           placeholder={DEFAULT_SUBJECT}
         />
       </div>
@@ -155,6 +191,7 @@ export function EmailTemplateEditor({ documentId }: { documentId: string }) {
 
         <textarea
           ref={bodyRef}
+          onFocus={() => (lastField.current = 'body')}
           value={body}
           onChange={(e) => setBody(e.target.value)}
           rows={10}
