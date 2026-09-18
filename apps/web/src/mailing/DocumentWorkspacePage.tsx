@@ -10,7 +10,8 @@ import { ValidationScreen } from '../validation/ValidationScreen';
 import { EmailTemplateEditor } from '../mail/EmailTemplateEditor';
 import { VerifyPanel } from '../verify/VerifyPanel';
 import { DocumentChrome } from '../editor/DocumentChrome';
-import type { FieldTarget } from '../editor/FieldsDrawer';
+import { FieldsSidebar, type FieldTarget } from '../editor/FieldsSidebar';
+import { useFieldsPanelOpen } from '../editor/fields-sidebar-store';
 import { useDocumentFileMenu } from '../editor/DocumentFileMenu';
 import { workspaceTab, type WorkspaceTab } from './workspace-tabs';
 
@@ -45,6 +46,7 @@ export function DocumentWorkspacePage() {
   const fileMenu = useDocumentFileMenu(doc.data);
   /** Куда вставляет панель полей: письмо отдаёт свою каретку. */
   const [fieldTarget, setFieldTarget] = useState<FieldTarget | null>(null);
+  const fieldsOpen = useFieldsPanelOpen();
 
   /*
    * Вкладку держим в адресе, а не в состоянии.
@@ -84,22 +86,28 @@ export function DocumentWorkspacePage() {
         title={page.title}
         actions={fileMenu.entries}
         tab={tab}
-        fieldTarget={tab === 'mail' ? (fieldTarget ?? undefined) : undefined}
       />
 
-      {tab === 'rules' ? (
-        <RulesTab documentId={id} ruleSetId={page.ruleSetId ?? null} />
-      ) : tab === 'check' ? (
-        <ValidationScreen documentId={id} onDone={() => open('table')} />
-      ) : tab === 'mail' ? (
-        <div className="min-h-0 flex-1 overflow-auto">
-          <EmailTemplateEditor documentId={id} onFieldTarget={setFieldTarget} />
+      <div className="flex min-h-0 flex-1">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          {tab === 'rules' ? (
+            <RulesTab documentId={id} ruleSetId={page.ruleSetId ?? null} />
+          ) : tab === 'check' ? (
+            <ValidationScreen documentId={id} onDone={() => open('table')} />
+          ) : tab === 'mail' ? (
+            <div className="min-h-0 flex-1 overflow-auto">
+              <EmailTemplateEditor documentId={id} onFieldTarget={setFieldTarget} />
+            </div>
+          ) : (
+            <div className="min-h-0 flex-1 overflow-auto">
+              <VerifyPanel doc={page} />
+            </div>
+          )}
         </div>
-      ) : (
-        <div className="min-h-0 flex-1 overflow-auto">
-          <VerifyPanel doc={page} />
-        </div>
-      )}
+        {fieldsOpen && (
+          <FieldsSidebar documentId={id} target={tab === 'mail' ? (fieldTarget ?? undefined) : undefined} />
+        )}
+      </div>
 
       {fileMenu.dialogs}
     </div>

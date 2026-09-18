@@ -22,6 +22,8 @@ import {
   Trash2,
   TriangleAlert,
   Undo2,
+  Variable,
+  Wand2,
   X,
 } from 'lucide-react';
 import type { Editor } from '@tiptap/core';
@@ -55,12 +57,14 @@ import { workspacePath } from '../mailing/workspace-tabs';
 import { SheetRenderer } from '../render/SheetRenderer';
 import { PropertiesPanel } from '../editor/PropertiesPanel';
 import { LayersPanel } from '../editor/LayersPanel';
-import { FIELD_DRAG_TYPE, FieldsPanel } from '../editor/FieldsPanel';
+import { FIELD_DRAG_TYPE, FieldsList } from '../editor/FieldsList';
+import { setFieldsPanelOpen, useFieldsPanelOpen } from '../editor/fields-sidebar-store';
 import { InlineTextEditor } from '../editor/rich/InlineTextEditor';
 import { useLayoutHistory } from '../editor/useLayoutHistory';
 import { FitPageDialog } from '../editor/FitPageDialog';
 import { PageSizeDialog } from '../editor/PageSizeDialog';
 import { Tooltip } from '../ui/Tooltip';
+import { Button } from '../ui/Button';
 import { ResizeDialog } from '../editor/ResizeDialog';
 import { fitPageToImage, readImageSize, type PageFit } from '../editor/fit-page';
 import { backgroundDpi, BLEED_MM, POOR_DPI, PRINT_DPI, resizeLayout, SAFE_MARGIN_MM, type ResizeMode } from '../editor/page-fit';
@@ -170,7 +174,18 @@ export function EditorPage() {
    * сама, как только выбран блок, и значком на панели — когда нужны поля
    * или слои.
    */
-  const [panel, setPanel] = useState<Panel | null>(null);
+  const [otherPanel, setOtherPanel] = useState<Exclude<Panel, 'fields'> | null>(null);
+  /*
+   * Поля — общая панель всего материала, а не только листа: открытая здесь,
+   * она остаётся открытой в письме и в таблице, поэтому живёт не в этом
+   * компоненте, а в `fields-sidebar-store`. Свойства и слои — свои.
+   */
+  const fieldsOpen = useFieldsPanelOpen();
+  const panel: Panel | null = fieldsOpen ? 'fields' : otherPanel;
+  const setPanel = (next: Panel | null) => {
+    setFieldsPanelOpen(next === 'fields');
+    if (next !== 'fields') setOtherPanel(next);
+  };
   const [showSafeArea, setShowSafeArea] = useState(false);
   /** Смена размера листа, ожидающая ответа «что делать с блоками». */
   const [resizeTo, setResizeTo] = useState<{ widthMm: number; heightMm: number } | null>(null);
@@ -477,9 +492,11 @@ export function EditorPage() {
   const hadSelection = useRef(false);
   useEffect(() => {
     const has = selected.size > 0;
-    if (has && !hadSelection.current) setPanel((current) => current ?? 'props');
+    // Открытые поля не подменяем свойствами: из них как раз вставляют
+    // в только что выделенный блок.
+    if (has && !hadSelection.current && !fieldsOpen) setOtherPanel((current) => current ?? 'props');
     hadSelection.current = has;
-  }, [selected]);
+  }, [selected, fieldsOpen]);
 
   const selectedElements = useMemo(
     () => layout.filter((el) => selected.has(el.id)),
@@ -887,7 +904,8 @@ export function EditorPage() {
 
     history.setLayout((prev) => [...prev, el]);
     setSelected(new Set([el.id]));
-    setPanel('props');
+    // Блок, вставленный из панели полей, не уводит из неё к свойствам.
+    if (!fieldsOpen) setOtherPanel('props');
   }
 
   /**
@@ -967,7 +985,7 @@ export function EditorPage() {
   const dataMode = viewMode === 'data';
 
   /** Значок панели работает переключателем: второе нажатие её закрывает. */
-  const togglePanel = (next: Panel) => setPanel((current) => (current === next ? null : next));
+  const togglePanel = (next: Panel) => setPanel(panel === next ? null : next);
 
   const hasBackground = Boolean(sheet.backgroundFileId);
   const pickBackground = () => backgroundInput.current?.click();
@@ -1208,7 +1226,6 @@ export function EditorPage() {
         actions={actions}
         tab="sheet"
         toolbar={toolbar}
-        fields={{ open: panel === 'fields', onToggle: () => togglePanel('fields') }}
       />
 
       {/* Поле выбора файла спрятано и живёт отдельно от меню: меню
@@ -1513,7 +1530,7 @@ export function EditorPage() {
               <Tab active={panel === 'props'} onClick={() => setPanel('props')} icon={<SlidersHorizontal size={14} />}>
                 Свойства
               </Tab>
-              <Tab active={panel === 'fields'} onClick={() => setPanel('fields')} icon={<Table2 size={14} />} badge={matches.length || undefined}>
+              <Tab active={panel === 'fields'} onClick={() => setPanel('fields')} icon={<Variable size={14} />} badge={matches.length || undefined}>
                 Поля
               </Tab>
               <Tab active={panel === 'layers'} onClick={() => setPanel('layers')} icon={<Layers size={14} />}>
@@ -1523,69 +1540,89 @@ export function EditorPage() {
                 <X size={15} />
               </IconButton>
             </div>
+            {panel === 'fields' ? (
+              <FieldsList
+                fields={fields}
+                samples={previewData}
+                action={{ label: 'Вставить', run: insertField }}
+                draggable
+                notice={
+                  matches.length > 0 ? (
+                    <div className="rounded-lg bg-[var(--warn-soft)] p-2.5 text-[13px] leading-5">
+                      <p>
+                        {matches.length === 1 ? 'Поле макета не нашло колонку' : 'Поля макета не нашли колонки'}:{' '}
+                        {matches.map((m) => `«${m.from}» → «${m.to.name}»`).join(', ')}.
+                      </p>
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        icon={<Wand2 size={14} />}
+                        onClick={() => history.setLayout(applyMatches(layout, matches))}
+                        className="mt-2"
+                      >
+                        Сопоставить
+                      </Button>
+                    </div>
+                  ) : undefined
+                }
+                onCreate={async (title) => {
+                  const field = fieldFromColumn(await recipientMutations.addColumn.mutateAsync({ title }));
+                  // В выделенный текст — сразу: ради этого поле обычно и
+                  // заводят. Без выделения новый блок посреди листа был бы
+                  // сюрпризом, поэтому поле просто появляется в списке.
+                  if (canInsertIntoText) insertField(field);
+                  return field;
+                }}
+              />
+            ) : (
             <div className="min-h-0 flex-1 overflow-y-auto p-4">
-              {panel === 'props' && (
-                <PropertiesPanel
-                  elements={selectedElements}
-                  page={pageBox}
-                  doc={doc.data}
-                  onSaveEvent={(values) => saveEvent.mutate(values)}
-                  onEventDraft={setEventDraft}
-                  onResizePage={(size) => setResizeTo(size)}
-                  onTextProps={patchTextProps}
-                  onShapeProps={patchShapeProps}
-                  onElement={(patch, commit) => patchElements(selected, (el) => ({ ...el, ...patch }) as SheetElement, commit)}
-                  onBox={(elementId, box) => {
-                    const safe = { ...box, w: Math.max(box.w, 5), h: Math.max(box.h, 5) };
-                    updateBoxes({ [elementId]: moveBox(safe, 0, 0, pageBox.w, pageBox.h) }, true);
-                  }}
-                  onAlign={align}
-                  onDistribute={distribute}
-                  onGroup={() => {
-                    const groupId = crypto.randomUUID();
-                    patchElements(selected, (el) => ({ ...el, groupId }));
-                  }}
-                  onUngroup={() => patchElements(selected, (el) => ({ ...el, groupId: null }))}
-                  onLayer={(where) => {
-                    let next = layout;
-                    for (const elementId of selected) next = moveLayer(next, elementId, where);
-                    history.setLayout(next);
-                  }}
-                  onApplyStyleToAll={applyStyleToAll}
-                  onCopyStyle={() => {
-                    const source = selectedElements.find((el): el is TextElement => el.type === 'text');
-                    if (source) setStyleClipboard(pickTextStyle(source.props));
-                  }}
-                  onPasteStyle={() => styleClipboard && patchTextProps(styleClipboard)}
-                  hasStyleClipboard={styleClipboard !== null}
-                  onDelete={removeSelected}
-                />
-              )}
-              {panel === 'fields' && (
-                <FieldsPanel
-                  fields={fields}
-                  matches={matches}
-                  onInsert={insertField}
-                  onAutoMatch={() => history.setLayout(applyMatches(layout, matches))}
-                  hint={canInsertIntoText ? 'Клик вставит поле в выделенный текст.' : 'Клик добавит на лист текст с этим полем.'}
-                  onCreate={async (title) => {
-                    const column = await recipientMutations.addColumn.mutateAsync({ title });
-                    // В выделенный текст — сразу: ради этого поле обычно и
-                    // заводят. Без выделения новый блок посреди листа был бы
-                    // сюрпризом, поэтому поле просто появляется в списке.
-                    if (canInsertIntoText) insertField(fieldFromColumn(column));
-                  }}
-                />
-              )}
-              {panel === 'layers' && (
-                <LayersPanel
-                  layout={layout}
-                  selected={selected}
-                  onSelect={(elementId, additive) => select(elementId, additive)}
-                  onChange={(next: SheetLayout) => history.setLayout(next)}
-                />
-              )}
-            </div>
+                {panel === 'props' && (
+                  <PropertiesPanel
+                    elements={selectedElements}
+                    page={pageBox}
+                    doc={doc.data}
+                    onSaveEvent={(values) => saveEvent.mutate(values)}
+                    onEventDraft={setEventDraft}
+                    onResizePage={(size) => setResizeTo(size)}
+                    onTextProps={patchTextProps}
+                    onShapeProps={patchShapeProps}
+                    onElement={(patch, commit) => patchElements(selected, (el) => ({ ...el, ...patch }) as SheetElement, commit)}
+                    onBox={(elementId, box) => {
+                      const safe = { ...box, w: Math.max(box.w, 5), h: Math.max(box.h, 5) };
+                      updateBoxes({ [elementId]: moveBox(safe, 0, 0, pageBox.w, pageBox.h) }, true);
+                    }}
+                    onAlign={align}
+                    onDistribute={distribute}
+                    onGroup={() => {
+                      const groupId = crypto.randomUUID();
+                      patchElements(selected, (el) => ({ ...el, groupId }));
+                    }}
+                    onUngroup={() => patchElements(selected, (el) => ({ ...el, groupId: null }))}
+                    onLayer={(where) => {
+                      let next = layout;
+                      for (const elementId of selected) next = moveLayer(next, elementId, where);
+                      history.setLayout(next);
+                    }}
+                    onApplyStyleToAll={applyStyleToAll}
+                    onCopyStyle={() => {
+                      const source = selectedElements.find((el): el is TextElement => el.type === 'text');
+                      if (source) setStyleClipboard(pickTextStyle(source.props));
+                    }}
+                    onPasteStyle={() => styleClipboard && patchTextProps(styleClipboard)}
+                    hasStyleClipboard={styleClipboard !== null}
+                    onDelete={removeSelected}
+                  />
+                )}
+                {panel === 'layers' && (
+                  <LayersPanel
+                    layout={layout}
+                    selected={selected}
+                    onSelect={(elementId, additive) => select(elementId, additive)}
+                    onChange={(next: SheetLayout) => history.setLayout(next)}
+                  />
+                )}
+              </div>
+            )}
           </aside>
         )}
       </div>

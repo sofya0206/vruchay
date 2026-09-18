@@ -38,6 +38,8 @@ import { GenerateDialog, type GenerateMode } from './GenerateDialog';
 import { DownloadDialog } from './DownloadDialog';
 import { InviteNudge } from '../referral/InviteNudge';
 import { DocumentChrome, ToolButton, ToolDivider } from '../editor/DocumentChrome';
+import { FieldsSidebar } from '../editor/FieldsSidebar';
+import { useFieldsPanelOpen } from '../editor/fields-sidebar-store';
 import { useDocumentFileMenu } from '../editor/DocumentFileMenu';
 import type { MenuEntry } from '../editor/DocumentChrome';
 import { IconButton } from '../ui/IconButton';
@@ -66,6 +68,7 @@ export function RecipientsTable({
 }) {
   const documentId = doc.id;
   const fileMenu = useDocumentFileMenu(doc);
+  const fieldsOpen = useFieldsPanelOpen();
   const table = useRecipients(documentId);
   const m = useRecipientMutations(documentId);
   const [jobId, setJobId] = useState<string | null>(null);
@@ -610,127 +613,130 @@ export function RecipientsTable({
         </p>
       )}
 
-      <div className="min-h-0 flex-1 overflow-auto">
-        {rows.length === 0 ? (
-          <div className="grid h-full place-items-center p-10 text-center">
-            <div>
-              <FileUp size={26} className="mx-auto mb-3 text-[var(--text-muted)]" strokeWidth={1.5} />
-              <p className="font-medium">Список получателей пуст</p>
-              <p className="mt-1 max-w-md text-sm text-[var(--text-muted)]">
-                Загрузите файл Excel или CSV — подойдёт обычный список участников,
-                шапку и лишние строки сервис распознает сам. Или скопируйте таблицу
-                в Excel и вставьте сюда через Ctrl+V.
-              </p>
-              {/* Кнопка здесь обязательна: на панели значок без подписи,
-                  и на пустом экране по нему не догадаться. */}
-              <div className="mt-4 flex justify-center gap-2">
-                <Button
-                  variant="primary"
-                  icon={<FileSpreadsheet size={15} />}
-                  disabled={m.parseFile.isPending}
-                  onClick={() => xlsInput.current?.click()}
-                >
-                  {m.parseFile.isPending ? 'Читаем файл…' : 'Загрузить файл'}
-                </Button>
-                <Button icon={<Plus size={15} />} onClick={() => m.addRow.mutate()}>
-                  Добавить строку
-                </Button>
+      <div className="flex min-h-0 flex-1">
+        <div className="min-h-0 min-w-0 flex-1 overflow-auto">
+          {rows.length === 0 ? (
+            <div className="grid h-full place-items-center p-10 text-center">
+              <div>
+                <FileUp size={26} className="mx-auto mb-3 text-[var(--text-muted)]" strokeWidth={1.5} />
+                <p className="font-medium">Список получателей пуст</p>
+                <p className="mt-1 max-w-md text-sm text-[var(--text-muted)]">
+                  Загрузите файл Excel или CSV — подойдёт обычный список участников,
+                  шапку и лишние строки сервис распознает сам. Или скопируйте таблицу
+                  в Excel и вставьте сюда через Ctrl+V.
+                </p>
+                {/* Кнопка здесь обязательна: на панели значок без подписи,
+                    и на пустом экране по нему не догадаться. */}
+                <div className="mt-4 flex justify-center gap-2">
+                  <Button
+                    variant="primary"
+                    icon={<FileSpreadsheet size={15} />}
+                    disabled={m.parseFile.isPending}
+                    onClick={() => xlsInput.current?.click()}
+                  >
+                    {m.parseFile.isPending ? 'Читаем файл…' : 'Загрузить файл'}
+                  </Button>
+                  <Button icon={<Plus size={15} />} onClick={() => m.addRow.mutate()}>
+                    Добавить строку
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
-        ) : (
-          <table className="w-full border-collapse text-sm">
-            <thead className="sticky top-0 z-10 bg-[var(--surface-sunken)]">
-              <tr>
-                <th className="w-10 border-r border-b border-[var(--line)] px-3 py-2">
-                  <Checkbox
-                    checked={allChecked}
-                    onChange={() => m.setChecked.mutate({ checked: !allChecked })}
-                    aria-label="Отметить все"
-                  />
-                </th>
-                {/* Номер строки — как в любой таблице: по нему называют место
-                    ошибки («в двенадцатой опечатка»), и без него сверять
-                    список с бумажным протоколом нечем. */}
-                <th className="w-12 border-r border-b border-[var(--line)] px-2 py-2 text-right text-xs font-normal text-[var(--text-muted)]">
-                  №
-                </th>
-                {/* Заголовок — по-человечески, переменная под ним мелким.
-                    Раньше колонки назывались «%name» и «%email»: для
-                    человека это не название столбца, а шифр.
-                    Переменную всё равно показываем — она нужна, когда
-                    человек вписывает её в макет. */}
-                {columns.map((col) => (
-                  <th
-                    key={col.id}
-                    className="group border-r border-b border-[var(--line)] px-3 py-2 text-left text-sm font-medium"
-                  >
-                    <span className="inline-flex items-center gap-1.5">
-                      {columnTitle(col)}
-                      <IconButton
-                        size="sm"
-                        label={`Удалить колонку ${columnTitle(col)}`}
-                        onClick={() => m.deleteColumn.mutate(col.id)}
-                        className="size-6 opacity-0 group-hover:opacity-100 hover:text-[var(--danger)]"
-                      >
-                        <X size={12} />
-                      </IconButton>
-                    </span>
-                    <span className="block font-mono text-xs font-normal text-[var(--text-muted)]">
-                      %{col.name}
-                    </span>
-                  </th>
-                ))}
-                <th className="w-10 border-b border-[var(--line)]" />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, index) => (
-                <tr key={row.id} className="group hover:bg-[var(--surface-sunken)]/60">
-                  <td className="border-r border-b border-[var(--line)] px-3 py-1 text-center">
+          ) : (
+            <table className="w-full border-collapse text-sm">
+              <thead className="sticky top-0 z-10 bg-[var(--surface-sunken)]">
+                <tr>
+                  <th className="w-10 border-r border-b border-[var(--line)] px-3 py-2">
                     <Checkbox
-                      checked={row.checked}
-                      onChange={() => m.updateRow.mutate({ rowId: row.id, checked: !row.checked })}
-                      aria-label="Включить в генерацию"
+                      checked={allChecked}
+                      onChange={() => m.setChecked.mutate({ checked: !allChecked })}
+                      aria-label="Отметить все"
                     />
-                  </td>
-                  <td className="tabular border-r border-b border-[var(--line)] px-2 py-1 text-right text-xs text-[var(--text-muted)]">
-                    {index + 1}
-                  </td>
+                  </th>
+                  {/* Номер строки — как в любой таблице: по нему называют место
+                      ошибки («в двенадцатой опечатка»), и без него сверять
+                      список с бумажным протоколом нечем. */}
+                  <th className="w-12 border-r border-b border-[var(--line)] px-2 py-2 text-right text-xs font-normal text-[var(--text-muted)]">
+                    №
+                  </th>
+                  {/* Заголовок — по-человечески, переменная под ним мелким.
+                      Раньше колонки назывались «%name» и «%email»: для
+                      человека это не название столбца, а шифр.
+                      Переменную всё равно показываем — она нужна, когда
+                      человек вписывает её в макет. */}
                   {columns.map((col) => (
-                    <td key={col.id} className="border-r border-b border-[var(--line)] p-0">
-                      <input
-                        defaultValue={row.data[col.name] ?? ''}
-                        onBlur={(e) => {
-                          const value = e.target.value;
-                          if (value !== (row.data[col.name] ?? '')) {
-                            trackSave(
-                              m.updateRow.mutateAsync({
-                                rowId: row.id,
-                                data: { [col.name]: value },
-                              }),
-                            );
-                          }
-                        }}
-                        className="w-full bg-transparent px-3 py-1.5 outline-none focus:bg-[var(--surface)] focus:ring-2 focus:ring-[var(--focus)]"
+                    <th
+                      key={col.id}
+                      className="group border-r border-b border-[var(--line)] px-3 py-2 text-left text-sm font-medium"
+                    >
+                      <span className="inline-flex items-center gap-1.5">
+                        {columnTitle(col)}
+                        <IconButton
+                          size="sm"
+                          label={`Удалить колонку ${columnTitle(col)}`}
+                          onClick={() => m.deleteColumn.mutate(col.id)}
+                          className="size-6 opacity-0 group-hover:opacity-100 hover:text-[var(--danger)]"
+                        >
+                          <X size={12} />
+                        </IconButton>
+                      </span>
+                      <span className="block font-mono text-xs font-normal text-[var(--text-muted)]">
+                        %{col.name}
+                      </span>
+                    </th>
+                  ))}
+                  <th className="w-10 border-b border-[var(--line)]" />
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, index) => (
+                  <tr key={row.id} className="group hover:bg-[var(--surface-sunken)]/60">
+                    <td className="border-r border-b border-[var(--line)] px-3 py-1 text-center">
+                      <Checkbox
+                        checked={row.checked}
+                        onChange={() => m.updateRow.mutate({ rowId: row.id, checked: !row.checked })}
+                        aria-label="Включить в генерацию"
                       />
                     </td>
-                  ))}
-                  <td className="border-b border-[var(--line)] px-2 text-center">
-                    <IconButton
-                      size="sm"
-                      label="Удалить строку"
-                      onClick={() => m.deleteRow.mutate(row.id)}
-                      className="size-7 opacity-0 group-hover:opacity-100 hover:text-[var(--danger)]"
-                    >
-                      <Trash2 size={14} />
-                    </IconButton>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+                    <td className="tabular border-r border-b border-[var(--line)] px-2 py-1 text-right text-xs text-[var(--text-muted)]">
+                      {index + 1}
+                    </td>
+                    {columns.map((col) => (
+                      <td key={col.id} className="border-r border-b border-[var(--line)] p-0">
+                        <input
+                          defaultValue={row.data[col.name] ?? ''}
+                          onBlur={(e) => {
+                            const value = e.target.value;
+                            if (value !== (row.data[col.name] ?? '')) {
+                              trackSave(
+                                m.updateRow.mutateAsync({
+                                  rowId: row.id,
+                                  data: { [col.name]: value },
+                                }),
+                              );
+                            }
+                          }}
+                          className="w-full bg-transparent px-3 py-1.5 outline-none focus:bg-[var(--surface)] focus:ring-2 focus:ring-[var(--focus)]"
+                        />
+                      </td>
+                    ))}
+                    <td className="border-b border-[var(--line)] px-2 text-center">
+                      <IconButton
+                        size="sm"
+                        label="Удалить строку"
+                        onClick={() => m.deleteRow.mutate(row.id)}
+                        className="size-7 opacity-0 group-hover:opacity-100 hover:text-[var(--danger)]"
+                      >
+                        <Trash2 size={14} />
+                      </IconButton>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+        {fieldsOpen && <FieldsSidebar documentId={documentId} />}
       </div>
 
       {parsed && (

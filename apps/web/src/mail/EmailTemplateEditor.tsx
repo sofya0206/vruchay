@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bold, Check, Italic, Paperclip } from 'lucide-react';
+import { Bold, Check, Italic, Paperclip, Variable } from 'lucide-react';
 import { api } from '../api/client';
 import { Button } from '../ui/Button';
 import { Input, Label } from '../ui/Field';
-import { parseBody, toHtml, toText, wrapSelection, type Run } from './email-body';
+import { insertToken, parseBody, toHtml, toText, wrapSelection, type Run } from './email-body';
 import { Checkbox } from '../ui/Checkbox';
 import { useTooltip } from '../ui/Tooltip';
-import type { FieldTarget } from '../editor/FieldsDrawer';
+import type { FieldTarget } from '../editor/FieldsSidebar';
+import { setFieldsPanelOpen } from '../editor/fields-sidebar-store';
 
 interface EmailTemplate {
   id: string;
@@ -115,26 +116,25 @@ export function EmailTemplateEditor({
    * и в то поле, где он стоял: в теме письма имя нужно не реже, чем в тексте.
    */
   const insert = useCallback((name: string) => {
-    const token = `%${name}`;
     const inSubject = lastField.current === 'subject';
     const field = inSubject ? subjectRef.current : bodyRef.current;
     const set = inSubject ? setSubject : setBody;
     if (!field) {
-      set((v) => v + token);
+      set((v) => insertToken(v, v.length, v.length, name).text);
       return;
     }
     const from = field.selectionStart ?? field.value.length;
     const to = field.selectionEnd ?? from;
-    set((v) => v.slice(0, from) + token + v.slice(to));
+    const next = insertToken(field.value, from, to, name);
+    set(next.text);
     requestAnimationFrame(() => {
       field.focus();
-      field.setSelectionRange(from + token.length, from + token.length);
+      field.setSelectionRange(next.caret, next.caret);
     });
   }, []);
 
   const target = useMemo<FieldTarget>(
     () => ({
-      hint: 'Клик вставит поле туда, где стоит курсор: в тему или в текст письма.',
       insert: (field) => insert(field.source),
       columnsOnly: true,
     }),
@@ -184,6 +184,16 @@ export function EmailTemplateEditor({
           <FormatButton onClick={() => applyFormat('_')} title="Курсив">
             <Italic size={15} />
           </FormatButton>
+          {/* Поля — общей панелью справа, как на листе: вставка идёт
+              туда, где стоял курсор, в тему или в текст. */}
+          <button
+            type="button"
+            onClick={() => setFieldsPanelOpen(true)}
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-sm text-[var(--text-muted)] ring-1 ring-[var(--line)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
+          >
+            <Variable size={15} strokeWidth={1.75} />
+            Поле
+          </button>
           <span className="ml-2 text-xs text-[var(--text-muted)]">
             Пустая строка — новый абзац. Адрес сайта сам станет ссылкой.
           </span>
@@ -199,26 +209,6 @@ export function EmailTemplateEditor({
           className="w-full rounded-xl bg-[var(--surface)] px-3 py-2 text-sm ring-1 ring-[var(--line)] focus:ring-2 focus:ring-[var(--accent)] focus:outline-none"
         />
       </div>
-
-      {variables.length > 0 && (
-        <div className="rounded-xl bg-[var(--surface-sunken)] p-3">
-          <p className="text-xs text-[var(--text-muted)]">
-            Подставить данные получателя — нажмите, чтобы добавить в текст:
-          </p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {variables.map((name) => (
-              <button
-                key={name}
-                type="button"
-                onClick={() => insert(name)}
-                className="rounded-lg bg-[var(--surface)] px-2 py-1 font-mono text-xs ring-1 ring-[var(--line)] hover:ring-[var(--accent)]"
-              >
-                %{name}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Убрано под спойлер: нужно редко — когда документ вручают на бумаге,
           а письмо служит уведомлением. На виду эта галочка только пугала:

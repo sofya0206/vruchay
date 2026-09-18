@@ -1,11 +1,10 @@
-import { useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { CheckCheck, ChevronRight, MoreHorizontal, Variable } from 'lucide-react';
 import { MATERIAL_TABS, materialTabPath, workspacePath, type MaterialTab } from '../mailing/workspace-tabs';
 import { IconButton } from '../ui/IconButton';
 import { Menu, MenuDivider, MenuItem } from '../ui/Menu';
-import { useTooltip } from '../ui/Tooltip';
-import { FieldsDrawer, type FieldTarget } from './FieldsDrawer';
+import { toggleFieldsPanel, useFieldsPanelOpen } from './fields-sidebar-store';
 
 /** Пункт меню «…» либо разделитель между смысловыми группами. */
 export type MenuEntry =
@@ -44,8 +43,6 @@ export function DocumentChrome({
   tab,
   toolbar,
   action,
-  fields,
-  fieldTarget,
 }: {
   documentId: string;
   title: string;
@@ -63,22 +60,9 @@ export function DocumentChrome({
    * действия не должно переезжать от вкладки к вкладке.
    */
   action?: ReactNode;
-  /**
-   * Панель полей, которой управляет сама вкладка.
-   *
-   * У листа поля живут в его боковой колонке рядом со свойствами и слоями,
-   * и кнопка в рамке только переключает её. Остальным вкладкам колонки
-   * негде взять — им рамка выдвигает свою панель.
-   */
-  fields?: { open: boolean; onToggle: () => void };
-  /** Куда вставляет клик по полю в выдвижной панели; нет — копирует. */
-  fieldTarget?: FieldTarget;
 }) {
-  const [drawer, setDrawer] = useState(false);
-  const fieldsOpen = fields ? fields.open : drawer;
-
   return (
-    <header className="relative shrink-0 border-b border-[var(--line)] bg-[var(--surface)]">
+    <header className="shrink-0 border-b border-[var(--line)] bg-[var(--surface)]">
       <div className="flex h-12 items-center gap-1 border-b border-[var(--line)] px-3">
         <h1 className="flex min-w-0 max-w-[32ch] shrink items-center gap-1 text-sm font-medium">
           <Link
@@ -113,10 +97,7 @@ export function DocumentChrome({
         </nav>
 
         <div className="flex shrink-0 items-center gap-1 pl-2">
-          <FieldsButton
-            active={fieldsOpen}
-            onClick={() => (fields ? fields.onToggle() : setDrawer((v) => !v))}
-          />
+          <FieldsButton />
           {action ?? (
             <Link
               to={workspacePath(documentId)}
@@ -161,10 +142,6 @@ export function DocumentChrome({
           {toolbar}
         </div>
       )}
-
-      {!fields && drawer && (
-        <FieldsDrawer documentId={documentId} target={fieldTarget} onClose={() => setDrawer(false)} />
-      )}
     </header>
   );
 }
@@ -174,24 +151,24 @@ export function DocumentChrome({
  *
  * Кнопка стоит на каждой вкладке и должна читаться с первого взгляда:
  * значок `{x}` без слова опознаёт только тот, кто уже знает, что за ним.
+ * Панель одна на весь материал, поэтому и состояние общее — открытая
+ * на листе, она остаётся открытой в письме.
  */
-function FieldsButton({ active, onClick }: { active: boolean; onClick: () => void }) {
-  const { triggerProps, tooltip } = useTooltip('Поля документа: посмотреть, добавить, вставить', { placement: 'bottom' });
+function FieldsButton() {
+  const open = useFieldsPanelOpen();
   return (
     <button
       type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      {...triggerProps}
-      className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-sm transition-colors ${
-        active
+      aria-pressed={open}
+      onClick={toggleFieldsPanel}
+      className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-medium transition-colors ${
+        open
           ? 'bg-[var(--accent-soft)] text-[var(--accent)]'
-          : 'text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]'
+          : 'text-[var(--text-muted)] hover:bg-[var(--row-hover)] hover:text-[var(--text)]'
       }`}
     >
-      <Variable size={15} />
+      <Variable size={16} strokeWidth={1.75} />
       Поля
-      {tooltip}
     </button>
   );
 }
