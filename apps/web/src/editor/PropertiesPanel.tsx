@@ -28,12 +28,11 @@ import {
   Ungroup,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { describeSize, extractVariables, isSafeHrefTemplate, type SheetElement, type SheetLayout, type ShapeElement, type TextProps } from '@gramota/shared';
+import { extractVariables, isSafeHrefTemplate, type SheetElement, type SheetLayout, type ShapeElement, type TextProps } from '@gramota/shared';
 
 type QrElement = Extract<SheetElement, { type: 'qr' }>;
 type LinkElement = Extract<SheetElement, { type: 'link' }>;
 import type { DocumentDetail } from '../api/types';
-import { PageSizePicker, type PageSizeValue } from '../documents/PageSizePicker';
 import { useTooltip } from '../ui/Tooltip';
 import { EventFields, type EventValues } from './EventFields';
 import { VerifySettings } from './VerifySettings';
@@ -76,8 +75,6 @@ interface Props {
   ) => void;
   /** Что набрано в «О мероприятии» сейчас — чтобы холст обновлялся при вводе. */
   onEventDraft?: (values: EventValues) => void;
-  /** Смена размера листа: вопрос «что делать с блоками» задаёт страница. */
-  onResizePage?: (size: PageSizeValue) => void;
 }
 
 /** «Смешанное» в поле ввода — пустое место с подсказкой, а не ложное число. */
@@ -107,7 +104,6 @@ export function PropertiesPanel(props: Props) {
             layout={props.layout ?? []}
             onSaveEvent={onSaveEvent}
             onEventDraft={onEventDraft}
-            onResizePage={props.onResizePage}
           />
         ) : (
           <>
@@ -303,76 +299,51 @@ export function PropertiesPanel(props: Props) {
 /** Переменные, которые заполняет раздел «О мероприятии». */
 const EVENT_VARIABLES = new Set(['event', 'event_date', 'event_place', 'hours', 'date', 'date_long', 'year']);
 
-type DocTab = 'sheet' | 'event' | 'verify';
+type DocTab = 'event' | 'verify';
 
 /**
- * Настройки материала без выбранного блока — вкладками, а не одной
- * простынёй: лист, мероприятие и проверка по QR — разные заботы.
- * Вкладка мероприятия появляется, когда на листе есть хоть одна его
- * переменная: пока их нет, заполнять нечего.
+ * Настройки материала без выбранного блока: мероприятие и проверка по QR,
+ * вкладками. Формат листа здесь не живёт — он в панели инструментов,
+ * как размер холста в Canva и Figma. Вкладка мероприятия появляется,
+ * когда на листе есть хоть одна его переменная: пока их нет, заполнять
+ * нечего, и панель показывает только проверку.
  */
 function DocumentSettings({
   doc,
   layout,
   onSaveEvent,
   onEventDraft,
-  onResizePage,
 }: {
   doc: DocumentDetail;
   layout: SheetLayout;
   onSaveEvent: NonNullable<Props['onSaveEvent']>;
   onEventDraft?: Props['onEventDraft'];
-  onResizePage?: Props['onResizePage'];
 }) {
-  const [picked, setPicked] = useState<DocTab>('sheet');
+  const [picked, setPicked] = useState<DocTab>('event');
   const hasEventVars = extractVariables(layout).some((name) => EVENT_VARIABLES.has(name));
-  const tab: DocTab = picked === 'event' && !hasEventVars ? 'sheet' : picked;
-  const items: Array<{ id: DocTab; label: string }> = [
-    { id: 'sheet', label: 'Лист' },
-    ...(hasEventVars ? [{ id: 'event' as const, label: 'Мероприятие' }] : []),
-    { id: 'verify', label: 'Проверка' },
-  ];
+  const tab: DocTab = hasEventVars ? picked : 'verify';
 
   return (
     <div className="space-y-5">
-      <Tabs items={items} value={tab} onChange={setPicked} label="Настройки материала" className="w-full" />
-      {tab === 'sheet' && (
-        <>
-          {onResizePage && <PageSettings doc={doc} onResize={onResizePage} />}
-          {!hasEventVars && (
-            <p className="text-sm text-[var(--text-muted)]">
-              Вставьте на лист название, даты или место мероприятия через «Вставить» — здесь появятся их
-              настройки.
-            </p>
-          )}
-        </>
+      {hasEventVars && (
+        <Tabs
+          items={[
+            { id: 'event', label: 'Мероприятие' },
+            { id: 'verify', label: 'Проверка' },
+          ]}
+          value={tab}
+          onChange={setPicked}
+          label="Настройки материала"
+          className="w-full"
+        />
       )}
       {tab === 'event' && <EventFields doc={doc} onSave={onSaveEvent} onDraft={onEventDraft} />}
       {tab === 'verify' && <VerifySettings doc={doc} onSave={onSaveEvent} />}
-    </div>
-  );
-}
-
-/**
- * Размер листа — здесь же, где остальные настройки материала.
- *
- * Применяется не на каждое изменение, а кнопкой: смена размера — вопрос
- * с последствиями для всех блоков, и его задаёт отдельный диалог.
- */
-function PageSettings({ doc, onResize }: { doc: DocumentDetail; onResize: (size: PageSizeValue) => void }) {
-  const current = { widthMm: doc.pageWidthMm, heightMm: doc.pageHeightMm };
-  const [draft, setDraft] = useState<PageSizeValue>(current);
-  useEffect(() => setDraft({ widthMm: doc.pageWidthMm, heightMm: doc.pageHeightMm }), [doc.pageWidthMm, doc.pageHeightMm]);
-  const changed = draft.widthMm !== current.widthMm || draft.heightMm !== current.heightMm;
-
-  return (
-    <div>
-      <p className="mb-2 text-sm font-medium">Лист: {describeSize(current)}</p>
-      <PageSizePicker value={draft} onChange={setDraft} />
-      {changed && (
-        <Button size="sm" variant="primary" onClick={() => onResize(draft)} className="mt-2">
-          Сменить лист на {describeSize(draft)}
-        </Button>
+      {!hasEventVars && (
+        <p className="border-t border-[var(--line)] pt-4 text-sm text-[var(--text-muted)]">
+          Вставьте на лист название, даты или место мероприятия через «Вставить» — здесь появятся их
+          настройки.
+        </p>
       )}
     </div>
   );

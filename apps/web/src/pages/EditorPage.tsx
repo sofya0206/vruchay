@@ -1783,7 +1783,6 @@ export function EditorPage() {
                     layout={layout}
                     onSaveEvent={(values) => saveEvent.mutate(values)}
                     onEventDraft={setEventDraft}
-                    onResizePage={(size) => setResizeTo(size)}
                     onTextProps={patchTextProps}
                     onShapeProps={patchShapeProps}
                     onQrProps={patchQrProps}
