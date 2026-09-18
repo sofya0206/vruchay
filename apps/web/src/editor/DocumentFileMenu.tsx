@@ -17,8 +17,8 @@ import { Button } from '../ui/Button';
 import { Label } from '../ui/Field';
 import { Select } from '../ui/Select';
 import { Dialog } from '../ui/Dialog';
-import { RenameDialog } from '../documents/RenameDialog';
 import type { MenuEntry } from './DocumentChrome';
+import { DOCUMENT_TITLE_ID } from './DocumentTitle';
 
 /**
  * Меню «Файл» — действия над материалом целиком.
@@ -28,9 +28,14 @@ import type { MenuEntry } from './DocumentChrome';
  * было нельзя — приходилось уходить со страницы, искать его в списке и потом
  * возвращаться, теряя место на листе.
  *
- * Возвращает и пункты меню, и окна к ним: окно переименования без пункта
+ * Возвращает и пункты меню, и окна к ним: окно переноса без пункта
  * бессмысленно, а пункт без окна ничего не делает, поэтому они и заводятся
  * одним вызовом.
+ *
+ * Своего окна у переименования нет: название правится на месте в шапке,
+ * и пункт меню просто ставит туда курсор — как «Файл → Переименовать»
+ * в Google Docs. Два разных способа одного действия на одном экране
+ * заставляли бы гадать, чем они отличаются.
  */
 export function useDocumentFileMenu(doc: DocumentDetail | undefined): {
   entries: MenuEntry[];
@@ -38,7 +43,6 @@ export function useDocumentFileMenu(doc: DocumentDetail | undefined): {
 } {
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const [renaming, setRenaming] = useState(false);
   const [moving, setMoving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [folderId, setFolderId] = useState<string | ''>('');
@@ -49,15 +53,6 @@ export function useDocumentFileMenu(doc: DocumentDetail | undefined): {
     void qc.invalidateQueries({ queryKey: ['document', doc?.id] });
     void qc.invalidateQueries({ queryKey: ['documents'] });
   };
-
-  const rename = useMutation({
-    mutationFn: (value: string) =>
-      api.patch<DocumentDetail>(`/documents/${doc!.id}`, { title: value }),
-    onSuccess: () => {
-      setRenaming(false);
-      refresh();
-    },
-  });
 
   const move = useMutation({
     mutationFn: (value: string | null) =>
@@ -109,7 +104,9 @@ export function useDocumentFileMenu(doc: DocumentDetail | undefined): {
       icon: <PencilLine size={16} />,
       label: 'Переименовать',
       disabled: !doc,
-      onSelect: () => setRenaming(true),
+      // После кадра: пункт меню ещё держит фокус от нажатия.
+      onSelect: () =>
+        requestAnimationFrame(() => document.getElementById(DOCUMENT_TITLE_ID)?.focus()),
     },
     {
       icon: <FolderInput size={16} />,
@@ -132,16 +129,6 @@ export function useDocumentFileMenu(doc: DocumentDetail | undefined): {
 
   const dialogs = (
     <>
-      {renaming && (
-        <RenameDialog
-          initial={doc?.title ?? ''}
-          pending={rename.isPending}
-          error={rename.isError ? (rename.error as Error).message : undefined}
-          onSubmit={(value) => rename.mutate(value)}
-          onClose={() => setRenaming(false)}
-        />
-      )}
-
       {moving && (
         <Dialog
           title="Переместить материал"
