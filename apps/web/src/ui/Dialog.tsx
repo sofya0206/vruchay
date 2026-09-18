@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { Button } from './Button';
 import { IconButton } from './IconButton';
@@ -17,11 +17,54 @@ export function Dialog({
   footer?: ReactNode;
   wide?: boolean;
 }) {
+  const panel = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
+
+  /*
+   * Фокус: внутрь при открытии, по кругу внутри, назад при закрытии.
+   * Без этого Tab уходил за окно на страницу под затемнением, а после
+   * закрытия фокус терялся в начале документа.
+   */
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    const root = panel.current;
+    if (!root) return;
+    const focusable = () =>
+      Array.from(
+        root.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((el) => el.offsetParent !== null || el === document.activeElement);
+    // Первое поле формы, а не крестик «Закрыть»: человек открыл окно,
+    // чтобы что-то ввести или подтвердить.
+    const first = focusable().find((el) => el.getAttribute('aria-label') !== 'Закрыть') ?? root;
+    first.focus();
+
+    const trap = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      const list = focusable();
+      if (list.length === 0) return;
+      const head = list[0];
+      const tail = list[list.length - 1];
+      if (e.shiftKey && document.activeElement === head) {
+        e.preventDefault();
+        tail.focus();
+      } else if (!e.shiftKey && document.activeElement === tail) {
+        e.preventDefault();
+        head.focus();
+      }
+    };
+    root.addEventListener('keydown', trap);
+    return () => {
+      root.removeEventListener('keydown', trap);
+      opener?.focus?.();
+    };
+  }, []);
 
   return (
     <div
@@ -32,7 +75,9 @@ export function Dialog({
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
-        className={`flex max-h-full w-full flex-col overflow-hidden rounded-2xl bg-[var(--surface-raised)] shadow-lg ${
+        ref={panel}
+        tabIndex={-1}
+        className={`flex max-h-full w-full flex-col overflow-hidden rounded-2xl bg-[var(--surface-raised)] outline-none shadow-lg ${
           wide ? 'max-w-4xl' : 'max-w-xl'
         }`}
       >

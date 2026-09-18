@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Check, KeyRound } from 'lucide-react';
 import { useTeamMutations } from '../api/team';
 import { Button } from '../ui/Button';
-import { Input, Label } from '../ui/Field';
+import { Field, Input } from '../ui/Field';
 
 /**
  * Смена собственного пароля.
@@ -46,38 +46,33 @@ export function ChangePassword() {
         }}
         className="mt-4 max-w-md space-y-4 rounded-2xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]"
       >
-        <div>
-          <Label>Нынешний пароль</Label>
+        <Field label="Нынешний пароль">
           <Input
             type="password"
             autoComplete="current-password"
             value={current}
             onChange={(e) => setCurrent(e.target.value)}
           />
-        </div>
+        </Field>
 
-        <div>
-          <Label>Новый пароль</Label>
+        <Field label="Новый пароль" help="Не короче 10 знаков, хотя бы одна буква и одна цифра.">
           <Input
             type="password"
             autoComplete="new-password"
             value={next}
             onChange={(e) => setNext(e.target.value)}
           />
-          <p className="mt-1.5 text-sm text-[var(--text-muted)]">
-            Не короче 10 знаков, хотя бы одна буква и одна цифра.
-          </p>
-        </div>
+        </Field>
 
         <div>
-          <Label>Новый пароль ещё раз</Label>
-          <Input
-            type="password"
-            autoComplete="new-password"
-            value={repeat}
-            onChange={(e) => setRepeat(e.target.value)}
-          />
-          {mismatch && <p className="mt-1.5 text-sm text-[var(--danger)]">Пароли не совпадают</p>}
+          <Field label="Новый пароль ещё раз" error={mismatch ? 'Пароли не совпадают' : undefined}>
+            <Input
+              type="password"
+              autoComplete="new-password"
+              value={repeat}
+              onChange={(e) => setRepeat(e.target.value)}
+            />
+          </Field>
         </div>
 
         {changePassword.isError && (

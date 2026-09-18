@@ -4,6 +4,7 @@ import { useOverview } from '../api/overview';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Loading } from '../ui/Loading';
+import { ErrorState } from '../ui/ErrorState';
 import { PageLayout, SectionTitle } from '../ui/SectionLayout';
 
 /**
@@ -16,6 +17,16 @@ export function BillingPage() {
   const overview = useOverview();
 
   if (overview.isPending) return <Loading />;
+  if (overview.isError) {
+    return (
+      <ErrorState
+        title="Не удалось открыть оплату"
+        onRetry={() => void overview.refetch()}
+        retrying={overview.isFetching}
+        code={String(overview.error)}
+      />
+    );
+  }
 
   const usage = overview.data?.usage;
   const unlimited = !usage || usage.limit === null || usage.left === null;

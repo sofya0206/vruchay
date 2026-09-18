@@ -1,4 +1,12 @@
-import type { InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react';
+import {
+  cloneElement,
+  isValidElement,
+  useId,
+  type InputHTMLAttributes,
+  type ReactElement,
+  type ReactNode,
+  type TextareaHTMLAttributes,
+} from 'react';
 import { cn } from './cn';
 
 const control =
@@ -6,12 +14,75 @@ const control =
   'ring-1 ring-[var(--line)] transition-colors outline-none ' +
   'placeholder:text-[var(--text-muted)] focus:ring-2 focus:ring-[var(--focus)]';
 
-export function Label({ children, hint }: { children: ReactNode; hint?: ReactNode }) {
+/**
+ * Подпись поля. Настоящий `label`: с `htmlFor` читалка называет поле
+ * по подписи, а клик по ней ставит курсор в поле. Без `htmlFor` она
+ * работает только как обёртка — тогда лучше `<Field>` ниже.
+ */
+export function Label({
+  children,
+  hint,
+  htmlFor,
+}: {
+  children: ReactNode;
+  hint?: ReactNode;
+  htmlFor?: string;
+}) {
   return (
-    <span className="mb-1.5 block text-sm font-medium text-[var(--text-muted)]">
+    <label htmlFor={htmlFor} className="mb-1.5 block text-sm font-medium text-[var(--text-muted)]">
       {children}
       {hint}
-    </span>
+    </label>
+  );
+}
+
+/**
+ * Подпись + поле одной парой: id рождается здесь и уходит в оба.
+ * `<Field label="Почта"><Input … /></Field>` — и поле подписано
+ * для читалки, и клик по подписи попадает в него.
+ */
+export function Field({
+  label,
+  hint,
+  help,
+  error,
+  children,
+  className = '',
+}: {
+  label: ReactNode;
+  hint?: ReactNode;
+  /** Пояснение под полем. */
+  help?: ReactNode;
+  /** Текст ошибки под полем: красный и связан с полем через aria. */
+  error?: ReactNode;
+  children: ReactElement<{ id?: string; 'aria-describedby'?: string; 'aria-invalid'?: boolean }>;
+  className?: string;
+}) {
+  const generated = useId();
+  const id = (isValidElement(children) && children.props.id) || generated;
+  const helpId = help || error ? `${id}-help` : undefined;
+  const control = isValidElement(children)
+    ? cloneElement(children, {
+        id,
+        'aria-describedby': helpId,
+        'aria-invalid': error ? true : undefined,
+      })
+    : children;
+  return (
+    <div className={className}>
+      <Label htmlFor={id} hint={hint}>
+        {label}
+      </Label>
+      {control}
+      {(error || help) && (
+        <p
+          id={helpId}
+          className={`mt-1.5 text-sm ${error ? 'text-[var(--danger)]' : 'text-[var(--text-muted)]'}`}
+        >
+          {error || help}
+        </p>
+      )}
+    </div>
   );
 }
 

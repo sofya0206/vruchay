@@ -101,8 +101,16 @@
   --line-strong: #b1bbcd;
   --text: #091135;
   --text-muted: #36394a;
-  --accent: #127ee3;
-  --accent-hover: #0f6ac1;
+  /*
+   * Синий чуть темнее прежнего #127ee3: тот давал 4,1 : 1 на белом
+   * и не проходил WCAG AA для текста ссылок и мелких подписей.
+   */
+  --accent: #0f6ac1;
+  --accent-hover: #0d5da9;
+  /* Фон главной кнопки. В светлой тот же синий; в тёмной темнее ссылки,
+     чтобы белая надпись на нём читалась 4,5 : 1. */
+  --accent-button: #0f6ac1;
+  --accent-button-hover: #0d5da9;
   --accent-soft: #eaf3fe;
   --accent-contrast: #ffffff;
   /*
@@ -110,9 +118,9 @@
    * не выражаются. Выведены из той же холодной гаммы: «в работе» — синий
    * контурный акцент, ошибка — красный, подобранный к кобальту по светлоте.
    */
-  --award: #0f77ff;
+  --award: #0b63d6;
   --award-soft: #e7f1ff;
-  --danger: #d92d3f;
+  --danger: #c9273a;
   --danger-soft: #fdecee;
   /*
    * Семантика состояний. Раньше «готово», «в очереди» и «заменено»
@@ -121,9 +129,9 @@
    * взгляда, но не срочно, красный — сломано. Синий остаётся за «идёт»
    * и за единственной главной кнопкой.
    */
-  --ok: #178a56;
+  --ok: #14764a;
   --ok-soft: #e3f5ec;
-  --warn: #b8690e;
+  --warn: #9e5a0c;
   --warn-soft: #fdf1df;
   --focus: #0f77ff;
   --accent-line: #0f77ff;
@@ -231,6 +239,8 @@
   --text-muted: #9aa4c2;
   --accent: #3d8ef5;
   --accent-hover: #5a9ff8;
+  --accent-button: #2470d2;
+  --accent-button-hover: #2a7add;
   --accent-soft: rgba(61, 142, 245, 0.14);
   --accent-contrast: #ffffff;
   --award: #5aa3ff;
@@ -273,6 +283,8 @@
   --text-muted: #9aa4c2;
   --accent: #3d8ef5;
   --accent-hover: #5a9ff8;
+  --accent-button: #2470d2;
+  --accent-button-hover: #2a7add;
   --accent-soft: rgba(61, 142, 245, 0.14);
   --accent-contrast: #ffffff;
   --award: #5aa3ff;
@@ -492,6 +504,22 @@ textarea::-webkit-resizer {
  * а цвет — откуда и не пропало ли. Размеры в em, а не в пикселях: фишка
  * живёт внутри текста любого кегля и масштабируется вместе с ним.
  */
+/*
+ * Скелетон: мягкое мерцание слева направо. Под reduced-motion остаётся
+ * ровная плашка — общее правило выше уже гасит анимацию.
+ */
+@keyframes vru-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.vru-skeleton {
+  background: linear-gradient(90deg, var(--surface-sunken) 25%, var(--line) 50%, var(--surface-sunken) 75%);
+  background-size: 200% 100%;
+  animation: vru-shimmer 1.6s linear infinite;
+}
+
 .merge-chip {
   display: inline;
   box-decoration-break: clone;
