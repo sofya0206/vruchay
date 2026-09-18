@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#127EE3" />
+    <meta name="theme-color" content="#4A3FCE" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Вручай" />
     <!--
@@ -48,10 +48,10 @@
         width: 56px;
         height: 56px;
         border-radius: 16px;
-        /* Тот же градиент, что у знака в шапке и у иконки приложения:
+        /* Тот же цвет, что у знака в шапке и у иконки приложения:
            заставка — первое, что человек видит, и знак на ней должен быть
            тем же самым, а не родственным. */
-        background: linear-gradient(135deg, #0f77ff, #6d5df6);
+        background: #4a3fce;
         display: grid;
         place-items: center;
         animation: splash-beat 1.8s ease-in-out infinite;
@@ -72,7 +72,7 @@
           opacity: 1;
         }
       }
-      /* Медаль медленно «дышит»: признак, что дело идёт, без вертящегося
+      /* Знак медленно «дышит»: признак, что дело идёт, без вертящегося
          колеса — оно на наградной странице выглядит тревожно. */
       @keyframes splash-beat {
         0%,
@@ -175,10 +175,10 @@
     <div id="splash">
       <div>
         <div class="mark">
-          <!-- Печать с галочкой — тот же знак, что в шапке (shell/Brand.tsx). -->
-          <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#ffffff" aria-hidden="true">
-            <circle cx="12" cy="12" r="6.6" stroke-width="1.9" />
-            <path d="M8.7 12.3l2.2 2.2 4.6-4.9" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" />
+          <!-- Буква «В» — тот же знак, что в шапке (shell/Brand.tsx). -->
+          <svg width="56" height="56" viewBox="0 0 24 24" fill="#ffffff" aria-hidden="true">
+            <path d="M7.5,6.19 H13.5 A2.77,2.77 0 0 1 13.5,11.72 H7.5 Z" />
+            <path d="M7.5,11.72 H13.69 A2.95,2.95 0 0 1 13.69,17.63 H7.5 Z" />
           </svg>
         </div>
         <div class="word">Вручай</div>

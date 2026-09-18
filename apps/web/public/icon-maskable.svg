@@ -1,14 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <!-- Вариант для Android: фон во весь квадрат, знак внутри безопасных 80 %. -->
-  <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#0F77FF"/>
-      <stop offset="1" stop-color="#6D5DF6"/>
-    </linearGradient>
-  </defs>
-  <rect width="512" height="512" fill="url(#g)"/>
-  <g fill="none" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="256" cy="256" r="118" stroke-width="34"/>
-    <path d="M198 261 L237 300 L319 213" stroke-width="38"/>
-  </g>
+  <rect width="512" height="512" fill="#4A3FCE"/>
+  <path d="M160,132 H288 A59,59 0 0 1 288,250 H160 Z" fill="#fff"/>
+  <path d="M160,250 H292 A63,63 0 0 1 292,376 H160 Z" fill="#fff"/>
 </svg>
