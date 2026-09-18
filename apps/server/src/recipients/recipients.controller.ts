@@ -38,6 +38,8 @@ import {
   SetCheckedDto,
   updateRowSchema,
   UpdateRowDto,
+  reorderColumnsSchema,
+  type ReorderColumnsDto,
 } from './recipients.dto';
 
 const uuidParam = new ZodValidationPipe(uuidSchema);
@@ -109,6 +111,15 @@ export class RecipientsController {
     @Body(new ZodValidationPipe(addColumnSchema)) dto: AddColumnDto,
   ) {
     return this.recipients.addColumn(user.orgId, id, dto);
+  }
+
+  @Post('columns/order')
+  reorderColumns(
+    @CurrentUser() user: SessionUser,
+    @Param('id', uuidParam) id: string,
+    @Body(new ZodValidationPipe(reorderColumnsSchema)) dto: ReorderColumnsDto,
+  ) {
+    return this.recipients.reorderColumns(user.orgId, id, dto.order);
   }
 
   @Patch('columns/:columnId')

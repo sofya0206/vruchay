@@ -144,6 +144,13 @@ export function useRecipientMutations(documentId: string) {
         void qc.invalidateQueries({ queryKey: ['recipient-columns', documentId] });
       },
     }),
+    reorderColumns: useMutation({
+      mutationFn: (order: string[]) => api.post(`${base}/columns/order`, { order }),
+      onSuccess: () => {
+        void refresh();
+        void qc.invalidateQueries({ queryKey: ['recipient-columns', documentId] });
+      },
+    }),
     deleteColumn: useMutation({
       mutationFn: (columnId: string) => api.delete(`${base}/columns/${columnId}`),
       onSuccess: refresh,

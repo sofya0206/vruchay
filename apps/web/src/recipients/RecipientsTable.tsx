@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import {
+import { GripVertical,
   Ban,
   CheckCheck,
   CheckCircle2,
@@ -74,6 +74,47 @@ export function RecipientsTable({
   const fieldsOpen = useFieldsPanelOpen();
   const table = useRecipients(documentId);
   const m = useRecipientMutations(documentId);
+  const [dragCol, setDragCol] = useState<string | null>(null);
+  const [overCol, setOverCol] = useState<string | null>(null);
+
+  /**
+   * Перетаскивание колонки за ручку в шапке. Указательные события
+   * вместо HTML5 drag-and-drop: тот не работает с пальца и на тачпаде
+   * ведёт себя как попало. Цель ищем по координатам — под пальцем
+   * элемент не меняется, пока захват удерживает событие.
+   */
+  function startColumnDrag(e: React.PointerEvent, columnId: string) {
+    e.preventDefault();
+    const handle = e.currentTarget as HTMLElement;
+    // Захват держит события на ручке, даже когда палец ушёл с неё;
+    // без активного указателя (автотест) браузер бросает исключение.
+    try {
+      handle.setPointerCapture(e.pointerId);
+    } catch {
+      /* без захвата события всё равно всплывают до ручки */
+    }
+    setDragCol(columnId);
+    let target: string | null = null;
+    const onMove = (ev: PointerEvent) => {
+      const th = document.elementFromPoint(ev.clientX, ev.clientY)?.closest<HTMLElement>('th[data-col]');
+      target = th?.dataset.col ?? null;
+      setOverCol(target);
+    };
+    const onUp = () => {
+      handle.removeEventListener('pointermove', onMove);
+      handle.removeEventListener('pointerup', onUp);
+      handle.removeEventListener('pointercancel', onUp);
+      setDragCol(null);
+      setOverCol(null);
+      if (!target || target === columnId) return;
+      const order = columns.map((c) => c.id).filter((id) => id !== columnId);
+      order.splice(order.indexOf(target), 0, columnId);
+      m.reorderColumns.mutate(order);
+    };
+    handle.addEventListener('pointermove', onMove);
+    handle.addEventListener('pointerup', onUp);
+    handle.addEventListener('pointercancel', onUp);
+  }
   const [jobId, setJobId] = useState<string | null>(null);
   const { job, start, cancel, resume } = useGeneration(documentId, jobId);
   const send = useSend(documentId);
@@ -686,9 +727,22 @@ export function RecipientsTable({
                   {columns.map((col) => (
                     <th
                       key={col.id}
-                      className="group border-r border-b border-[var(--line)] px-3 py-2 text-left text-sm font-medium"
+                      data-col={col.id}
+                      className={`group border-r border-b border-[var(--line)] px-3 py-2 text-left text-sm font-medium ${
+                        dragCol && overCol === col.id && overCol !== dragCol ? 'bg-[var(--accent-soft)]' : ''
+                      } ${dragCol === col.id ? 'opacity-50' : ''}`}
                     >
                       <span className="inline-flex items-center gap-1.5">
+                        {/* Ручка: колонки переставляются перетаскиванием, мышью
+                            и пальцем — указательные события работают и там, и там. */}
+                        <span
+                          role="button"
+                          aria-label={`Переставить колонку ${columnTitle(col)}`}
+                          onPointerDown={(e) => startColumnDrag(e, col.id)}
+                          className="-ml-1 cursor-grab touch-none text-[var(--text-muted)] opacity-0 group-hover:opacity-100 active:cursor-grabbing"
+                        >
+                          <GripVertical size={13} />
+                        </span>
                         {columnTitle(col)}
                         <IconButton
                           size="sm"

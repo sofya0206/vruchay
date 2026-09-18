@@ -175,3 +175,37 @@ describe('addColumn', () => {
     );
   });
 });
+
+describe('перестановка колонок', () => {
+  const A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
+  const B = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2';
+  const C = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3';
+  function make() {
+    const positions: Record<string, number> = {};
+    const prisma = {
+      document: { findFirst: async ({ where }: { where: { orgId: string } }) => (where.orgId === ORG ? { id: DOCUMENT } : null) },
+      recipientColumn: {
+        findMany: async () => [{ id: A }, { id: B }, { id: C }],
+        update: ({ where, data }: { where: { id: string }; data: { position: number } }) => {
+          positions[where.id] = data.position;
+          return Promise.resolve();
+        },
+      },
+      $transaction: (ops: Promise<unknown>[]) => Promise.all(ops),
+    };
+    return { service: new RecipientsService(prisma as never), positions };
+  }
+
+  it('ставит колонки в заданном порядке, неупомянутые — следом', async () => {
+    const { service, positions } = make();
+    await expect(service.reorderColumns(ORG, DOCUMENT, [C, A])).resolves.toEqual({ order: [C, A, B] });
+    expect(positions).toEqual({ [C]: 0, [A]: 1, [B]: 2 });
+  });
+
+  it('чужая колонка — «не найдена»', async () => {
+    const { service } = make();
+    await expect(service.reorderColumns(ORG, DOCUMENT, ['dddddddd-dddd-4ddd-8ddd-dddddddddddd'])).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+});

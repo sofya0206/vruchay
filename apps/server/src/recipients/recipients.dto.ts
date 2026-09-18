@@ -47,6 +47,10 @@ export type AddColumnDto = z.infer<typeof addColumnSchema>;
 export const renameColumnSchema = z.object({ name: columnName });
 export type RenameColumnDto = z.infer<typeof renameColumnSchema>;
 
+/** Новый порядок колонок — все идентификаторы документа, слева направо. */
+export const reorderColumnsSchema = z.object({ order: z.array(z.string().uuid()).min(1).max(200) });
+export type ReorderColumnsDto = z.infer<typeof reorderColumnsSchema>;
+
 export const addRowSchema = z.object({ data: rowData.default({}) });
 export type AddRowDto = z.infer<typeof addRowSchema>;
 

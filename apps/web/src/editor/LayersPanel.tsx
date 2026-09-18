@@ -111,7 +111,7 @@ export function LayersPanel({
                 <ChevronDown size={13} />
               </Small>
               <Small
-                title={el.locked ? 'Разблокировать' : 'Заблокировать'}
+                title={el.locked ? 'Заперт — не двигается и не растягивается. Нажмите, чтобы отпереть' : 'Не заперт. Нажмите, чтобы запереть'}
                 pressed={el.locked}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -121,7 +121,7 @@ export function LayersPanel({
                 {el.locked ? <Lock size={13} /> : <LockOpen size={13} />}
               </Small>
               <Small
-                title={el.hidden ? 'Показать' : 'Скрыть'}
+                title={el.hidden ? 'Скрыт. Нажмите, чтобы показать' : 'Виден. Нажмите, чтобы скрыть'}
                 pressed={el.hidden}
                 onClick={(e) => {
                   e.stopPropagation();
