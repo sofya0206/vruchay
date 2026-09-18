@@ -27,6 +27,7 @@ import {
   type HeaderChoice,
   type ParsedSheet,
   type RecipientColumn,
+  type RecipientRow,
   type SendResult,
 } from '../api/recipients';
 import { PreviewDialog } from './PreviewDialog';
@@ -201,6 +202,7 @@ export function RecipientsTable({
 
   const { columns, rows, checkedCount } = table.data;
   const allChecked = rows.length > 0 && rows.every((r) => r.checked);
+  const widths = Object.fromEntries(columns.map((col) => [col.name, fitChars(rows, col.name)]));
   // Задание стоит «в очереди», но за ним никто не пришёл: пакет не доехал
   // до очереди, и сам собой он не тронется. Сервис поднимет такое задание
   // сторожем в течение нескольких минут, но человеку у экрана незачем
@@ -715,7 +717,9 @@ export function RecipientsTable({
                   {columns.map((col) => (
                     <th
                       key={col.id}
-                      className="group border-r border-b border-[var(--line)] px-3 py-2 text-left text-sm font-medium"
+                      // В одну строку: в узкой колонке «E-mail» рвался по дефису,
+                      // а «Фамилия, имя, отчество» раздувал шапку на три строки.
+                      className="group border-r border-b border-[var(--line)] px-3 py-2 text-left text-sm font-medium whitespace-nowrap"
                     >
                       <span className="inline-flex items-center gap-1.5">
                         {columnTitle(col)}
@@ -753,7 +757,18 @@ export function RecipientsTable({
                       <td key={col.id} className="border-r border-b border-[var(--line)] p-0">
                         <input
                           defaultValue={row.data[col.name] ?? ''}
+                          size={widths[col.name]}
+                          // Нижний предел: когда шапки не влезают и таблица уезжает
+                          // вбок, колонка иначе сжималась до ширины заголовка
+                          // и почта превращалась в «a@exam…».
+                          style={{ minWidth: `calc(${Math.min(widths[col.name], 12)}ch + 1.5rem)` }}
+                          // Фамилии и названия организаций проверка орфографии
+                          // подчёркивает сплошь — красное в каждой строке ничего не значит.
+                          spellCheck={false}
                           onBlur={(e) => {
+                            // Иначе ячейка так и остаётся прокрученной к концу
+                            // и показывает «ФУ, г. Екатеринбург» без начала.
+                            e.currentTarget.scrollLeft = 0;
                             const value = e.target.value;
                             if (value !== (row.data[col.name] ?? '')) {
                               trackSave(
@@ -764,7 +779,9 @@ export function RecipientsTable({
                               );
                             }
                           }}
-                          className="w-full bg-transparent px-3 py-1.5 outline-none focus:bg-[var(--surface)] focus:ring-2 focus:ring-[var(--focus)]"
+                          // Рамка внутри ячейки: снаружи она легла бы на линии
+                          // соседних клеток, а верх ушёл бы под прилипшую шапку.
+                          className="w-full truncate bg-transparent px-3 py-1.5 outline-none focus:bg-[var(--surface)] focus:ring-2 focus:ring-[var(--focus)] focus:ring-inset"
                         />
                       </td>
                     ))}
@@ -919,4 +936,18 @@ function columnTitle(column: RecipientColumn): string {
     email: 'Адрес почты',
   };
   return column.title?.trim() || known[column.name] || column.name;
+}
+
+/**
+ * Желаемая ширина колонки в знаках — по самому длинному значению.
+ *
+ * Поле ввода без размера держит одну ширину на всех, около двадцати знаков:
+ * фамилии обрезались на полуслове, а колонки с двузначными номерами стояли
+ * такими же широкими. Размер лишь просит место — если всем не хватает,
+ * таблица делит ширину пропорционально этим просьбам.
+ */
+function fitChars(rows: RecipientRow[], name: string): number {
+  let longest = 0;
+  for (const row of rows) longest = Math.max(longest, (row.data[name] ?? '').length);
+  return Math.min(Math.max(longest + 1, 4), 36);
 }
