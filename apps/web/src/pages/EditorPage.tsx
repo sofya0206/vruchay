@@ -5,6 +5,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  ChevronsRight,
   CopyPlus,
   Dot,
   Grid3x3,
@@ -24,7 +25,6 @@ import {
   Undo2,
   Variable,
   Wand2,
-  X,
 } from 'lucide-react';
 import type { Editor } from '@tiptap/core';
 import {
@@ -58,7 +58,6 @@ import { SheetRenderer } from '../render/SheetRenderer';
 import { PropertiesPanel } from '../editor/PropertiesPanel';
 import { LayersPanel } from '../editor/LayersPanel';
 import { FIELD_DRAG_TYPE, FieldsList } from '../editor/FieldsList';
-import { FieldsToggle } from '../editor/FieldsToggle';
 import { setFieldsPanelOpen, useFieldsPanelOpen } from '../editor/fields-sidebar-store';
 import { InlineTextEditor } from '../editor/rich/InlineTextEditor';
 import { useLayoutHistory } from '../editor/useLayoutHistory';
@@ -170,14 +169,12 @@ export function EditorPage() {
   const [guides, setGuides] = useState<SnapLine[]>([]);
   const [marquee, setMarquee] = useState<Rect | null>(null);
   /*
-   * Панель справа закрыта, пока не за чем следить.
-   *
-   * На пустом холсте она показывала «Ничего не выбрано» и отъедала треть
-   * ширины у листа — того единственного, ради чего сюда приходят. Открывается
-   * сама, как только выбран блок, и значком на панели — когда нужны поля
-   * или слои.
+   * Панель справа открыта с самого начала, как в Figma и Pitch: свойства,
+   * данные и слои — её вкладки, и других кнопок для них нет. Свернуть её
+   * можно крестиком; свёрнутая оставляет полоску значков у края, и любой
+   * из них раскрывает панель сразу на нужной вкладке.
    */
-  const [otherPanel, setOtherPanel] = useState<Exclude<Panel, 'fields'> | null>(null);
+  const [otherPanel, setOtherPanel] = useState<Exclude<Panel, 'fields'> | null>('props');
   /*
    * Поля — общая панель всего материала, а не только листа: открытая здесь,
    * она остаётся открытой в письме и в таблице, поэтому живёт не в этом
@@ -990,7 +987,6 @@ export function EditorPage() {
   const dataMode = viewMode === 'data';
 
   /** Значок панели работает переключателем: второе нажатие её закрывает. */
-  const togglePanel = (next: Panel) => setPanel(panel === next ? null : next);
 
   const hasBackground = Boolean(sheet.backgroundFileId);
   const pickBackground = () => backgroundInput.current?.click();
@@ -1082,19 +1078,6 @@ export function EditorPage() {
       <ToolDivider />
 
       <ToolButton
-        title="Свойства блока"
-        active={panel === 'props'}
-        onClick={() => togglePanel('props')}
-      >
-        <SlidersHorizontal size={16} />
-      </ToolButton>
-      <ToolButton title="Слои" active={panel === 'layers'} onClick={() => togglePanel('layers')}>
-        <Layers size={16} />
-      </ToolButton>
-
-      <ToolDivider />
-
-      <ToolButton
         title="Сетка 5 мм и прилипание к ней"
         active={showGrid}
         onClick={() => setShowGrid((v) => !v)}
@@ -1148,8 +1131,6 @@ export function EditorPage() {
       />
 
       <div className="ml-auto flex items-center gap-2">
-        <FieldsToggle />
-
         <StatusChip
           tone={
             saved === 'saved'
@@ -1514,6 +1495,25 @@ export function EditorPage() {
         {/* Панели справа нет, пока она не нужна: лист занимает весь экран,
             как в любом редакторе документов. Открывают её значком на панели
             или первым выделенным блоком. */}
+        {!panel && (
+          <aside
+            aria-label="Свёрнутая панель"
+            className="flex w-11 shrink-0 flex-col items-center gap-1 border-l border-[var(--line)] bg-[var(--surface)] py-2"
+          >
+            <IconButton size="sm" label="Свойства" onClick={() => setPanel('props')}>
+              <SlidersHorizontal size={16} />
+            </IconButton>
+            <IconButton size="sm" label="Данные" onClick={() => setPanel('fields')} className="relative">
+              <Variable size={16} />
+              {matches.length > 0 && (
+                <span className="absolute right-1 top-1 size-2 rounded-full bg-[var(--accent)]" />
+              )}
+            </IconButton>
+            <IconButton size="sm" label="Слои" onClick={() => setPanel('layers')}>
+              <Layers size={16} />
+            </IconButton>
+          </aside>
+        )}
         {panel && (
           <aside className="flex w-80 shrink-0 flex-col border-l border-[var(--line)] bg-[var(--surface)]">
             <div className="flex border-b border-[var(--line)]">
@@ -1521,13 +1521,13 @@ export function EditorPage() {
                 Свойства
               </Tab>
               <Tab active={panel === 'fields'} onClick={() => setPanel('fields')} icon={<Variable size={14} />} badge={matches.length || undefined}>
-                Поля
+                Данные
               </Tab>
               <Tab active={panel === 'layers'} onClick={() => setPanel('layers')} icon={<Layers size={14} />}>
                 Слои
               </Tab>
-              <IconButton size="sm" label="Закрыть панель" onClick={() => setPanel(null)} className="m-1 shrink-0">
-                <X size={15} />
+              <IconButton size="sm" label="Свернуть панель" onClick={() => setPanel(null)} className="m-1 shrink-0">
+                <ChevronsRight size={15} />
               </IconButton>
             </div>
             {panel === 'fields' ? (

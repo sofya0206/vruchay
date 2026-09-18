@@ -48,7 +48,7 @@ export function EmailTemplateEditor({
   onFieldTarget,
 }: {
   documentId: string;
-  /** Отдать рамке материала вставку поля — для панели «Поля». */
+  /** Отдать рамке материала вставку поля — для панели «Данные». */
   onFieldTarget?: (target: FieldTarget | null) => void;
 }) {
   const qc = useQueryClient();
