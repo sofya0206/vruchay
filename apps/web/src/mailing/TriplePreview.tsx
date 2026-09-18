@@ -301,9 +301,9 @@ function LetterPreview({
 
       {/* Белый фон и тёмный текст независимо от темы кабинета: письмо
           человек откроет в почте, а не здесь. */}
-      <div className="mt-3 rounded-lg bg-white px-4 py-3 text-[15px] leading-relaxed text-[#1a1a1a]">
+      <div className="mt-3 rounded-lg bg-[var(--sheet-paper)] px-4 py-3 text-[15px] leading-relaxed text-[var(--sheet-ink)]">
         {paragraphs.length === 0 ? (
-          <p className="text-sm text-neutral-400">Письмо пустое</p>
+          <p className="text-sm text-[var(--sheet-ink-muted)]">Письмо пустое</p>
         ) : (
           paragraphs.map((runs, i) => (
             <p key={i} className={i > 0 ? 'mt-3' : undefined}>
@@ -317,7 +317,7 @@ function LetterPreview({
         {/* Низ рекламного письма собирает сервер, но показать его надо
             здесь: человек должен видеть, что отправляет именно рекламу. */}
         {kind === 'marketing' && (
-          <div className="mt-6 border-t border-neutral-200 pt-3 text-xs text-neutral-500">
+          <div className="mt-6 border-t border-[var(--sheet-line)] pt-3 text-xs text-[var(--sheet-ink-muted)]">
             <p>Реклама. {advertiserName || '(рекламодатель не указан)'}</p>
             <p className="mt-1 underline">Отписаться от рассылки</p>
           </div>

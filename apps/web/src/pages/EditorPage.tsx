@@ -849,8 +849,8 @@ export function EditorPage() {
   // их порядок между отрисовками.
   if (moved) return <Navigate to={moved} replace />;
 
-  if (doc.isPending) return <div className="p-6 text-slate-500">Загрузка документа…</div>;
-  if (!doc.data || !sheet) return <div className="p-6 text-slate-500">Документ не найден</div>;
+  if (doc.isPending) return <div className="p-6 text-[var(--text-muted)]">Загрузка документа…</div>;
+  if (!doc.data || !sheet) return <div className="p-6 text-[var(--text-muted)]">Документ не найден</div>;
 
   const page = doc.data;
   const pageBox = { w: page.pageWidthMm, h: page.pageHeightMm };
@@ -1315,7 +1315,7 @@ export function EditorPage() {
 
             <div
               ref={sheetRef}
-              className="relative shadow-lg"
+              className="relative shadow-[var(--shadow-sheet)]"
               style={{ width: px(page.pageWidthMm), height: px(page.pageHeightMm) }}
               onPointerDown={startMarquee}
             >
@@ -1372,7 +1372,7 @@ export function EditorPage() {
               {showSafeArea && (
                 <>
                   <div
-                    className="pointer-events-none absolute border border-dashed border-red-400/70"
+                    className="pointer-events-none absolute border border-dashed border-[var(--danger)]/70"
                     style={{ inset: px(BLEED_MM) }}
                   />
                   <div
@@ -1800,7 +1800,7 @@ function Tab({
       {icon}
       {children}
       {badge ? (
-        <span className="rounded-full bg-[var(--accent)] px-1.5 text-[10px] font-medium text-white">{badge}</span>
+        <span className="rounded-full bg-[var(--accent)] px-1.5 text-[10px] font-medium text-[var(--accent-contrast)]">{badge}</span>
       ) : null}
     </button>
   );

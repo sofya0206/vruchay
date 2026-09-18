@@ -104,7 +104,7 @@ export function InsertMenu({
                   ? 'bg-[var(--accent-soft)] text-[var(--accent)]'
                   : 'text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]'
               }`
-            : 'inline-flex items-center gap-2 rounded-lg bg-[var(--accent)] px-2.5 py-1.5 text-sm text-white transition-opacity hover:opacity-90'
+            : 'inline-flex items-center gap-2 rounded-lg bg-[var(--accent)] px-2.5 py-1.5 text-sm text-[var(--accent-contrast)] transition-opacity hover:opacity-90'
         }
       >
         <Plus size={iconOnly ? 16 : 15} />

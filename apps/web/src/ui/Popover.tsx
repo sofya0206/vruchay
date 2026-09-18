@@ -141,7 +141,7 @@ export function Popover({
        * обрезает содержимое по той же дуге, что и рамка.
        */
       className={
-        'fixed z-50 overflow-auto bg-[var(--surface)] shadow-lg ring-1 ring-[var(--line)] ' +
+        'fixed z-50 overflow-auto bg-[var(--surface-raised)] shadow-lg ring-1 ring-[var(--line)] ' +
         // Нижний лист на телефоне у самого края экрана — здесь запас снизу
         // нужен: без него последний пункт упирался бы в границу экрана.
         (box.sheet ? 'rounded-t-2xl pb-2' : 'rounded-xl')

@@ -32,7 +32,7 @@ export function Dialog({
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
-        className={`flex max-h-full w-full flex-col overflow-hidden rounded-2xl bg-[var(--surface)] shadow-lg ${
+        className={`flex max-h-full w-full flex-col overflow-hidden rounded-2xl bg-[var(--surface-raised)] shadow-lg ${
           wide ? 'max-w-4xl' : 'max-w-xl'
         }`}
       >
