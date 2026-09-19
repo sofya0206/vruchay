@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { GripVertical,
   Ban,
-  CheckCheck,
   CheckCircle2,
   Columns3,
   Download,
@@ -43,7 +42,7 @@ import { planPaste } from './clipboard';
 import { GenerateDialog, type GenerateMode } from './GenerateDialog';
 import { DownloadDialog } from './DownloadDialog';
 import { InviteNudge } from '../referral/InviteNudge';
-import { DocumentChrome, ToolButton, ToolDivider } from '../editor/DocumentChrome';
+import { DocumentChrome, ReleaseButton, ToolButton, ToolDivider } from '../editor/DocumentChrome';
 import { FieldsSidebar } from '../editor/FieldsSidebar';
 import { FieldsToggle } from '../editor/FieldsToggle';
 import { useFieldsPanelOpen } from '../editor/fields-sidebar-store';
@@ -544,17 +543,12 @@ export function RecipientsTable({
         tab="table"
         toolbar={toolbar}
         action={
-          <Button
-            variant="primary"
-            size="sm"
-            icon={
-              running ? <LoaderCircle size={15} className="animate-spin" /> : <CheckCheck size={15} />
-            }
+          <ReleaseButton
+            count={checkedCount}
+            running={running}
             disabled={running || checkedCount === 0}
             onClick={() => setAsking(true)}
-          >
-            {running ? 'Выпускаем' : `Выпустить ${checkedCount || ''}`}
-          </Button>
+          />
         }
       />
 
