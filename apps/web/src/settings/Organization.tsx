@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Building2, Check, UserRound } from 'lucide-react';
+import { errorText } from '../api/client';
 import { useOrgProfile, useOrgMutations } from '../api/org';
 import { Button } from '../ui/Button';
 import { Input, Label } from '../ui/Field';
@@ -83,7 +84,7 @@ export function OrgName() {
         </div>
         {renameOrg.isError && (
           <p role="alert" className="mt-1.5 text-sm text-[var(--danger)]">
-            {(renameOrg.error as Error).message}
+            {errorText(renameOrg.error)}
           </p>
         )}
       </div>
@@ -136,6 +137,11 @@ export function MyProfile() {
           </Button>
           {saved && <Saved />}
         </div>
+        {renameMe.isError && (
+          <p role="alert" className="mt-1.5 text-sm text-[var(--danger)]">
+            {errorText(renameMe.error)}
+          </p>
+        )}
       </div>
     </section>
   );

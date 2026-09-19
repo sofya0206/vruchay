@@ -67,7 +67,9 @@ export function useSessionMutations() {
   const qc = useQueryClient();
   const refresh = () => qc.invalidateQueries({ queryKey: ['sessions'] });
   return {
-    revoke: useMutation({ mutationFn: securityApi.revoke, onSuccess: refresh }),
+    // Список обновляем и после отказа: 404 значит, что вход уже закрыт
+    // (в другой вкладке, истёк срок), и строка должна уйти.
+    revoke: useMutation({ mutationFn: securityApi.revoke, onSettled: refresh }),
     revokeOthers: useMutation({ mutationFn: securityApi.revokeOthers, onSuccess: refresh }),
   };
 }

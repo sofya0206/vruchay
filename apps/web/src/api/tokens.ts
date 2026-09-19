@@ -33,7 +33,8 @@ export function useTokenMutations() {
     }),
     revoke: useMutation({
       mutationFn: (id: string) => api.delete<{ ok: true }>(`/tokens/${id}`),
-      onSuccess: refresh,
+      // 404 — токен уже отозван в другой вкладке: строка должна уйти и тогда.
+      onSettled: refresh,
     }),
   };
 }

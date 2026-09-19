@@ -2,7 +2,7 @@ import { FormEvent, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, FilePlus2, Plus } from 'lucide-react';
-import { api } from '../api/client';
+import { api, errorText } from '../api/client';
 import type { DocumentDetail, DocumentList } from '../api/types';
 import { useFolders } from '../api/folders';
 import { Button } from '../ui/Button';
@@ -150,7 +150,7 @@ export function CreateDocumentPanel({
 
       {create.isError && (
         <p role="alert" className="text-sm text-[var(--danger)]">
-          {create.error.message}
+          {errorText(create.error)}
         </p>
       )}
     </form>

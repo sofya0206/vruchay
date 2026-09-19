@@ -3,6 +3,7 @@ import { Award } from 'lucide-react';
 import { useAcceptInvite } from '../api/team';
 import { Button } from '../ui/Button';
 import { Input, Label } from '../ui/Field';
+import { errorText } from '../api/client';
 
 /**
  * Человек открыл ссылку из приглашения и придумывает пароль.
@@ -73,7 +74,7 @@ export function InvitePage() {
 
         {accept.isError && (
           <p role="alert" className="text-sm text-[var(--danger)]">
-            {(accept.error as Error).message}
+            {errorText(accept.error)}
           </p>
         )}
 

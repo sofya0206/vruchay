@@ -31,6 +31,7 @@ import {
   type RecipientRow,
   type SendResult,
 } from '../api/recipients';
+import { errorText } from '../api/client';
 import { PreviewDialog } from './PreviewDialog';
 import { RowOutcomeChip } from './RowOutcomeChip';
 import { Button } from '../ui/Button';
@@ -117,7 +118,7 @@ export function RecipientsTable({
       if (!target || target === columnId) return;
       const order = columns.map((c) => c.id).filter((id) => id !== columnId);
       order.splice(order.indexOf(target), 0, columnId);
-      m.reorderColumns.mutate(order);
+      report(m.reorderColumns.mutateAsync(order));
     };
     handle.addEventListener('pointermove', onMove);
     handle.addEventListener('pointerup', onUp);
@@ -144,6 +145,29 @@ export function RecipientsTable({
   /** Отказ сервера на новую колонку — под полем окна, а не в общей полосе за ним. */
   const [columnError, setColumnError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * Отказ сервера — в полосу над таблицей. Через промис, а не onError
+   * у mutate: тот срабатывает только у последнего вызова, а строки
+   * удаляют и отмечают подряд, не дожидаясь ответа на предыдущую.
+   */
+  const report = (action: Promise<unknown>) => {
+    action.catch((err: unknown) => setError(errorText(err)));
+  };
+  /**
+   * Ячейки, чья правка не дошла до сервера, — «строка:колонка». Состояние
+   * красит их, а ссылку читает выпуск: после ожидания записей состояние
+   * этого рендера уже устарело.
+   */
+  const [unsavedCells, setUnsavedCells] = useState<ReadonlySet<string>>(() => new Set());
+  const unsaved = useRef<ReadonlySet<string>>(unsavedCells);
+  const markCell = (key: string, failed: boolean) => {
+    if (unsaved.current.has(key) === failed) return;
+    const next = new Set(unsaved.current);
+    if (failed) next.add(key);
+    else next.delete(key);
+    unsaved.current = next;
+    setUnsavedCells(next);
+  };
   const [preview, setPreview] = useState(false);
   const [asking, setAsking] = useState(false);
   const [sent, setSent] = useState<SendResult | null>(null);
@@ -169,8 +193,8 @@ export function RecipientsTable({
    * Незаконченные записи ячеек.
    *
    * Копится цепочкой: правок может быть несколько, а дождаться нужно всех.
-   * Ошибку глотаем — о ней уже сообщит сама запись, а выпуск из-за неё
-   * останавливать не за что.
+   * Ошибку здесь глотаем: о ней сообщает сама запись — полосой и красной
+   * ячейкой, — а выпуск после ожидания сверяется с `unsaved`.
    */
   /**
    * Файл, из которого разобран открытый диалог. Нужен, чтобы перечитать
@@ -228,7 +252,7 @@ export function RecipientsTable({
     sentForJob.current = job.id;
     send.mutate(undefined, {
       onSuccess: (result) => setSent(result),
-      onError: (err) => setError((err as Error).message),
+      onError: (err) => setError(errorText(err)),
     });
   }, [job?.id, job?.status, job?.done, send]);
 
@@ -288,7 +312,7 @@ export function RecipientsTable({
       setParsedFrom(from);
       setParsed(sheet);
     } catch (err) {
-      setError((err as Error).message);
+      setError(errorText(err));
     }
   }
 
@@ -307,10 +331,22 @@ export function RecipientsTable({
       // Секунды здесь никто не заметит, а испорченную партию заметят все.
       await pendingSaves.current;
 
+      // Правка, которая не дошла, в грамоту не попадёт: выпуск напечатал бы
+      // прежнее значение, а с рассылкой ещё и отправил бы его человеку.
+      // Строки и колонки, удалённые с тех пор, не в счёт — править там нечего.
+      const lost = [...unsaved.current].some((key) => {
+        const [rowId, name] = key.split(':');
+        return rows.some((r) => r.id === rowId) && columns.some((c) => c.name === name);
+      });
+      if (lost) {
+        setError('Не все правки сохранились — исправьте ячейки, отмеченные красным');
+        return;
+      }
+
       const created = await start.mutateAsync();
       setJobId(created.id);
     } catch (err) {
-      setError((err as Error).message);
+      setError(errorText(err));
     }
   }
 
@@ -324,7 +360,7 @@ export function RecipientsTable({
     try {
       await cancel.mutateAsync(job.id);
     } catch (err) {
-      setError((err as Error).message);
+      setError(errorText(err));
     }
   }
 
@@ -341,7 +377,7 @@ export function RecipientsTable({
     try {
       await resume.mutateAsync(job.id);
     } catch (err) {
-      setError((err as Error).message);
+      setError(errorText(err));
     }
   }
 
@@ -362,7 +398,7 @@ export function RecipientsTable({
         setNewColumn('');
         setAddingColumn(false);
       },
-      onError: (err) => setColumnError(err.message),
+      onError: (err) => setColumnError(errorText(err)),
     });
   }
 
@@ -392,7 +428,7 @@ export function RecipientsTable({
       icon: <Rows3 size={16} />,
       label: 'Добавить строку',
       disabled: m.addRow.isPending,
-      onSelect: () => m.addRow.mutate(),
+      onSelect: () => report(m.addRow.mutateAsync()),
     },
     {
       icon: <Columns3 size={16} />,
@@ -404,13 +440,13 @@ export function RecipientsTable({
       icon: <CheckCircle2 size={16} />,
       label: 'Отметить все строки',
       disabled: rows.length === 0,
-      onSelect: () => m.setChecked.mutate({ checked: true }),
+      onSelect: () => report(m.setChecked.mutateAsync({ checked: true })),
     },
     {
       icon: <ListX size={16} />,
       label: 'Снять отметку со всех строк',
       disabled: rows.length === 0,
-      onSelect: () => m.setChecked.mutate({ checked: false }),
+      onSelect: () => report(m.setChecked.mutateAsync({ checked: false })),
     },
     { separator: true },
     {
@@ -441,7 +477,7 @@ export function RecipientsTable({
       <ToolButton
         title="Добавить строку"
         disabled={m.addRow.isPending}
-        onClick={() => m.addRow.mutate()}
+        onClick={() => report(m.addRow.mutateAsync())}
       >
         <Plus size={16} />
       </ToolButton>
@@ -748,7 +784,7 @@ export function RecipientsTable({
                   >
                     {m.parseFile.isPending ? 'Читаем файл…' : 'Загрузить файл'}
                   </Button>
-                  <Button icon={<Plus size={15} />} onClick={() => m.addRow.mutate()}>
+                  <Button icon={<Plus size={15} />} onClick={() => report(m.addRow.mutateAsync())}>
                     Добавить строку
                   </Button>
                 </div>
@@ -761,7 +797,7 @@ export function RecipientsTable({
                   <th className="w-10 border-r border-b border-[var(--line)] px-3 py-2">
                     <Checkbox
                       checked={allChecked}
-                      onChange={() => m.setChecked.mutate({ checked: !allChecked })}
+                      onChange={() => report(m.setChecked.mutateAsync({ checked: !allChecked }))}
                       aria-label="Отметить все"
                     />
                   </th>
@@ -814,7 +850,7 @@ export function RecipientsTable({
                         <IconButton
                           size="sm"
                           label={`Удалить колонку ${columnTitle(col)}`}
-                          onClick={() => m.deleteColumn.mutate(col.id)}
+                          onClick={() => report(m.deleteColumn.mutateAsync(col.id))}
                           className="size-6 opacity-0 group-hover:opacity-100 hover:text-[var(--danger)] pointer-coarse:size-10 pointer-coarse:opacity-100"
                         >
                           <X size={12} />
@@ -834,7 +870,9 @@ export function RecipientsTable({
                     <td className="border-r border-b border-[var(--line)] px-3 py-1 text-center">
                       <Checkbox
                         checked={row.checked}
-                        onChange={() => m.updateRow.mutate({ rowId: row.id, checked: !row.checked })}
+                        onChange={() =>
+                          report(m.updateRow.mutateAsync({ rowId: row.id, checked: !row.checked }))
+                        }
                         aria-label="Включить в генерацию"
                       />
                     </td>
@@ -861,18 +899,31 @@ export function RecipientsTable({
                             // и показывает «ФУ, г. Екатеринбург» без начала.
                             e.currentTarget.scrollLeft = 0;
                             const value = e.target.value;
-                            if (value !== (row.data[col.name] ?? '')) {
-                              trackSave(
-                                m.updateRow.mutateAsync({
-                                  rowId: row.id,
-                                  data: { [col.name]: value },
-                                }),
-                              );
+                            const key = `${row.id}:${col.name}`;
+                            // Вернули прежнее значение — сохранять нечего,
+                            // и неудачная запись до этого больше не в счёт.
+                            if (value === (row.data[col.name] ?? '')) {
+                              markCell(key, false);
+                              return;
                             }
+                            // Набранное остаётся в ячейке: его правят,
+                            // а не вспоминают и набирают заново.
+                            trackSave(
+                              m.updateRow
+                                .mutateAsync({ rowId: row.id, data: { [col.name]: value } })
+                                .then(
+                                  () => markCell(key, false),
+                                  (err: unknown) => {
+                                    markCell(key, true);
+                                    setError(`Строка ${index + 1}: ${errorText(err)}`);
+                                  },
+                                ),
+                            );
                           }}
+                          aria-invalid={unsavedCells.has(`${row.id}:${col.name}`) || undefined}
                           // Рамка внутри ячейки: снаружи она легла бы на линии
                           // соседних клеток, а верх ушёл бы под прилипшую шапку.
-                          className="w-full truncate bg-transparent px-3 py-1.5 outline-none focus:bg-[var(--surface)] focus:ring-2 focus:ring-[var(--focus)] focus:ring-inset"
+                          className="w-full truncate bg-transparent px-3 py-1.5 outline-none focus:bg-[var(--surface)] focus:ring-2 focus:ring-[var(--focus)] focus:ring-inset aria-invalid:ring-2 aria-invalid:ring-[var(--danger)] aria-invalid:ring-inset"
                         />
                       </td>
                     ))}
@@ -880,7 +931,7 @@ export function RecipientsTable({
                       <IconButton
                         size="sm"
                         label="Удалить строку"
-                        onClick={() => m.deleteRow.mutate(row.id)}
+                        onClick={() => report(m.deleteRow.mutateAsync(row.id))}
                         className="size-7 opacity-0 group-hover:opacity-100 hover:text-[var(--danger)] pointer-coarse:size-10 pointer-coarse:opacity-100"
                       >
                         <Trash2 size={14} />
@@ -943,7 +994,7 @@ export function RecipientsTable({
           onConfirm={(cols, importRows, mode, titles) => {
             m.importRows.mutate(
               { columns: cols, rows: importRows, titles, mode },
-              { onSuccess: () => setParsed(null), onError: (e) => setError((e as Error).message) },
+              { onSuccess: () => setParsed(null), onError: (e) => setError(errorText(e)) },
             );
           }}
         />

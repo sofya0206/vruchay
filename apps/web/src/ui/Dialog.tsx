@@ -115,6 +115,7 @@ export function ConfirmDialog({
   confirmLabel,
   danger,
   pending,
+  error,
   onConfirm,
   onClose,
 }: {
@@ -123,6 +124,8 @@ export function ConfirmDialog({
   confirmLabel: string;
   danger?: boolean;
   pending?: boolean;
+  /** Отказ сервера. Окно остаётся открытым — иначе оно просто стояло бы без ответа. */
+  error?: string | null;
   onConfirm: () => void;
   onClose: () => void;
 }) {
@@ -142,6 +145,11 @@ export function ConfirmDialog({
       }
     >
       {children && <div className="text-[var(--text-muted)]">{children}</div>}
+      {error && (
+        <p role="alert" className="mt-3 rounded-lg bg-[var(--danger-soft)] p-3 text-[var(--danger)]">
+          {error}
+        </p>
+      )}
     </Dialog>
   );
 }

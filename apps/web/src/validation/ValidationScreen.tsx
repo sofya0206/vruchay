@@ -23,6 +23,7 @@ import { useValidation, useValidationFixes, type CellFix } from '../api/validati
 import { DiscussTermsLink } from '../billing/DiscussTermsLink';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Field';
+import { errorText } from '../api/client';
 
 /**
  * Проверка всех строк до выпуска.
@@ -55,7 +56,7 @@ export function ValidationScreen({
     try {
       setReport(await validation.mutateAsync(scope));
     } catch (err) {
-      setError((err as Error).message);
+      setError(errorText(err));
     }
   }
 
@@ -67,7 +68,7 @@ export function ValidationScreen({
       // в соседней строке, и показывать устаревший разбор нельзя.
       await run();
     } catch (err) {
-      setError((err as Error).message);
+      setError(errorText(err));
     }
   }
 
@@ -77,7 +78,7 @@ export function ValidationScreen({
       await exclude.mutateAsync(rowIds);
       await run();
     } catch (err) {
-      setError((err as Error).message);
+      setError(errorText(err));
     }
   }
 

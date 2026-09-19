@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Check, Mail, Trash2, UserPlus } from 'lucide-react';
+import { errorText } from '../api/client';
 import { useTeam, useTeamMutations, type TeamMember, type TeamRole } from '../api/team';
 import { useMe } from '../auth/useAuth';
 import { Button } from '../ui/Button';
@@ -33,6 +34,16 @@ export function Team() {
   const m = useTeamMutations();
   const [adding, setAdding] = useState(false);
   const [removing, setRemoving] = useState<TeamMember | null>(null);
+  /**
+   * Отказ на смену роли или повторное приглашение: «уже вошёл», «свою роль
+   * изменить нельзя». Раньше выбор роли молча откатывался, а письмо
+   * «не уходило» без единого слова.
+   */
+  const [actionError, setActionError] = useState<string | null>(null);
+  const report = (action: Promise<unknown>) => {
+    setActionError(null);
+    action.catch((err: unknown) => setActionError(errorText(err)));
+  };
 
   const members = team.data?.members ?? [];
   const myRole = members.find((x) => x.email === me.data?.email)?.role;
@@ -54,19 +65,25 @@ export function Team() {
             key={member.userId}
             member={member}
             canManage={canManage && member.role !== 'owner' && member.email !== me.data?.email}
-            onRole={(role) => m.setRole.mutate({ userId: member.userId, role })}
+            onRole={(role) => report(m.setRole.mutateAsync({ userId: member.userId, role }))}
             onRemove={() => setRemoving(member)}
-            onResend={() => m.resend.mutate(member.userId)}
+            onResend={() => report(m.resend.mutateAsync(member.userId))}
             resent={m.resend.isSuccess && m.resend.variables === member.userId}
           />
         ))}
       </ul>
 
+      {actionError && (
+        <p role="alert" className="mt-2 text-sm text-[var(--danger)]">
+          {actionError}
+        </p>
+      )}
+
       {canManage &&
         (adding ? (
           <InviteForm
             pending={m.invite.isPending}
-            error={m.invite.error ? (m.invite.error as Error).message : null}
+            error={m.invite.error ? errorText(m.invite.error) : null}
             onCancel={() => {
               setAdding(false);
               m.invite.reset();
@@ -95,7 +112,11 @@ export function Team() {
           confirmLabel="Убрать"
           danger
           pending={m.remove.isPending}
-          onClose={() => setRemoving(null)}
+          error={m.remove.error ? errorText(m.remove.error) : null}
+          onClose={() => {
+            setRemoving(null);
+            m.remove.reset();
+          }}
           onConfirm={() =>
             m.remove.mutate(removing.userId, { onSuccess: () => setRemoving(null) })
           }

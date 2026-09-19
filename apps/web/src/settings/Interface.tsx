@@ -1,4 +1,5 @@
 import { CalendarDays, Monitor, Moon, Sun, type LucideIcon } from 'lucide-react';
+import { errorText } from '../api/client';
 import { usePreferences, useUpdatePreferences, type DateFormat, type UiTheme } from '../api/org';
 import { formatDate } from './preferences';
 import { useTheme } from './theme';
@@ -42,6 +43,18 @@ export function Interface() {
   const sample = new Date();
 
   if (!prefs.data) return null;
+
+  /*
+   * Отказ показываем под той частью, где выбирали. Тема при этом остаётся
+   * выбранной на этом устройстве, но сервер её не знает — и при следующем
+   * входе вернул бы прежнюю молча, будто выбор не состоялся.
+   */
+  const failed = update.isError
+    ? {
+        on: update.variables?.theme !== undefined ? 'theme' : 'dateFormat',
+        text: errorText(update.error),
+      }
+    : null;
 
   function chooseTheme(next: UiTheme) {
     setTheme(next);
@@ -90,6 +103,11 @@ export function Interface() {
             );
           })}
         </div>
+        {failed?.on === 'theme' && (
+          <p role="alert" className="mt-2 text-sm text-[var(--danger)]">
+            {failed.text}
+          </p>
+        )}
       </div>
 
       <div>
@@ -125,6 +143,11 @@ export function Interface() {
             );
           })}
         </div>
+        {failed?.on === 'dateFormat' && (
+          <p role="alert" className="mt-2 text-sm text-[var(--danger)]">
+            {failed.text}
+          </p>
+        )}
       </div>
     </section>
   );

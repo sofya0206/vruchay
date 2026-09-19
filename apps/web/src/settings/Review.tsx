@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Check, MessageSquareQuote, Trash2 } from 'lucide-react';
+import { errorText } from '../api/client';
 import { useMyReview, useReviewMutations, type MyReview } from '../api/reviews';
 import { Button } from '../ui/Button';
 import { Input, Label, Textarea } from '../ui/Field';
@@ -158,7 +159,7 @@ function ReviewForm({ existing }: { existing: MyReview | null }) {
 
         {submit.isError && (
           <p role="alert" className="text-sm text-[var(--danger)]">
-            {(submit.error as Error).message}
+            {errorText(submit.error)}
           </p>
         )}
 
@@ -188,6 +189,12 @@ function ReviewForm({ existing }: { existing: MyReview | null }) {
             </button>
           )}
         </div>
+
+        {remove.isError && (
+          <p role="alert" className="text-sm text-[var(--danger)]">
+            {errorText(remove.error)}
+          </p>
+        )}
 
         <p className="text-sm text-[var(--text-muted)]">
           Перед публикацией мы читаем отзыв глазами — обычно в течение пары дней.
