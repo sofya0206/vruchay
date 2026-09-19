@@ -974,10 +974,26 @@ html[data-snap='y'] {
     transform var(--duration-base) var(--ease-out-quint);
 }
 .vru-role {
-  padding: 28px;
+  padding: 20px;
 }
 .vru-fact {
-  padding: 20px;
+  padding: 16px;
+}
+/* На телефоне плитка факта — строка: иконка слева, текст справа. */
+@media (max-width: 639px) {
+  .vru-fact {
+    flex-direction: row;
+    gap: 14px;
+    align-items: flex-start;
+  }
+}
+@media (min-width: 1024px) {
+  .vru-role {
+    padding: 28px;
+  }
+  .vru-fact {
+    padding: 20px;
+  }
 }
 .vru-role:hover,
 .vru-fact:hover {

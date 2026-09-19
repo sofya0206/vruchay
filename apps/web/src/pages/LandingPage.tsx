@@ -127,7 +127,7 @@ function SiteHeader() {
 function Hero() {
   return (
     <section id="top" className="vru-screen relative pt-14">
-      <div className="mx-auto max-w-[var(--width-page)] px-6 py-16 text-center">
+      <div className="mx-auto max-w-[var(--width-page)] px-6 py-10 text-center lg:py-16">
         <p className="vru-eyebrow vru-enter">
           <ShieldCheck size={14} /> Данные участников остаются в России
         </p>
@@ -139,11 +139,15 @@ function Hero() {
           верификации
         </p>
         <div className="vru-enter vru-delay mt-8 flex flex-wrap justify-center gap-3">
-          <Link to="/register">
-            <Button variant="primary">Попробовать бесплатно</Button>
+          <Link to="/register" className="w-full sm:w-auto">
+            <Button variant="primary" className="w-full">
+              Попробовать бесплатно
+            </Button>
           </Link>
-          <a href="#kak">
-            <Button variant="secondary">Посмотреть, как это работает</Button>
+          <a href="#kak" className="w-full sm:w-auto">
+            <Button variant="secondary" className="w-full">
+              Посмотреть, как это работает
+            </Button>
           </a>
         </div>
         <p className="mt-4 text-sm text-[var(--text-muted)]">
@@ -209,7 +213,7 @@ const ROLES: {
 function ForOrganisations() {
   return (
     <section id="organizatsiyam" className="vru-screen">
-      <div className="mx-auto w-full max-w-[var(--width-page)] px-6 py-16">
+      <div className="mx-auto w-full max-w-[var(--width-page)] px-6 py-10 lg:py-16">
         <h2 className="vru-h2 vru-reveal">Для организаций</h2>
         <p
           className="vru-reveal mt-4 max-w-[560px] text-[var(--text-muted)]"
@@ -218,7 +222,7 @@ function ForOrganisations() {
           Закон, договор и подключение — всё готово до первого награждения. Каждому в организации —
           свой ответ.
         </p>
-        <div className="mt-10 grid gap-5 md:grid-cols-3">
+        <div className="mt-8 grid gap-4 md:grid-cols-3 lg:mt-10 lg:gap-5">
           {ROLES.map((r, i) => (
             <div
               key={r.role}
@@ -287,7 +291,7 @@ function RoleCard({
 function CheckYourself() {
   return (
     <section id="proverka" className="vru-screen relative">
-      <div className="mx-auto grid w-full max-w-[var(--width-page)] items-center gap-12 px-6 py-16 lg:grid-cols-[1fr_1.15fr]">
+      <div className="mx-auto grid w-full max-w-[var(--width-page)] items-center gap-10 px-6 py-10 lg:gap-12 lg:py-16 lg:grid-cols-[1fr_1.15fr]">
         <div className="vru-reveal">
           <h2 className="vru-h2">Проверьте, куда уходят фамилии участников</h2>
           <p className="mt-5 text-[var(--text-muted)]">
@@ -303,11 +307,13 @@ function CheckYourself() {
               className="vru-reveal vru-fact"
               style={{ '--reveal-i': i + 1 } as CSSProperties}
             >
-              <span className="vru-feature__icon">
+              <span className="vru-feature__icon shrink-0">
                 <f.icon size={18} strokeWidth={1.75} />
               </span>
-              <p className="mt-3 font-medium">{f.title}</p>
-              <p className="mt-1 text-sm leading-snug text-[var(--text-muted)]">{f.text}</p>
+              <div className="sm:mt-3">
+                <p className="font-medium">{f.title}</p>
+                <p className="mt-1 text-sm leading-snug text-[var(--text-muted)]">{f.text}</p>
+              </div>
             </li>
           ))}
         </ul>
@@ -353,7 +359,7 @@ const NUMBERS: [string, string][] = [
 function FinalScreen() {
   return (
     <section id="start" className="vru-screen">
-      <div className="mx-auto grid w-full max-w-[var(--width-page)] flex-1 items-center gap-12 px-6 py-16 lg:grid-cols-[1.1fr_1fr]">
+      <div className="mx-auto grid w-full max-w-[var(--width-page)] flex-1 items-center gap-12 px-6 py-10 lg:py-16 lg:grid-cols-[1.1fr_1fr]">
         <div>
           <h2 className="vru-h2 vru-reveal">Ближайшее мероприятие — уже спокойное</h2>
           <p
@@ -367,25 +373,25 @@ function FinalScreen() {
             className="vru-reveal mt-8 flex flex-wrap gap-3"
             style={{ '--reveal-i': 2 } as CSSProperties}
           >
-            <Link to="/register">
-              <Button variant="primary" size="lg">
+            <Link to="/register" className="w-full sm:w-auto">
+              <Button variant="primary" size="lg" className="w-full">
                 Попробовать бесплатно
               </Button>
             </Link>
-            <Link to="/obsudit">
-              <Button variant="secondary" size="lg">
+            <Link to="/obsudit" className="w-full sm:w-auto">
+              <Button variant="secondary" size="lg" className="w-full">
                 Написать нам
               </Button>
             </Link>
           </div>
           <dl
-            className="vru-reveal mt-12 grid grid-cols-3 gap-6 border-t border-[var(--line)] pt-8"
+            className="vru-reveal mt-10 grid gap-4 border-t border-[var(--line)] pt-6 sm:grid-cols-3 sm:gap-6 lg:mt-12 lg:pt-8"
             style={{ '--reveal-i': 3 } as CSSProperties}
           >
             {NUMBERS.map(([value, label]) => (
-              <div key={label}>
-                <dt className="font-serif text-3xl">{value}</dt>
-                <dd className="mt-1 text-sm text-[var(--text-muted)]">{label}</dd>
+              <div key={label} className="flex items-baseline gap-3 sm:block">
+                <dt className="font-serif text-2xl sm:text-3xl">{value}</dt>
+                <dd className="text-sm text-[var(--text-muted)] sm:mt-1">{label}</dd>
               </div>
             ))}
           </dl>

@@ -132,7 +132,7 @@ export function HowItWorks() {
 
   return (
     <section id="kak" className="vru-screen">
-      <div className="mx-auto w-full max-w-[var(--width-page)] px-6 py-16">
+      <div className="mx-auto w-full max-w-[var(--width-page)] px-6 py-10 lg:py-16">
         <WalkthroughTabs value={tab} onChange={setTab} className="vru-reveal" />
         <div className="vru-reveal mt-8 grid" style={{ '--reveal-i': 1 } as CSSProperties}>
           {WALKTHROUGH.map((step) => {
