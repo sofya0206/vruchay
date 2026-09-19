@@ -781,19 +781,10 @@ textarea::-webkit-resizer {
 /*
  * Посадочная экранами: одна секция — один экран.
  *
- * Прилипание включается только на широком и высоком окне, где секция
- * помещается в экран целиком. На телефоне она длиннее окна, и обязательное
- * прилипание не даёт дочитать середину — там оно мягкое (proximity):
- * дотягивает до начала секции, только если человек и так рядом.
+ * Ниже ноутбука экранов нет вовсе — см. медиазапрос ниже.
  */
 html[data-snap='y'] {
-  scroll-snap-type: y proximity;
   scroll-behavior: smooth;
-}
-@media (min-width: 1024px) and (min-height: 700px) {
-  html[data-snap='y'] {
-    scroll-snap-type: y mandatory;
-  }
 }
 @media (prefers-reduced-motion: reduce) {
   html[data-snap='y'] {
@@ -801,13 +792,23 @@ html[data-snap='y'] {
   }
 }
 
-.vru-screen {
-  min-height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  scroll-snap-align: start;
-  scroll-snap-stop: always;
+/*
+ * Экраны — только на ноутбуке и шире. На телефоне посадочная остаётся
+ * обычной лентой: секция там длиннее окна, растягивать её до экрана и
+ * прилипать к началу — значит прятать середину.
+ */
+@media (min-width: 1024px) and (min-height: 700px) {
+  html[data-snap='y'] {
+    scroll-snap-type: y mandatory;
+  }
+  .vru-screen {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
 }
 
 /*
@@ -927,6 +928,23 @@ html[data-snap='y'] {
   color: var(--line-strong);
 }
 
+/* На телефоне закладки в одну строку с прокруткой: перенос ронял
+   последний шаг на вторую строку и оставлял стрелку висеть в конце первой. */
+@media (max-width: 640px) {
+  .vru-tabbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    gap: 12px;
+  }
+  .vru-tabbar::-webkit-scrollbar {
+    display: none;
+  }
+  .vru-tabbar button {
+    white-space: nowrap;
+  }
+}
+
 /*
  * Без рейки. На посадочной линия отделяет оглавление от рассказа, а в
  * кабинете закладки стоят последними на экране — там та же линия читается
@@ -938,45 +956,79 @@ html[data-snap='y'] {
 }
 
 /*
- * Карточка «Для организаций». Список раскрывается сеткой 0fr → 1fr:
- * так высота анимируется без height: auto, который анимировать нельзя.
+ * Карточки «Для организаций» и плитки фактов. Содержимое видно сразу:
+ * закрытая карточка выглядит пустой, а с клавиатуры и с телефона до
+ * спрятанного под наведение списка не добраться. На наведение —
+ * только подъём и рамка акцентом, как у прочих карточек посадочной.
  */
-.vru-expand {
+.vru-role,
+.vru-fact {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   background: var(--surface);
   border-radius: var(--radius-card);
   box-shadow: var(--ring-line);
-  padding: 24px;
   transition:
     box-shadow var(--duration-base) var(--ease-out-quint),
     transform var(--duration-base) var(--ease-out-quint);
 }
-.vru-expand:hover,
-.vru-expand:focus-within {
-  box-shadow: inset 0 0 0 1px var(--accent-line), var(--shadow-lg);
-  transform: translateY(-4px);
+.vru-role {
+  padding: 20px;
 }
-.vru-expand__body {
-  display: grid;
-  grid-template-rows: 0fr;
+.vru-fact {
+  padding: 16px;
+}
+/* На телефоне плитка факта — строка: иконка слева, текст справа. */
+@media (max-width: 639px) {
+  .vru-fact {
+    flex-direction: row;
+    gap: 14px;
+    align-items: flex-start;
+  }
+}
+@media (min-width: 1024px) {
+  .vru-role {
+    padding: 28px;
+  }
+  .vru-fact {
+    padding: 20px;
+  }
+}
+.vru-role:hover,
+.vru-fact:hover {
+  box-shadow:
+    inset 0 0 0 1px var(--accent-line),
+    var(--shadow-lg);
+  transform: translateY(-3px);
+}
+
+/*
+ * Шаг «Как это работает». Уходящий шаг пропадает сразу, входящий
+ * проявляется: кроссфейд двух шагов в одной ячейке на треть секунды
+ * показывал оба текста разом, и это читалось как поломка.
+ */
+.vru-step {
   opacity: 0;
-  overflow: hidden;
-  transition:
-    grid-template-rows var(--duration-rise) var(--ease-out-quint),
-    opacity var(--duration-base) var(--ease-out-quint);
+  visibility: hidden;
 }
-.vru-expand__body > * {
-  min-height: 0;
-}
-.vru-expand:hover .vru-expand__body,
-.vru-expand:focus-within .vru-expand__body {
-  grid-template-rows: 1fr;
+.vru-step.is-active {
   opacity: 1;
+  visibility: visible;
+  animation: vru-fade 320ms var(--ease-out-quint) both;
 }
 @media (prefers-reduced-motion: reduce) {
-  .vru-expand:hover,
-  .vru-expand:focus-within {
-    transform: none;
+  .vru-step.is-active {
+    animation: none;
   }
+}
+
+/* Окно терминала: та же рамка, что у экранов продукта, но с моноширинным содержимым. */
+.vru-terminal {
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--ring-line), var(--shadow-sheet);
+  overflow: hidden;
 }
 
 .vru-feature__icon {
