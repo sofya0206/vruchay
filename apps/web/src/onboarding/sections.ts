@@ -22,7 +22,7 @@ export interface Section {
 }
 
 const RELEASE: TipStep = {
-  at: [{ text: 'Выпустить', in: 'header a, header button' }],
+  at: [{ text: 'Выпуск', in: 'header a, header button' }],
   title: 'Выпуск — отсюда',
   text: 'Кнопка всегда на месте: с любой вкладки ведёт к списку, откуда выпускают.',
   placement: 'bottom',

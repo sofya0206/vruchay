@@ -937,6 +937,28 @@ textarea::-webkit-resizer {
 .vru-coach-card {
   animation: vru-fade-up var(--duration-fast) var(--ease-out-quint) both;
 }
+/* Подсказки по разделу: лёгкое затемнение вокруг элемента и кольцо. */
+.vru-coach-spot {
+  box-shadow:
+    0 0 0 9999px rgba(9, 17, 53, 0.16),
+    0 0 0 2px var(--accent);
+  transition: all var(--duration-base) var(--ease-out-quint);
+}
+.vru-coach-spot::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 16px;
+  border: 1.5px solid var(--accent);
+  opacity: 0.4;
+  animation: vru-coach-pulse 1.8s var(--ease-out-quint) infinite;
+}
+@keyframes vru-coach-pulse {
+  to {
+    transform: scale(1.08);
+    opacity: 0;
+  }
+}
 .vru-guide {
   animation: vru-fade var(--duration-base) var(--ease-out-quint) both;
 }
@@ -973,6 +995,7 @@ textarea::-webkit-resizer {
 }
 @media (prefers-reduced-motion: reduce) {
   .vru-hotspot,
+  .vru-coach-spot::after,
   .vru-coach-card,
   .vru-guide,
   .vru-guide-slide,
