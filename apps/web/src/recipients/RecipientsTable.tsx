@@ -243,6 +243,7 @@ export function RecipientsTable({
         <DocumentChrome
           documentId={documentId}
           title={doc.title}
+          isTemplate={doc.isTemplate}
           actions={fileMenu.entries}
           tab="table"
           toolbar={<span aria-hidden className="size-8" />}
@@ -537,6 +538,7 @@ export function RecipientsTable({
       <DocumentChrome
         documentId={documentId}
         title={doc.title}
+        isTemplate={doc.isTemplate}
         actions={actions}
         tab="table"
         toolbar={toolbar}

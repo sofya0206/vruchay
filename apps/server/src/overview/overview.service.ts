@@ -88,9 +88,9 @@ export class OverviewService {
         where: { orgId, kind: 'generated', createdAt: { gte: since } },
       }),
       this.prisma.email.count({ where: { orgId, status: { in: [...SENT_STATUSES] } } }),
-      this.prisma.document.count({ where: { orgId, deletedAt: null } }),
+      this.prisma.document.count({ where: { orgId, deletedAt: null, isTemplate: false } }),
       this.prisma.document.findMany({
-        where: { orgId, deletedAt: null },
+        where: { orgId, deletedAt: null, isTemplate: false },
         orderBy: { updatedAt: 'desc' },
         take: RECENT_LIMIT,
         select: { id: true, title: true, eventName: true, eventDate: true, updatedAt: true },

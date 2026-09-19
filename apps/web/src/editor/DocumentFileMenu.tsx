@@ -6,6 +6,7 @@ import {
   FilePlus2,
   FolderOpen,
   FolderInput,
+  LayoutTemplate,
   PencilLine,
   Trash2,
 } from 'lucide-react';
@@ -73,12 +74,24 @@ export function useDocumentFileMenu(doc: DocumentDetail | undefined): {
     },
   });
 
+  /* Шаблон — копия, и открываем именно её: иначе правки, которые человек
+     начнёт тут же вносить «в шаблон», уйдут в сам документ. */
+  const saveAsTemplate = useMutation({
+    mutationFn: () => api.post<DocumentDetail>(`/documents/${doc!.id}/template`, {}),
+    onSuccess: (created) => {
+      void qc.invalidateQueries({ queryKey: ['documents'] });
+      navigate(`/documents/${created.id}`);
+    },
+  });
+
+  const isTemplate = Boolean(doc?.isTemplate);
+
   const remove = useMutation({
     mutationFn: () => api.delete<{ ok: true }>(`/documents/${doc!.id}`),
     onSuccess: () => {
       setDeleting(false);
       void qc.invalidateQueries({ queryKey: ['documents'] });
-      navigate('/documents');
+      navigate(isTemplate ? '/documents/templates' : '/documents');
     },
   });
 
@@ -96,10 +109,21 @@ export function useDocumentFileMenu(doc: DocumentDetail | undefined): {
     { separator: true },
     {
       icon: <Copy size={16} />,
-      label: 'Создать копию документа',
+      label: isTemplate ? 'Создать копию шаблона' : 'Создать копию документа',
       disabled: !doc || duplicate.isPending,
       onSelect: () => duplicate.mutate(),
     },
+    // У шаблона «Документ по шаблону» — главная кнопка в шапке, не пункт меню.
+    ...(isTemplate
+      ? []
+      : [
+          {
+            icon: <LayoutTemplate size={16} />,
+            label: 'Сохранить как шаблон',
+            disabled: !doc || saveAsTemplate.isPending,
+            onSelect: () => saveAsTemplate.mutate(),
+          },
+        ]),
     {
       icon: <PencilLine size={16} />,
       label: 'Переименовать',
@@ -111,7 +135,8 @@ export function useDocumentFileMenu(doc: DocumentDetail | undefined): {
     {
       icon: <FolderInput size={16} />,
       label: 'Переместить',
-      disabled: !doc,
+      // Шаблоны общие на организацию и по папкам не раскладываются.
+      disabled: !doc || isTemplate,
       onSelect: () => {
         setFolderId(doc?.folderId ?? '');
         setMoving(true);

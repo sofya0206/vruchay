@@ -184,6 +184,12 @@ export class DocumentsController {
     return this.documents.duplicate(user.orgId, id);
   }
 
+  /** Сохранить как шаблон — копией макета, без получателей и мероприятия. */
+  @Post(':id/template')
+  saveAsTemplate(@CurrentUser() user: SessionUser, @Param('id', uuidParam) id: string) {
+    return this.documents.saveAsTemplate(user.orgId, id);
+  }
+
   @Post(':id/sheets')
   addSheet(@CurrentUser() user: SessionUser, @Param('id', uuidParam) id: string) {
     return this.documents.addSheet(user.orgId, id);
