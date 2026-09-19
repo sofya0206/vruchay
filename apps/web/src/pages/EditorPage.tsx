@@ -58,6 +58,8 @@ import { useDocumentFileMenu } from '../editor/DocumentFileMenu';
 import { SheetTabs } from '../editor/SheetTabs';
 import type { MenuEntry } from '../editor/DocumentChrome';
 import { StatusChip } from '../ui/Field';
+import { Hotspot } from '../onboarding/Hotspot';
+import { onboarding } from '../onboarding/store';
 import { IconButton } from '../ui/IconButton';
 import { Menu, MenuItem } from '../ui/Menu';
 import { Select } from '../ui/Select';
@@ -225,6 +227,10 @@ export function EditorPage() {
    */
   const fieldsOpen = useFieldsPanelOpen();
   const panel: Panel | null = fieldsOpen ? 'fields' : otherPanel;
+  // Панель «Данные» открыта — точка у вкладки больше не нужна.
+  useEffect(() => {
+    if (panel === 'fields') onboarding.markSeen('fields');
+  }, [panel]);
   const setPanel = (next: Panel | null) => {
     setFieldsPanelOpen(next === 'fields');
     if (next !== 'fields') setOtherPanel(next);
@@ -1814,6 +1820,7 @@ export function EditorPage() {
               </Tab>
               <Tab active={panel === 'fields'} onClick={() => setPanel('fields')} icon={<Variable size={14} />} badge={matches.length || undefined}>
                 Данные
+                <Hotspot id="fields" />
               </Tab>
               <Tab active={panel === 'layers'} onClick={() => setPanel('layers')} icon={<Layers size={14} />}>
                 Слои

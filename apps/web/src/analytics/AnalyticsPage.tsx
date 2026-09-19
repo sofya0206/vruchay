@@ -13,6 +13,7 @@ import {
 import { plural } from '../registry/registry-format';
 import { formatCount, formatDuration, formatShare, withinTarget } from './analytics-format';
 import { PlatformFunnel } from './PlatformFunnel';
+import { TourDropOff } from '../onboarding/TourDropOff';
 
 /**
  * Раздел «Аналитика».
@@ -57,6 +58,7 @@ export function AnalyticsPage() {
       <Months data={data} />
 
       {me.data?.isPlatform && <PlatformFunnel />}
+      {me.data?.isPlatform && <TourDropOff />}
     </section>
   );
 }

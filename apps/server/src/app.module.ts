@@ -36,6 +36,7 @@ import { PlatformModule } from './platform/platform.module';
 import { ExpiryModule } from './expiry/expiry.module';
 import { PublicOrgModule } from './public-org/public-org.module';
 import { PlansModule } from './plans/plans.module';
+import { OnboardingModule } from './onboarding/onboarding.module';
 
 @Module({
   imports: [
@@ -74,6 +75,7 @@ import { PlansModule } from './plans/plans.module';
     ExpiryModule,
     PublicOrgModule,
     PlansModule,
+    OnboardingModule,
   ],
   controllers: [HealthController],
 })

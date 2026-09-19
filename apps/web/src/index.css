@@ -919,3 +919,66 @@ textarea::-webkit-resizer {
   background: var(--danger-soft);
   color: var(--danger);
 }
+
+/*
+ * Обучение: точка у элемента, карточка точки и полноэкранные слайды.
+ * Точка пульсирует мягко и гаснет навсегда, как только место найдено.
+ */
+.vru-hotspot {
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 50%, transparent);
+  animation: vru-hotspot 1.6s infinite;
+}
+@keyframes vru-hotspot {
+  70%,
+  100% {
+    box-shadow: 0 0 0 9px color-mix(in srgb, var(--accent) 0%, transparent);
+  }
+}
+.vru-coach-card {
+  animation: vru-fade-up var(--duration-fast) var(--ease-out-quint) both;
+}
+.vru-guide {
+  animation: vru-fade var(--duration-base) var(--ease-out-quint) both;
+}
+.vru-guide-slide {
+  animation: vru-fade-up var(--duration-base) var(--ease-out-quint) both;
+}
+.vru-guide-pop {
+  animation: vru-pop 360ms var(--ease-out-quint) both;
+}
+.vru-guide-row {
+  animation: vru-fade-up 320ms var(--ease-out-quint) both;
+}
+/* Действие на слайде сделано — стрелка «дальше» зовёт мягким ореолом. */
+.vru-guide-next {
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent);
+  animation: vru-hotspot 1.6s infinite;
+}
+@keyframes vru-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes vru-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+.vru-qr-glyph {
+  background: conic-gradient(var(--sheet-ink) 25%, var(--sheet-paper) 0 50%, var(--sheet-ink) 0 75%, var(--sheet-paper) 0) 0 0 / 50% 50%;
+  outline: 1.5px solid var(--sheet-ink);
+  outline-offset: -1px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .vru-hotspot,
+  .vru-coach-card,
+  .vru-guide,
+  .vru-guide-slide,
+  .vru-guide-pop,
+  .vru-guide-row,
+  .vru-guide-next {
+    animation: none;
+  }
+}
