@@ -1,13 +1,9 @@
-import { Link } from 'react-router-dom';
-import { Check, Mail, QrCode, RefreshCw, Timer } from 'lucide-react';
+import { Check, Mail, RefreshCw, Timer } from 'lucide-react';
 import { useMe } from '../auth/useAuth';
 import { Loading } from '../ui/Loading';
-import { Button } from '../ui/Button';
 import {
-  useDigestPreview,
   useOrgAnalytics,
   type ActivationStep,
-  type MonthNumbers,
   type OrgAnalytics,
 } from '../api/analytics';
 import { plural } from '../registry/registry-format';
@@ -46,52 +42,17 @@ export function AnalyticsPage() {
   return (
     <section className="space-y-8 border-t border-[var(--line)] pt-8">
       <header>
-        <h2 className="text-lg font-medium">По организации</h2>
+        <h2 className="text-lg font-medium">Качество и активация</h2>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Что происходит с выданными документами и где спотыкается награждение
+          Не врём ли клиенту: перевыпуски, пакеты с ошибками и путь до первого документа
         </p>
       </header>
 
-      <Verifications data={data} />
       <Quality data={data} />
       <Activation steps={data.activation.steps} timeToFirst={data.timeToFirst} />
-      <Months data={data} />
 
       {me.data?.isPlatform && <PlatformFunnel />}
       {me.data?.isPlatform && <TourDropOff />}
-    </section>
-  );
-}
-
-/** Главная цифра раздела: сколько раз выданное проверяли по QR-коду. */
-function Verifications({ data }: { data: OrgAnalytics }) {
-  const { total, files } = data.verifications;
-
-  return (
-    <section>
-      <h2 className="mb-3 text-lg font-medium">Проверки по QR-коду</h2>
-      <div className="rounded-2xl bg-[var(--accent-soft)] p-5">
-        <p className="flex items-center gap-2 text-3xl text-[var(--accent)] tabular-nums">
-          <QrCode size={24} strokeWidth={1.5} />
-          {formatCount(total)}
-        </p>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
-          {plural(total, 'проверка', 'проверки', 'проверок')} у {formatCount(files)}{' '}
-          {plural(files, 'документа', 'документов', 'документов')} из {formatCount(data.issued)}{' '}
-          выданных
-        </p>
-        <p className="mt-3 max-w-prose text-sm text-[var(--text-muted)]">
-          Каждая проверка — это чей-то работодатель, приёмная комиссия или судья, сканировавшие
-          QR-код с вашего бланка. Это единственное свидетельство, что документ живёт после
-          награждения. Кто и откуда проверял, мы не собираем.
-        </p>
-        <Link
-          to="/registry"
-          className="mt-4 inline-block text-sm text-[var(--accent)] underline underline-offset-4"
-        >
-          Посмотреть по мероприятиям в реестре
-        </Link>
-      </div>
     </section>
   );
 }
@@ -192,62 +153,6 @@ function Activation({
         ))}
       </ol>
     </section>
-  );
-}
-
-/** Два последних месяца и кнопка «прислать себе сводку». */
-function Months({ data }: { data: OrgAnalytics }) {
-  const preview = useDigestPreview();
-
-  return (
-    <section>
-      <h2 className="mb-3 text-lg font-medium">По месяцам</h2>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <MonthCard numbers={data.thisMonth} note="идёт сейчас" />
-        <MonthCard numbers={data.lastMonth} note="о нём приходит сводка" />
-      </div>
-
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        <Button
-          variant="secondary"
-          onClick={() => preview.mutate()}
-          disabled={preview.isPending}
-        >
-          {preview.isPending ? 'Отправляем…' : 'Прислать сводку себе'}
-        </Button>
-        <p className="text-xs text-[var(--text-muted)]">
-          {preview.isSuccess
-            ? 'Отправили на ваш адрес — то же письмо владелец получает первого числа.'
-            : preview.isError
-              ? 'Письмо не ушло. Проверьте настройки почты и попробуйте ещё раз.'
-              : 'Сводка за прошлый месяц уходит владельцу аккаунта первого числа.'}
-        </p>
-      </div>
-    </section>
-  );
-}
-
-function MonthCard({ numbers, note }: { numbers: MonthNumbers; note: string }) {
-  return (
-    <div className="card p-5">
-      <p className="font-medium">
-        {numbers.title} <span className="text-xs text-[var(--text-muted)]">· {note}</span>
-      </p>
-      <dl className="mt-3 space-y-1 text-sm">
-        <Row label="Выпущено" value={formatCount(numbers.issued)} />
-        <Row label="Разослано" value={formatCount(numbers.mailed)} />
-        <Row label="Документов проверяли" value={formatCount(numbers.verifiedFiles)} />
-      </dl>
-    </div>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between gap-3">
-      <dt className="text-[var(--text-muted)]">{label}</dt>
-      <dd className="tabular-nums">{value}</dd>
-    </div>
   );
 }
 

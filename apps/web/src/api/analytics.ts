@@ -93,3 +93,63 @@ export function useDigestPreview() {
     mutationFn: () => api.post<{ ok: true } & MonthNumbers>('/analytics/digest/preview', {}),
   });
 }
+
+/* ---------- Сводка за период ---------- */
+
+export const PERIODS = ['7d', '30d', '90d', '365d', 'all'] as const;
+export type Period = (typeof PERIODS)[number];
+
+export interface DayPoint {
+  /** «2026-09-20» по Москве */
+  day: string;
+  n: number;
+}
+
+export interface SummaryMaterial {
+  documentId: string | null;
+  title: string;
+  eventName: string;
+  issued: number;
+  checks: number;
+  checkedFiles: number;
+  sent: number;
+  delivered: number;
+}
+
+export interface Summary {
+  period: Period;
+  range: { from: string | null; to: string; prevFrom: string | null; prevTo: string | null };
+  issued: { total: number; prev: number | null; byDay: DayPoint[] };
+  checks: {
+    total: number;
+    prev: number | null;
+    uniques: number;
+    files: number;
+    lastAt: string | null;
+    byDay: DayPoint[];
+  };
+  mail: { sent: number; delivered: number; undelivered: number };
+  states: { valid: number; revoked: number; replaced: number; expired: number };
+  materials: SummaryMaterial[];
+  materialsTotal: number;
+}
+
+export function isPeriod(value: string | null): value is Period {
+  return (PERIODS as readonly string[]).includes(value ?? '');
+}
+
+/**
+ * Сводка за период: плитки, графики по дням, разбивка по материалам.
+ * Один запрос на экран; прошлые данные держим на экране, пока грузятся
+ * новые, чтобы переключение периода не мигало скелетом.
+ */
+export function useAnalyticsSummary(period: Period, documentId = '') {
+  const q = new URLSearchParams({ period });
+  if (documentId) q.set('documentId', documentId);
+  return useQuery({
+    queryKey: ['analytics-summary', period, documentId],
+    queryFn: () => api.get<Summary>(`/analytics/summary?${q}`),
+    placeholderData: (prev) => prev,
+    staleTime: 60_000,
+  });
+}

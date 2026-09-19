@@ -117,6 +117,7 @@ function controllerWith(files: Issued[]) {
     prisma as never,
     replacement as never,
     testConfig({ SESSION_SECRET: SECRET }) as never,
+    { count: async () => ({ counted: true, unique: true }) } as never,
   );
   return { controller, lookups };
 }

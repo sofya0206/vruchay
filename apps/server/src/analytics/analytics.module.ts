@@ -4,6 +4,7 @@ import { AnalyticsController } from './analytics.controller';
 import { MetricsService } from './metrics.service';
 import { FunnelService } from './funnel.service';
 import { DigestService } from './digest.service';
+import { SummaryService } from './summary.service';
 
 /**
  * Метрики: цифры по своей организации, воронка активации по всем сразу
@@ -15,7 +16,7 @@ import { DigestService } from './digest.service';
 @Module({
   imports: [MailModule],
   controllers: [AnalyticsController],
-  providers: [MetricsService, FunnelService, DigestService],
+  providers: [MetricsService, FunnelService, DigestService, SummaryService],
   exports: [MetricsService],
 })
 export class AnalyticsModule {}

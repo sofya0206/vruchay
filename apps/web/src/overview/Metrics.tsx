@@ -1,5 +1,8 @@
 import type { ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import type { Overview } from '../api/overview';
+import type { Summary } from '../api/analytics';
+import { Sparkline } from '../analytics/DayChart';
 import { DiscussTermsLink } from '../billing/DiscussTermsLink';
 import { cn } from '../ui/cn';
 import { usagePercent, usageTone } from './desk';
@@ -16,7 +19,16 @@ import { monthDelta, monthIn, plural } from './format';
  * по тому же порогу, по которому сервер откажет в выпуске; недошедшие
  * письма — красным числом. Всё остальное — чернильное.
  */
-export function Metrics({ data, now = new Date() }: { data: Overview; now?: Date }) {
+export function Metrics({
+  data,
+  summary,
+  now = new Date(),
+}: {
+  data: Overview;
+  /** Сводка за 30 дней — для линий и числа проверок; без неё плитки просто без линий. */
+  summary?: Summary;
+  now?: Date;
+}) {
   const { usage } = data;
   const unlimited = usage.limit === null || usage.left === null;
   const tone = usageTone(usage);
@@ -71,6 +83,8 @@ export function Metrics({ data, now = new Date() }: { data: Overview; now?: Date
       <Tile
         label={`Выпущено ${monthIn(now)}`}
         value={data.issuedMonth}
+        to="/registry?tab=analytics&period=30d"
+        aside={summary && <Sparkline points={summary.issued.byDay} />}
         note={
           <span
             className={cn(
@@ -106,9 +120,15 @@ export function Metrics({ data, now = new Date() }: { data: Overview; now?: Date
 
       <Tile
         label="Проверки по QR"
-        value={data.verifiedMonth}
-        unit={plural(data.verifiedMonth, 'документ', 'документа', 'документов')}
-        note={`за месяц · ${data.verificationsTotal} всего`}
+        value={summary ? summary.checks.total : data.verifiedMonth}
+        unit={
+          summary
+            ? plural(summary.checks.total, 'проверка', 'проверки', 'проверок')
+            : plural(data.verifiedMonth, 'документ', 'документа', 'документов')
+        }
+        note={summary ? `за 30 дней · ${data.verificationsTotal} всего` : `за месяц · ${data.verificationsTotal} всего`}
+        to="/registry?tab=analytics&period=30d"
+        aside={summary && <Sparkline points={summary.checks.byDay} tone="ok" />}
       />
     </ul>
   );
@@ -120,6 +140,8 @@ function Tile({
   unit,
   note,
   danger = false,
+  to,
+  aside,
   children,
 }: {
   label: string;
@@ -127,10 +149,17 @@ function Tile({
   unit?: string;
   note?: ReactNode;
   danger?: boolean;
+  /** Куда ведёт плитка: в аналитику за тем же периодом. */
+  to?: string;
+  /** Линия за период в правом верхнем углу. */
+  aside?: ReactNode;
   children?: ReactNode;
 }) {
-  return (
-    <li className="flex min-h-24 min-w-0 flex-col gap-1.5 self-stretch rounded-[var(--radius-card)] bg-[var(--surface)] px-3 pt-3 pb-2.5 shadow-[var(--ring-line)] sm:min-h-28 sm:px-4 sm:pt-3.5 sm:pb-3">
+  const cls =
+    'relative flex min-h-24 min-w-0 flex-col gap-1.5 self-stretch rounded-[var(--radius-card)] bg-[var(--surface)] px-3 pt-3 pb-2.5 shadow-[var(--ring-line)] sm:min-h-28 sm:px-4 sm:pt-3.5 sm:pb-3';
+  const body = (
+    <>
+      {aside && <div className="absolute top-3 right-3 hidden sm:block">{aside}</div>}
       <p className="text-sm text-[var(--text-muted)]">{label}</p>
       <p className="flex items-baseline gap-1.5">
         <span
@@ -145,6 +174,16 @@ function Tile({
       </p>
       {children}
       {note && <p className="mt-auto text-sm text-[var(--text-muted)]">{note}</p>}
-    </li>
+    </>
   );
+  if (to) {
+    return (
+      <li className="contents">
+        <Link to={to} className={cn(cls, 'transition-colors hover:bg-[var(--row-hover)]')}>
+          {body}
+        </Link>
+      </li>
+    );
+  }
+  return <li className={cls}>{body}</li>;
 }
