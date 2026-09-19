@@ -127,7 +127,7 @@ function SiteHeader() {
 function Hero() {
   return (
     <section id="top" className="vru-screen relative pt-14">
-      <div className="mx-auto max-w-[var(--width-page)] px-6 text-center">
+      <div className="mx-auto max-w-[var(--width-page)] px-6 py-16 text-center">
         <p className="vru-eyebrow vru-enter">
           <ShieldCheck size={14} /> Данные участников остаются в России
         </p>

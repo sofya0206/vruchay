@@ -781,19 +781,10 @@ textarea::-webkit-resizer {
 /*
  * Посадочная экранами: одна секция — один экран.
  *
- * Прилипание включается только на широком и высоком окне, где секция
- * помещается в экран целиком. На телефоне она длиннее окна, и обязательное
- * прилипание не даёт дочитать середину — там оно мягкое (proximity):
- * дотягивает до начала секции, только если человек и так рядом.
+ * Ниже ноутбука экранов нет вовсе — см. медиазапрос ниже.
  */
 html[data-snap='y'] {
-  scroll-snap-type: y proximity;
   scroll-behavior: smooth;
-}
-@media (min-width: 1024px) and (min-height: 700px) {
-  html[data-snap='y'] {
-    scroll-snap-type: y mandatory;
-  }
 }
 @media (prefers-reduced-motion: reduce) {
   html[data-snap='y'] {
@@ -801,13 +792,23 @@ html[data-snap='y'] {
   }
 }
 
-.vru-screen {
-  min-height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  scroll-snap-align: start;
-  scroll-snap-stop: always;
+/*
+ * Экраны — только на ноутбуке и шире. На телефоне посадочная остаётся
+ * обычной лентой: секция там длиннее окна, растягивать её до экрана и
+ * прилипать к началу — значит прятать середину.
+ */
+@media (min-width: 1024px) and (min-height: 700px) {
+  html[data-snap='y'] {
+    scroll-snap-type: y mandatory;
+  }
+  .vru-screen {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
 }
 
 /*
