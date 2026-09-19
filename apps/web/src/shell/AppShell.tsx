@@ -4,6 +4,8 @@ import { InstallHint } from '../ui/InstallHint';
 import { useMe } from '../auth/useAuth';
 import { Guide } from '../onboarding/Guide';
 import { HintCard } from '../onboarding/HintCard';
+import { HelpButton } from '../onboarding/HelpButton';
+import { SectionTips } from '../onboarding/SectionTips';
 import { onboarding } from '../onboarding/store';
 import { AccountMenu } from './AccountMenu';
 import { Brand } from './Brand';
@@ -94,6 +96,7 @@ export function AppShell() {
           </Link>
 
           <div className="ml-auto flex items-center gap-1">
+            <HelpButton />
             <AccountMenu />
           </div>
         </div>
@@ -125,6 +128,7 @@ export function AppShell() {
 
       <InstallHint />
       <HintCard />
+      <SectionTips />
       <Guide />
     </div>
   );

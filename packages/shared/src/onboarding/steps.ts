@@ -22,11 +22,12 @@ export type HintId = (typeof HINT_IDS)[number];
  * `missing` — места точки нет на экране (ошибка вёрстки, не отказ).
  */
 export const ONBOARDING_ACTIONS = ['shown', 'done', 'closed', 'missing'] as const;
-export const ONBOARDING_FLOWS = ['guide', 'hint'] as const;
+export const ONBOARDING_FLOWS = ['guide', 'hint', 'tips'] as const;
 
 export const onboardingEvent = z.object({
   flow: z.enum(ONBOARDING_FLOWS),
-  step: z.enum([...GUIDE_SLIDES, ...HINT_IDS]),
+  // У подсказок по разделам шаг — «раздел.номер»: home.1, editor.3.
+  step: z.union([z.enum([...GUIDE_SLIDES, ...HINT_IDS]), z.string().regex(/^[a-z]{3,12}\.[1-9]$/)]),
   action: z.enum(ONBOARDING_ACTIONS),
 });
 export type OnboardingEvent = z.infer<typeof onboardingEvent>;

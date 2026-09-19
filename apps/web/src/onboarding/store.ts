@@ -15,10 +15,12 @@ export interface OnboardingState {
   /** Карточка точки, которую попросили нажатием. */
   hint: HintId | null;
   seen: HintId[];
+  /** Подсказки по разделу: какой раздел и какой шаг. */
+  tips: { key: string; index: number } | null;
 }
 
 const KEY = 'vruchay:onboarding';
-let state: OnboardingState = { email: null, slide: null, hint: null, seen: [] };
+let state: OnboardingState = { email: null, slide: null, hint: null, seen: [], tips: null };
 const listeners = new Set<() => void>();
 
 function read(email: string): HintId[] {
@@ -48,7 +50,18 @@ export const onboarding = {
     if (state.email !== email) set({ email, seen: read(email) });
   },
   open(slide = 0) {
-    set({ slide, hint: null });
+    set({ slide, hint: null, tips: null });
+  },
+  startTips(key: string) {
+    set({ tips: { key, index: 0 }, hint: null, slide: null });
+  },
+  /** За последним шагом — конец, перед первым — остаёмся на первом. */
+  stepTips(index: number, total: number) {
+    if (!state.tips) return;
+    set({ tips: index >= total ? null : { ...state.tips, index: Math.max(0, index) } });
+  },
+  endTips() {
+    set({ tips: null });
   },
   close() {
     set({ slide: null });
