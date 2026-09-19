@@ -18,7 +18,6 @@ interface EmailTemplate {
   attachGeneratedFile: boolean;
 }
 
-
 /**
  * Письмо, которое получит участник вместе с документом.
  *
@@ -149,8 +148,8 @@ export function EmailTemplateEditor({
       <header className="max-w-3xl">
         <h2 className="text-lg font-medium">Письмо участнику</h2>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Так выглядит письмо, которое придёт вместе с документом. Отправителем участник
-          увидит название вашей организации.
+          Так выглядит письмо, которое придёт вместе с документом. Отправителем участник увидит
+          название вашей организации.
         </p>
       </header>
 
@@ -204,9 +203,7 @@ export function EmailTemplateEditor({
           а письмо служит уведомлением. На виду эта галочка только пугала:
           непонятно, зачем снимать то, ради чего всё и затевалось. */}
       <details className="max-w-3xl rounded-xl bg-[var(--surface-sunken)] px-4 py-3">
-        <summary className="cursor-pointer text-sm text-[var(--text-muted)]">
-          Дополнительно
-        </summary>
+        <summary className="cursor-pointer text-sm text-[var(--text-muted)]">Дополнительно</summary>
         <label className="mt-3 flex items-start gap-3 text-sm">
           <Checkbox checked={attach} onChange={setAttach} className="mt-0.5" />
           <span>
@@ -214,8 +211,8 @@ export function EmailTemplateEditor({
               <Paperclip size={14} /> Прикладывать документ к письму
             </span>
             <span className="mt-0.5 block text-[var(--text-muted)]">
-              Обычно нужно: участник получает грамоту прямо в письме. Снимайте, только
-              если вручаете документ на бумаге, а письмо — просто уведомление.
+              Обычно нужно: участник получает грамоту прямо в письме. Снимайте, только если вручаете
+              документ на бумаге, а письмо — просто уведомление.
             </span>
           </span>
         </label>
@@ -233,9 +230,7 @@ export function EmailTemplateEditor({
           </span>
         )}
         {save.isError && (
-          <span className="text-sm text-[var(--danger)]">
-            {errorText(save.error)}
-          </span>
+          <span className="text-sm text-[var(--danger)]">{errorText(save.error)}</span>
         )}
       </div>
     </div>
@@ -287,11 +282,11 @@ function Preview({
       <p className="text-xs text-[var(--text-muted)]">Как увидит участник</p>
       <p className="mt-2 font-medium">{fill(subject)}</p>
 
-      {/* Белый фон и тёмный текст независимо от темы кабинета: письмо
-          человек откроет в почте, а не здесь. */}
-      <div className="mt-2 rounded-lg bg-[var(--sheet-paper)] px-4 py-3 text-[15px] leading-relaxed text-[var(--sheet-ink)]">
+      {/* В цветах кабинета, как и всё вокруг: белая плашка в тёмной теме
+          била по глазам, а само письмо человек и так откроет в почте. */}
+      <div className="mt-2 rounded-lg bg-[var(--surface)] px-4 py-3 text-[15px] leading-relaxed text-[var(--text)] shadow-[var(--ring-line)]">
         {paragraphs.length === 0 ? (
-          <p className="text-sm text-[var(--sheet-ink-muted)]">Письмо пустое</p>
+          <p className="text-sm text-[var(--text-muted)]">Письмо пустое</p>
         ) : (
           paragraphs.map((runs, i) => (
             <p key={i} className={i > 0 ? 'mt-3' : undefined}>
@@ -318,7 +313,7 @@ function RunView({ run }: { run: Run }) {
     case 'link':
       // Рабочей ссылку не делаем: нажимать её здесь незачем, а уводить
       // человека со страницы настройки письма — тем более.
-      return <span className="text-[#1F5D3F] underline">{run.text}</span>;
+      return <span className="text-[var(--accent)] underline">{run.text}</span>;
     default:
       return <>{run.text}</>;
   }

@@ -1,8 +1,10 @@
+import type { CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
 import { ArrowRight, Building2, Check, FileCheck2, Scale, ShieldCheck } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { HowItWorks } from '../landing/HowItWorks';
+import { ScreenDots, useReveal, useSnapScroll, type Screen } from '../landing/fullpage';
 import { Meta } from '../seo/Meta';
 import { LANDING_JSON_LD } from '../seo/landing-schema';
 
@@ -17,6 +19,15 @@ import { LANDING_JSON_LD } from '../seo/landing-schema';
  * фрагмент кабинета в рамке браузера, а не абстрактную иллюстрацию.
  */
 
+/** Экраны по порядку — для точек у правого края. */
+const SCREENS: Screen[] = [
+  { id: 'top', label: 'Начало' },
+  { id: 'kak', label: 'Как это работает' },
+  { id: 'organizatsiyam', label: 'Для организаций' },
+  { id: 'proverka', label: 'Проверьте сами' },
+  { id: 'start', label: 'Попробовать' },
+];
+
 const FACTS = [
   'Данные и серверы — в России, 152-ФЗ',
   'Договор-поручение — по требованию юридического отдела',
@@ -26,6 +37,9 @@ const FACTS = [
 ];
 
 export function LandingPage() {
+  useSnapScroll();
+  useReveal();
+
   return (
     <div className="vru-landing relative isolate bg-[var(--ground)]">
       <Meta
@@ -45,12 +59,12 @@ export function LandingPage() {
       </div>
 
       <SiteHeader />
+      <ScreenDots screens={SCREENS} />
       <Hero />
       <HowItWorks />
       <ForOrganisations />
       <CheckYourself />
-      <FinalCta />
-      <SiteFooter />
+      <FinalScreen />
     </div>
   );
 }
@@ -77,8 +91,8 @@ function SiteHeader() {
 
 function Hero() {
   return (
-    <section className="relative pt-14">
-      <div className="mx-auto max-w-[var(--width-page)] px-6 pt-16 text-center">
+    <section id="top" className="vru-screen relative pt-14">
+      <div className="mx-auto max-w-[var(--width-page)] px-6 text-center">
         <p className="vru-eyebrow vru-enter">
           <ShieldCheck size={14} /> Данные участников остаются в России
         </p>
@@ -107,51 +121,59 @@ function Hero() {
 
 function ForOrganisations() {
   return (
-    <section className="mx-auto max-w-[var(--width-page)] px-6 py-16">
-      <h2 className="vru-h2">Для организаций</h2>
-      <p className="mt-4 text-[var(--text-muted)]">
-        Закон, договор и подключение — всё готово до первого награждения.
-      </p>
-      {/* items-start обязателен: иначе карточки тянутся до высоты раскрытой
+    <section id="organizatsiyam" className="vru-screen">
+      <div className="mx-auto w-full max-w-[var(--width-page)] px-6 py-16">
+        <h2 className="vru-h2 vru-reveal">Для организаций</h2>
+        <p
+          className="vru-reveal mt-4 text-[var(--text-muted)]"
+          style={{ '--reveal-i': 1 } as CSSProperties}
+        >
+          Закон, договор и подключение — всё готово до первого награждения.
+        </p>
+        {/* items-start обязателен: иначе карточки тянутся до высоты раскрытой
           соседки, и на наведение по одной кажется, будто открылись все три. */}
-      <div className="mt-8 grid items-start gap-5 md:grid-cols-3">
-        <ExpandCard
-          icon={Scale}
-          title="Юристу"
-          lead="152-ФЗ и договор-поручение"
-          items={[
-            'Данные в России — ч. 5 ст. 18 152-ФЗ',
-            'Договор-поручение приложением к договору',
-            'Оператор в реестре Роскомнадзора',
-            'Служебные сведения стираются через 90 дней',
-          ]}
-        />
-        <ExpandCard
-          icon={FileCheck2}
-          title="Бухгалтерии"
-          lead="Закрывающие документы"
-          items={[
-            'Договор, счёт, акт',
-            'Безналичный расчёт, аванс',
-            'Без НДС — УСН',
-            'Договор с российским ИП',
-          ]}
-        />
-        <ExpandCard
-          icon={Building2}
-          title="Разработчику"
-          lead="Документация и API"
-          items={[
-            'Документация по продукту',
-            'API-документация с примерами',
-            'Форма на сайте и Тильда',
-            'Импорт списков и протоколов мероприятий',
-          ]}
-          links={[
-            ['Документация', '/docs'],
-            ['API', '/docs/api'],
-          ]}
-        />
+        <div className="mt-8 grid items-start gap-5 md:grid-cols-3">
+          <ExpandCard
+            index={2}
+            icon={Scale}
+            title="Юристу"
+            lead="152-ФЗ и договор-поручение"
+            items={[
+              'Данные в России — ч. 5 ст. 18 152-ФЗ',
+              'Договор-поручение приложением к договору',
+              'Оператор в реестре Роскомнадзора',
+              'Служебные сведения стираются через 90 дней',
+            ]}
+          />
+          <ExpandCard
+            index={3}
+            icon={FileCheck2}
+            title="Бухгалтерии"
+            lead="Закрывающие документы"
+            items={[
+              'Договор, счёт, акт',
+              'Безналичный расчёт, аванс',
+              'Без НДС — УСН',
+              'Договор с российским ИП',
+            ]}
+          />
+          <ExpandCard
+            index={4}
+            icon={Building2}
+            title="Разработчику"
+            lead="Документация и API"
+            items={[
+              'Документация по продукту',
+              'API-документация с примерами',
+              'Форма на сайте и Тильда',
+              'Импорт списков и протоколов мероприятий',
+            ]}
+            links={[
+              ['Документация', '/docs'],
+              ['API', '/docs/api'],
+            ]}
+          />
+        </div>
       </div>
     </section>
   );
@@ -163,12 +185,15 @@ function ForOrganisations() {
  * недоступно тому, кто не пользуется мышью.
  */
 function ExpandCard({
+  index,
   icon: Icon,
   title,
   lead,
   items,
   links,
 }: {
+  /** Порядок появления в экране: карточки выходят одна за другой. */
+  index: number;
   icon: LucideIcon;
   title: string;
   lead: string;
@@ -176,37 +201,41 @@ function ExpandCard({
   links?: [string, string][];
 }) {
   return (
-    <div className="vru-expand" tabIndex={0}>
-      <span className="vru-feature__icon">
-        <Icon size={20} strokeWidth={1.75} />
-      </span>
-      <h3 className="mt-4">{title}</h3>
-      <p className="mt-1 text-sm text-[var(--text-muted)]">{lead}</p>
-      <div className="vru-expand__body">
-        <div>
-          <ul className="mt-4 grid gap-2">
-            {items.map((it) => (
-              <li key={it} className="flex gap-2 text-sm">
-                <span className="mt-px shrink-0 text-[var(--accent-line)]">
-                  <Check size={16} />
-                </span>
-                {it}
-              </li>
-            ))}
-          </ul>
-          {links && (
-            <div className="mt-4 flex gap-4">
-              {links.map(([label, href]) => (
-                <Link
-                  key={label}
-                  to={href}
-                  className="inline-flex items-center gap-1 text-sm font-medium text-[var(--accent)]"
-                >
-                  {label} <ArrowRight size={14} />
-                </Link>
+    // Появление — на обёртке: у самой карточки свой переход на наведение,
+    // и второй набор transition на том же элементе его перебил бы.
+    <div className="vru-reveal" style={{ '--reveal-i': index } as CSSProperties}>
+      <div className="vru-expand" tabIndex={0}>
+        <span className="vru-feature__icon">
+          <Icon size={20} strokeWidth={1.75} />
+        </span>
+        <h3 className="mt-4">{title}</h3>
+        <p className="mt-1 text-sm text-[var(--text-muted)]">{lead}</p>
+        <div className="vru-expand__body">
+          <div>
+            <ul className="mt-4 grid gap-2">
+              {items.map((it) => (
+                <li key={it} className="flex gap-2 text-sm">
+                  <span className="mt-px shrink-0 text-[var(--accent-line)]">
+                    <Check size={16} />
+                  </span>
+                  {it}
+                </li>
               ))}
-            </div>
-          )}
+            </ul>
+            {links && (
+              <div className="mt-4 flex gap-4">
+                {links.map(([label, href]) => (
+                  <Link
+                    key={label}
+                    to={href}
+                    className="inline-flex items-center gap-1 text-sm font-medium text-[var(--accent)]"
+                  >
+                    {label} <ArrowRight size={14} />
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -220,21 +249,25 @@ function ExpandCard({
  */
 function CheckYourself() {
   return (
-    <section className="relative">
-      <div className="mx-auto grid max-w-[var(--width-page)] items-center gap-12 px-6 py-16 lg:grid-cols-2">
-        <div>
+    <section id="proverka" className="vru-screen relative">
+      <div className="mx-auto grid w-full max-w-[var(--width-page)] items-center gap-12 px-6 py-16 lg:grid-cols-2">
+        <div className="vru-reveal">
           <h2 className="vru-h2">Проверьте, куда уходят фамилии участников</h2>
           <p className="mt-5 text-[var(--text-muted)]">
-            Многие сервисы рассылки стоят за рубежом, и по виду это не определить. Проверьте
-            за десять секунд — у любого, включая наш:
+            Многие сервисы рассылки стоят за рубежом, и по виду это не определить. Проверьте за
+            десять секунд — у любого, включая наш:
           </p>
           <pre className="mt-5 overflow-x-auto rounded-[var(--radius-control)] bg-[var(--surface)] p-4 font-mono text-sm shadow-[var(--ring-line)]">
             dig TXT vruchay.ru +short
           </pre>
         </div>
         <ul className="grid gap-4">
-          {FACTS.map((line) => (
-            <li key={line} className="flex items-start gap-3">
+          {FACTS.map((line, i) => (
+            <li
+              key={line}
+              className="vru-reveal flex items-start gap-3"
+              style={{ '--reveal-i': i + 1 } as CSSProperties}
+            >
               <span className="mt-0.5 shrink-0 text-[var(--accent-line)]">
                 <Check size={18} />
               </span>
@@ -247,22 +280,32 @@ function CheckYourself() {
   );
 }
 
-function FinalCta() {
+/** Последний экран: призыв и подвал вместе — подвалу отдельный экран не нужен. */
+function FinalScreen() {
   return (
-    <section className="mx-auto max-w-[var(--width-page)] px-6 py-16 text-center">
-      <h2 className="vru-h2">Ближайшее мероприятие — уже спокойное</h2>
-      <p className="mx-auto mt-5 max-w-[520px] text-[var(--text-muted)]">
-        Соберите документ, загрузите список, отправьте. Пятьдесят документов на пробу не
-        стоят ничего.
-      </p>
-      <div className="mt-8 flex flex-wrap justify-center gap-3">
-        <Link to="/register">
-          <Button variant="primary">Попробовать бесплатно</Button>
-        </Link>
-        <Link to="/obsudit">
-          <Button variant="secondary">Написать нам</Button>
-        </Link>
+    <section id="start" className="vru-screen">
+      <div className="mx-auto flex w-full max-w-[var(--width-page)] flex-1 flex-col justify-center px-6 py-16 text-center">
+        <h2 className="vru-h2 vru-reveal">Ближайшее мероприятие — уже спокойное</h2>
+        <p
+          className="vru-reveal mx-auto mt-5 max-w-[520px] text-[var(--text-muted)]"
+          style={{ '--reveal-i': 1 } as CSSProperties}
+        >
+          Соберите документ, загрузите список, отправьте. Пятьдесят документов на пробу не стоят
+          ничего.
+        </p>
+        <div
+          className="vru-reveal mt-8 flex flex-wrap justify-center gap-3"
+          style={{ '--reveal-i': 2 } as CSSProperties}
+        >
+          <Link to="/register">
+            <Button variant="primary">Попробовать бесплатно</Button>
+          </Link>
+          <Link to="/obsudit">
+            <Button variant="secondary">Написать нам</Button>
+          </Link>
+        </div>
       </div>
+      <SiteFooter />
     </section>
   );
 }
