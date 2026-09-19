@@ -216,11 +216,11 @@ export function MailingPage() {
               items={STATS_RANGES.map((r) => ({ id: r.id, label: r.label }))}
             />
           ) : letterFolder ? (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 max-md:w-full">
               <IconButton label="Обновить список писем" onClick={() => void refresh()}>
                 <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
               </IconButton>
-              <div className="relative">
+              <div className="relative max-md:flex-1">
                 <Search
                   size={16}
                   className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-[var(--text-muted)]"
@@ -230,7 +230,7 @@ export function MailingPage() {
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Поиск в письмах"
                   aria-label="Поиск в письмах"
-                  className="w-40 py-1.5 pl-9 text-sm sm:w-56"
+                  className="w-40 py-1.5 pl-9 text-sm max-md:h-11 max-md:w-full sm:w-56"
                 />
               </div>
             </div>
@@ -239,8 +239,10 @@ export function MailingPage() {
         bar={
           letterFolder ? (
             <>
-              <span className="tabular text-[var(--text-muted)]">Писем: {letters.length}</span>
-              <div className="ml-auto flex flex-wrap items-center gap-3">
+              {/* На телефоне — только два отбора в одну строку: число писем
+                  уже стоит у заголовка раздела. */}
+              <span className="tabular text-[var(--text-muted)] max-md:hidden">Писем: {letters.length}</span>
+              <div className="ml-auto flex items-center gap-3 max-md:ml-0 max-md:w-full max-md:gap-2 md:flex-wrap">
                 <Select
                   value={documentId}
                   onChange={setDocumentId}
@@ -249,16 +251,16 @@ export function MailingPage() {
                     ...items.map((doc) => ({ value: doc.id, label: doc.title })),
                   ]}
                   aria-label="Материал"
-                  className="w-52 py-1 text-sm"
+                  className="w-52 py-1 text-sm max-md:h-10 max-md:w-auto max-md:min-w-0 max-md:flex-1"
                 />
-                <label className="flex items-center gap-2 text-[var(--text-muted)]">
-                  <CalendarRange size={15} />
+                <label className="flex items-center gap-2 text-[var(--text-muted)] max-md:shrink-0">
+                  <CalendarRange size={15} className="max-md:hidden" />
                   <Select
                     value={period}
                     onChange={setPeriod}
                     options={MAIL_PERIODS.map((o) => ({ value: o.id, label: o.label }))}
                     aria-label="Отрезок времени"
-                    className="w-32 py-1 text-sm"
+                    className="w-32 py-1 text-sm max-md:h-10"
                   />
                 </label>
               </div>

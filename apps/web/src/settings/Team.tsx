@@ -41,7 +41,7 @@ export function Team() {
   return (
     <section>
       <h2 className="text-lg font-medium">Кто работает в организации</h2>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)]">
+      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
         Добавьте коллег, чтобы каждый входил под своим именем и паролем. Так видно, кто
         какие грамоты выпустил, и не приходится передавать один пароль на всех.
       </p>

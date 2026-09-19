@@ -25,7 +25,7 @@ export function Review() {
         <MessageSquareQuote size={18} className="text-[var(--accent)]" />
         Отзыв о сервисе
       </h2>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)]">
+      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
         Если «Вручай» вам пригодился — расскажите об этом. Отзыв появится на главной
         странице сервиса вместе с названием вашей организации.
       </p>

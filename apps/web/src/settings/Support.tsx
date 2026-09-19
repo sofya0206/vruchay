@@ -37,7 +37,7 @@ export function Support() {
         <LifeBuoy size={18} className="text-[var(--accent)]" />
         Поддержка
       </h2>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)]">
+      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
         Отвечаем в рабочие часы по Москве. Если документы уже раздают, а что-то не работает — так и
         напишите в первой строке: такие обращения разбираем первыми.
       </p>

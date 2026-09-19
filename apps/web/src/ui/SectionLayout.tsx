@@ -29,18 +29,20 @@ export function SectionLayout({
   return (
     <div className="flex min-h-0 flex-1 flex-col md:flex-row">
       <aside className="border-b border-[var(--line)] md:w-60 md:shrink-0 md:border-r md:border-b-0">
-        <div className="p-3 md:sticky md:top-[var(--app-header)] md:max-h-[calc(100vh-var(--app-header))] md:overflow-y-auto">
+        <div className="p-3 max-md:px-2 max-md:py-2 md:sticky md:top-[var(--app-header)] md:max-h-[calc(100vh-var(--app-header))] md:overflow-y-auto">
           {column}
         </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="z-10 flex flex-wrap items-center gap-3 border-b border-[var(--line)] bg-[var(--surface)] px-6 py-3 md:sticky md:top-[var(--app-header)]">
-          <div className="min-w-[10rem] flex-1">{head}</div>
-          {tools}
+        {/* На телефоне заголовок — своей строкой, инструменты (поиск) — второй
+            во всю ширину: в одну строку поле поиска сжималось до обрывка. */}
+        <div className="z-10 flex flex-wrap items-center gap-3 border-b border-[var(--line)] bg-[var(--surface)] px-6 py-3 max-md:gap-2 max-md:px-4 md:sticky md:top-[var(--app-header)]">
+          <div className="min-w-[10rem] flex-1 max-md:basis-full">{head}</div>
+          {tools && <div className="flex min-w-0 items-center gap-2 max-md:w-full max-md:[&>*:last-child]:flex-1">{tools}</div>}
         </div>
 
-        <main className="min-w-0 flex-1 px-6 py-6">{children}</main>
+        <main className="min-w-0 flex-1 px-6 py-6 max-md:px-4 max-md:py-4">{children}</main>
 
         {bar && (
           <div
@@ -101,7 +103,7 @@ export function SectionTitle({ children, count }: { children: ReactNode; count?:
 /** Список колонки: на телефоне — лента вбок, на десктопе — столбик. */
 export function ColumnList({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <ul className={cn('flex gap-1 overflow-x-auto md:flex-col md:overflow-visible', className)}>
+    <ul className={cn('no-scrollbar flex gap-1 overflow-x-auto md:flex-col md:overflow-visible', className)}>
       {children}
     </ul>
   );

@@ -48,7 +48,7 @@ export function VerifyDomain() {
         <Globe size={18} className="text-[var(--accent)]" />
         Домен страницы проверки
       </h2>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)]">
+      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
         Адрес, который проверяющий видит в ссылке и в QR-коде. Пусто — общий адрес сервиса; он
         работает всегда и настройки не требует.
       </p>

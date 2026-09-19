@@ -54,7 +54,7 @@ export function OrgName() {
         <Building2 size={18} className="text-[var(--accent)]" />
         Название организации
       </h2>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)]">
+      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
         Участники увидят его в письме — в поле «от кого», а проверяющие — на странице
         проверки документа.
       </p>
@@ -109,7 +109,7 @@ export function MyProfile() {
         <UserRound size={18} className="text-[var(--accent)]" />
         Профиль
       </h2>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)]">
+      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
         Имя видят только коллеги внутри кабинета — оно стоит в журнале действий рядом
         с тем, что вы сделали.
       </p>

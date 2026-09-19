@@ -47,6 +47,7 @@ export function DocumentChrome({
   toolbar,
   action,
   isTemplate = false,
+  titleActions,
 }: {
   documentId: string;
   title: string;
@@ -69,13 +70,19 @@ export function DocumentChrome({
    * действия не должно переезжать от вкладки к вкладке.
    */
   action?: ReactNode;
+  /**
+   * Действия в строке названия — только на телефоне. Туда встаёт отмена
+   * с повтором: отдельная строка панели ради двух значков съедала высоту
+   * у листа.
+   */
+  titleActions?: ReactNode;
 }) {
   return (
     <header className="shrink-0 border-b border-[var(--line)] bg-[var(--surface)]">
       {/* На телефоне строка переносится: название и действия сверху, лента
           вкладок — второй строкой во всю ширину. В одну строку лента
           сжималась до нуля, и из листа нельзя было попасть в таблицу. */}
-      <div className="flex flex-wrap items-center gap-1 border-b border-[var(--line)] px-3 max-md:pt-1 md:h-12 md:flex-nowrap">
+      <div className="flex flex-wrap items-center gap-1 px-3 max-md:pt-1 md:h-12 md:flex-nowrap md:border-b md:border-[var(--line)]">
         <h1 className="flex min-w-0 items-center gap-1 text-sm font-medium max-md:flex-1 md:max-w-[32ch] md:shrink">
           {/* На телефоне — стрелка под палец вместо значка библиотеки. */}
           <Link
@@ -97,7 +104,7 @@ export function DocumentChrome({
             тогда, когда шесть вкладок в ширину не помещаются. */}
         <nav
           aria-label="Стороны материала"
-          className="flex min-w-0 flex-1 items-stretch gap-0.5 self-stretch overflow-x-auto max-md:order-last max-md:h-11 max-md:basis-full"
+          className="no-scrollbar flex min-w-0 flex-1 items-stretch gap-0.5 self-stretch overflow-x-auto max-md:order-last max-md:h-11 max-md:basis-full"
         >
           {MATERIAL_TABS.map((item) => (
             <SpineTab
@@ -109,6 +116,8 @@ export function DocumentChrome({
             </SpineTab>
           ))}
         </nav>
+
+        {titleActions && <div className="flex shrink-0 items-center md:hidden">{titleActions}</div>}
 
         {/* На телефоне «Выпуск» живёт внизу вкладки «Получатели», в шапке
             он не помещается рядом с названием. */}

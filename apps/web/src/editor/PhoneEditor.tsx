@@ -104,17 +104,21 @@ function BarButton({
       disabled={disabled}
       aria-pressed={active || undefined}
       className={cn(
-        'relative flex h-14 flex-col items-center justify-center gap-1 rounded-xl px-0.5 text-[11px] leading-none font-medium transition-colors disabled:opacity-40',
+        'relative flex h-14 flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 text-[11px] leading-none font-medium transition-colors disabled:opacity-40',
         fixed ? 'w-[68px] shrink-0' : 'min-w-0 flex-1',
         active ? 'bg-[var(--accent-soft)] text-[var(--accent)]' : 'text-[var(--text-muted)] active:bg-[var(--surface-sunken)]',
         danger && !active && 'text-[var(--danger)]',
       )}
     >
-      {primary ? (
-        <span className="grid size-10 place-items-center rounded-full bg-[var(--accent-button)] text-[var(--accent-contrast)]">{icon}</span>
-      ) : (
-        icon
-      )}
+      {/* Значок — в гнезде одной высоты у всех кнопок: иначе круглая «Вставить»
+          сдвигала свою подпись ниже соседних. */}
+      <span className="grid h-8 place-items-center">
+        {primary ? (
+          <span className="grid size-8 place-items-center rounded-full bg-[var(--accent-button)] text-[var(--accent-contrast)]">{icon}</span>
+        ) : (
+          icon
+        )}
+      </span>
       <span className="max-w-full truncate">{label}</span>
       {badge ? (
         <span className="absolute top-1.5 right-[calc(50%-22px)] grid h-4 min-w-4 place-items-center rounded-full bg-[var(--accent)] px-1 text-[10px] font-semibold leading-none text-white">
@@ -171,7 +175,7 @@ export function PhoneToolbar({
     >
       {selectedCount > 0 ? (
         // Лента прокручивается: пунктов больше, чем влезает в ширину.
-        <div className="flex min-w-0 flex-1 gap-0.5 overflow-x-auto">
+        <div className="no-scrollbar flex min-w-0 flex-1 gap-0.5 overflow-x-auto">
           <BarButton fixed icon={<Pencil size={20} />} label="Изменить" disabled={!canEditText} onClick={onEditText} />
           <BarButton fixed icon={<SlidersHorizontal size={20} />} label="Свойства" active={on('props')} onClick={() => onSheet('props')} />
           <BarButton fixed icon={<Variable size={20} />} label="Поле" active={on('fields')} onClick={() => onSheet('fields')} />
@@ -183,13 +187,14 @@ export function PhoneToolbar({
         </div>
       ) : (
         <>
-          <BarButton icon={<Plus size={22} strokeWidth={2} />} label="Вставить" primary onClick={onInsert} />
+          <BarButton icon={<Plus size={20} strokeWidth={2.25} />} label="Вставить" primary onClick={onInsert} />
           <BarButton icon={<Image size={20} />} label={backgroundBusy ? 'Грузим…' : 'Бланк'} disabled={backgroundBusy} onClick={onBackground} />
           <BarButton icon={<Variable size={20} />} label="Поля" active={on('fields')} badge={fieldsBadge} onClick={() => onSheet('fields')} />
           <BarButton icon={<Layers size={20} />} label="Слои" active={on('layers')} onClick={() => onSheet('layers')} />
           {/* Без выбранного блока «Свойства» показывают сам лист: мероприятие,
-              формат, проверку по QR. */}
-          <BarButton icon={<FileSliders size={20} />} label="Лист" active={on('props')} onClick={() => onSheet('props')} />
+              формат, проверку по QR. Не «Лист» — так уже подписана кнопка
+              добавления листа над панелью, и одно слово значило бы два дела. */}
+          <BarButton icon={<FileSliders size={20} />} label="Свойства" active={on('props')} onClick={() => onSheet('props')} />
         </>
       )}
     </div>
@@ -218,7 +223,7 @@ export function ViewPill({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        'h-8 rounded-lg px-3 text-[13px] transition-colors disabled:opacity-50',
+        'h-8 rounded-lg px-3 text-[13px] whitespace-nowrap transition-colors disabled:opacity-50',
         active ? 'bg-[var(--accent-soft)] font-medium text-[var(--accent)]' : 'text-[var(--text-muted)]',
       )}
     >
@@ -234,12 +239,14 @@ export function ViewPill({
       {seg('Заготовка', !dataMode, () => onMode('placeholders'))}
       {seg('Данные', dataMode, () => onMode('data'), rowCount === 0)}
       {dataMode && rowCount > 0 && (
-        <span className="tabular flex items-center pl-1 text-[13px] text-[var(--text-muted)]">
-          <button type="button" aria-label="Предыдущая строка" onClick={() => onRow(Math.max(0, row - 1))} className="grid size-8 place-items-center">
+        <span className="flex items-center border-l border-[var(--line)] pl-0.5 text-[13px] text-[var(--text-muted)]">
+          <button type="button" aria-label="Предыдущая строка" disabled={row === 0} onClick={() => onRow(Math.max(0, row - 1))} className="grid size-8 place-items-center disabled:opacity-30">
             <ChevronLeft size={16} />
           </button>
-          {row + 1} / {rowCount}
-          <button type="button" aria-label="Следующая строка" onClick={() => onRow(Math.min(rowCount - 1, row + 1))} className="grid size-8 place-items-center">
+          <span className="min-w-9 text-center whitespace-nowrap tabular-nums">
+            {row + 1}/{rowCount}
+          </span>
+          <button type="button" aria-label="Следующая строка" disabled={row >= rowCount - 1} onClick={() => onRow(Math.min(rowCount - 1, row + 1))} className="grid size-8 place-items-center disabled:opacity-30">
             <ChevronRight size={16} />
           </button>
         </span>
@@ -248,7 +255,10 @@ export function ViewPill({
   );
 }
 
-/** Листы материала — плавающей пилюлей внизу холста, вместо ленты закладок. */
+/**
+ * Листы материала — плавающей пилюлей внизу холста, вместо ленты закладок.
+ * Лист один — только «+ Лист»: стрелки в никуда и «1 из 1» были шумом.
+ */
 export function PagePill({
   index,
   count,
@@ -265,11 +275,21 @@ export function PagePill({
       {icon}
     </button>
   );
+  const shell =
+    'pointer-events-auto absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center rounded-full bg-[var(--surface)] p-0.5 shadow-[var(--shadow-sm)] ring-1 ring-[var(--line)]';
+  if (count <= 1) {
+    return (
+      <button type="button" onClick={onAdd} className={`${shell} h-10 gap-1.5 pr-4 pl-3 text-[13px] font-medium text-[var(--text-muted)]`}>
+        <Plus size={16} />
+        Лист
+      </button>
+    );
+  }
   return (
-    <div className="pointer-events-auto absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center rounded-full bg-[var(--surface)] p-0.5 shadow-[var(--shadow-sm)] ring-1 ring-[var(--line)]">
+    <div className={shell}>
       {btn('Предыдущий лист', <ChevronLeft size={18} />, () => onSelect(index - 1), index === 0)}
-      <span className="tabular px-1 text-[13px] font-medium whitespace-nowrap">
-        Лист {index + 1} из {count}
+      <span className="min-w-10 text-center text-[13px] font-medium whitespace-nowrap tabular-nums">
+        {index + 1}/{count}
       </span>
       {btn('Следующий лист', <ChevronRight size={18} />, () => onSelect(index + 1), index >= count - 1)}
       <span aria-hidden className="mx-0.5 h-4 w-px bg-[var(--line)]" />
@@ -564,7 +584,7 @@ export function PhoneFormatBar({
         </button>
       </div>
       {/* Поля таблицы — фишками: вставляются в каретку. Ряд прокручивается. */}
-      <div className="flex items-center gap-2 overflow-x-auto px-3 pt-1.5 pb-[max(8px,env(safe-area-inset-bottom))]">
+      <div className="no-scrollbar flex items-center gap-2 overflow-x-auto px-3 pt-1.5 pb-[max(8px,env(safe-area-inset-bottom))]">
         {fields.map((f) => (
           <button
             key={f.source}

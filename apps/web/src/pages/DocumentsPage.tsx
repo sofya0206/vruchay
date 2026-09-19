@@ -211,7 +211,7 @@ export function DocumentsPage({
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Поиск по названию"
             aria-label="Поиск по названию"
-            className="w-40 py-1.5 pl-9 text-sm sm:w-56"
+            className="w-40 py-1.5 pl-9 text-sm max-md:h-11 max-md:w-full sm:w-56"
           />
         </div>
       }
@@ -246,7 +246,9 @@ export function DocumentsPage({
           <h2 className="font-medium">
             {trash ? 'Удалённые' : templates ? 'Шаблоны организации' : 'Документы'}
           </h2>
-          <p className="mt-0.5 text-sm text-[var(--text-muted)]">
+          {/* Пояснение раздела на телефоне не показываем: там и так тесно,
+              а что в разделе — видно по карточкам. */}
+          <p className="mt-0.5 text-sm text-[var(--text-muted)] max-md:hidden">
             {trash ? (
               <>Удалённое хранится {TRASH_DAYS} дней, потом стирается насовсем</>
             ) : templates ? (

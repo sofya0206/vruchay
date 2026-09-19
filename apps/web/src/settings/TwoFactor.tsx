@@ -66,7 +66,7 @@ export function TwoFactor() {
         <ShieldCheck size={18} className="text-[var(--accent)]" />
         Вход по коду
       </h2>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)]">
+      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
         Второй шаг после пароля: шесть цифр из приложения на телефоне. Украденного пароля станет
         мало, чтобы войти в кабинет и выпустить документы от вашего имени.
       </p>

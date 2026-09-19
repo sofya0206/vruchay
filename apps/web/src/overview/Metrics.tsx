@@ -105,10 +105,10 @@ export function Metrics({ data, now = new Date() }: { data: Overview; now?: Date
       />
 
       <Tile
-        label="Проверяли по QR за месяц"
+        label="Проверки по QR"
         value={data.verifiedMonth}
         unit={plural(data.verifiedMonth, 'документ', 'документа', 'документов')}
-        note={`${data.verificationsTotal} ${plural(data.verificationsTotal, 'проверка', 'проверки', 'проверок')} за всё время`}
+        note={`за месяц · ${data.verificationsTotal} всего`}
       />
     </ul>
   );
@@ -130,7 +130,7 @@ function Tile({
   children?: ReactNode;
 }) {
   return (
-    <li className="flex min-h-24 min-w-0 flex-col gap-1.5 rounded-[var(--radius-card)] bg-[var(--surface)] px-3 pt-3 pb-2.5 shadow-[var(--ring-line)] sm:min-h-28 sm:px-4 sm:pt-3.5 sm:pb-3">
+    <li className="flex min-h-24 min-w-0 flex-col gap-1.5 self-stretch rounded-[var(--radius-card)] bg-[var(--surface)] px-3 pt-3 pb-2.5 shadow-[var(--ring-line)] sm:min-h-28 sm:px-4 sm:pt-3.5 sm:pb-3">
       <p className="text-sm text-[var(--text-muted)]">{label}</p>
       <p className="flex items-baseline gap-1.5">
         <span

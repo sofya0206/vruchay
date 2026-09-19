@@ -960,3 +960,15 @@ textarea::-webkit-resizer {
     font-size: max(16px, 1em);
   }
 }
+
+/*
+ * Лента, которая прокручивается вбок, — без полосы прокрутки: на телефоне
+ * она рисуется лишней серой линией под вкладками. Что лента длиннее экрана,
+ * видно по обрезанному краю.
+ */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

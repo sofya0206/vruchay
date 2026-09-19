@@ -24,7 +24,7 @@ export function Roadmap() {
         <Map size={18} className="text-[var(--accent)]" />
         Что дальше
       </h2>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)]">
+      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
         Что мы собираемся делать. Голос — один от организации; он не назначает срок, а показывает
         нам, с чего начать.
       </p>

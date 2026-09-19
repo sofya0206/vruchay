@@ -28,7 +28,7 @@ export function AuditLog() {
         <ScrollText size={18} className="text-[var(--text-muted)]" />
         Журнал действий
       </h2>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)]">
+      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
         Что делали в организации: выпуск документов, рассылки, удаления, изменения в составе
         сотрудников. Пригодится, когда нужно разобраться, кто и когда что сделал. Время
         московское.

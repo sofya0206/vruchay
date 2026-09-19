@@ -106,7 +106,7 @@ export function RegistryBlock() {
               className="pl-9 pr-9 text-sm"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Фамилия, почта или проверочный код"
+              placeholder="Фамилия, почта или код"
               aria-label="Найти в реестре выданного"
               autoComplete="off"
             />
@@ -122,7 +122,7 @@ export function RegistryBlock() {
             )}
           </div>
         </form>
-        <div role="tablist" aria-label="Состояние" className="flex gap-1 max-md:-mx-1 max-md:w-full max-md:overflow-x-auto max-md:px-1 md:flex-wrap">
+        <div role="tablist" aria-label="Состояние" className="no-scrollbar flex gap-1 max-md:-mx-1 max-md:w-full max-md:overflow-x-auto max-md:px-1 max-md:py-0.5 md:flex-wrap">
           {TABS.map((item) => (
             <button
               key={item.id}

@@ -85,7 +85,7 @@ function CreateLink({ label, className = '' }: { label: string; className?: stri
     <Link
       to="/documents?new=1"
       className={
-        'inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--accent)] px-4 py-2 ' +
+        'inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--accent)] px-4 py-2 max-md:h-11 ' +
         'text-sm font-medium whitespace-nowrap text-[var(--accent-contrast)] transition-colors ' +
         `hover:bg-[var(--accent-hover)] ${className}`
       }
@@ -279,7 +279,7 @@ export function LibraryNav({ archiveCount }: { archiveCount?: number | null }) {
     <nav aria-label="Разделы библиотеки" className="mt-3">
       {/* На узком экране колонка превратилась бы в две трети экрана телефона,
           поэтому там это лента, которая прокручивается вбок. */}
-      <div className="flex gap-1 overflow-x-auto md:block md:overflow-visible">
+      <div className="no-scrollbar flex gap-1 overflow-x-auto md:block md:overflow-visible">
         <ul className="flex gap-1 md:flex-col" {...dragHandlers}>
           <RootRow
             active={onDocuments && !openFolderId}

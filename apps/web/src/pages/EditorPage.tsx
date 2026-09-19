@@ -1643,8 +1643,10 @@ export function EditorPage() {
     <>
             {panel === 'fields' ? (
               <FieldsList
+                // На телефоне переключатель уже стоит пилюлей над листом — второй
+                // такой же в полулисте был бы дублем.
                 header={
-                  <SheetView
+                  phone ? undefined : <SheetView
                     dataMode={dataMode}
                     onMode={(mode) => setViewMode(mode)}
                     row={safeRow}
@@ -1742,18 +1744,17 @@ export function EditorPage() {
      сохранения. Остальное уехало вниз, под большой палец. */
   const phoneToolbar = (
     <>
+      {/* Сохранение видно, только когда есть что сказать: крутится, пока
+          пишет, и краснеет, если не вышло. Зелёная галочка на каждом шаге
+          была лишним значком в тесной строке. */}
+      {saved === 'saving' && <LoaderCircle size={16} className="mx-1.5 animate-spin text-[var(--text-muted)]" aria-label="Сохраняем" />}
+      {saved === 'error' && <TriangleAlert size={18} className="mx-1.5 text-[var(--danger)]" aria-label="Не удалось сохранить" />}
       <IconButton label="Отменить" onClick={history.undo} disabled={!history.canUndo}>
         <Undo2 size={20} />
       </IconButton>
       <IconButton label="Повторить" onClick={history.redo} disabled={!history.canRedo}>
         <Redo2 size={20} />
       </IconButton>
-      <div className="ml-auto flex items-center">
-        <StatusChip tone={saved === 'saved' ? 'done' : saved === 'saving' ? 'progress' : saved === 'error' ? 'error' : 'neutral'}>
-          {saved === 'saved' ? <Check size={13} /> : saved === 'saving' ? <LoaderCircle size={13} className="animate-spin" /> : saved === 'error' ? <TriangleAlert size={13} /> : <Dot size={13} />}
-          {saved === 'error' ? 'Не удалось сохранить' : <span className="sr-only">{saved === 'saved' ? 'Сохранено' : saved === 'saving' ? 'Сохраняем' : 'Есть правки'}</span>}
-        </StatusChip>
-      </div>
     </>
   );
 
@@ -1790,7 +1791,8 @@ export function EditorPage() {
         isTemplate={page.isTemplate}
         actions={actions}
         tab="sheet"
-        toolbar={phone ? phoneToolbar : toolbar}
+        toolbar={phone ? undefined : toolbar}
+        titleActions={phone ? phoneToolbar : undefined}
       />
 
       {/* Поле выбора файла спрятано и живёт отдельно от меню: меню
@@ -1930,7 +1932,11 @@ export function EditorPage() {
               на две в ряд нет, встают столбиком. */}
           {!sheet.backgroundFileId && layout.length === 0 && !buildHere.has(sheet.id) && (
             <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center p-4 @container">
-              <div className="pointer-events-auto grid w-full max-w-sm grid-cols-1 gap-3 @[17rem]:grid-cols-2">
+              <div
+                className="pointer-events-auto grid w-full max-w-sm grid-cols-1 gap-3 @[17rem]:grid-cols-2 max-md:grid-cols-2 max-md:gap-2"
+                // На телефоне плитки не шире листа: иначе вылезали за его края.
+                style={phone ? { maxWidth: Math.max(220, px(page.pageWidthMm) - 24) } : undefined}
+              >
                 <StartTile
                   icon={<ImageUp size={22} />}
                   label="Свой бланк"
@@ -2360,7 +2366,7 @@ export function EditorPage() {
           <BottomSheet
             open={panel !== null}
             onClose={() => setPhoneSheet(null)}
-            title={panel === 'layers' ? 'Слои' : panel === 'fields' ? 'Поля' : selected.size ? 'Свойства блока' : 'Лист'}
+            title={panel === 'layers' ? 'Слои' : panel === 'fields' ? 'Поля' : selected.size ? 'Свойства блока' : 'Свойства листа'}
             className="h-[62vh]"
           >
             <div className="flex min-h-0 flex-1 flex-col">{panelBody}</div>
@@ -2655,7 +2661,7 @@ function StartTile({
         onFile(file);
       }}
       className={
-        'flex flex-col items-center gap-1.5 rounded-2xl border-2 bg-[var(--surface)] px-3 py-5 ' +
+        'flex flex-col items-center gap-1.5 rounded-2xl border-2 bg-[var(--surface)] px-3 py-5 max-md:gap-1 max-md:rounded-xl max-md:border max-md:py-3 ' +
         // Пунктир — только у плитки, на которую можно бросить файл.
         (onFile ? 'border-dashed ' : '') +
         'transition-colors disabled:opacity-60 ' +
@@ -2664,7 +2670,7 @@ function StartTile({
           : 'border-[var(--line)] hover:border-[var(--accent)]')
       }
     >
-      <span className="grid size-11 place-items-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">
+      <span className="grid size-11 place-items-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)] max-md:size-9 max-md:rounded-lg">
         {icon}
       </span>
       <span className="text-sm font-medium whitespace-nowrap">{label}</span>

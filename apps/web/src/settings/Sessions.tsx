@@ -39,7 +39,7 @@ export function Sessions() {
         <MonitorSmartphone size={18} className="text-[var(--accent)]" />
         Устройства
       </h2>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)]">
+      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
         Где вы вошли прямо сейчас. Забытый вход на чужом компьютере закрывается отсюда — для этого
         не нужно ни менять пароль, ни искать тот компьютер.
       </p>
@@ -99,7 +99,7 @@ function LoginHistory() {
   return (
     <div className="mt-8">
       <h3 className="font-medium">Журнал входов</h3>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)]">
+      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
         Последние попытки войти в вашу учётную запись — и удачные, и нет.
       </p>
 

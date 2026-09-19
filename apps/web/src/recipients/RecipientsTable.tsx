@@ -472,7 +472,7 @@ export function RecipientsTable({
 
       <div className="ml-auto flex items-center gap-2">
         <FieldsToggle />
-        <span className="tabular text-sm text-[var(--text-muted)]">
+        <span className="tabular text-sm text-[var(--text-muted)] max-md:hidden">
           отмечено {checkedCount} из {rows.length}
         </span>
 

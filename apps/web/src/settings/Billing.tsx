@@ -81,7 +81,7 @@ export function Billing() {
         <ReceiptText size={18} className="text-[var(--accent)]" />
         Реквизиты
       </h2>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)]">
+      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
         По ним выставляется счёт и оформляются закрывающие документы. Бухгалтерия проверит их до
         копейки, поэтому лучше заполнить один раз и точно.
       </p>

@@ -31,7 +31,33 @@ export function RegistryTable({ rows, selected, onToggle, onToggleAll, onOpen }:
   const allChecked = rows.length > 0 && rows.every((r) => selected.has(r.fileId));
 
   return (
-    <div className="card overflow-x-auto">
+    <>
+    {/* На телефоне — карточками: таблица в 1024 точки показывала одни имена,
+        а состояние и письмо оставались за краем. Тап открывает историю. */}
+    <ul className="card divide-y divide-[var(--line)] overflow-hidden md:hidden">
+      {rows.map((row) => (
+        <li key={row.fileId} className="flex items-start gap-3 px-3 py-3" onClick={() => onOpen(row.fileId)}>
+          <span className="pt-0.5" onClick={(e) => e.stopPropagation()}>
+            <Checkbox checked={selected.has(row.fileId)} onChange={() => onToggle(row.fileId)} aria-label={`Отметить ${row.name}`} />
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col gap-1.5">
+            <span className="flex items-start justify-between gap-2">
+              <span className="min-w-0">
+                <span className="block truncate text-[15px] font-medium">{row.name}</span>
+                <span className="block truncate text-xs text-[var(--text-muted)]">{row.documentTitle}</span>
+              </span>
+              <StatusChip tone={stateTone(row)}>{stateLabel(row)}</StatusChip>
+            </span>
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--text-muted)]">
+              <StatusChip tone={mailTone(row.mail?.status)}>{mailLabel(row.mail?.status)}</StatusChip>
+              <span className="tabular-nums">{formatDate(row.issuedAt)}</span>
+              <span className="tabular-nums">{row.verifyCount} пров.</span>
+            </span>
+          </span>
+        </li>
+      ))}
+    </ul>
+    <div className="card overflow-x-auto max-md:hidden">
       <table className="w-full min-w-[64rem] border-collapse text-sm">
         <thead>
           <tr className="border-b border-[var(--line)] text-left text-xs tracking-wide text-[var(--text-muted)] uppercase">
@@ -157,5 +183,6 @@ export function RegistryTable({ rows, selected, onToggle, onToggleAll, onOpen }:
         </tbody>
       </table>
     </div>
+    </>
   );
 }

@@ -51,13 +51,15 @@ function NewMailingLink({ className = '' }: { className?: string }) {
     <Link
       to={mailListPath('new')}
       className={
-        'inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--accent)] px-4 py-2 ' +
+        'inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--accent)] px-4 py-2 max-md:h-11 max-md:px-3.5 ' +
         'text-sm font-medium whitespace-nowrap text-[var(--accent-contrast)] transition-colors ' +
         `hover:bg-[var(--accent-hover)] ${className}`
       }
     >
       <Plus size={16} />
-      Новая рассылка
+      {/* На телефоне короче: длинная подпись сжимала поиск рядом до обрывка. */}
+      <span className="max-md:hidden">Новая рассылка</span>
+      <span className="md:hidden">Рассылка</span>
     </Link>
   );
 }
