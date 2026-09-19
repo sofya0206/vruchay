@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
+import { Check, Copy } from 'lucide-react';
+import { headingId } from './panel';
 
 /**
  * Разметка страниц базы знаний.
@@ -120,14 +122,7 @@ export function renderDoc(source: string, options: Options): ReactNode[] {
         i++;
       }
       i++; // закрывающая строка
-      out.push(
-        <pre
-          key={key++}
-          className="my-4 overflow-x-auto rounded-xl border border-[var(--line)] bg-[var(--surface-sunken)] p-4 text-[0.8125rem] leading-relaxed"
-        >
-          <code className="font-mono text-[var(--text)]">{code.join('\n')}</code>
-        </pre>,
-      );
+      out.push(<CodeBlock key={key++} lang={fence[1]} code={code.join('\n')} />);
       continue;
     }
 
@@ -137,13 +132,13 @@ export function renderDoc(source: string, options: Options): ReactNode[] {
       const text = heading[2];
       const cls =
         level === 1
-          ? 'mt-2 mb-4 font-serif text-2xl'
+          ? 'mt-2 mb-4 text-2xl font-medium'
           : level === 2
-            ? 'mt-8 mb-2 border-t border-[var(--line)] pt-6 font-serif text-lg'
+            ? 'mt-10 mb-3 scroll-mt-28 text-xs font-medium tracking-wide text-[var(--text-muted)] uppercase'
             : 'mt-6 mb-2 font-medium';
       const Tag = (level === 1 ? 'h1' : level === 2 ? 'h2' : 'h3') as 'h1' | 'h2' | 'h3';
       out.push(
-        <Tag key={key++} className={cls}>
+        <Tag key={key++} id={level === 2 ? headingId(text) : undefined} className={cls}>
           {inline(text, `h${key}`, options)}
         </Tag>,
       );
@@ -175,7 +170,7 @@ export function renderDoc(source: string, options: Options): ReactNode[] {
         i++;
       }
       out.push(
-        <ul key={key++} className="my-3 list-disc space-y-1 pl-6">
+        <ul key={key++} className="my-3 list-disc space-y-1.5 pl-5 marker:text-[var(--text-muted)]">
           {items.map((item, n) => (
             <li key={n}>{inline(item, `l${key}-${n}`, options)}</li>
           ))}
@@ -191,7 +186,7 @@ export function renderDoc(source: string, options: Options): ReactNode[] {
         i++;
       }
       out.push(
-        <ol key={key++} className="my-3 list-decimal space-y-1 pl-6">
+        <ol key={key++} className="my-3 list-decimal space-y-1.5 pl-5 marker:text-[var(--text-muted)]">
           {items.map((item, n) => (
             <li key={n}>{inline(item, `o${key}-${n}`, options)}</li>
           ))}
@@ -211,11 +206,11 @@ export function renderDoc(source: string, options: Options): ReactNode[] {
       }
       out.push(
         <div key={key++} className="my-4 overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="text-xs text-[var(--text-muted)] uppercase">
+          <table className="w-full text-left text-sm [&_code]:text-[0.8rem]">
+            <thead className="text-[11px] tracking-wide text-[var(--text-muted)] uppercase">
               <tr>
                 {head.map((h, n) => (
-                  <th key={n} className="py-1.5 pr-4 font-medium">
+                  <th key={n} className="pb-2 pr-4 font-medium">
                     {inline(h, `th${n}`, options)}
                   </th>
                 ))}
@@ -225,7 +220,7 @@ export function renderDoc(source: string, options: Options): ReactNode[] {
               {rows.map((row, n) => (
                 <tr key={n} className="border-t border-[var(--line)]">
                   {row.map((c, m) => (
-                    <td key={m} className="py-1.5 pr-4 align-top">
+                    <td key={m} className="py-2 pr-4 align-top">
                       {inline(c, `td${n}-${m}`, options)}
                     </td>
                   ))}
@@ -264,4 +259,57 @@ export function renderDoc(source: string, options: Options): ReactNode[] {
   }
 
   return out;
+}
+
+/**
+ * Блок кода с кнопкой копирования и подписью языка.
+ *
+ * Тёмный на любой теме: код — это терминал, а не текст страницы,
+ * и так его читают в Stripe и Mintlify.
+ */
+export function CodeBlock({ lang, code, label }: { lang?: string; code: string; label?: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Буфер закрыт настройками браузера — текст можно выделить руками.
+    }
+  };
+  return (
+    <div data-code className="my-4 overflow-hidden rounded-xl bg-[#0b0f1d] text-[#e6eaf5] ring-1 ring-white/10">
+      {(label || lang) && (
+        <div className="flex items-center gap-2 border-b border-white/10 px-3 py-1.5 text-xs text-[#9aa4c2]">
+          <span className="font-medium text-[#e6eaf5]">{label}</span>
+          <span className="ml-auto font-mono">{lang}</span>
+          <CopyBtn copied={copied} onClick={copy} />
+        </div>
+      )}
+      <div className="relative">
+        {!(label || lang) && (
+          <div className="absolute top-2 right-2">
+            <CopyBtn copied={copied} onClick={copy} />
+          </div>
+        )}
+        <pre className="overflow-x-auto p-4 text-[0.8125rem] leading-relaxed">
+          <code className="font-mono">{code}</code>
+        </pre>
+      </div>
+    </div>
+  );
+}
+
+function CopyBtn({ copied, onClick }: { copied: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={copied ? 'Скопировано' : 'Скопировать'}
+      className="grid size-7 place-items-center rounded-md text-[#9aa4c2] transition-colors hover:bg-white/10 hover:text-[#e6eaf5]"
+    >
+      {copied ? <Check size={14} /> : <Copy size={14} />}
+    </button>
+  );
 }

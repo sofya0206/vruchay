@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { ScrollText } from 'lucide-react';
 import { useAudit, type AuditEvent } from '../api/audit';
 import { Button } from '../ui/Button';
+import { SettingsSection } from '../ui/Settings';
 
 const PAGE = 50;
 
@@ -23,66 +23,59 @@ export function AuditLog() {
   const { data, isLoading, isError } = useAudit(offset, PAGE);
 
   return (
-    <section>
-      <h2 className="flex items-center gap-2 text-lg font-medium">
-        <ScrollText size={18} className="text-[var(--text-muted)]" />
-        Журнал действий
-      </h2>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
-        Что делали в организации: выпуск документов, рассылки, удаления, изменения в составе
-        сотрудников. Пригодится, когда нужно разобраться, кто и когда что сделал. Время
-        московское.
-      </p>
-
-      {isLoading && <p className="mt-4 text-sm text-[var(--text-muted)]">Загружаем…</p>}
+    <SettingsSection
+      title="Журнал действий"
+      about="Выпуск, рассылки, удаления, изменения в команде. Время московское."
+      action={
+        data &&
+        data.total > PAGE && (
+          <div className="flex items-center gap-2">
+            <span className="tabular text-sm text-[var(--text-muted)]">
+              {offset + 1}–{Math.min(offset + PAGE, data.total)} из {data.total}
+            </span>
+            <Button size="sm" disabled={offset === 0} onClick={() => setOffset(offset - PAGE)}>
+              Новее
+            </Button>
+            <Button
+              size="sm"
+              disabled={offset + PAGE >= data.total}
+              onClick={() => setOffset(offset + PAGE)}
+            >
+              Старее
+            </Button>
+          </div>
+        )
+      }
+    >
+      {isLoading && <p className="text-sm text-[var(--text-muted)]">Загружаем…</p>}
 
       {isError && (
-        <p className="mt-4 text-sm text-[var(--text-muted)]">
+        <p className="text-sm text-[var(--text-muted)]">
           Журнал доступен владельцу и управляющему.
         </p>
       )}
 
       {data && data.total === 0 && (
-        <p className="mt-4 text-sm text-[var(--text-muted)]">
-          Пока пусто. Здесь появятся записи, как только кто-нибудь выпустит документы или разошлёт
+        <p className="text-sm text-[var(--text-muted)]">
+          Пока пусто. Записи появятся, как только кто-нибудь выпустит документы или разошлёт
           письма.
         </p>
       )}
 
       {data && data.total > 0 && (
-        <>
-          <ul className="mt-4 max-w-2xl divide-y divide-[var(--line)] rounded-2xl bg-[var(--surface)] ring-1 ring-[var(--line)]">
-            {data.items.map((event) => (
-              <Row key={event.id} event={event} />
-            ))}
-          </ul>
-
-          <div className="mt-3 flex max-w-2xl items-center gap-3">
-            <span className="text-sm text-[var(--text-muted)]">
-              {offset + 1}–{Math.min(offset + PAGE, data.total)} из {data.total}
-            </span>
-            <div className="ml-auto flex gap-2">
-              <Button size="sm" disabled={offset === 0} onClick={() => setOffset(offset - PAGE)}>
-                Новее
-              </Button>
-              <Button
-                size="sm"
-                disabled={offset + PAGE >= data.total}
-                onClick={() => setOffset(offset + PAGE)}
-              >
-                Старее
-              </Button>
-            </div>
-          </div>
-        </>
+        <ul className="divide-y divide-[var(--line)]">
+          {data.items.map((event) => (
+            <Row key={event.id} event={event} />
+          ))}
+        </ul>
       )}
-    </section>
+    </SettingsSection>
   );
 }
 
 function Row({ event }: { event: AuditEvent }) {
   return (
-    <li className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-3 text-sm">
+    <li className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-2.5 text-sm">
       <span className="tabular shrink-0 text-[var(--text-muted)]">{when(event.createdAt)}</span>
       <span>{event.summary}</span>
       <span className="ml-auto text-[var(--text-muted)]">
@@ -97,8 +90,7 @@ function Row({ event }: { event: AuditEvent }) {
  *
  * Организации у нас от Калининграда до Владивостока: если время показывать
  * местное, два человека, обсуждающие одну и ту же запись, увидят разные
- * часы — ровно в том разговоре, ради которого журнал и заведён. Что оно
- * московское, сказано в описании раздела.
+ * часы — ровно в том разговоре, ради которого журнал и заведён.
  */
 function when(iso: string): string {
   return new Intl.DateTimeFormat('ru-RU', {

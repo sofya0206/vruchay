@@ -63,6 +63,7 @@ const GROUP_TITLES: Record<string, string> = {
   awards: 'Правила награждения',
   audit: 'Журнал действий',
   documents: 'Документы и листы',
+  folders: 'Папки',
   generation: 'Выпуск',
   integrations: 'Интеграции',
   mail: 'Почта и домены',

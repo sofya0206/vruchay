@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Check, MessageSquareQuote, Trash2 } from 'lucide-react';
+import { Check, Trash2 } from 'lucide-react';
 import { errorText } from '../api/client';
 import { useMyReview, useReviewMutations, type MyReview } from '../api/reviews';
 import { Button } from '../ui/Button';
+import { SectionHead } from '../ui/Settings';
 import { Input, Label, Textarea } from '../ui/Field';
 
 /**
@@ -22,14 +23,7 @@ export function Review() {
 
   return (
     <section>
-      <h2 className="flex items-center gap-2 text-lg font-medium">
-        <MessageSquareQuote size={18} className="text-[var(--accent)]" />
-        Отзыв о сервисе
-      </h2>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
-        Если «Вручай» вам пригодился — расскажите об этом. Отзыв появится на главной
-        странице сервиса вместе с названием вашей организации.
-      </p>
+      <SectionHead title="Отзыв о сервисе" about={<>Если «Вручай» вам пригодился — расскажите об этом. Отзыв появится на главной странице сервиса вместе с названием вашей организации.</>} />
 
       {isLoading && <p className="mt-4 text-sm text-[var(--text-muted)]">Загружаем…</p>}
       {!isLoading && <ReviewForm existing={data ?? null} />}

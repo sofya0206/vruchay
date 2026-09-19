@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Check, Timer } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { errorText } from '../api/client';
 import { usePublicProfile, useUpdatePublicProfile } from '../api/org';
 import { Button } from '../ui/Button';
+import { SectionHead } from '../ui/Settings';
 import { Input, Label } from '../ui/Field';
 
 /**
@@ -37,14 +38,7 @@ export function RetentionPolicy() {
 
   return (
     <section>
-      <h2 className="flex items-center gap-2 text-lg font-medium">
-        <Timer size={18} className="text-[var(--accent)]" />
-        Сроки хранения
-      </h2>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
-        Закон запрещает держать данные дольше, чем требует цель. Оператор этих данных — вы,
-        поэтому срок корзины выбираете тоже вы.
-      </p>
+      <SectionHead title="Сроки хранения" about={<>Закон запрещает держать данные дольше, чем требует цель. Оператор этих данных — вы, поэтому срок корзины выбираете тоже вы.</>} />
 
       <div className="mt-4 max-w-md space-y-3 rounded-2xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]">
         <div>

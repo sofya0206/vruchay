@@ -32,6 +32,8 @@ import { PricingPage } from './pages/PricingPage';
 import { OfferPage } from './pages/OfferPage';
 import { DpaPage } from './pages/DpaPage';
 import { KnowledgeBasePage } from './docs/KnowledgeBasePage';
+import { SupportPage } from './pages/SupportPage';
+import { ReferralPage } from './pages/ReferralPage';
 import { BillingPage } from './billing/BillingPage';
 import { IssuerPage } from './public/IssuerPage';
 import { RecipientPage } from './public/RecipientPage';
@@ -188,6 +190,13 @@ export function App() {
           path="/settings/integrations"
           element={<Navigate to="/integrations/tilda" replace />}
         />
+        {/* Поддержка и приглашение друга жили в настройках, хотя ничего
+            не настраивают: теперь у них свои адреса из меню «Помощь»,
+            а старые ведут туда же. */}
+        <Route path="/settings/support" element={<Navigate to="/support" replace />} />
+        <Route path="/settings/referral" element={<Navigate to="/referral" replace />} />
+        <Route path="/support" element={<SupportPage />} />
+        <Route path="/referral" element={<ReferralPage />} />
         <Route path="/invoices" element={<InvoicesPage />} />
         {/* База знаний для вошедшего — внутри кабинета, с той же колонкой
             разделов; гость читает её без оболочки. */}
@@ -224,7 +233,7 @@ function AfterLogin() {
 }
 
 /** Разделы кабинета: их адрес без входа — повод войти, а не «не найдено». */
-const CABINET_PREFIXES = ['/documents', '/mailing', '/registry', '/settings', '/billing', '/invoices', '/analytics', '/integrations'];
+const CABINET_PREFIXES = ['/documents', '/mailing', '/registry', '/settings', '/billing', '/invoices', '/analytics', '/integrations', '/support', '/referral'];
 
 /**
  * Ссылка на материал из письма коллеги или вкладка, открытая вчера,

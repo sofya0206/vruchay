@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Check, Globe, ImagePlus, ShieldCheck } from 'lucide-react';
+import { Check, ImagePlus, ShieldCheck } from 'lucide-react';
 import { api, errorText } from '../api/client';
 import {
   usePublicProfile,
@@ -9,6 +9,7 @@ import {
   type VerifyNameMode,
 } from '../api/org';
 import { Button } from '../ui/Button';
+import { SectionHead } from '../ui/Settings';
 import { Checkbox, Radio } from '../ui/Checkbox';
 import { Input, Label, Textarea } from '../ui/Field';
 
@@ -106,14 +107,7 @@ export function PublicProfile() {
 
   return (
     <section>
-      <h2 className="flex items-center gap-2 text-lg font-medium">
-        <Globe size={18} className="text-[var(--accent)]" />
-        Страница проверки и публичный реестр
-      </h2>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
-        Страницу проверки открывает любой, кто знает код с документа. Что на ней показывать о
-        человеке — решаете вы как оператор персональных данных.
-      </p>
+      <SectionHead title="Страница проверки и публичный реестр" about={<>Страницу проверки открывает любой, кто знает код с документа. Что на ней показывать о человеке — решаете вы как оператор персональных данных.</>} />
 
       <div className="mt-4 max-w-2xl space-y-6 rounded-2xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]">
         <div>

@@ -3,10 +3,10 @@ import {
   AtSign,
   Building2,
   Eye,
-  Gift,
   Globe,
-  LifeBuoy,
+  KeyRound,
   Palette,
+  ScrollText,
   ShieldCheck,
   UserRound,
   Users,
@@ -29,123 +29,109 @@ import { ApiTokens } from './ApiTokens';
 import { Interface } from './Interface';
 import { PublicProfile } from './PublicProfile';
 import { RetentionPolicy } from './RetentionPolicy';
-import { InviteFriend } from './InviteFriend';
-import { Support } from './Support';
-import { Roadmap } from './Roadmap';
-import { Review } from './Review';
+import { SettingsStack } from '../ui/Settings';
+
+/** Кому принадлежит настройка: человеку, организации или её интеграциям. */
+export type SettingsGroup = 'you' | 'org' | 'dev';
+
+export const SETTINGS_GROUPS: { key: SettingsGroup; title: string }[] = [
+  { key: 'you', title: 'Вы' },
+  { key: 'org', title: 'Организация' },
+  { key: 'dev', title: 'Разработчикам' },
+];
 
 export interface SettingsSection {
   /** Часть адреса после /settings/ — она же ключ раздела. */
   path: string;
   title: string;
   icon: LucideIcon;
+  group: SettingsGroup;
   element: ReactNode;
-}
-
-function Stack({ children }: { children: ReactNode }) {
-  return <div className="space-y-10">{children}</div>;
 }
 
 /**
  * Разделы настроек.
  *
- * Раньше это было одно полотно сверху вниз: чтобы дойти до журнала
- * действий, приходилось пролистать домены и приглашения, а дать коллеге
- * ссылку «вот здесь настрой отправителя» было нельзя вовсе. Теперь
- * у каждого раздела свой адрес, и список ниже — единственное место,
+ * У каждого раздела свой адрес, и список ниже — единственное место,
  * где он заводится: и меню, и маршруты берут его отсюда.
+ *
+ * Разделы сгруппированы по владельцу: личное («Вы»), общее для
+ * организации и то, что нужно только тому, кто подключает API.
+ * Поддержка, дорожная карта, отзыв и приглашение друга настройками
+ * не были и переехали в меню «Помощь» внизу колонки разделов;
+ * старые адреса ведут туда — см. App.tsx.
  */
 export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     path: 'account',
     title: 'Аккаунт',
     icon: UserRound,
+    group: 'you',
     element: (
-      <Stack>
+      <SettingsStack>
         <MyProfile />
         <ChangePassword />
         <TwoFactor />
         <DeleteAccount />
-      </Stack>
+      </SettingsStack>
+    ),
+  },
+  { path: 'interface', title: 'Интерфейс', icon: Palette, group: 'you', element: <Interface /> },
+  { path: 'security', title: 'Устройства и входы', icon: ShieldCheck, group: 'you', element: <Sessions /> },
+  {
+    path: 'organization',
+    title: 'Организация и оплата',
+    icon: Building2,
+    group: 'org',
+    element: (
+      <SettingsStack>
+        <OrgName />
+        <Billing />
+      </SettingsStack>
     ),
   },
   {
-    path: 'organization',
-    title: 'Организация',
-    icon: Building2,
+    path: 'team',
+    title: 'Команда и роли',
+    icon: Users,
+    group: 'org',
     element: (
-      <Stack>
-        <OrgName />
-        <Billing />
-      </Stack>
+      <SettingsStack>
+        <Team />
+        <RolePermissions />
+      </SettingsStack>
     ),
   },
   {
     path: 'domains',
     title: 'Домены',
     icon: Globe,
+    group: 'org',
     element: (
       <DesktopFirst
         title="Настройку доменов"
         why="Понадобится скопировать несколько длинных DNS-записей в панель регистратора — с двумя окнами рядом это минута, а с телефона легко ошибиться в одном знаке."
       >
-        <Stack>
+        <SettingsStack>
           <MailDomains />
           <VerifyDomain />
-        </Stack>
+        </SettingsStack>
       </DesktopFirst>
     ),
   },
-  { path: 'senders', title: 'Адреса рассылки', icon: AtSign, element: <Senders /> },
-  {
-    path: 'team',
-    title: 'Команда и роли',
-    icon: Users,
-    element: (
-      <Stack>
-        <Team />
-        <RolePermissions />
-      </Stack>
-    ),
-  },
-  {
-    path: 'security',
-    title: 'Безопасность',
-    icon: ShieldCheck,
-    element: (
-      <Stack>
-        <Sessions />
-        <AuditLog />
-        <ApiTokens />
-      </Stack>
-    ),
-  },
-  { path: 'interface', title: 'Интерфейс', icon: Palette, element: <Interface /> },
+  { path: 'senders', title: 'Адреса рассылки', icon: AtSign, group: 'org', element: <Senders /> },
   {
     path: 'privacy',
     title: 'Конфиденциальность',
     icon: Eye,
+    group: 'org',
     element: (
-      <Stack>
+      <SettingsStack>
         <PublicProfile />
         <RetentionPolicy />
-      </Stack>
+      </SettingsStack>
     ),
   },
-  { path: 'referral', title: 'Пригласить друга', icon: Gift, element: <InviteFriend /> },
-  {
-    path: 'support',
-    title: 'Поддержка',
-    icon: LifeBuoy,
-    element: (
-      <Stack>
-        <Support />
-        <Roadmap />
-        <Review />
-      </Stack>
-    ),
-  },
-  // Формы на сайте здесь больше нет: у интеграций свой раздел кабинета,
-  // и пока страница жила в обоих местах, два раздела показывали одно
-  // и то же. Старый адрес /settings/integrations уводит туда — в App.tsx.
+  { path: 'audit', title: 'Журнал действий', icon: ScrollText, group: 'org', element: <AuditLog /> },
+  { path: 'tokens', title: 'Токены API', icon: KeyRound, group: 'dev', element: <ApiTokens /> },
 ];

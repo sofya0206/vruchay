@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Check, Copy, KeyRound, Plus, TriangleAlert, X } from 'lucide-react';
+import { Check, Copy, Plus, TriangleAlert, X } from 'lucide-react';
 import { ApiError, errorText } from '../api/client';
 import { useTokens, useTokenMutations, type ApiTokenInfo, type TokenRole } from '../api/tokens';
 import { Button } from '../ui/Button';
+import { SectionHead } from '../ui/Settings';
 import { Input, Label } from '../ui/Field';
 import { Select } from '../ui/Select';
 
@@ -21,29 +22,16 @@ const ROLE_TITLE: Record<TokenRole, string> = {
  * невозможно и не нужно.
  */
 export function ApiTokens() {
-  const [open, setOpen] = useState(false);
   const { data, isError } = useTokens();
 
   return (
     <section>
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 text-lg font-medium"
-        aria-expanded={open}
-      >
-        <KeyRound size={18} className="text-[var(--accent)]" />
-        Доступ для программ
-        <span className="rounded-full bg-[var(--surface-sunken)] px-2 py-0.5 text-xs font-normal text-[var(--text-muted)]">
-          {open ? 'скрыть' : 'показать'}
-        </span>
-      </button>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
-        Нужно, только если вы подключаете сервис к своей программе или сайту. Для обычной работы
-        в кабинете это не требуется.
-      </p>
+      <SectionHead
+        title="Токены API"
+        about="Нужны, только если вы подключаете сервис к своей программе или сайту. Полный токен показывается один раз."
+      />
 
-      {open && (
-        <div className="mt-4 max-w-2xl">
+      <div className="mt-4 max-w-2xl">
           {isError ? (
             <p className="text-sm text-[var(--text-muted)]">
               Доступ к токенам есть у владельца и управляющего.
@@ -54,8 +42,7 @@ export function ApiTokens() {
               <TokenList tokens={data ?? []} />
             </>
           )}
-        </div>
-      )}
+      </div>
     </section>
   );
 }

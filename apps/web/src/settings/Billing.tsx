@@ -1,8 +1,9 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { Check, ReceiptText } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { useBilling, useUpdateBilling, type BillingKind, type BillingPatch } from '../api/org';
 import { ApiError } from '../api/client';
 import { Button } from '../ui/Button';
+import { SectionHead } from '../ui/Settings';
 import { Input, Label } from '../ui/Field';
 import { Select } from '../ui/Select';
 import { formatDate } from './preferences';
@@ -77,14 +78,7 @@ export function Billing() {
 
   return (
     <section>
-      <h2 className="flex items-center gap-2 text-lg font-medium">
-        <ReceiptText size={18} className="text-[var(--accent)]" />
-        Реквизиты
-      </h2>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
-        По ним выставляется счёт и оформляются закрывающие документы. Бухгалтерия проверит их до
-        копейки, поэтому лучше заполнить один раз и точно.
-      </p>
+      <SectionHead title="Реквизиты" about={<>По ним выставляется счёт и оформляются закрывающие документы. Бухгалтерия проверит их до копейки, поэтому лучше заполнить один раз и точно.</>} />
 
       {data && !data.kind && data.suggested.name && (
         <p className="mt-3 max-w-2xl rounded-xl bg-[var(--surface-sunken)] p-3 text-sm text-[var(--text-muted)]">

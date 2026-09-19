@@ -1,8 +1,9 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { Check, Globe } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { usePublicProfile, useSetVerifyDomain } from '../api/org';
 import { ApiError } from '../api/client';
 import { Button } from '../ui/Button';
+import { SectionHead } from '../ui/Settings';
 import { Input, Label } from '../ui/Field';
 
 /**
@@ -44,14 +45,7 @@ export function VerifyDomain() {
 
   return (
     <section>
-      <h2 className="flex items-center gap-2 text-lg font-medium">
-        <Globe size={18} className="text-[var(--accent)]" />
-        Домен страницы проверки
-      </h2>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
-        Адрес, который проверяющий видит в ссылке и в QR-коде. Пусто — общий адрес сервиса; он
-        работает всегда и настройки не требует.
-      </p>
+      <SectionHead title="Домен страницы проверки" about={<>Адрес, который проверяющий видит в ссылке и в QR-коде. Пусто — общий адрес сервиса; он работает всегда и настройки не требует.</>} />
 
       <form
         onSubmit={submit}

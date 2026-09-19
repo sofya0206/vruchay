@@ -15,9 +15,12 @@ const REQUIRED = [
   'security',
   'interface',
   'privacy',
-  'referral',
-  'support',
+  'audit',
+  'tokens',
 ];
+
+/* «Поддержка» и «Пригласить друга» переехали из настроек: их старые адреса
+   редиректят на /support и /referral — см. App.tsx. */
 
 describe('разделы настроек', () => {
   it('у каждого обязательного раздела есть свой адрес', () => {

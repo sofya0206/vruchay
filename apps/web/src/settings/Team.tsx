@@ -4,6 +4,7 @@ import { errorText } from '../api/client';
 import { useTeam, useTeamMutations, type TeamMember, type TeamRole } from '../api/team';
 import { useMe } from '../auth/useAuth';
 import { Button } from '../ui/Button';
+import { SectionHead } from '../ui/Settings';
 import { Input, Label } from '../ui/Field';
 import { ConfirmDialog } from '../ui/Dialog';
 import { Select } from '../ui/Select';
@@ -51,11 +52,7 @@ export function Team() {
 
   return (
     <section>
-      <h2 className="text-lg font-medium">Кто работает в организации</h2>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
-        Добавьте коллег, чтобы каждый входил под своим именем и паролем. Так видно, кто
-        какие грамоты выпустил, и не приходится передавать один пароль на всех.
-      </p>
+      <SectionHead title="Кто работает в организации" about={<>Добавьте коллег, чтобы каждый входил под своим именем и паролем. Так видно, кто какие грамоты выпустил, и не приходится передавать один пароль на всех.</>} />
 
       {team.isPending && <p className="mt-4 text-sm text-[var(--text-muted)]">Загрузка…</p>}
 
