@@ -927,6 +927,23 @@ html[data-snap='y'] {
   color: var(--line-strong);
 }
 
+/* На телефоне закладки в одну строку с прокруткой: перенос ронял
+   последний шаг на вторую строку и оставлял стрелку висеть в конце первой. */
+@media (max-width: 640px) {
+  .vru-tabbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    gap: 12px;
+  }
+  .vru-tabbar::-webkit-scrollbar {
+    display: none;
+  }
+  .vru-tabbar button {
+    white-space: nowrap;
+  }
+}
+
 /*
  * Без рейки. На посадочной линия отделяет оглавление от рассказа, а в
  * кабинете закладки стоят последними на экране — там та же линия читается
@@ -967,6 +984,26 @@ html[data-snap='y'] {
     inset 0 0 0 1px var(--accent-line),
     var(--shadow-lg);
   transform: translateY(-3px);
+}
+
+/*
+ * Шаг «Как это работает». Уходящий шаг пропадает сразу, входящий
+ * проявляется: кроссфейд двух шагов в одной ячейке на треть секунды
+ * показывал оба текста разом, и это читалось как поломка.
+ */
+.vru-step {
+  opacity: 0;
+  visibility: hidden;
+}
+.vru-step.is-active {
+  opacity: 1;
+  visibility: visible;
+  animation: vru-fade 320ms var(--ease-out-quint) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .vru-step.is-active {
+    animation: none;
+  }
 }
 
 /* Окно терминала: та же рамка, что у экранов продукта, но с моноширинным содержимым. */

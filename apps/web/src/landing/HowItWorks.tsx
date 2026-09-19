@@ -140,9 +140,7 @@ export function HowItWorks() {
             return (
               <div
                 key={step.id}
-                className={`[grid-area:1/1] transition-opacity duration-300 ${
-                  active ? 'opacity-100' : 'pointer-events-none opacity-0'
-                }`}
+                className={`vru-step [grid-area:1/1] ${active ? 'is-active' : ''}`}
                 aria-hidden={!active}
                 // inert: скрытый шаг не ловит фокус с клавиатуры.
                 inert={!active}
