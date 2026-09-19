@@ -61,6 +61,7 @@
 - [DELETE /api/folders/{id} — Удалить папку](https://vruchay.ru/docs/endpoints/folders/delete-folders-id): Удаляет папку.
 - [GET /api/folders — Папки библиотеки](https://vruchay.ru/docs/endpoints/folders/get-folders): Папки организации в том порядке, в каком они стоят в колонке кабинета.
 - [PATCH /api/folders/{id} — Переименовать папку](https://vruchay.ru/docs/endpoints/folders/patch-folders-id): Меняет название папки.
+- [PATCH /api/folders/order — Переставить папки](https://vruchay.ru/docs/endpoints/folders/patch-folders-order): Задаёт порядок папок в колонке.
 - [POST /api/folders — Завести папку](https://vruchay.ru/docs/endpoints/folders/post-folders): Заводит папку в конце списка.
 
 ## Эндпоинты: generation

@@ -9,6 +9,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { suggestColumnName } from '../import/column-names';
 import type { AddColumnDto, ImportDto, UpdateRowDto } from './recipients.dto';
+import { changedSinceIssue, lastMailByRow } from './row-outcome';
 
 /** Первые две колонки создаются вместе с документом: по ним работает вся выдача. */
 export const DEFAULT_COLUMNS = ['name', 'email'] as const;
@@ -29,7 +30,7 @@ export class RecipientsService {
 
   async getTable(orgId: string, documentId: string) {
     await this.assertDocument(orgId, documentId);
-    const [columns, rows, checkedCount] = await Promise.all([
+    const [columns, rows, checkedCount, emails] = await Promise.all([
       this.prisma.recipientColumn.findMany({
         where: { documentId },
         orderBy: { position: 'asc' },
@@ -38,10 +39,30 @@ export class RecipientsService {
         where: { documentId },
         orderBy: { position: 'asc' },
         take: 10000,
+        include: { lastFile: { select: { issuedData: true } } },
       }),
       this.prisma.recipientRow.count({ where: { documentId, checked: true } }),
+      // Одним запросом по материалу, а не списком строк: на десяти тысячах
+      // получателей список идентификаторов в запросе весил бы больше ответа.
+      this.prisma.email.findMany({
+        where: { documentId, orgId, rowId: { not: null } },
+        orderBy: { queuedAt: 'asc' },
+        select: { rowId: true, fileId: true, status: true },
+      }),
     ]);
-    return { columns, rows, checkedCount };
+    const mail = lastMailByRow(rows, emails);
+    return {
+      columns,
+      rows: rows.map(({ lastFile, ...row }) => ({
+        ...row,
+        mailStatus: mail.get(row.id) ?? null,
+        changedSinceIssue: changedSinceIssue(
+          row.data as Record<string, string>,
+          (lastFile?.issuedData ?? null) as Record<string, string> | null,
+        ),
+      })),
+      checkedCount,
+    };
   }
 
   async addColumn(orgId: string, documentId: string, dto: AddColumnDto) {

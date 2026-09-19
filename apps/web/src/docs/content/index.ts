@@ -178,6 +178,11 @@ export const INDEX: DocEntry[] = [
     meta: {"method":"PATCH","path":"/api/folders/{id}","title":"Переименовать папку","group":"folders","auth":"token","roles":"any","rate_limit":"none"},
   },
   {
+    slug: "endpoints/folders/patch-folders-order",
+    title: "Переставить папки",
+    meta: {"method":"PATCH","path":"/api/folders/order","title":"Переставить папки","group":"folders","auth":"token","roles":"any","rate_limit":"none"},
+  },
+  {
     slug: "endpoints/folders/post-folders",
     title: "Завести папку",
     meta: {"method":"POST","path":"/api/folders","title":"Завести папку","group":"folders","auth":"token","roles":"any","rate_limit":"none"},

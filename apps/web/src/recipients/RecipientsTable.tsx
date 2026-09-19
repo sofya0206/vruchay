@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { GripVertical,
   Ban,
-  CheckCheck,
   CheckCircle2,
   Columns3,
   Download,
@@ -31,6 +30,7 @@ import {
   type SendResult,
 } from '../api/recipients';
 import { PreviewDialog } from './PreviewDialog';
+import { RowOutcomeChip } from './RowOutcomeChip';
 import { Button } from '../ui/Button';
 import { Field, Input, StatusChip } from '../ui/Field';
 import { cn } from '../ui/cn';
@@ -42,7 +42,7 @@ import { planPaste } from './clipboard';
 import { GenerateDialog, type GenerateMode } from './GenerateDialog';
 import { DownloadDialog } from './DownloadDialog';
 import { InviteNudge } from '../referral/InviteNudge';
-import { DocumentChrome, ToolButton, ToolDivider } from '../editor/DocumentChrome';
+import { DocumentChrome, ReleaseButton, ToolButton, ToolDivider } from '../editor/DocumentChrome';
 import { FieldsSidebar } from '../editor/FieldsSidebar';
 import { FieldsToggle } from '../editor/FieldsToggle';
 import { useFieldsPanelOpen } from '../editor/fields-sidebar-store';
@@ -543,17 +543,12 @@ export function RecipientsTable({
         tab="table"
         toolbar={toolbar}
         action={
-          <Button
-            variant="primary"
-            size="sm"
-            icon={
-              running ? <LoaderCircle size={15} className="animate-spin" /> : <CheckCheck size={15} />
-            }
+          <ReleaseButton
+            count={checkedCount}
+            running={running}
             disabled={running || checkedCount === 0}
             onClick={() => setAsking(true)}
-          >
-            {running ? 'Выпускаем' : `Выпустить ${checkedCount || ''}`}
-          </Button>
+          />
         }
       />
 
@@ -769,6 +764,11 @@ export function RecipientsTable({
                   <th className="w-12 border-r border-b border-[var(--line)] px-2 py-2 text-right text-xs font-normal text-[var(--text-muted)]">
                     №
                   </th>
+                  {/* Итог сразу за номером: при широкой таблице колонки данных
+                      уезжают вбок, а судьба строки должна оставаться на виду. */}
+                  <th className="border-r border-b border-[var(--line)] px-3 py-2 text-left text-sm font-medium whitespace-nowrap">
+                    Итог
+                  </th>
                   {/* Заголовок — по-человечески, переменная под ним мелким.
                       Раньше колонки назывались «%name» и «%email»: для
                       человека это не название столбца, а шифр.
@@ -833,6 +833,9 @@ export function RecipientsTable({
                     </td>
                     <td className="tabular border-r border-b border-[var(--line)] px-2 py-1 text-right text-xs text-[var(--text-muted)]">
                       {index + 1}
+                    </td>
+                    <td className="border-r border-b border-[var(--line)] px-3 py-1">
+                      <RowOutcomeChip row={row} />
                     </td>
                     {columns.map((col) => (
                       <td key={col.id} className="border-r border-b border-[var(--line)] p-0">
