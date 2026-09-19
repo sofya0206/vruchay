@@ -100,10 +100,17 @@ export function SectionTitle({ children, count }: { children: ReactNode; count?:
   );
 }
 
-/** Список колонки: на телефоне — лента вбок, на десктопе — столбик. */
+/**
+ * Список колонки: на десктопе — столбик, на телефоне — значки сеткой.
+ *
+ * Лентой вбок, как раньше, разделы приходилось листать, и половина их
+ * пряталась за краем. Значки делят ширину поровну, а если их больше, чем
+ * помещается по 44 точки, переносятся второй строкой. Название открытого
+ * раздела стоит заголовком ниже — подпись у значка на телефоне лишняя.
+ */
 export function ColumnList({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <ul className={cn('no-scrollbar flex gap-1 overflow-x-auto md:flex-col md:overflow-visible', className)}>
+    <ul className={cn('grid grid-cols-[repeat(auto-fit,minmax(44px,1fr))] gap-1 md:flex md:flex-col', className)}>
       {children}
     </ul>
   );
@@ -126,6 +133,8 @@ export function ColumnList({ children, className = '' }: { children: ReactNode; 
 export function columnRowClass({ active, nested }: { active?: boolean; nested?: boolean } = {}): string {
   return cn(
     'flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-3 py-2 text-sm whitespace-nowrap transition-colors md:px-2 md:py-1.5',
+    // Телефон: только значок по центру ячейки, под палец.
+    'max-md:h-11 max-md:justify-center max-md:rounded-lg max-md:px-0 max-md:py-0',
     // Вложенная строка отступает на ширину значка родителя: папки читаются
     // как ветка «Моих документов», а не как второй плоский список.
     nested && 'md:pl-5 md:text-[13px]',
@@ -171,11 +180,11 @@ export function ColumnRow({
         onContextMenu={onContextMenu}
         className={columnRowClass({ active, nested })}
       >
-        <Icon size={16} strokeWidth={1.75} className={cn('shrink-0', !active && tint)} />
-        <span className="md:flex-1 md:truncate">{children}</span>
-        {count ? <span className="tabular text-xs text-[var(--text-muted)]">{count}</span> : null}
+        <Icon size={16} strokeWidth={1.75} className={cn('shrink-0 max-md:size-5', !active && tint)} />
+        <span className="max-md:sr-only md:flex-1 md:truncate">{children}</span>
+        {count ? <span className="tabular text-xs text-[var(--text-muted)] max-md:hidden">{count}</span> : null}
       </NavLink>
-      {trailing}
+      {trailing && <span className="max-md:hidden">{trailing}</span>}
     </li>
   );
 }

@@ -32,6 +32,7 @@ import {
   type Folder as FolderItem,
 } from '../api/folders';
 import { ConfirmDialog } from '../ui/Dialog';
+import { BottomSheet } from '../ui/BottomSheet';
 import { SectionLayout, columnRowClass } from '../ui/SectionLayout';
 import { cn } from '../ui/cn';
 import { useTooltip } from '../ui/Tooltip';
@@ -131,6 +132,9 @@ export function LibraryNav({ archiveCount }: { archiveCount?: number | null }) {
   );
   /** Папка, удаление которой ждёт подтверждения. */
   const [deleting, setDeleting] = useState<FolderItem | null>(null);
+  /** Телефон: выбор папки нижним листом. */
+  const [picker, setPicker] = useState(false);
+  const [pickerCreating, setPickerCreating] = useState(false);
 
   const folders = useFolders();
   const create = useCreateFolder();
@@ -276,10 +280,88 @@ export function LibraryNav({ archiveCount }: { archiveCount?: number | null }) {
   ];
 
   return (
-    <nav aria-label="Разделы библиотеки" className="mt-3">
-      {/* На узком экране колонка превратилась бы в две трети экрана телефона,
-          поэтому там это лента, которая прокручивается вбок. */}
-      <div className="no-scrollbar flex gap-1 overflow-x-auto md:block md:overflow-visible">
+    <nav aria-label="Разделы библиотеки" className="mt-3 max-md:mt-0">
+      {/*
+        Телефон: три значка на всю ширину — папки, шаблоны, архив. Лента
+        с подписями не помещалась и листалась вбок, а стрелка раскрытия
+        папок разворачивала их туда же, за край. Папки открываются значком
+        папки — нижним листом, как выбор папки в «Файлах» и Google Диске.
+      */}
+      <div className="grid grid-cols-3 gap-1 md:hidden">
+        <button
+          type="button"
+          aria-label="Папки"
+          aria-haspopup="dialog"
+          onClick={() => setPicker(true)}
+          className={phoneCell(onDocuments)}
+        >
+          <FolderOpen size={20} strokeWidth={1.75} />
+          {list.length > 0 && <ChevronDown size={13} strokeWidth={2} className="-ml-0.5" />}
+        </button>
+        {archive.map((item) => (
+          <Link
+            key={item.to}
+            to={item.to}
+            aria-label={item.label}
+            aria-current={item.active ? 'page' : undefined}
+            className={phoneCell(item.active)}
+          >
+            <item.icon size={20} strokeWidth={1.75} />
+          </Link>
+        ))}
+      </div>
+
+      <BottomSheet
+        open={picker}
+        onClose={() => {
+          setPicker(false);
+          setPickerCreating(false);
+        }}
+        title="Папки"
+      >
+        <ul className="px-1 pb-2">
+          <li>
+            <Link
+              to="/documents"
+              onClick={() => setPicker(false)}
+              className={pickerRow(onDocuments && !openFolderId)}
+            >
+              <FolderOpen size={20} strokeWidth={1.75} className="shrink-0" />
+              <span className="flex-1 truncate">Мои документы</span>
+            </Link>
+          </li>
+          {list.map((folder) => (
+            <li key={folder.id}>
+              <Link
+                to={`/documents?folder=${folder.id}`}
+                onClick={() => setPicker(false)}
+                className={cn(pickerRow(onDocuments && openFolderId === folder.id), 'pl-8')}
+              >
+                <Folder size={18} strokeWidth={1.75} className="shrink-0" />
+                <span className="flex-1 truncate">{folder.name}</span>
+                <span className="tabular text-sm text-[var(--text-muted)]">{folder.count}</span>
+              </Link>
+            </li>
+          ))}
+          <li className="pt-1">
+            {pickerCreating ? (
+              <FolderNameForm
+                busy={create.isPending}
+                error={create.error?.message}
+                onCancel={() => setPickerCreating(false)}
+                onSubmit={(name) => create.mutate(name, { onSuccess: () => setPickerCreating(false) })}
+              />
+            ) : (
+              <button type="button" onClick={() => setPickerCreating(true)} className={cn(pickerRow(false), 'w-full text-[var(--accent)]')}>
+                <FolderPlus size={18} strokeWidth={1.75} className="shrink-0" />
+                Новая папка
+              </button>
+            )}
+          </li>
+        </ul>
+      </BottomSheet>
+
+      <div className="max-md:hidden md:block">
         <ul className="flex gap-1 md:flex-col" {...dragHandlers}>
           <RootRow
             active={onDocuments && !openFolderId}
@@ -868,5 +950,21 @@ export function LibraryLayout({
     >
       {children}
     </SectionLayout>
+  );
+}
+
+/** Ячейка значка в ленте библиотеки на телефоне. */
+function phoneCell(active: boolean): string {
+  return cn(
+    'flex h-11 items-center justify-center gap-0.5 rounded-lg transition-colors',
+    active ? 'bg-[var(--accent-soft)] text-[var(--accent)]' : 'text-[var(--text-muted)] active:bg-[var(--surface-sunken)]',
+  );
+}
+
+/** Строка папки в нижнем листе выбора. */
+function pickerRow(active: boolean): string {
+  return cn(
+    'flex h-12 items-center gap-3 rounded-xl px-3 text-base transition-colors',
+    active ? 'bg-[var(--accent-soft)] font-medium text-[var(--accent)]' : 'text-[var(--text)] active:bg-[var(--surface-sunken)]',
   );
 }

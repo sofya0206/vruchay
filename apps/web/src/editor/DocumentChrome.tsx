@@ -1,6 +1,19 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronLeft, FilePlus2, FileText, LayoutTemplate, LoaderCircle, MoreHorizontal } from 'lucide-react';
+import {
+  BadgeCheck,
+  ChevronLeft,
+  FilePlus2,
+  FileText,
+  LayoutTemplate,
+  ListChecks,
+  LoaderCircle,
+  Mail,
+  MoreHorizontal,
+  Scale,
+  Users,
+  type LucideIcon,
+} from 'lucide-react';
 import { MATERIAL_TABS, materialTabPath, workspacePath, type MaterialTab } from '../mailing/workspace-tabs';
 import { IconButton } from '../ui/IconButton';
 import { Menu, MenuDivider, MenuItem } from '../ui/Menu';
@@ -104,11 +117,12 @@ export function DocumentChrome({
             тогда, когда шесть вкладок в ширину не помещаются. */}
         <nav
           aria-label="Стороны материала"
-          className="no-scrollbar flex min-w-0 flex-1 items-stretch gap-0.5 self-stretch overflow-x-auto max-md:order-last max-md:h-11 max-md:basis-full"
+          className="no-scrollbar flex min-w-0 flex-1 items-stretch gap-0.5 self-stretch overflow-x-auto max-md:order-last max-md:h-11 max-md:basis-full max-md:overflow-visible"
         >
           {MATERIAL_TABS.map((item) => (
             <SpineTab
               key={item.id}
+              id={item.id}
               to={materialTabPath(documentId, item.id)}
               active={item.id === tab}
             >
@@ -248,18 +262,33 @@ function LibraryLink({ isTemplate }: { isTemplate: boolean }) {
  * Ссылка, а не кнопка: у каждой стороны материала свой адрес, и его надо
  * уметь открыть в соседней вкладке браузера и послать коллеге.
  */
-function SpineTab({ to, active, children }: { to: string; active: boolean; children: ReactNode }) {
+/** Значки сторон материала — для телефона, где подписи всех шести не помещаются. */
+const TAB_ICONS: Record<MaterialTab, LucideIcon> = {
+  sheet: FileText,
+  table: Users,
+  rules: Scale,
+  check: ListChecks,
+  mail: Mail,
+  verify: BadgeCheck,
+};
+
+function SpineTab({ id, to, active, children }: { id: MaterialTab; to: string; active: boolean; children: ReactNode }) {
+  const Icon = TAB_ICONS[id];
   return (
     <Link
       to={to}
       aria-current={active ? 'page' : undefined}
-      className={`-mb-px inline-flex shrink-0 items-center whitespace-nowrap border-b-2 px-2.5 text-sm transition-colors max-md:px-3 max-md:text-[15px] ${
+      aria-label={typeof children === 'string' ? children : undefined}
+      className={`-mb-px inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-2.5 text-sm transition-colors max-md:flex-1 max-md:justify-center max-md:px-1 ${
         active
-          ? 'border-[var(--accent)] font-medium text-[var(--accent)]'
+          ? 'border-[var(--accent)] font-medium text-[var(--accent)] max-md:flex-[2.2]'
           : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text)]'
       }`}
     >
-      {children}
+      {/* Телефон: значки, а подпись — только у открытой вкладки. Шесть
+          подписей в ширину не помещались, и ленту приходилось листать. */}
+      <Icon size={20} strokeWidth={1.75} className="shrink-0 md:hidden" />
+      <span className={active ? 'max-md:text-[14px]' : 'max-md:sr-only'}>{children}</span>
     </Link>
   );
 }
