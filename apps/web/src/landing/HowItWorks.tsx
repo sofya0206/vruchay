@@ -1,4 +1,4 @@
-import { useState, type ComponentType } from 'react';
+import { useState, type ComponentType, type CSSProperties } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { EditorMock, FilesMock, LettersMock, TableMock } from './Mocks';
 
@@ -125,10 +125,12 @@ export function HowItWorks() {
   const step = WALKTHROUGH.find((t) => t.id === tab) ?? WALKTHROUGH[0];
 
   return (
-    <section id="kak" className="mx-auto max-w-[var(--width-page)] scroll-mt-16 px-6 pt-20 pb-16">
-      <WalkthroughTabs value={tab} onChange={setTab} />
-      <div className="mt-8">
-        <WalkthroughPanel step={step} />
+    <section id="kak" className="vru-screen">
+      <div className="mx-auto w-full max-w-[var(--width-page)] px-6 py-16">
+        <WalkthroughTabs value={tab} onChange={setTab} className="vru-reveal" />
+        <div className="vru-reveal mt-8" style={{ '--reveal-i': 1 } as CSSProperties}>
+          <WalkthroughPanel step={step} />
+        </div>
       </div>
     </section>
   );

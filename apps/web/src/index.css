@@ -370,6 +370,17 @@ h2 {
  * Псевдоэлементы Chromium и Firefox в один селектор через запятую не
  * соберёшь: незнакомый префикс заставляет движок выбросить всё правило.
  */
+/*
+ * Маска пароля. Гарнитура сайта рисует «•» крошечной точкой, и введённый
+ * пароль выглядит как пыль. Точки набираются системным шрифтом с разрядкой —
+ * так их рисуют браузеры и формы у всех, а сам текст поля виден только
+ * в маске, поэтому смена гарнитуры ничего другого не задевает.
+ */
+input[type='password']:not(:placeholder-shown) {
+  font-family: Verdana, system-ui, sans-serif;
+  letter-spacing: 0.12em;
+}
+
 input[type='range'] {
   appearance: none;
   background: transparent;
@@ -765,6 +776,116 @@ textarea::-webkit-resizer {
   .vru-aura__blob {
     animation: none;
   }
+}
+
+/*
+ * Посадочная экранами: одна секция — один экран.
+ *
+ * Прилипание включается только на широком и высоком окне, где секция
+ * помещается в экран целиком. На телефоне она длиннее окна, и обязательное
+ * прилипание не даёт дочитать середину — там оно мягкое (proximity):
+ * дотягивает до начала секции, только если человек и так рядом.
+ */
+html[data-snap='y'] {
+  scroll-snap-type: y proximity;
+  scroll-behavior: smooth;
+}
+@media (min-width: 1024px) and (min-height: 700px) {
+  html[data-snap='y'] {
+    scroll-snap-type: y mandatory;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-snap='y'] {
+    scroll-behavior: auto;
+  }
+}
+
+.vru-screen {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+
+/*
+ * Появление при входе в экран: чуть снизу и из прозрачности. Сдвиг мал,
+ * а задержка растёт с порядковым номером (--reveal-i) — элементы одной
+ * секции выходят друг за другом, а не единым блоком.
+ */
+.vru-reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 640ms ease-out,
+    transform 640ms var(--ease-out-quint);
+  transition-delay: calc(var(--reveal-i, 0) * 90ms);
+}
+.vru-reveal.is-in {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .vru-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* Точки экранов у правого края; подпись выезжает на наведение. */
+.vru-dots {
+  position: fixed;
+  right: 20px;
+  top: 50%;
+  z-index: 20;
+  display: none;
+  flex-direction: column;
+  gap: 14px;
+  transform: translateY(-50%);
+}
+@media (min-width: 1024px) and (min-height: 700px) {
+  .vru-dots {
+    display: flex;
+  }
+}
+.vru-dots__dot {
+  position: relative;
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--line-strong);
+  transition:
+    background var(--duration-fast),
+    transform var(--duration-base) var(--ease-out-quint);
+}
+.vru-dots__dot:hover,
+.vru-dots__dot[aria-current='true'] {
+  background: var(--accent);
+  transform: scale(1.4);
+}
+.vru-dots__label {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  translate: 0 -50%;
+  white-space: nowrap;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  box-shadow: var(--ring-line);
+  padding: 4px 10px;
+  font-size: var(--text-caption);
+  color: var(--text);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-fast);
+}
+.vru-dots__dot:hover .vru-dots__label,
+.vru-dots__dot:focus-visible .vru-dots__label {
+  opacity: 1;
 }
 
 /* Закладки как путь: между шагами стрелка, активный — синий с линией. */

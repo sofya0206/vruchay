@@ -183,7 +183,7 @@ type Gesture =
   /** `tapEdit` — касание уже выбранного текста без сдвига открывает его правку. */
   | (GestureBase & { kind: 'move'; boxes: Record<string, Box>; lines?: SnapLine[]; tapEdit?: string })
   /** `keepRatio` — угол тянет с сохранением пропорций: у картинки всегда, у прочих с Shift. */
-  | (GestureBase & { kind: 'resize'; id: string; handle: ResizeHandle; box: Box; keepRatio: boolean; square: boolean })
+  | (GestureBase & { kind: 'resize'; id: string; handle: ResizeHandle; box: Box; keepRatio: boolean; square: boolean; fontSize?: number })
   | (GestureBase & { kind: 'scale'; handle: ResizeHandle; frame: Rect; boxes: Record<string, Box>; sizes: Record<string, number> })
   | (GestureBase & { kind: 'rotate'; id: string; center: { x: number; y: number } })
   | (GestureBase & { kind: 'marquee'; additive: boolean; base: ReadonlySet<string> });
@@ -953,13 +953,26 @@ export function EditorPage() {
       }
 
       if (g.kind === 'resize') {
-        const proportional = g.handle.length === 2 && (g.keepRatio || e.shiftKey);
-        let next = proportional
-          ? scaleGroup([g.box], g.box, g.handle, dx, dy, page).boxes[0]
-          : resizeBox(g.box, g.handle, dx, dy, page.w, page.h);
+        const corner = g.handle.length === 2;
+        // Текст за угол — как в Canva: кегль растёт вместе с рамкой.
+        // За бок меняется только ширина, и строки переносятся заново.
+        const scalesText = corner && g.fontSize != null;
+        const proportional = corner && (g.keepRatio || e.shiftKey || scalesText);
+        const scaled = proportional ? scaleGroup([g.box], g.box, g.handle, dx, dy, page) : null;
+        let next = scaled ? scaled.boxes[0] : resizeBox(g.box, g.handle, dx, dy, page.w, page.h);
         // Сетка округляет стороны порознь — пропорции она бы сломала.
         if (showGrid && !proportional) next = snapToGrid(next, GRID_MM);
         if (g.square) next = squareBox(g.box, next, g.handle, page.w, page.h);
+        if (scaled && scalesText) {
+          const fontSize = Math.max(4, Math.round(g.fontSize! * scaled.scale * 2) / 2);
+          const box = roundBox(next);
+          patchElements(
+            new Set([g.id]),
+            (el) => (el.type === 'text' ? { ...el, ...box, props: { ...el.props, fontSize } } : { ...el, ...box }),
+            false,
+          );
+          return;
+        }
         updateBoxes({ [g.id]: next }, false);
         return;
       }
@@ -2156,6 +2169,7 @@ export function EditorPage() {
                                   box: { x: el.x, y: el.y, w: el.w, h: el.h },
                                   keepRatio: el.type === 'image',
                                   square: el.type === 'qr',
+                                  fontSize: el.type === 'text' ? el.props.fontSize : undefined,
                                   moved: false,
                                 };
                               }}

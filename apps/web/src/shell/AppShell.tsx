@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { InstallHint } from '../ui/InstallHint';
 import { useMe } from '../auth/useAuth';
@@ -52,29 +52,41 @@ export function AppShell() {
 
   /*
    * Колонка разделов: человек сворачивает её сам, и это запоминается.
-   * В материале она свёрнута всегда, но развернуть на время можно —
-   * такой временный выбор в хранилище не пишем, иначе, выйдя из
-   * редактора, человек нашёл бы колонку не в том виде, в каком оставил.
+   * В материале она свёрнута всегда, но развернуть на время можно.
+   *
+   * При переходе колонка остаётся такой, какой была в момент перехода:
+   * из редактора со свёрнутой рейкой человек уходит в «Письма» — и рейка
+   * не разворачивается у него на глазах. Значит, вид на момент перехода
+   * и становится запомненным.
    */
   const [stored, setStored] = useState(storedCollapsed);
   const [override, setOverride] = useState<boolean | null>(null);
-  useEffect(() => setOverride(null), [pathname]);
 
   const forced = isMaterial(pathname);
   const collapsed = override ?? (forced || stored);
 
-  function toggleSidebar() {
-    if (forced) {
-      setOverride(!collapsed);
-      return;
-    }
-    const next = !stored;
+  const collapsedRef = useRef(collapsed);
+  collapsedRef.current = collapsed;
+  useEffect(() => {
+    setOverride(null);
+    remember(collapsedRef.current);
+  }, [pathname]);
+
+  function remember(next: boolean) {
     setStored(next);
     try {
       localStorage.setItem(SIDEBAR_KEY, next ? 'collapsed' : 'open');
     } catch {
       // Приватное окно: колонка не запомнится, и только.
     }
+  }
+
+  function toggleSidebar() {
+    if (forced) {
+      setOverride(!collapsed);
+      return;
+    }
+    remember(!stored);
   }
 
   return (
