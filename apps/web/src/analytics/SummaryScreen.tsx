@@ -16,7 +16,7 @@ import { ErrorState } from '../ui/ErrorState';
 import { EmptyState } from '../ui/EmptyState';
 import { cn } from '../ui/cn';
 import { usePhone } from '../ui/useMediaQuery';
-import { plural, formatDate, formatDateTime } from '../registry/registry-format';
+import { plural, formatDate } from '../registry/registry-format';
 import { formatCount } from './analytics-format';
 import { DiscussTermsLink } from '../billing/DiscussTermsLink';
 import { DayChart, Sparkline } from './DayChart';
@@ -305,7 +305,7 @@ export function SummaryScreen({
                   </Row>
                   <Row label="Первых за день">{formatCount(data.checks.uniques)}</Row>
                   <Row label="Последняя проверка">
-                    {data.checks.lastAt ? formatDateTime(data.checks.lastAt) : 'ещё не было'}
+                    {data.checks.lastAt ? shortDateTime(data.checks.lastAt) : 'ещё не было'}
                   </Row>
                 </dl>
                 <p className="mt-3 rounded-lg bg-[var(--surface-sunken)] px-3 py-2 text-xs text-[var(--text-muted)]">
@@ -337,6 +337,13 @@ export function SummaryScreen({
 }
 
 /* ---------- части экрана ---------- */
+
+/** «19.09.2026, 21:28» — коротко, чтобы влезало в строку на телефоне. */
+function shortDateTime(iso: string): string {
+  const d = new Date(iso);
+  const time = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  return `${formatDate(iso)}, ${time}`;
+}
 
 function Tile({
   icon: Icon,
