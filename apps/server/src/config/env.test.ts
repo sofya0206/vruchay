@@ -109,3 +109,34 @@ describe('пустое значение', () => {
     expect(validateEnv({ ...valid, TRUST_PROXY: '' }).TRUST_PROXY).toBe('');
   });
 });
+
+/*
+ * Провайдер почты без ключа.
+ *
+ * Сервер с MAIL_PROVIDER=dashamail и пустым ключом поднимался бы
+ * и ронял каждое письмо уже в очереди. Ключ стирают, выключая строку
+ * в .env, — ровно так и выглядит забытая настройка.
+ */
+describe('провайдер почты', () => {
+  it('по умолчанию SMTP — локально это Mailpit', () => {
+    expect(validateEnv(valid).MAIL_PROVIDER).toBe('smtp');
+  });
+
+  it('DashaMail без ключа не даёт серверу стартовать и называет настройку', () => {
+    expect(() => validateEnv({ ...valid, MAIL_PROVIDER: 'dashamail' })).toThrow(
+      /DASHAMAIL_API_KEY/,
+    );
+    expect(() =>
+      validateEnv({ ...valid, MAIL_PROVIDER: 'dashamail', DASHAMAIL_API_KEY: '' }),
+    ).toThrow(/DASHAMAIL_API_KEY/);
+  });
+
+  it('DashaMail с ключом проходит', () => {
+    const env = validateEnv({ ...valid, MAIL_PROVIDER: 'dashamail', DASHAMAIL_API_KEY: 'k' });
+    expect(env.MAIL_PROVIDER).toBe('dashamail');
+  });
+
+  it('ключ без выбора провайдера ничего не включает', () => {
+    expect(validateEnv({ ...valid, DASHAMAIL_API_KEY: 'k' }).MAIL_PROVIDER).toBe('smtp');
+  });
+});

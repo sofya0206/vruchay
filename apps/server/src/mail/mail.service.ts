@@ -1,11 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { EmailKind } from '@prisma/client';
 import { baseUrl, type Env } from '../config/env';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
-import { SmtpProvider } from './smtp.provider';
 import {
   escapeHtml,
   isValidEmail,
@@ -14,7 +13,13 @@ import {
   renderSubject,
   sanitizeEmailHtml,
 } from './mail-template';
-import type { MailAttachment, MailProvider, NormalizedEvent } from './mail-provider.interface';
+import {
+  MAIL_PROVIDER,
+  PermanentSendError,
+  type MailAttachment,
+  type MailProvider,
+  type NormalizedEvent,
+} from './mail-provider.interface';
 import { advanceStatus, type EmailStatus } from './email-status';
 import { sharedDomainRefusal } from './shared-domain-limit';
 import { platformSender, type ResolvedSender } from './platform-sender';
@@ -41,18 +46,13 @@ export class MailService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
-    private readonly smtp: SmtpProvider,
+    @Inject(MAIL_PROVIDER) private readonly provider: MailProvider,
     private readonly config: ConfigService<Env, true>,
   ) {}
 
   /** Публичный адрес сервиса без косой черты — из проверенной схемы настроек. */
   private get publicUrl(): string {
     return baseUrl(this.config.get('PUBLIC_URL', { infer: true }));
-  }
-
-  /** Пока провайдер один; когда появится DashaMail — выбор по домену отправителя. */
-  private providerFor(_provider: string): MailProvider {
-    return this.smtp;
   }
 
   // ─── Домены ──────────────────────────────────────────────────────────────
@@ -75,15 +75,14 @@ export class MailService {
       );
     }
 
-    const provider = this.providerFor('smtp');
     const verificationToken = randomUUID();
-    const records = await provider.getDomainSetup(normalized, verificationToken);
+    const records = await this.provider.getDomainSetup(normalized, verificationToken);
 
     return this.prisma.mailDomain.create({
       data: {
         orgId,
         domain: normalized,
-        provider: provider.name,
+        provider: this.provider.name,
         verificationToken,
         dnsRecords: records as unknown as object,
       },
@@ -103,10 +102,18 @@ export class MailService {
     const domain = await this.prisma.mailDomain.findFirst({ where: { id: domainId, orgId } });
     if (!domain) throw new NotFoundException('Домен не найден');
 
-    const provider = this.providerFor(domain.provider);
-    const status = await provider.checkDomain(
+    // Домен заявлен при другом провайдере — его записи новому не годятся:
+    // у DashaMail свой ключ DKIM, а домен ещё надо подключить к аккаунту.
+    // Выдаём записи заново с тем же токеном: подтверждение владения,
+    // которое уже прописано в DNS, остаётся в силе, дописать надо только новое.
+    const reissued =
+      domain.provider === this.provider.name
+        ? null
+        : await this.provider.getDomainSetup(domain.domain, domain.verificationToken);
+
+    const status = await this.provider.checkDomain(
       domain.domain,
-      domain.dnsRecords as never,
+      (reissued ?? domain.dnsRecords) as never,
     );
 
     return this.prisma.mailDomain.update({
@@ -115,6 +122,9 @@ export class MailService {
         status,
         lastCheckedAt: new Date(),
         verifiedAt: status === 'verified' ? (domain.verifiedAt ?? new Date()) : null,
+        ...(reissued
+          ? { provider: this.provider.name, dnsRecords: reissued as unknown as object }
+          : {}),
       },
     });
   }
@@ -223,7 +233,7 @@ export class MailService {
       '<p style="font-size:15px">Если оно дошло и в поле «от кого» стоит то, что вы ожидали, ' +
       'отправка настроена верно. Ответьте на него, чтобы проверить адрес для ответов.</p>';
 
-    const { providerMessageId } = await this.providerFor('smtp').send({
+    const { providerMessageId } = await this.provider.send({
       from: { email: sender.email, name: sender.displayName },
       replyTo: sender.replyTo || undefined,
       to: toEmail,
@@ -373,7 +383,7 @@ export class MailService {
             kind: 'transactional',
             toEmail: item.email,
             subject: renderSubject(template.subject, item.data),
-            provider: this.providerFor('smtp').name,
+            provider: this.provider.name,
           },
         }),
       ),
@@ -411,7 +421,7 @@ export class MailService {
         kind: 'transactional',
         toEmail: toEmail.trim().toLowerCase(),
         subject: template ? renderSubject(template.subject, data) : DEFAULT_SUBJECT,
-        provider: this.providerFor('smtp').name,
+        provider: this.provider.name,
       },
     });
     return email.id;
@@ -454,7 +464,7 @@ export class MailService {
         subject: notice.subject,
         bodyHtml: notice.bodyHtml,
         attachFile: false,
-        provider: this.providerFor('smtp').name,
+        provider: this.provider.name,
       },
     });
     return email.id;
@@ -569,7 +579,7 @@ export class MailService {
           ]
         : undefined;
 
-      const { providerMessageId } = await this.providerFor(email.provider).send({
+      const { providerMessageId } = await this.provider.send({
         from: { email: sender.email, name: sender.displayName },
         replyTo: sender.replyTo,
         to: email.toEmail,
@@ -609,7 +619,7 @@ export class MailService {
       // причин, что показывает их человеку в журнале: второй список правил
       // разошёлся бы с первым на первой же правке.
       const problem = deliveryProblem('failed', message);
-      const retryable = problem?.retryable ?? true;
+      const retryable = err instanceof PermanentSendError ? false : (problem?.retryable ?? true);
 
       if (retryable && !lastAttempt) {
         // Ошибку не гасим, а выпускаем наружу: повтор запускает очередь,
@@ -944,7 +954,7 @@ export class MailService {
       throw new BadRequestException('Отправка писем не настроена — код выслать некуда');
     }
 
-    await this.providerFor('smtp').send({
+    await this.provider.send({
       from: { email: sender.email, name: sender.displayName },
       to,
       subject: `${code} — код для получения документа`,
@@ -980,7 +990,7 @@ export class MailService {
     if (!sender) {
       throw new BadRequestException('Отправка писем не настроена — обратитесь в поддержку');
     }
-    await this.providerFor('smtp').send({
+    await this.provider.send({
       from: { email: sender.email, name: sender.displayName },
       replyTo: sender.replyTo,
       to,
@@ -1003,7 +1013,7 @@ export class MailService {
       throw new BadRequestException('Отправка писем не настроена — ссылку выслать некуда');
     }
 
-    await this.providerFor('smtp').send({
+    await this.provider.send({
       from: { email: sender.email, name: sender.displayName },
       to,
       subject: 'Подтвердите адрес, чтобы получить документ',
@@ -1053,7 +1063,7 @@ export class MailService {
       this.logger.error('Уведомление не отправлено: отправка писем не настроена');
       return;
     }
-    await this.providerFor('smtp').send({
+    await this.provider.send({
       from: { email: sender.email, name: sender.displayName },
       to,
       subject,
@@ -1075,7 +1085,7 @@ export class MailService {
       this.logger.error('Документ не отправлен: отправка писем не настроена');
       return;
     }
-    await this.providerFor('smtp').send({
+    await this.provider.send({
       from: { email: sender.email, name: sender.displayName },
       replyTo: sender.replyTo,
       to: params.to,
@@ -1104,7 +1114,7 @@ export class MailService {
     const m = raw.match(/^\s*(.*?)\s*<([^>]+)>\s*$/);
     const from = m ? { name: m[1], email: m[2] } : { name: 'Вручай', email: raw.trim() };
 
-    await this.providerFor('smtp').send({ from, to, subject, html });
+    await this.provider.send({ from, to, subject, html });
   }
 
   async listEmails(orgId: string, documentId?: string) {

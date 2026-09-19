@@ -90,3 +90,15 @@ export interface MailProvider {
 }
 
 export const MAIL_PROVIDER = Symbol('MAIL_PROVIDER');
+
+/**
+ * Отказ провайдера, который повтором не лечится.
+ *
+ * SMTP-шлюз отвечает текстом, и что повторять, решает разбор текста
+ * (bounce-reason). Провайдер с API отвечает кодом, и про неверный ключ,
+ * неподтверждённого отправителя или слишком большое вложение он знает
+ * точно — гонять такое письмо по трём попыткам с паузами незачем.
+ */
+export class PermanentSendError extends Error {
+  override readonly name = 'PermanentSendError';
+}

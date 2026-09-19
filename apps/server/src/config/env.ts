@@ -76,7 +76,11 @@ export const envSchema = z.object({
    */
   PLAYWRIGHT_CHANNEL: z.string().default(''),
 
-  /** Почта. Локально — Mailpit на 1025 без авторизации. */
+  /**
+   * Почта. Локально — SMTP в Mailpit на 1025 без авторизации, наружу
+   * ничего не уходит. В проде — транзакционное API DashaMail: оно идёт
+   * по HTTPS, а почтовые порты у Selectel закрыты (см. docs/launch-day.md).
+   */
   MAIL_PROVIDER: z.enum(['smtp', 'dashamail']).default('smtp'),
   SMTP_HOST: z.string().default('localhost'),
   SMTP_PORT: z.coerce.number().int().positive().default(1025),
@@ -325,8 +329,25 @@ function withoutBlanks(raw: Record<string, unknown>): Record<string, unknown> {
   return out;
 }
 
+/**
+ * Связи между настройками, которые одним полем не выразить.
+ *
+ * Выбран DashaMail, а ключа нет — без этой проверки сервер поднимался бы
+ * и ронял каждое письмо уже в очереди, а узнали бы об этом по жалобам
+ * участников, а не при выкатке.
+ */
+function crossChecks(env: Env, ctx: z.RefinementCtx): void {
+  if (env.MAIL_PROVIDER === 'dashamail' && !env.DASHAMAIL_API_KEY) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['DASHAMAIL_API_KEY'],
+      message: 'нужен ключ API, раз MAIL_PROVIDER=dashamail',
+    });
+  }
+}
+
 export function validateEnv(raw: Record<string, unknown>): Env {
-  const parsed = envSchema.safeParse(withoutBlanks(raw));
+  const parsed = envSchema.superRefine(crossChecks).safeParse(withoutBlanks(raw));
   if (!parsed.success) {
     const details = parsed.error.issues
       .map((i) => `  ${i.path.join('.')}: ${i.message}`)
