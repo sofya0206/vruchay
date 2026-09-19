@@ -84,6 +84,7 @@ export function DocumentWorkspacePage() {
       <DocumentChrome
         documentId={id}
         title={page.title}
+        isTemplate={page.isTemplate}
         actions={fileMenu.entries}
         tab={tab}
       />

@@ -17,6 +17,7 @@ import {
   Folder,
   FolderOpen,
   FolderPlus,
+  LayoutTemplate,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -259,6 +260,12 @@ export function LibraryNav({ archiveCount }: { archiveCount?: number | null }) {
   };
 
   const archive: Item[] = [
+    {
+      to: '/documents/templates',
+      label: 'Шаблоны',
+      icon: LayoutTemplate,
+      active: pathname === '/documents/templates',
+    },
     {
       to: '/documents/archive',
       label: 'Архив',

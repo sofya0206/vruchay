@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCheck, ChevronRight, MoreHorizontal } from 'lucide-react';
+import { CheckCheck, ChevronRight, FilePlus2, MoreHorizontal } from 'lucide-react';
 import { MATERIAL_TABS, materialTabPath, workspacePath, type MaterialTab } from '../mailing/workspace-tabs';
 import { IconButton } from '../ui/IconButton';
 import { Menu, MenuDivider, MenuItem } from '../ui/Menu';
@@ -43,9 +43,15 @@ export function DocumentChrome({
   tab,
   toolbar,
   action,
+  isTemplate = false,
 }: {
   documentId: string;
   title: string;
+  /**
+   * Шаблон не выпускается: главное действие у него — новый документ
+   * по нему, на том же месте, где у документа «Выпустить».
+   */
+  isTemplate?: boolean;
   /** Пункты меню «…». */
   actions: MenuEntry[];
   /** Какая сторона материала открыта — она подсвечена в ленте вкладок. */
@@ -66,10 +72,10 @@ export function DocumentChrome({
       <div className="flex h-12 items-center gap-1 border-b border-[var(--line)] px-3">
         <h1 className="flex min-w-0 max-w-[32ch] shrink items-center gap-1 text-sm font-medium">
           <Link
-            to="/documents"
+            to={isTemplate ? '/documents/templates' : '/documents'}
             className="shrink-0 text-[var(--text-muted)] transition-colors hover:text-[var(--text)] hover:underline"
           >
-            Документы
+            {isTemplate ? 'Шаблоны' : 'Документы'}
           </Link>
           <ChevronRight size={14} aria-hidden className="shrink-0 text-[var(--text-muted)]" />
           <DocumentTitle documentId={documentId} title={title} />
@@ -95,7 +101,15 @@ export function DocumentChrome({
         </nav>
 
         <div className="flex shrink-0 items-center gap-1 pl-2">
-          {action ?? (
+          {isTemplate ? (
+            <Link
+              to={`/documents?new=1&template=${documentId}`}
+              className="inline-flex h-9 items-center gap-2 rounded-lg bg-[var(--accent)] px-3 text-sm font-medium text-[var(--accent-contrast)] transition-colors hover:bg-[var(--accent-hover)]"
+            >
+              <FilePlus2 size={15} />
+              Документ по шаблону
+            </Link>
+          ) : action ?? (
             <Link
               to={workspacePath(documentId)}
               title="Отметить получателей и выпустить документы"

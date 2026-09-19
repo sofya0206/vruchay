@@ -441,6 +441,21 @@ model Document {
   sourceDocument   Document?  @relation("DocumentCopies", fields: [sourceDocumentId], references: [id], onDelete: SetNull)
   copies           Document[] @relation("DocumentCopies")
 
+  /**
+   * Шаблон: макет, который организация берёт за основу новых документов.
+   *
+   * Флаг, а не отдельная модель: шаблону нужны ровно те же листы, фон,
+   * колонки и редактор, что и документу, — отдельная таблица заставила бы
+   * держать вторую копию макета и второй редактор. Документ из шаблона —
+   * копия макета и колонок, без получателей и без мероприятия (см.
+   * `DocumentsService.copyFrom`), поэтому шаблон никогда не держит чужих
+   * персональных данных и не выпускается сам.
+   *
+   * Шаблоны живут отдельным списком: в «Моих документах», рассылке,
+   * Тильде и сводке их нет.
+   */
+  isTemplate Boolean @default(false) @map("is_template")
+
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
   deletedAt      DateTime? @map("deleted_at")
@@ -467,6 +482,7 @@ model Document {
   @@index([orgId, deletedAt])
   // Библиотека фильтруется по папке внутри организации — это её главный запрос.
   @@index([orgId, folderId])
+  @@index([orgId, isTemplate, deletedAt])
   @@map("documents")
 }
 

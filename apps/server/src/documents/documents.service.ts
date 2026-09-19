@@ -50,6 +50,9 @@ export class DocumentsService {
     const where: Prisma.DocumentWhereInput = {
       orgId,
       deletedAt: query.trashed ? { not: null } : null,
+      // Архив общий: удалённый шаблон восстанавливают оттуда же,
+      // откуда и документ, а второй корзины человек не найдёт.
+      ...(query.trashed ? {} : { isTemplate: query.templates }),
       ...(query.search
         ? { title: { contains: query.search, mode: Prisma.QueryMode.insensitive } }
         : {}),
@@ -70,6 +73,7 @@ export class DocumentsService {
           updatedAt: true,
           createdAt: true,
           folderId: true,
+          isTemplate: true,
           /*
            * Мероприятие и число получателей — чтобы одинаково названные
            * материалы различались в списке. В рассылке три строки «Грамота
@@ -132,6 +136,15 @@ export class DocumentsService {
   async create(orgId: string, dto: CreateDocumentDto) {
     if (dto.folderId) await this.folderOrFail(orgId, dto.folderId);
 
+    if (dto.templateId) {
+      const template = await this.sourceOrFail(orgId, dto.templateId, { isTemplate: true });
+      return this.copyFrom(orgId, template, {
+        title: dto.title,
+        folderId: dto.folderId ?? null,
+        isTemplate: false,
+      });
+    }
+
     // Документ без листа бесполезен, а таблица без колонок «имя» и «почта»
     // не даст ни сгенерировать файл, ни отправить его — создаём всё сразу.
     const columns = [...DEFAULT_COLUMNS];
@@ -166,35 +179,82 @@ export class DocumentsService {
    * другого мероприятия». Бланк организации один на сезон, а мероприятий
    * за сезон десятки, и сегодня на каждое приходится делать копию целиком.
    *
-   * Получателей не копируем намеренно — это чужие персональные данные,
-   * и тащить их в новый материал никто не просил. Название, даты и место
-   * мероприятия не копируем по той же причине, по которой копию и делают:
-   * мероприятие другое, и старое название на новых грамотах — ровно та
-   * ошибка, которую замечают уже после печати трёхсот листов.
-   *
-   * Фон переиспользуем по ссылке на тот же файл, а не копией в хранилище:
-   * файл принадлежит той же организации, а лишняя копия — лишние деньги
-   * за хранение и лишний след тех же данных.
+   * Что именно переносится — см. `copyFrom`.
    */
   async duplicate(orgId: string, documentId: string) {
+    const source = await this.sourceOrFail(orgId, documentId);
+    // Копия шаблона — второй шаблон, копия документа — документ
+    // под новое мероприятие: из списка шаблонов копия не должна пропадать.
+    return this.copyFrom(orgId, source, {
+      title: source.isTemplate ? `${source.title} — копия` : `${source.title} — новое мероприятие`,
+      folderId: source.folderId,
+      isTemplate: source.isTemplate,
+    });
+  }
+
+  /**
+   * Сохранить документ как шаблон — копией, а не флагом на нём самом.
+   *
+   * Флаг на месте оставил бы в шаблоне таблицу получателей и сведения
+   * о мероприятии: каждый новый документ по нему видел бы чужие
+   * персональные данные, а выпущенные файлы документа потеряли бы
+   * свой материал в «Моих документах». Копия уносит только макет.
+   */
+  async saveAsTemplate(orgId: string, documentId: string) {
+    const source = await this.sourceOrFail(orgId, documentId, { isTemplate: false });
+    return this.copyFrom(orgId, source, {
+      title: source.title,
+      // Шаблоны общие на организацию, а папки — раскладка документов.
+      folderId: null,
+      isTemplate: true,
+    });
+  }
+
+  /** Исходник для копии; чужой, удалённый или не того вида — 404. */
+  private async sourceOrFail(orgId: string, id: string, where: { isTemplate?: boolean } = {}) {
     const source = await this.prisma.document.findFirst({
-      where: { id: documentId, orgId, deletedAt: null },
+      where: { id, orgId, deletedAt: null, ...where },
       include: {
         sheets: { orderBy: { position: 'asc' } },
         columns: { orderBy: { position: 'asc' } },
       },
     });
-    if (!source) throw new NotFoundException('Документ не найден');
+    if (!source) {
+      throw new NotFoundException(where.isTemplate ? 'Шаблон не найден' : 'Документ не найден');
+    }
+    return source;
+  }
 
+  /**
+   * Новый материал с макетом и колонками исходника — и ничем больше.
+   *
+   * Одна копия на три пути: «такой же под новое мероприятие», «документ
+   * по шаблону» и «сохранить как шаблон». Во всех трёх получателей не
+   * копируем намеренно — это чужие персональные данные, и тащить их
+   * в новый материал никто не просил. Название, даты и место мероприятия
+   * не копируем по той же причине, по которой копию и делают: мероприятие
+   * другое, и старое название на новых грамотах — ровно та ошибка,
+   * которую замечают уже после печати трёхсот листов.
+   *
+   * Фон переиспользуем по ссылке на тот же файл, а не копией в хранилище:
+   * файл принадлежит той же организации, а лишняя копия — лишние деньги
+   * за хранение и лишний след тех же данных.
+   */
+  private copyFrom(
+    orgId: string,
+    source: Prisma.DocumentGetPayload<{ include: { sheets: true; columns: true } }>,
+    target: { title: string; folderId: string | null; isTemplate: boolean },
+  ) {
     return this.prisma.document.create({
       data: {
         orgId,
-        title: `${source.title} — новое мероприятие`,
+        title: target.title,
         pageWidthMm: source.pageWidthMm,
         pageHeightMm: source.pageHeightMm,
         verifyEnabled: source.verifyEnabled,
         verifyFields: (source.verifyFields ?? []) as Prisma.InputJsonValue,
-        folderId: source.folderId,
+        folderId: target.folderId,
+        isTemplate: target.isTemplate,
         // Связь на исходник, а не на его собственный исходник: цепочка копий
         // копий никому не нужна, человеку важен бланк, который он открывал.
         sourceDocumentId: source.id,
@@ -210,7 +270,11 @@ export class DocumentsService {
           })),
         },
         columns: {
-          create: source.columns.map((c) => ({ name: c.name, position: c.position })),
+          create: source.columns.map((c) => ({
+            name: c.name,
+            title: c.title,
+            position: c.position,
+          })),
         },
       },
       include: { sheets: { orderBy: { position: 'asc' } } },

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   CalendarPlus,
   Check,
@@ -9,8 +9,10 @@ import {
   FileText,
   Folder,
   FolderMinus,
+  LayoutTemplate,
   MoreVertical,
   Pencil,
+  PencilRuler,
   RotateCcw,
   Trash2,
 } from 'lucide-react';
@@ -43,6 +45,7 @@ export function DocumentCard({
   onDelete,
   onRestore,
   onPurge,
+  onSaveAsTemplate,
 }: {
   doc: DocumentSummary;
   onRename: (doc: DocumentSummary) => void;
@@ -53,6 +56,8 @@ export function DocumentCard({
   /** Заданы только в корзине: там карточка ведёт себя иначе. */
   onRestore?: (doc: DocumentSummary) => void;
   onPurge?: (doc: DocumentSummary) => void;
+  /** Только у документа: у шаблона вместо него «Изменить шаблон». */
+  onSaveAsTemplate?: (doc: DocumentSummary) => void;
 }) {
   const layout = doc.preview?.layout ?? [];
   const empty = layout.length === 0 && !doc.preview?.backgroundUrl;
@@ -71,7 +76,13 @@ export function DocumentCard({
 
   return (
     <li className="card group relative overflow-hidden transition-shadow hover:shadow-lg">
-      <Link to={`/documents/${doc.id}`} className="block">
+      {/* Шаблон по нажатию даёт новый документ, а не открывает себя: его
+          выбирают, чтобы начать работу, и правка самого шаблона в ответ на
+          это читалась как «ничего не произошло». Править — из меню. */}
+      <Link
+        to={doc.isTemplate ? `/documents?new=1&template=${doc.id}` : `/documents/${doc.id}`}
+        className="block"
+      >
         {/* Рамка одинаковая у всех карточек, а лист вписывается внутрь.
             Пропорции самого документа задавать рамке нельзя: A5 книжная
             рядом с A4 альбомной рвёт сетку, названия оказываются на разной
@@ -82,7 +93,7 @@ export function DocumentCard({
               <FileText size={26} className="text-[var(--line-strong)]" strokeWidth={1.5} />
             </div>
           ) : (
-            <Preview doc={doc} />
+            <DocumentPreview doc={doc} />
           )}
           {/* Слева внизу: справа вверху стоит меню действий. */}
           {(doc.sheetCount ?? 1) > 1 && (
@@ -101,7 +112,7 @@ export function DocumentCard({
 
       {/* Связь с исходным бланком — вне ссылки на сам материал: это отдельный
           переход, и вложенные ссылки браузер всё равно не разрешает. */}
-      {doc.source && (
+      {doc.source && !doc.isTemplate && (
         <div className="-mt-1 px-3 pb-3 text-center">
           <Link
             to={`/documents/${doc.source.id}`}
@@ -115,6 +126,8 @@ export function DocumentCard({
 
       <ActionsMenu
         title={doc.title}
+        template={doc.isTemplate ? doc.id : null}
+        onSaveAsTemplate={onSaveAsTemplate && (() => onSaveAsTemplate(doc))}
         folderId={doc.folderId ?? null}
         onRename={() => onRename(doc)}
         onMove={(to) => onMove(doc, to)}
@@ -154,7 +167,7 @@ function TrashedCard({
             <FileText size={26} className="text-[var(--line-strong)]" strokeWidth={1.5} />
           </div>
         ) : (
-          <Preview doc={doc} />
+          <DocumentPreview doc={doc} />
         )}
       </div>
 
@@ -206,7 +219,7 @@ function dayWord(n: number): string {
 }
 
 /** Первый лист материала, ужатый до рамки карточки. */
-function Preview({ doc }: { doc: DocumentSummary }) {
+export function DocumentPreview({ doc }: { doc: DocumentSummary }) {
   return (
     <SheetThumbnail widthMm={doc.pageWidthMm} heightMm={doc.pageHeightMm}>
       <SheetRenderer
@@ -230,6 +243,8 @@ function Preview({ doc }: { doc: DocumentSummary }) {
  */
 function ActionsMenu({
   title,
+  template,
+  onSaveAsTemplate,
   folderId,
   onRename,
   onMove,
@@ -237,6 +252,9 @@ function ActionsMenu({
   onDelete,
 }: {
   title: string;
+  /** Идентификатор, если это шаблон: у него своё меню. */
+  template: string | null;
+  onSaveAsTemplate?: () => void;
   folderId: string | null;
   onRename: () => void;
   onMove: (folderId: string | null) => void;
@@ -244,6 +262,7 @@ function ActionsMenu({
   onDelete: () => void;
 }) {
   const folders = useFolders();
+  const navigate = useNavigate();
   const [moving, setMoving] = useState(false);
 
   return (
@@ -302,17 +321,36 @@ function ActionsMenu({
           </>
         ) : (
           <>
-            {/* Первым пунктом и глаголом: ради него меню открывают чаще всего —
-                бланк один на сезон, а мероприятий десятки. */}
-            <MenuItem icon={<CalendarPlus size={16} />} onClick={onDuplicate}>
-              Скопировать под новое мероприятие
-            </MenuItem>
+            {template ? (
+              <MenuItem icon={<PencilRuler size={16} />} onClick={() => navigate(`/documents/${template}`)}>
+                Изменить шаблон
+              </MenuItem>
+            ) : (
+              <>
+                {/* Первым пунктом и глаголом: ради него меню открывают чаще
+                    всего — бланк один на сезон, а мероприятий десятки. */}
+                <MenuItem icon={<CalendarPlus size={16} />} onClick={onDuplicate}>
+                  Скопировать под новое мероприятие
+                </MenuItem>
+                {onSaveAsTemplate && (
+                  <MenuItem icon={<LayoutTemplate size={16} />} onClick={onSaveAsTemplate}>
+                    Сохранить как шаблон
+                  </MenuItem>
+                )}
+              </>
+            )}
             <MenuItem icon={<Pencil size={16} />} onClick={onRename}>
               Переименовать
             </MenuItem>
+            {template && (
+              <MenuItem icon={<CalendarPlus size={16} />} onClick={onDuplicate}>
+                Копия шаблона
+              </MenuItem>
+            )}
             {/* Открывает список папок вместо меню, поэтому окно не закрываем:
-                это не пункт меню для обработчика закрытия. */}
-            <button
+                это не пункт меню для обработчика закрытия. Шаблоны общие
+                на организацию и по папкам не раскладываются. */}
+            {!template && <button
               type="button"
               className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[15px] transition-colors hover:bg-[var(--surface-sunken)]"
               onClick={() => setMoving(true)}
@@ -320,7 +358,7 @@ function ActionsMenu({
               <Folder size={16} />
               <span className="flex-1">Переложить в папку</span>
               <ChevronRight size={16} className="text-[var(--text-muted)]" />
-            </button>
+            </button>}
             <MenuDivider />
             <MenuItem icon={<Trash2 size={16} />} danger onClick={onDelete}>
               В корзину

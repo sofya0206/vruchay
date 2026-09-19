@@ -25,6 +25,7 @@ import {
   Printer,
   Proportions,
   Redo2,
+  Shapes,
   SlidersHorizontal,
   Square,
   SquareDashed,
@@ -189,6 +190,11 @@ export function EditorPage() {
   const navigate = useNavigate();
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
   const [editingId, setEditingId] = useState<string | null>(null);
+  /**
+   * Листы, на которых выбрали «Собрать здесь»: плитки выбора пути там
+   * больше не нужны, лист чистый и ждёт работы.
+   */
+  const [buildHere, setBuildHere] = useState<ReadonlySet<string>>(() => new Set());
   /** Настройки какого поля открыть при входе в правку — по правой кнопке. */
   const [openField, setOpenField] = useState<number | null>(null);
   const [zoom, setZoom] = useState(1);
@@ -1386,6 +1392,7 @@ export function EditorPage() {
       <DocumentChrome
         documentId={id}
         title={page.title}
+        isTemplate={page.isTemplate}
         actions={actions}
         tab="sheet"
         toolbar={toolbar}
@@ -1482,22 +1489,30 @@ export function EditorPage() {
             void addImage(file, pointToMm(e.clientX, e.clientY));
           }}
         >
-          {!sheet.backgroundFileId && layout.length === 0 && (
-            <div className="absolute inset-x-0 top-6 z-10 flex justify-center px-6">
-              <div className="max-w-sm rounded-2xl bg-[var(--surface)] px-5 py-4 text-center shadow-sm ring-1 ring-[var(--line)]">
-                <p className="font-medium">Лист пока пустой</p>
-                <p className="mt-1 text-sm text-[var(--text-muted)]">
-                  Загрузите свой бланк фоном, а поверх поставьте текст: «Вставка» →
-                  «Загрузить бланк», потом «Добавить текстовый блок». Фамилия и другие
-                  колонки списка подставляются переменными вида %name.
-                </p>
+          {/* Выбор пути на пустом листе — двумя крупными плитками, а не
+              абзацем подсказки: абзац читали как «сначала обязательно бланк»,
+              хотя собрать грамоту можно и на чистом листе. */}
+          {!sheet.backgroundFileId && layout.length === 0 && !buildHere.has(sheet.id) && (
+            <div className="pointer-events-none absolute inset-x-0 top-6 z-10 flex justify-center px-6">
+              <div className="pointer-events-auto grid w-full max-w-md grid-cols-2 gap-3">
+                <StartTile
+                  icon={<ImageUp size={22} />}
+                  label="Загрузить свой бланк"
+                  disabled={uploadBackground.isPending}
+                  onClick={pickBackground}
+                />
+                <StartTile
+                  icon={<Shapes size={22} />}
+                  label="Собрать здесь"
+                  onClick={() => setBuildHere((prev) => new Set(prev).add(sheet.id))}
+                />
               </div>
             </div>
           )}
           {sheet.backgroundFileId && layout.length === 0 && (
             <div className="pointer-events-none absolute inset-x-0 top-6 z-10 flex justify-center">
               <p className="rounded-full bg-[var(--surface)] px-4 py-2 text-sm text-[var(--text-muted)] shadow-sm ring-1 ring-[var(--line)]">
-                Бланк на месте. Теперь «Вставка» → «Добавить текстовый блок».
+                Бланк на месте. Двойной щелчок по листу — текст.
               </p>
             </div>
           )}
@@ -2126,6 +2141,37 @@ function Tab({
       {badge ? (
         <span className="rounded-full bg-[var(--accent)] px-1.5 text-[10px] font-medium text-[var(--accent-contrast)]">{badge}</span>
       ) : null}
+    </button>
+  );
+}
+
+/** Плитка выбора пути на пустом листе. */
+function StartTile({
+  icon,
+  label,
+  onClick,
+  disabled,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={
+        'flex flex-col items-center gap-2 rounded-2xl bg-[var(--surface)] px-4 py-5 text-sm font-medium ' +
+        'shadow-sm ring-1 ring-[var(--line)] transition-shadow hover:shadow-md hover:ring-[var(--accent)] ' +
+        'disabled:opacity-60'
+      }
+    >
+      <span className="grid size-11 place-items-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">
+        {icon}
+      </span>
+      {label}
     </button>
   );
 }

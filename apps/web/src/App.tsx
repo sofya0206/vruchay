@@ -134,6 +134,7 @@ export function App() {
             сегмент стоит выше `/documents/:id` в разборе адреса, поэтому
             редактор материала он не перехватывает. */}
         <Route path="/documents/archive" element={<DocumentsPage archived />} />
+        <Route path="/documents/templates" element={<DocumentsPage templates />} />
 
         {/* ─────────── МАРШРУТЫ РАЗДЕЛОВ БЛОКА 1 ───────────
             Ветка, которая делает свой раздел, заменяет ЗДЕСЬ одну строку

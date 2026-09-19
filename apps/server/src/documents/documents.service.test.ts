@@ -17,6 +17,8 @@ const ORG = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const OTHER_ORG = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const DOCUMENT = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const FOLDER = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+/** Шаблон той же организации. */
+const TEMPLATE = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
 /** Папка соседней организации: по идентификатору она неотличима от своей. */
 const OTHER_FOLDER = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 
@@ -38,6 +40,7 @@ interface StoredDocument {
   sheets: { position: number; layout: unknown; schemaVersion: number; backgroundFileId: null }[];
   columns: { name: string; position: number }[];
   deletedAt: Date | null;
+  isTemplate: boolean;
 }
 
 function stored(over: Partial<StoredDocument> = {}): StoredDocument {
@@ -61,6 +64,7 @@ function stored(over: Partial<StoredDocument> = {}): StoredDocument {
       { name: 'place', position: 2 },
     ],
     deletedAt: null,
+    isTemplate: false,
     ...over,
   };
 }
@@ -69,8 +73,14 @@ function serviceWith(docs: StoredDocument[] = [stored()]) {
   const created: Created[] = [];
   const prisma = {
     document: {
-      findFirst: async ({ where }: { where: { id: string; orgId: string } }) =>
-        docs.find((d) => d.id === where.id && d.orgId === where.orgId && !d.deletedAt) ?? null,
+      findFirst: async ({ where }: { where: { id: string; orgId: string; isTemplate?: boolean } }) =>
+        docs.find(
+          (d) =>
+            d.id === where.id &&
+            d.orgId === where.orgId &&
+            !d.deletedAt &&
+            (where.isTemplate === undefined || d.isTemplate === where.isTemplate),
+        ) ?? null,
       create: async (args: Created) => {
         created.push(args);
         return { id: 'new', sheets: [] };
@@ -96,6 +106,8 @@ function payload(entry: Created) {
     folderId: string | null;
     sourceDocumentId?: string;
     eventName?: string;
+    isTemplate?: boolean;
+    pageWidthMm: number;
     sheets: { create: { layout: unknown; schemaVersion: number } };
     columns: { create: { name: string }[] };
   };
@@ -104,6 +116,8 @@ function payload(entry: Created) {
     folderId: data.folderId,
     sourceDocumentId: data.sourceDocumentId,
     eventName: data.eventName,
+    isTemplate: data.isTemplate ?? false,
+    pageWidthMm: data.pageWidthMm,
     sheet: data.sheets.create,
     columns: data.columns.create.map((c) => c.name),
   };
@@ -212,6 +226,69 @@ describe('копия под новое мероприятие', () => {
 
     expect(payload(created[0]).sourceDocumentId).toBe(DOCUMENT);
     expect(payload(created[0]).title).toBe('Грамота федерации — новое мероприятие');
+  });
+});
+
+describe('шаблоны', () => {
+  const template = () =>
+    stored({ id: TEMPLATE, title: 'Бланк федерации', isTemplate: true, pageWidthMm: 210 });
+
+  it('документ по шаблону берёт макет, колонки и размер листа, но не мероприятие', async () => {
+    const { service, created } = serviceWith([template()]);
+    const dto = createDocumentSchema.parse({ title: 'Кубок города', templateId: TEMPLATE });
+
+    await service.create(ORG, dto);
+
+    const result = payload(created[0]);
+    expect(result.title).toBe('Кубок города');
+    expect(result.isTemplate).toBe(false);
+    expect(result.columns).toEqual(['name', 'email', 'place']);
+    // Макет свёрстан под лист шаблона: размер по умолчанию его бы сломал.
+    expect(result.pageWidthMm).toBe(210);
+    expect(result.eventName).toBeUndefined();
+    expect(result.sourceDocumentId).toBe(TEMPLATE);
+    expect(JSON.stringify(created[0].data)).not.toContain('rows');
+  });
+
+  it('обычный документ за шаблон не принимается', async () => {
+    const { service, created } = serviceWith();
+    const dto = createDocumentSchema.parse({ title: 'Кубок', templateId: DOCUMENT });
+
+    await expect(service.create(ORG, dto)).rejects.toThrow(NotFoundException);
+    expect(created).toHaveLength(0);
+  });
+
+  it('чужой шаблон не находится и отвечает 404', async () => {
+    const { service, created } = serviceWith([template()]);
+    const dto = createDocumentSchema.parse({ title: 'Кубок', templateId: TEMPLATE });
+
+    await expect(service.create(OTHER_ORG, dto)).rejects.toThrow(NotFoundException);
+    expect(created).toHaveLength(0);
+  });
+
+  it('сохранение как шаблон — копия без получателей и вне папки', async () => {
+    const { service, created } = serviceWith();
+    await service.saveAsTemplate(ORG, DOCUMENT);
+
+    const result = payload(created[0]);
+    expect(result.isTemplate).toBe(true);
+    expect(result.title).toBe('Грамота федерации');
+    expect(result.folderId).toBeNull();
+    expect(result.eventName).toBeUndefined();
+    expect(JSON.stringify(created[0].data)).not.toContain('rows');
+  });
+
+  it('копия шаблона остаётся шаблоном', async () => {
+    const { service, created } = serviceWith([template()]);
+    await service.duplicate(ORG, TEMPLATE);
+
+    expect(payload(created[0]).isTemplate).toBe(true);
+    expect(payload(created[0]).title).toBe('Бланк федерации — копия');
+  });
+
+  it('в списке документов шаблонов нет, пока их не попросили', () => {
+    expect(listDocumentsSchema.parse({}).templates).toBe(false);
+    expect(listDocumentsSchema.parse({ templates: 'true' }).templates).toBe(true);
   });
 });
 

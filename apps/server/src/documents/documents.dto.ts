@@ -16,6 +16,12 @@ export const createDocumentSchema = z.object({
   pageWidthMm: pageSizeMm.default(297),
   pageHeightMm: pageSizeMm.default(210),
   folderId: folderId.optional(),
+  /**
+   * Шаблон, с которого снять макет. Размер листа при этом берётся
+   * у шаблона: макет свёрстан под свой лист, и на чужом размере блоки
+   * уедут за край.
+   */
+  templateId: z.string().uuid('Некорректный идентификатор шаблона').optional(),
 });
 export type CreateDocumentDto = z.infer<typeof createDocumentSchema>;
 
@@ -97,6 +103,11 @@ export const listDocumentsSchema = z.object({
   sort: z.enum(DOCUMENT_SORTS).default('updated'),
   /** Корзина — тот же список, только из удалённого. */
   trashed: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
+  /** Шаблоны — отдельный список: в «Моих документах» их нет. */
+  templates: z
     .enum(['true', 'false'])
     .default('false')
     .transform((v) => v === 'true'),
