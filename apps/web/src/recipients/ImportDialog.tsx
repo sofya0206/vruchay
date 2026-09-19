@@ -1,4 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Hotspot } from '../onboarding/Hotspot';
+import { onboarding } from '../onboarding/store';
 import { AlertTriangle, Wand2, X } from 'lucide-react';
 import type { ImportSuggestion, ParsedSheet } from '../api/recipients';
 import { Button } from '../ui/Button';
@@ -98,6 +100,8 @@ export function ImportDialog({
   // переименовал колонку «Участник» в свою переменную, повторная загрузка
   // того же файла не должна возвращать её к «name».
   const [names, setNames] = useState(() => initialNames(sheet.columns, remembered));
+  // Окно увидели — в следующий раз точки у сопоставления уже нет.
+  useEffect(() => () => onboarding.markSeen('import'), []);
   const [mode, setMode] = useState<'append' | 'replace'>('append');
   // Предложения выключены по умолчанию: правку текста человек включает сам.
   const [accepted, setAccepted] = useState<number[]>([]);
@@ -241,7 +245,9 @@ export function ImportDialog({
 
           <div>
             <div className="flex items-baseline justify-between gap-3">
-              <Label>Колонки файла и имена переменных</Label>
+              <Label>
+                Колонки файла и имена переменных <Hotspot id="import" />
+              </Label>
               <span
                 className={`text-sm ${
                   bound === result.columns.length

@@ -1760,3 +1760,17 @@ model PushSubscription {
   @@index([userId, orgId])
   @@map("push_subscriptions")
 }
+
+/// Сколько раз показали, прошли и закрыли каждый слайд обучения и каждую
+/// точку — по дням. Счётчики, а не события: кто именно бросил, не нужно
+/// и не хранится (152-ФЗ), нужно только, на каком экране бросают.
+model OnboardingStat {
+  day    DateTime @db.Date
+  flow   String
+  step   String
+  action String
+  count  Int      @default(0)
+
+  @@id([day, flow, step, action])
+  @@map("onboarding_stats")
+}

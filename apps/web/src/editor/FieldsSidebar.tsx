@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import { X } from 'lucide-react';
+import { onboarding } from '../onboarding/store';
 import { useRecipientMutations } from '../api/recipients';
 import { IconButton } from '../ui/IconButton';
 import { FieldsList, type FieldAction } from './FieldsList';
@@ -45,6 +47,8 @@ export function FieldsSidebar({ documentId, target }: { documentId: string; targ
   const { fields } = useDocumentFields(documentId);
   const samples = useFieldSamples(documentId);
   const m = useRecipientMutations(documentId);
+  // Панель данных открыта и здесь — точка в редакторе не нужна.
+  useEffect(() => onboarding.markSeen('fields'), []);
 
   const shown = target?.columnsOnly ? fields.filter((f) => f.kind === 'column') : fields;
   const action: FieldAction = target ? { label: 'Вставить', run: target.insert } : COPY;
