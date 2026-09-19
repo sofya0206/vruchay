@@ -168,6 +168,9 @@ type Gesture =
 /** Открытая панель справа. `null` — панели нет, лист занимает весь экран. */
 type Panel = 'props' | 'layers' | 'fields';
 
+/** С этой ширины панель справа стоит рядом с листом, а не поверх него. */
+const WIDE_EDITOR = '(min-width: 768px)';
+
 /**
  * Страница редактирования материала.
  *
@@ -211,7 +214,10 @@ export function EditorPage() {
    * можно крестиком; свёрнутая оставляет полоску значков у края, и любой
    * из них раскрывает панель сразу на нужной вкладке.
    */
-  const [otherPanel, setOtherPanel] = useState<Exclude<Panel, 'fields'> | null>('props');
+  // На узком экране — свёрнута: там она ложится поверх листа и закрыла бы его.
+  const [otherPanel, setOtherPanel] = useState<Exclude<Panel, 'fields'> | null>(() =>
+    window.matchMedia(WIDE_EDITOR).matches ? 'props' : null,
+  );
   /*
    * Поля — общая панель всего материала, а не только листа: открытая здесь,
    * она остаётся открытой в письме и в таблице, поэтому живёт не в этом
@@ -1447,7 +1453,7 @@ export function EditorPage() {
         </p>
       )}
 
-      <div className="flex min-h-0 flex-1">
+      <div className="relative flex min-h-0 flex-1">
         <div
           ref={containerRef}
           // Граница для панели оформления текста: за холст она не выходит.
@@ -1489,6 +1495,32 @@ export function EditorPage() {
             void addImage(file, pointToMm(e.clientX, e.clientY));
           }}
         >
+          {/* Выбор пути — двумя плитками поверх пустого листа, как «Start from
+              your content / Create from scratch» в Adobe Express. Лежат на
+              холсте, а не внутри листа: лист на узком экране ужимается до
+              десятой доли, и плитки ужимались бы вместе с ним. Когда места
+              на две в ряд нет, встают столбиком. */}
+          {!sheet.backgroundFileId && layout.length === 0 && !buildHere.has(sheet.id) && (
+            <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center p-4 @container">
+              <div className="pointer-events-auto grid w-full max-w-sm grid-cols-1 gap-3 @[17rem]:grid-cols-2">
+                <StartTile
+                  icon={<ImageUp size={22} />}
+                  label="Свой бланк"
+                  hint="PNG · JPG"
+                  disabled={uploadBackground.isPending}
+                  onClick={pickBackground}
+                  onFile={(file) => void onPickBackground(file)}
+                />
+                <StartTile
+                  icon={<FilePlus2 size={22} />}
+                  label="С нуля"
+                  hint="Чистый лист"
+                  onClick={() => setBuildHere((prev) => new Set(prev).add(sheet.id))}
+                />
+              </div>
+            </div>
+          )}
+
           <div className="relative" style={{ padding: 18 }}>
             {/* Линейки в миллиметрах — по краям листа. */}
             <Ruler axis="x" lengthMm={page.pageWidthMm} zoom={zoom} />
@@ -1516,35 +1548,6 @@ export function EditorPage() {
                 if (mm) setCanvasMenu({ x: e.clientX, y: e.clientY, mm });
               }}
             >
-              {/* Выбор пути — двумя плитками прямо на пустом листе, как
-                  «Start from your content / Create from scratch» в Adobe
-                  Express. Абзац подсказки читали как «сначала обязательно
-                  бланк», хотя собрать грамоту можно и на чистом листе. */}
-              {!sheet.backgroundFileId && layout.length === 0 && !buildHere.has(sheet.id) && (
-                <div
-                  className="absolute inset-0 z-20 grid place-items-center p-4"
-                  // Нажатие по плиткам — не начало рамки выделения и не новый текст.
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onDoubleClick={(e) => e.stopPropagation()}
-                >
-                  <div className="grid w-full max-w-sm grid-cols-2 gap-3">
-                    <StartTile
-                      icon={<ImageUp size={22} />}
-                      label="Свой бланк"
-                      hint="PNG · JPG"
-                      disabled={uploadBackground.isPending}
-                      onClick={pickBackground}
-                      onFile={(file) => void onPickBackground(file)}
-                    />
-                    <StartTile
-                      icon={<FilePlus2 size={22} />}
-                      label="С нуля"
-                      hint="Чистый лист"
-                      onClick={() => setBuildHere((prev) => new Set(prev).add(sheet.id))}
-                    />
-                  </div>
-                </div>
-              )}
               <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}>
                 <SheetRenderer
                   layout={layout}
@@ -1797,7 +1800,14 @@ export function EditorPage() {
           </aside>
         )}
         {panel && (
-          <aside className="flex w-80 shrink-0 flex-col border-l border-[var(--line)] bg-[var(--surface)]">
+          // На узком экране панель выезжает поверх холста, а не делит с ним
+          // ширину: иначе лист ужимался до десятой доли и работать было не на чем.
+          <aside
+            className={
+              'absolute inset-y-0 right-0 z-30 flex w-80 max-w-[calc(100%-2.75rem)] flex-col border-l border-[var(--line)] ' +
+              'bg-[var(--surface)] shadow-xl md:static md:max-w-none md:shrink-0 md:shadow-none'
+            }
+          >
             <div className="flex border-b border-[var(--line)]">
               <Tab active={panel === 'props'} onClick={() => setPanel('props')} icon={<SlidersHorizontal size={14} />}>
                 Свойства
@@ -2199,8 +2209,8 @@ function StartTile({
       <span className="grid size-11 place-items-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">
         {icon}
       </span>
-      <span className="text-sm font-medium">{label}</span>
-      <span className="text-xs text-[var(--text-muted)]">{hint}</span>
+      <span className="text-sm font-medium whitespace-nowrap">{label}</span>
+      <span className="text-xs whitespace-nowrap text-[var(--text-muted)]">{hint}</span>
     </button>
   );
 }
