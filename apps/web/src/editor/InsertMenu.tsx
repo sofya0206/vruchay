@@ -2,9 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ChevronDown,
   ChevronRight,
+  Circle,
+  Image as ImageIcon,
   Link2,
+  Minus,
   Plus,
   QrCode,
+  Square,
   Type,
 } from 'lucide-react';
 import type { FieldInfo } from './fields';
@@ -256,10 +260,8 @@ function SubItem({
 /**
  * То же меню «Вставить» нижним листом — для телефона.
  *
- * Вложенные списки здесь раскрываются на месте, а не вылетают вправо:
- * на экране в 375 точек справа от списка шириной 288 места нет, и второй
- * уровень уходил бы за край. Наведения на телефоне тоже нет — раскрытие
- * только нажатием.
+ * Вложенных списков нет: на экране в 375 точек второй уровень уходил бы
+ * за край. Поля таблицы — фишками, редкое — плитками.
  */
 export function InsertSheet({
   open,
@@ -267,6 +269,7 @@ export function InsertSheet({
   onInsert,
   fields = [],
   onBackground,
+  onImage,
   backgroundLoading = false,
   hasBackground = false,
 }: {
@@ -275,115 +278,88 @@ export function InsertSheet({
   onInsert: (what: InsertKind) => void;
   fields?: FieldInfo[];
   onBackground: () => void;
+  onImage: () => void;
   backgroundLoading?: boolean;
   hasBackground?: boolean;
 }) {
-  const [submenu, setSubmenu] = useState<'text' | 'shape' | null>(null);
   const pick = (what: InsertKind) => {
     onInsert(what);
-    setSubmenu(null);
     onClose();
   };
   const columns = fields.filter((f) => f.kind === 'column');
   const system = fields.filter((f) => f.kind === 'system');
-  const row =
-    'flex min-h-14 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left active:bg-[var(--surface-sunken)] disabled:opacity-50';
-  const sub = 'flex min-h-12 w-full items-center gap-3 rounded-lg py-2 pr-3 pl-11 text-left active:bg-[var(--surface-sunken)]';
-  const head = (icon: React.ReactNode, label: string, hint: string, extra?: React.ReactNode) => (
-    <>
-      <span className="text-[var(--text-muted)]">{icon}</span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-base font-medium">{label}</span>
-        <span className="block text-sm text-[var(--text-muted)]">{hint}</span>
-      </span>
-      {extra}
-    </>
+  const label = (text: string) => (
+    <p className="px-5 pt-3.5 pb-2 text-[12px] font-medium tracking-wider text-[var(--text-muted)] uppercase">{text}</p>
   );
-  const chevron = (on: boolean) => (
-    <ChevronDown size={18} className={`text-[var(--text-muted)] transition-transform ${on ? 'rotate-180' : ''}`} />
+  const chips = (items: FieldInfo[]) => (
+    <div className="flex flex-wrap gap-2 px-5 pb-1">
+      {items.map((f) => (
+        <button
+          key={f.source}
+          type="button"
+          role="menuitem"
+          onClick={() => pick({ type: 'text', field: f })}
+          className="inline-flex h-10 items-center gap-1.5 rounded-full border border-[var(--line-strong)] px-3.5 text-[15px] text-[var(--text)] active:bg-[var(--surface-sunken)]"
+        >
+          <Plus size={14} className="text-[var(--accent)]" strokeWidth={2.4} />
+          {f.title}
+        </button>
+      ))}
+    </div>
+  );
+  const tile = (icon: React.ReactNode, title: string, hint: string, onClick: () => void, disabled = false) => (
+    <button
+      type="button"
+      role="menuitem"
+      disabled={disabled}
+      onClick={() => {
+        onClose();
+        onClick();
+      }}
+      className="flex h-[84px] flex-col items-center justify-center gap-1.5 rounded-2xl bg-[var(--surface-sunken)] text-[var(--text)] active:bg-[var(--accent-soft)] disabled:opacity-50"
+    >
+      {icon}
+      <span className="text-sm font-medium">{title}</span>
+      <span className="-mt-1 text-[11px] text-[var(--text-muted)]">{hint}</span>
+    </button>
   );
 
   return (
-    <BottomSheet open={open} onClose={onClose} title="Вставить на лист">
-      <div role="menu" aria-label="Вставить на лист">
-        <button
-          type="button"
-          role="menuitem"
-          disabled={backgroundLoading}
-          onClick={() => {
-            onClose();
-            onBackground();
-          }}
-          className={row}
-        >
-          {head(
-            <ImageIcon size={20} />,
-            backgroundLoading ? 'Загружаем бланк…' : hasBackground ? 'Заменить бланк' : 'Бланк',
-            hasBackground ? 'Другая картинка вместо нынешней' : 'Фото или скан вашей грамоты',
-          )}
-        </button>
-
-        <button
-          type="button"
-          aria-expanded={submenu === 'text'}
-          onClick={() => setSubmenu((v) => (v === 'text' ? null : 'text'))}
-          className={row}
-        >
-          {head(<Type size={20} />, 'Текст', 'Имя, звание, дата — из таблицы', chevron(submenu === 'text'))}
-        </button>
-        {submenu === 'text' && (
-          <div className="pb-2">
-            {[...columns, ...system].map((f) => (
-              <button
-                key={f.source}
-                type="button"
-                role="menuitem"
-                onClick={() => pick({ type: 'text', field: f })}
-                className={sub}
-              >
-                <span className="min-w-0 flex-1 truncate text-base">{f.title}</span>
-                <span className="shrink-0 text-sm text-[var(--text-muted)]">
-                  {f.kind === 'column' ? 'из таблицы' : 'подставит сервис'}
-                </span>
-              </button>
-            ))}
-            <button type="button" role="menuitem" onClick={() => pick({ type: 'text' })} className={sub}>
-              <span className="text-base">Просто текст, без подстановки</span>
-            </button>
-          </div>
+    <BottomSheet open={open} onClose={onClose} title="Вставить на лист" className="h-[82vh]">
+      <div role="menu" className="min-h-0 flex-1 overflow-y-auto pb-4">
+        {label('Текст')}
+        <div className="px-5 pb-1">
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => pick({ type: 'text' })}
+            className="flex h-12 w-full items-center gap-3 rounded-xl bg-[var(--surface-sunken)] px-4 text-left active:bg-[var(--accent-soft)]"
+          >
+            <Type size={20} className="text-[var(--text-muted)]" />
+            <span className="text-[15px] font-medium">Текстовый блок</span>
+            <span className="ml-auto text-[13px] text-[var(--text-muted)]">без подстановки</span>
+          </button>
+        </div>
+        {columns.length > 0 && (
+          <>
+            {label('Из таблицы получателей')}
+            {chips(columns)}
+          </>
         )}
-
-        <button type="button" role="menuitem" onClick={() => pick({ type: 'qr' })} className={row}>
-          {head(<QrCode size={20} />, 'QR-код', 'Ведёт на проверку подлинности')}
-        </button>
-        <button type="button" role="menuitem" onClick={() => pick({ type: 'link' })} className={row}>
-          {head(<Link2 size={20} />, 'Ссылка', 'Кликабельный адрес в PDF')}
-        </button>
-
-        <button
-          type="button"
-          aria-expanded={submenu === 'shape'}
-          onClick={() => setSubmenu((v) => (v === 'shape' ? null : 'shape'))}
-          className={row}
-        >
-          {head(<Square size={20} />, 'Фигура', 'Линия, рамка, подложка', chevron(submenu === 'shape'))}
-        </button>
-        {submenu === 'shape' && (
-          <div className="pb-2">
-            <button type="button" role="menuitem" onClick={() => pick({ type: 'shape', kind: 'line' })} className={sub}>
-              <Minus size={16} className="text-[var(--text-muted)]" />
-              <span className="text-base">Линия под подпись</span>
-            </button>
-            <button type="button" role="menuitem" onClick={() => pick({ type: 'shape', kind: 'rect' })} className={sub}>
-              <Square size={16} className="text-[var(--text-muted)]" />
-              <span className="text-base">Прямоугольник</span>
-            </button>
-            <button type="button" role="menuitem" onClick={() => pick({ type: 'shape', kind: 'ellipse' })} className={sub}>
-              <Circle size={16} className="text-[var(--text-muted)]" />
-              <span className="text-base">Овал</span>
-            </button>
-          </div>
-        )}
+        {label('Подставит сервис')}
+        {chips(system)}
+        {label('Ещё')}
+        <div className="grid grid-cols-4 gap-2.5 px-5">
+          {tile(<QrCode size={24} />, 'QR-код', 'проверка', () => onInsert({ type: 'qr' }))}
+          {tile(<ImageIcon size={24} />, 'Картинка', 'логотип', onImage)}
+          {tile(<Minus size={24} />, 'Линия', 'подпись', () => onInsert({ type: 'shape', kind: 'line' }))}
+          {tile(<Square size={24} />, 'Фигура', 'рамка', () => onInsert({ type: 'shape', kind: 'rect' }))}
+        </div>
+        <div className="grid grid-cols-4 gap-2.5 px-5 pt-2.5">
+          {tile(<Circle size={24} />, 'Овал', 'печать', () => onInsert({ type: 'shape', kind: 'ellipse' }))}
+          {tile(<Link2 size={24} />, 'Ссылка', 'адрес', () => onInsert({ type: 'link' }))}
+          {tile(<ImageIcon size={24} />, hasBackground ? 'Бланк' : 'Бланк', hasBackground ? 'заменить' : 'фон листа', onBackground, backgroundLoading)}
+        </div>
       </div>
     </BottomSheet>
   );

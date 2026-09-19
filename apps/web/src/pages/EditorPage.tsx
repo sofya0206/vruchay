@@ -51,7 +51,21 @@ import {
 
 type QrElement = Extract<SheetElement, { type: 'qr' }>;
 type LinkElement = Extract<SheetElement, { type: 'link' }>;
-import { InsertMenu, type InsertKind } from '../editor/InsertMenu';
+import { InsertMenu, InsertSheet, type InsertKind } from '../editor/InsertMenu';
+import {
+  ContextSheet,
+  MiniBar,
+  PagePill,
+  PHONE_HANDLES,
+  PhoneFormatBar,
+  PhoneToolbar,
+  PositionSheet,
+  TouchZone,
+  ViewPill,
+  type PhoneSheet,
+} from '../editor/PhoneEditor';
+import { BottomSheet } from '../ui/BottomSheet';
+import { usePhone, useVisualViewport } from '../ui/useMediaQuery';
 import { CanvasMenu } from '../editor/CanvasMenu';
 import { DocumentChrome, ToolButton, ToolDivider } from '../editor/DocumentChrome';
 import { useDocumentFileMenu } from '../editor/DocumentFileMenu';
@@ -155,10 +169,15 @@ interface GestureBase {
   startY: number;
   /** Было ли реальное перемещение: от этого зависит и история, и сохранение. */
   moved: boolean;
+  /** Жест пальцем: до сдвига дальше TOUCH_SLOP_PX он ещё касание, а не перетаскивание. */
+  touch?: boolean;
 }
 type Gesture =
+  /** Холст пальцем. `tapClear` — касание пустого места без сдвига снимает выбор. */
+  | (GestureBase & { kind: 'pan'; left: number; top: number; tapClear: boolean })
   /** `lines` — направляющие: считаются один раз на жест, остальные блоки стоят на месте. */
-  | (GestureBase & { kind: 'move'; boxes: Record<string, Box>; lines?: SnapLine[] })
+  /** `tapEdit` — касание уже выбранного текста без сдвига открывает его правку. */
+  | (GestureBase & { kind: 'move'; boxes: Record<string, Box>; lines?: SnapLine[]; tapEdit?: string })
   /** `keepRatio` — угол тянет с сохранением пропорций: у картинки всегда, у прочих с Shift. */
   | (GestureBase & { kind: 'resize'; id: string; handle: ResizeHandle; box: Box; keepRatio: boolean; square: boolean })
   | (GestureBase & { kind: 'scale'; handle: ResizeHandle; frame: Rect; boxes: Record<string, Box>; sizes: Record<string, number> })
@@ -170,6 +189,10 @@ type Panel = 'props' | 'layers' | 'fields';
 
 /** С этой ширины панель справа стоит рядом с листом, а не поверх него. */
 const WIDE_EDITOR = '(min-width: 768px)';
+/** Сколько палец может дрогнуть, прежде чем касание станет перетаскиванием. */
+const TOUCH_SLOP_PX = 8;
+/** Долгое нажатие на блок — меню. */
+const LONG_PRESS_MS = 450;
 
 /**
  * Страница редактирования материала.
@@ -224,8 +247,25 @@ export function EditorPage() {
    * компоненте, а в `fields-sidebar-store`. Свойства и слои — свои.
    */
   const fieldsOpen = useFieldsPanelOpen();
-  const panel: Panel | null = fieldsOpen ? 'fields' : otherPanel;
+  /*
+   * Телефон. Раскладка другая целиком — панель снизу, свойства полулистом,
+   * текст с панелью над клавиатурой, — поэтому решаем один раз здесь, а не
+   * классами: редактор в предварительную отрисовку не попадает.
+   */
+  const phone = usePhone();
+  const [phoneSheet, setPhoneSheet] = useState<PhoneSheet | null>(null);
+  const panel: Panel | null = phone
+    ? phoneSheet === 'position'
+      ? null
+      : phoneSheet
+    : fieldsOpen
+      ? 'fields'
+      : otherPanel;
   const setPanel = (next: Panel | null) => {
+    if (phone) {
+      setPhoneSheet(next);
+      return;
+    }
     setFieldsPanelOpen(next === 'fields');
     if (next !== 'fields') setOtherPanel(next);
   };
@@ -266,6 +306,20 @@ export function EditorPage() {
   const clipboard = useRef<SheetElement[]>([]);
   /** Меню по правому клику на пустом месте: где показать и куда вставлять. */
   const [canvasMenu, setCanvasMenu] = useState<{ x: number; y: number; mm: { x: number; y: number } } | null>(null);
+  const viewport = useVisualViewport();
+  const [insertOpen, setInsertOpen] = useState(false);
+  /** Меню долгого нажатия на блок. */
+  const [ctxOpen, setCtxOpen] = useState(false);
+  /** Режим «выделить несколько»: касания добавляют к выделению до «Готово». */
+  const [multi, setMulti] = useState(false);
+  /* Пальцы на холсте — для щипка. Жест одного пальца живёт в `gesture`. */
+  const touches = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{ dist: number; zoom: number; mid: { x: number; y: number } } | null>(null);
+  /** Точка листа под пальцами при щипке — она должна остаться под ними. */
+  const zoomAnchor = useRef<{ mm: { x: number; y: number }; client: { x: number; y: number } } | null>(null);
+  const longPress = useRef<number | null>(null);
+  /** Где нажали долго — по этой точке ищется блок «под». */
+  const pressAt = useRef<{ x: number; y: number } | null>(null);
   const liveEditor = useRef<Editor | null>(null);
 
   // Адреса уехавших вкладок: `?view=table` и соседние. Разбираются
@@ -489,16 +543,77 @@ export function EditorPage() {
   }, [version, sheet]);
 
   // Масштаб «вписать в окно» пересчитывается при изменении размеров контейнера.
+  // Пока на телефоне правят текст, холст меняет размер из-за клавиатуры,
+  // а масштаб при этом держится на блоке — «вписать» его перебивать нельзя.
+  const editingOnPhone = useRef(false);
+  editingOnPhone.current = phone && editingId !== null;
   useLayoutEffect(() => {
     const el = containerRef.current;
     if (!el || !doc.data) return;
-    const recompute = () =>
+    const recompute = () => {
+      if (editingOnPhone.current) return;
       setZoom(fitZoom(el.clientWidth - 24, el.clientHeight - 24, doc.data.pageWidthMm, doc.data.pageHeightMm));
+    };
     recompute();
     const observer = new ResizeObserver(recompute);
     observer.observe(el);
     return () => observer.disconnect();
   }, [doc.data]);
+
+  /*
+   * Щипок увеличивает вокруг пальцев, а не вокруг угла листа: после
+   * перерисовки в новом масштабе докручиваем холст так, чтобы точка листа,
+   * бывшая под пальцами, осталась под ними.
+   */
+  useLayoutEffect(() => {
+    const anchor = zoomAnchor.current;
+    const box = containerRef.current;
+    const sheetEl = sheetRef.current;
+    zoomAnchor.current = null;
+    if (!anchor || !box || !sheetEl) return;
+    const rect = sheetEl.getBoundingClientRect();
+    box.scrollLeft += rect.left + anchor.mm.x * PX_PER_MM * zoom - anchor.client.x;
+    box.scrollTop += rect.top + anchor.mm.y * PX_PER_MM * zoom - anchor.client.y;
+  }, [zoom]);
+
+  /*
+   * Правка текста на телефоне: лист приближается так, чтобы блок занял
+   * ширину экрана, и прокручивается к нему — в масштабе «вписать» кегль 14
+   * на экране телефона мельче четырёх точек. По выходу — снова вписать.
+   */
+  const wasEditing = useRef(false);
+  useLayoutEffect(() => {
+    if (!phone) return;
+    const box = containerRef.current;
+    if (editingId) {
+      const el = layout.find((item) => item.id === editingId);
+      if (!el || !box) return;
+      wasEditing.current = true;
+      const next = clamp((box.clientWidth - 32) / (el.w * PX_PER_MM), 0.25, 4);
+      setZoom(next);
+      const center = () => {
+        const sheetEl = sheetRef.current;
+        if (!sheetEl) return;
+        const rect = sheetEl.getBoundingClientRect();
+        const view = box.getBoundingClientRect();
+        box.scrollLeft += rect.left + (el.x + el.w / 2) * PX_PER_MM * next - (view.left + view.width / 2);
+        box.scrollTop += rect.top + (el.y + el.h / 2) * PX_PER_MM * next - (view.top + view.height / 2);
+      };
+      const frame = requestAnimationFrame(center);
+      return () => cancelAnimationFrame(frame);
+    }
+    if (wasEditing.current) {
+      wasEditing.current = false;
+      zoomTo('fit');
+    }
+    // Только вход и выход из правки: `layout` меняется на каждую букву.
+  }, [phone, editingId, viewport.height]);
+
+  // Клавиатура на iOS сдвигает страницу вверх — возвращаем на место, иначе
+  // шапка кабинета уезжает за верхний край и не возвращается.
+  useEffect(() => {
+    if (phone && editingId && window.scrollY) window.scrollTo(0, 0);
+  }, [phone, editingId, viewport.top]);
 
   const hasCanvas = Boolean(doc.data);
   // Ctrl+колёсико — масштаб, а не прокрутка страницы; пробел — панорамирование.
@@ -550,9 +665,10 @@ export function EditorPage() {
     const has = selected.size > 0;
     // Открытые поля не подменяем свойствами: из них как раз вставляют
     // в только что выделенный блок.
-    if (has && !hadSelection.current && !fieldsOpen) setOtherPanel((current) => current ?? 'props');
+    if (has && !hadSelection.current && !fieldsOpen && !phone) setOtherPanel((current) => current ?? 'props');
+    if (!has) setPhoneSheet((current) => (current === 'position' ? null : current));
     hadSelection.current = has;
-  }, [selected, fieldsOpen]);
+  }, [selected, fieldsOpen, phone]);
 
   const selectedElements = useMemo(
     () => layout.filter((el) => selected.has(el.id)),
@@ -766,6 +882,17 @@ export function EditorPage() {
       const { layout, zoom, showGrid, snapping, page, updateBoxes, patchElements, pointToMm } = live.current;
       if (!g || !page) return;
 
+      if (g.kind === 'pan') {
+        const box = containerRef.current;
+        const dxPx = e.clientX - g.startX;
+        const dyPx = e.clientY - g.startY;
+        if (!box || (!g.moved && Math.hypot(dxPx, dyPx) < TOUCH_SLOP_PX)) return;
+        g.moved = true;
+        box.scrollLeft = g.left - dxPx;
+        box.scrollTop = g.top - dyPx;
+        return;
+      }
+
       if (g.kind === 'marquee') {
         const from = pointToMm(g.startX, g.startY);
         const to = pointToMm(e.clientX, e.clientY);
@@ -781,6 +908,7 @@ export function EditorPage() {
 
       // Снимок в историю делаем один раз, на первом сдвиге.
       if (!g.moved) {
+        if (g.touch && Math.hypot(e.clientX - g.startX, e.clientY - g.startY) < TOUCH_SLOP_PX) return;
         g.moved = true;
         beginGesture();
       }
@@ -852,19 +980,64 @@ export function EditorPage() {
       if (e) apply(e);
     }
 
+    const cancelLongPress = () => {
+      if (longPress.current) clearTimeout(longPress.current);
+      longPress.current = null;
+    };
+
     function onMove(e: PointerEvent) {
+      if (e.pointerType === 'touch' && touches.current.has(e.pointerId)) {
+        touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        const p = pinch.current;
+        if (p && touches.current.size >= 2) {
+          const [a, b] = [...touches.current.values()];
+          const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+          const box = containerRef.current;
+          // Два пальца двигают холст вместе с щипком — как карту.
+          if (box) {
+            box.scrollLeft -= mid.x - p.mid.x;
+            box.scrollTop -= mid.y - p.mid.y;
+          }
+          p.mid = mid;
+          zoomAnchor.current = { mm: live.current.pointToMm(mid.x, mid.y), client: mid };
+          setZoom(clamp(p.zoom * (Math.hypot(a.x - b.x, a.y - b.y) / p.dist), 0.1, 4));
+          return;
+        }
+        const g = gesture.current;
+        if (g && Math.hypot(e.clientX - g.startX, e.clientY - g.startY) >= TOUCH_SLOP_PX) cancelLongPress();
+      }
       if (!gesture.current) return;
       pending = e;
       if (!frameId) frameId = requestAnimationFrame(flush);
     }
 
-    function onUp() {
+    function onUp(e: PointerEvent) {
+      cancelLongPress();
+      if (e.pointerType === 'touch') {
+        touches.current.delete(e.pointerId);
+        // Щипок кончается целиком: оставшийся палец холст не тащит,
+        // иначе картинка дёрнулась бы к нему.
+        if (pinch.current) {
+          if (touches.current.size < 2) pinch.current = null;
+          gesture.current = null;
+          return;
+        }
+      }
       // Последнее движение — сразу, а не в следующем кадре: иначе блок
       // встал бы на шаг раньше того места, где его отпустили.
       if (frameId) cancelAnimationFrame(frameId);
       flush();
       const g = gesture.current;
       if (g?.kind === 'marquee') setMarquee(null);
+      else if (g?.kind === 'pan') {
+        if (!g.moved && g.tapClear) {
+          setSelected(new Set());
+          setEditingId(null);
+        }
+      }
+      // Второе касание уже выбранного текста — правка, вместо двойного
+      // щелчка: двойное касание на телефоне занято масштабом страницы.
+      else if (g?.kind === 'move' && !g.moved && g.tapEdit) setEditingId(g.tapEdit);
       // Без этого перетаскивание не попадало бы в автосохранение:
       // промежуточные кадры намеренно не двигают счётчик версии.
       else if (g?.moved) endGesture();
@@ -874,10 +1047,15 @@ export function EditorPage() {
 
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
+    // Отмену касания (системный жест, звонок) закрываем как отпускание:
+    // без этого жест оставался висеть и тянул блок за следующим касанием.
+    window.addEventListener('pointercancel', onUp);
     return () => {
       if (frameId) cancelAnimationFrame(frameId);
+      cancelLongPress();
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
     };
   }, [beginGesture, endGesture, setLayout]);
 
@@ -1124,10 +1302,70 @@ export function EditorPage() {
     );
   }
 
+  function startPan(e: React.PointerEvent, tapClear: boolean) {
+    const box = containerRef.current;
+    if (!box) return;
+    gesture.current = {
+      kind: 'pan',
+      startX: e.clientX,
+      startY: e.clientY,
+      left: box.scrollLeft,
+      top: box.scrollTop,
+      moved: false,
+      touch: true,
+      tapClear,
+    };
+  }
+
+  /** Долгое нажатие на блок — меню «Блок»; жест при этом отменяется. */
+  function armLongPress(e: React.PointerEvent, id: string) {
+    if (longPress.current) clearTimeout(longPress.current);
+    pressAt.current = pointToMm(e.clientX, e.clientY);
+    longPress.current = window.setTimeout(() => {
+      longPress.current = null;
+      gesture.current = null;
+      setSelected(expandToGroups(layout, [id]));
+      setCtxOpen(true);
+    }, LONG_PRESS_MS);
+  }
+
+  /** Блок под выбранным в точке долгого нажатия — следующий вниз по слоям. */
+  function selectBehind() {
+    const at = pressAt.current;
+    const current = single;
+    if (!at || !current) return;
+    const under = layout
+      .filter((el) => !el.hidden && at.x >= el.x && at.x <= el.x + el.w && at.y >= el.y && at.y <= el.y + el.h)
+      .sort((a, b) => b.z - a.z);
+    const index = under.findIndex((el) => el.id === current.id);
+    const next = under[index + 1] ?? under[0];
+    if (next) setSelected(expandToGroups(layout, [next.id]));
+  }
+
   function startMove(e: React.PointerEvent, el: SheetElement) {
     e.preventDefault();
     e.stopPropagation();
     if (editingId && editingId !== el.id) setEditingId(null);
+    const touch = e.pointerType === 'touch';
+    if (touch) {
+      armLongPress(e, el.id);
+      /*
+       * Пальцем невыбранный блок только выбирается, а тянуть дальше — значит
+       * двигать холст. Иначе каждая попытка пролистать лист сдвигала бы
+       * попавшуюся под палец фамилию, и испорченной вышла бы вся пачка.
+       * В режиме «выделить несколько» касание добавляет или убирает блок.
+       */
+      if (multi || !selected.has(el.id)) {
+        setSelected((prev) => {
+          const base = new Set(multi ? prev : []);
+          if (multi && prev.has(el.id)) base.delete(el.id);
+          else base.add(el.id);
+          return expandToGroups(layout, base);
+        });
+        startPan(e, false);
+        return;
+      }
+    }
     const additive = e.shiftKey;
     // Что окажется выделенным после этого клика — считаем сразу, чтобы жест
     // вёл именно эту группу, а не ту, что была до клика.
@@ -1148,10 +1386,21 @@ export function EditorPage() {
     for (const item of layout) {
       if (next.has(item.id) && !item.locked) boxes[item.id] = { x: item.x, y: item.y, w: item.w, h: item.h };
     }
-    gesture.current = { kind: 'move', boxes, startX: e.clientX, startY: e.clientY, moved: false };
+    gesture.current = {
+      kind: 'move',
+      boxes,
+      startX: e.clientX,
+      startY: e.clientY,
+      moved: false,
+      touch,
+      tapEdit: touch && selected.size === 1 && el.type === 'text' ? el.id : undefined,
+    };
   }
 
   function startMarquee(e: React.PointerEvent) {
+    // Рамки выделения пальцем нет: касание пустого места двигает холст —
+    // его подхватит обработчик холста.
+    if (e.pointerType === 'touch') return;
     if (e.button !== 0) return;
     setEditingId(null);
     if (!e.shiftKey) setSelected(new Set());
@@ -1389,19 +1638,159 @@ export function EditorPage() {
     </>
   );
 
+  /* Содержимое панели — одно для колонки справа и для полулиста на телефоне. */
+  const panelBody = (
+    <>
+            {panel === 'fields' ? (
+              <FieldsList
+                header={
+                  <SheetView
+                    dataMode={dataMode}
+                    onMode={(mode) => setViewMode(mode)}
+                    row={safeRow}
+                    rowCount={rowCount}
+                    onRow={setRowIndex}
+                  />
+                }
+                fields={fields}
+                samples={previewData}
+                action={{ label: 'Вставить', run: insertField }}
+                draggable
+                notice={
+                  matches.length > 0 ? (
+                    <div className="rounded-lg bg-[var(--warn-soft)] p-2.5 text-[13px] leading-5">
+                      <p>
+                        {matches.length === 1 ? 'Поле макета не нашло колонку' : 'Поля макета не нашли колонки'}:{' '}
+                        {matches.map((m) => `«${m.from}» → «${m.to.name}»`).join(', ')}.
+                      </p>
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        icon={<Wand2 size={14} />}
+                        onClick={() => history.setLayout(applyMatches(layout, matches))}
+                        className="mt-2"
+                      >
+                        Сопоставить
+                      </Button>
+                    </div>
+                  ) : undefined
+                }
+                onCreate={async (title) => {
+                  const field = fieldFromColumn(await recipientMutations.addColumn.mutateAsync({ title }));
+                  // В выделенный текст — сразу: ради этого поле обычно и
+                  // заводят. Без выделения новый блок посреди листа был бы
+                  // сюрпризом, поэтому поле просто появляется в списке.
+                  if (canInsertIntoText) insertField(field);
+                  return field;
+                }}
+              />
+            ) : (
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+                {panel === 'props' && (
+                  <PropertiesPanel
+                    elements={selectedElements}
+                    page={pageBox}
+                    doc={doc.data}
+                    layout={layout}
+                    onSaveEvent={(values) => saveEvent.mutate(values)}
+                    onEventDraft={setEventDraft}
+                    onTextProps={patchTextProps}
+                    onShapeProps={patchShapeProps}
+                    onQrProps={patchQrProps}
+                    onLinkProps={patchLinkProps}
+                    onElement={(patch, commit) => patchElements(selected, (el) => ({ ...el, ...patch }) as SheetElement, commit)}
+                    onBox={(elementId, box) => {
+                      const safe = { ...box, w: Math.max(box.w, 5), h: Math.max(box.h, 5) };
+                      updateBoxes({ [elementId]: moveBox(safe, 0, 0, pageBox.w, pageBox.h) }, true);
+                    }}
+                    onAlign={align}
+                    onDistribute={distribute}
+                    onGroup={() => {
+                      const groupId = crypto.randomUUID();
+                      patchElements(selected, (el) => ({ ...el, groupId }));
+                    }}
+                    onUngroup={() => patchElements(selected, (el) => ({ ...el, groupId: null }))}
+                    onLayer={(where) => {
+                      let next = layout;
+                      for (const elementId of selected) next = moveLayer(next, elementId, where);
+                      history.setLayout(next);
+                    }}
+                    onApplyStyleToAll={applyStyleToAll}
+                    onCopyStyle={() => {
+                      const source = selectedElements.find((el): el is TextElement => el.type === 'text');
+                      if (source) setStyleClipboard(pickTextStyle(source.props));
+                    }}
+                    onPasteStyle={() => styleClipboard && patchTextProps(styleClipboard)}
+                    hasStyleClipboard={styleClipboard !== null}
+                    onDelete={removeSelected}
+                  />
+                )}
+                {panel === 'layers' && (
+                  <LayersPanel
+                    layout={layout}
+                    selected={selected}
+                    onSelect={(elementId, additive) => select(elementId, additive)}
+                    onChange={(next: SheetLayout) => history.setLayout(next)}
+                  />
+                )}
+              </div>
+            )}
+    </>
+  );
+
+  /* Верхняя строка на телефоне — одна, без переносов: отмена и отметка
+     сохранения. Остальное уехало вниз, под большой палец. */
+  const phoneToolbar = (
+    <>
+      <IconButton label="Отменить" onClick={history.undo} disabled={!history.canUndo}>
+        <Undo2 size={20} />
+      </IconButton>
+      <IconButton label="Повторить" onClick={history.redo} disabled={!history.canRedo}>
+        <Redo2 size={20} />
+      </IconButton>
+      <div className="ml-auto flex items-center">
+        <StatusChip tone={saved === 'saved' ? 'done' : saved === 'saving' ? 'progress' : saved === 'error' ? 'error' : 'neutral'}>
+          {saved === 'saved' ? <Check size={13} /> : saved === 'saving' ? <LoaderCircle size={13} className="animate-spin" /> : saved === 'error' ? <TriangleAlert size={13} /> : <Dot size={13} />}
+          {saved === 'error' ? 'Не удалось сохранить' : <span className="sr-only">{saved === 'saved' ? 'Сохранено' : saved === 'saving' ? 'Сохраняем' : 'Есть правки'}</span>}
+        </StatusChip>
+      </div>
+    </>
+  );
+
+  const sheetIndex = Math.max(0, sheets.findIndex((item) => item.id === sheet.id));
+  const editingElement = phone && editingId ? layout.find((el): el is TextElement => el.id === editingId && el.type === 'text') : undefined;
+  const selectionCenter = single ? { x: px(single.x + single.w / 2), y: px(single.y) } : frame ? { x: px(frame.x + frame.w / 2), y: px(frame.y) } : null;
+  const toggleSheet = (next: PhoneSheet) => setPhoneSheet((current) => (current === next ? null : next));
+  const layerOrder = (where: 'front' | 'up' | 'down' | 'back') => {
+    let next = layout;
+    for (const elementId of selected) next = moveLayer(next, elementId, where === 'front' ? 'top' : where === 'back' ? 'bottom' : where);
+    history.setLayout(next);
+  };
+
+
   return (
     // Высота — точным счётом, а не `h-full`: оболочка кабинета больше не
     // задаёт высоту своей колонке (это ломало прилипание разделов на
     // длинных страницах, см. AppShell), и опереться на неё через `h-full`
     // стало не на что. Лист по-прежнему получает ровно экран без шапки.
-    <div className="flex h-[calc(100dvh-var(--app-header))] flex-col">
+    <div
+      className="editor-height flex flex-col"
+      // Пока на телефоне правят текст, редактор ужимается до видимой части
+      // окна: на iOS клавиатура ложится поверх страницы, и панель оформления
+      // иначе ушла бы под неё.
+      style={
+        phone && editingId
+          ? { height: viewport.height - (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--app-header')) || 72) }
+          : undefined
+      }
+    >
       <DocumentChrome
         documentId={id}
         title={page.title}
         isTemplate={page.isTemplate}
         actions={actions}
         tab="sheet"
-        toolbar={toolbar}
+        toolbar={phone ? phoneToolbar : toolbar}
       />
 
       {/* Поле выбора файла спрятано и живёт отдельно от меню: меню
@@ -1458,9 +1847,48 @@ export function EditorPage() {
           ref={containerRef}
           // Граница для панели оформления текста: за холст она не выходит.
           data-canvas
-          className="relative grid flex-1 place-items-center overflow-auto bg-[var(--surface-sunken)] p-6"
-          style={panning ? { cursor: pan.current ? 'grabbing' : 'grab' } : undefined}
+          /*
+            На телефоне лист по центру автополями внутри гибкого ряда, а не
+            `place-items: center`: у сетки то, что вылезло за левый край при
+            увеличении, уходит в минус и прокруткой не достаётся.
+
+            `touch-action: none` — жесты пальцем холст разбирает сам: один
+            палец двигает холст или блок, два — масштаб. Мышь это не трогает.
+          */
+          className={
+            phone
+              ? 'relative flex flex-1 overflow-auto bg-[var(--surface-sunken)] p-4'
+              : 'relative grid flex-1 place-items-center overflow-auto bg-[var(--surface-sunken)] p-6'
+          }
+          style={{ touchAction: 'none', ...(panning ? { cursor: pan.current ? 'grabbing' : 'grab' } : null) }}
+          onPointerDown={(e) => {
+            // Палец на пустом месте холста: двигает холст, а касание без
+            // сдвига снимает выбор. Блоки и ручки сюда жест не отдают.
+            if (e.pointerType === 'touch' && !gesture.current && !pinch.current) startPan(e, true);
+          }}
           onPointerDownCapture={(e) => {
+            if (e.pointerType === 'touch') {
+              touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+              if (touches.current.size >= 2) {
+                // Второй палец — щипок. Начатое первым пальцем закрываем тем,
+                // что успело сдвинуться, и дальше блоки не трогаем.
+                const g = gesture.current;
+                if (g?.moved && g.kind !== 'pan' && g.kind !== 'marquee') endGesture();
+                if (longPress.current) clearTimeout(longPress.current);
+                longPress.current = null;
+                gesture.current = null;
+                setGuides([]);
+                const [a, b] = [...touches.current.values()];
+                pinch.current = {
+                  dist: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)),
+                  zoom,
+                  mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
+                };
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+              }
+            }
             if (!panning) return;
             e.preventDefault();
             e.stopPropagation();
@@ -1521,10 +1949,11 @@ export function EditorPage() {
             </div>
           )}
 
-          <div className="relative" style={{ padding: 18 }}>
-            {/* Линейки в миллиметрах — по краям листа. */}
-            <Ruler axis="x" lengthMm={page.pageWidthMm} zoom={zoom} />
-            <Ruler axis="y" lengthMm={page.pageHeightMm} zoom={zoom} />
+          <div className={phone ? 'relative m-auto' : 'relative'} style={{ padding: phone ? 0 : 18 }}>
+            {/* Линейки в миллиметрах — по краям листа. На телефоне их нет:
+                цифры в 9 точек там не прочесть, а место у листа они съедают. */}
+            {!phone && <Ruler axis="x" lengthMm={page.pageWidthMm} zoom={zoom} />}
+            {!phone && <Ruler axis="y" lengthMm={page.pageHeightMm} zoom={zoom} />}
 
             <div
               ref={sheetRef}
@@ -1576,6 +2005,7 @@ export function EditorPage() {
                       }}
                       onChange={(richDoc) => setDoc(element.id, richDoc, false)}
                       openField={openField}
+                      toolbar={!phone}
                       onDone={(richDoc) => {
                         setOpenField(null);
                         liveEditor.current = null;
@@ -1689,7 +2119,7 @@ export function EditorPage() {
                         <>
                           {/* У картинки только углы: сторона растянула бы рамку,
                               а картинка в ней осталась бы прежней формы. */}
-                          {(el.type === 'image' ? CORNERS : HANDLES).map((handle) => (
+                          {(el.type === 'image' ? CORNERS : phone ? PHONE_HANDLES : HANDLES).map((handle) => (
                             <span
                               key={handle}
                               onPointerDown={(e) => {
@@ -1709,7 +2139,9 @@ export function EditorPage() {
                               }}
                               style={handleStyle(handle, { x: px(el.w) < TIGHT_PX, y: px(el.h) < TIGHT_PX })}
                               className="absolute h-2.5 w-2.5 rounded-full border border-[var(--surface)] bg-[var(--focus)]"
-                            />
+                            >
+                              <TouchZone />
+                            </span>
                           ))}
                           {/* Ручка поворота — над верхним краем. Shift — с шагом в 15°. */}
                           <span
@@ -1727,9 +2159,11 @@ export function EditorPage() {
                               };
                             }}
                             title="Повернуть (Shift — с шагом 15°)"
-                            style={{ top: -22, left: 'calc(50% - 5px)', cursor: 'grab' }}
+                            style={{ top: phone ? -34 : -22, left: 'calc(50% - 5px)', cursor: 'grab' }}
                             className="absolute h-2.5 w-2.5 rounded-full border border-[var(--surface)] bg-[var(--accent)]"
-                          />
+                          >
+                            <TouchZone />
+                          </span>
                         </>
                       )}
                     </div>
@@ -1762,9 +2196,21 @@ export function EditorPage() {
                       }}
                       style={{ ...handleStyle(handle), pointerEvents: 'auto' }}
                       className="absolute h-3 w-3 rounded-sm border border-[var(--surface)] bg-[var(--focus)]"
-                    />
+                    >
+                      <TouchZone />
+                    </span>
                   ))}
                 </div>
+              )}
+
+              {phone && selectionCenter && !editingId && (
+                <MiniBar
+                  left={selectionCenter.x}
+                  top={selectionCenter.y - 14}
+                  onDuplicate={() => cloneInto(selectedElements)}
+                  onDelete={removeSelected}
+                  onMore={() => setCtxOpen(true)}
+                />
               )}
 
               {marquee && (
@@ -1780,7 +2226,7 @@ export function EditorPage() {
         {/* Панели справа нет, пока она не нужна: лист занимает весь экран,
             как в любом редакторе документов. Открывают её значком на панели
             или первым выделенным блоком. */}
-        {!panel && (
+        {!phone && !panel && (
           <aside
             aria-label="Свёрнутая панель"
             className="flex w-11 shrink-0 flex-col items-center gap-1 border-l border-[var(--line)] bg-[var(--surface)] py-2"
@@ -1799,7 +2245,7 @@ export function EditorPage() {
             </IconButton>
           </aside>
         )}
-        {panel && (
+        {!phone && panel && (
           // На узком экране панель выезжает поверх холста, а не делит с ним
           // ширину: иначе лист ужимался до десятой доли и работать было не на чем.
           <aside
@@ -1822,105 +2268,69 @@ export function EditorPage() {
                 <ChevronsRight size={15} />
               </IconButton>
             </div>
-            {panel === 'fields' ? (
-              <FieldsList
-                header={
-                  <SheetView
-                    dataMode={dataMode}
-                    onMode={(mode) => setViewMode(mode)}
-                    row={safeRow}
-                    rowCount={rowCount}
-                    onRow={setRowIndex}
-                  />
-                }
-                fields={fields}
-                samples={previewData}
-                action={{ label: 'Вставить', run: insertField }}
-                draggable
-                notice={
-                  matches.length > 0 ? (
-                    <div className="rounded-lg bg-[var(--warn-soft)] p-2.5 text-[13px] leading-5">
-                      <p>
-                        {matches.length === 1 ? 'Поле макета не нашло колонку' : 'Поля макета не нашли колонки'}:{' '}
-                        {matches.map((m) => `«${m.from}» → «${m.to.name}»`).join(', ')}.
-                      </p>
-                      <Button
-                        size="sm"
-                        variant="primary"
-                        icon={<Wand2 size={14} />}
-                        onClick={() => history.setLayout(applyMatches(layout, matches))}
-                        className="mt-2"
-                      >
-                        Сопоставить
-                      </Button>
-                    </div>
-                  ) : undefined
-                }
-                onCreate={async (title) => {
-                  const field = fieldFromColumn(await recipientMutations.addColumn.mutateAsync({ title }));
-                  // В выделенный текст — сразу: ради этого поле обычно и
-                  // заводят. Без выделения новый блок посреди листа был бы
-                  // сюрпризом, поэтому поле просто появляется в списке.
-                  if (canInsertIntoText) insertField(field);
-                  return field;
-                }}
-              />
-            ) : (
-            <div className="min-h-0 flex-1 overflow-y-auto p-4">
-                {panel === 'props' && (
-                  <PropertiesPanel
-                    elements={selectedElements}
-                    page={pageBox}
-                    doc={doc.data}
-                    layout={layout}
-                    onSaveEvent={(values) => saveEvent.mutate(values)}
-                    onEventDraft={setEventDraft}
-                    onTextProps={patchTextProps}
-                    onShapeProps={patchShapeProps}
-                    onQrProps={patchQrProps}
-                    onLinkProps={patchLinkProps}
-                    onElement={(patch, commit) => patchElements(selected, (el) => ({ ...el, ...patch }) as SheetElement, commit)}
-                    onBox={(elementId, box) => {
-                      const safe = { ...box, w: Math.max(box.w, 5), h: Math.max(box.h, 5) };
-                      updateBoxes({ [elementId]: moveBox(safe, 0, 0, pageBox.w, pageBox.h) }, true);
-                    }}
-                    onAlign={align}
-                    onDistribute={distribute}
-                    onGroup={() => {
-                      const groupId = crypto.randomUUID();
-                      patchElements(selected, (el) => ({ ...el, groupId }));
-                    }}
-                    onUngroup={() => patchElements(selected, (el) => ({ ...el, groupId: null }))}
-                    onLayer={(where) => {
-                      let next = layout;
-                      for (const elementId of selected) next = moveLayer(next, elementId, where);
-                      history.setLayout(next);
-                    }}
-                    onApplyStyleToAll={applyStyleToAll}
-                    onCopyStyle={() => {
-                      const source = selectedElements.find((el): el is TextElement => el.type === 'text');
-                      if (source) setStyleClipboard(pickTextStyle(source.props));
-                    }}
-                    onPasteStyle={() => styleClipboard && patchTextProps(styleClipboard)}
-                    hasStyleClipboard={styleClipboard !== null}
-                    onDelete={removeSelected}
-                  />
-                )}
-                {panel === 'layers' && (
-                  <LayersPanel
-                    layout={layout}
-                    selected={selected}
-                    onSelect={(elementId, additive) => select(elementId, additive)}
-                    onChange={(next: SheetLayout) => history.setLayout(next)}
-                  />
-                )}
+            {panelBody}
+          </aside>
+        )}
+        {phone && !editingId && (
+          <>
+            <ViewPill dataMode={dataMode} rowCount={rowCount} row={safeRow} onMode={setViewMode} onRow={setRowIndex} />
+            <PagePill
+              index={sheetIndex}
+              count={sheets.length}
+              onSelect={(index) => {
+                const target = sheets[index];
+                if (!target) return;
+                setSelected(new Set());
+                setActiveSheetId(target.id);
+              }}
+              onAdd={() => addSheet.mutate()}
+            />
+            {multi && (
+              <div className="pointer-events-auto absolute top-3 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-xl bg-[var(--text)] py-1 pr-1 pl-4 text-sm text-white shadow-[var(--shadow-lg)]">
+                Выбрано {selected.size}
+                <button type="button" onClick={() => setMulti(false)} className="h-9 rounded-lg px-3 font-semibold text-[#8fc0ff]">
+                  Готово
+                </button>
               </div>
             )}
-          </aside>
+          </>
         )}
       </div>
 
+      {phone && editingElement && (
+        <PhoneFormatBar
+          editor={liveEditor.current}
+          base={editingElement.props}
+          fields={fields}
+          onProps={(patch) => patchTextProps(patch)}
+          onInsertField={insertField}
+          // Тем же путём, что Escape на клавиатуре: живой редактор сам
+          // запишет шаг в историю и закроется. Снять фокус недостаточно —
+          // в браузере без настоящего фокуса blur не приходит.
+          onDone={() => liveEditor.current?.view.dom.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))}
+        />
+      )}
+
+      {phone && !editingId && (
+        <PhoneToolbar
+          selectedCount={selected.size}
+          canEditText={single?.type === 'text' && !single.locked}
+          locked={allLocked}
+          sheet={phoneSheet}
+          fieldsBadge={matches.length || undefined}
+          onInsert={() => setInsertOpen(true)}
+          onSheet={toggleSheet}
+          onBackground={pickBackground}
+          backgroundBusy={uploadBackground.isPending}
+          onEditText={() => single && setEditingId(single.id)}
+          onDuplicate={() => cloneInto(selectedElements)}
+          onLock={() => patchElements(selected, (el) => ({ ...el, locked: !allLocked }))}
+          onDelete={removeSelected}
+        />
+      )}
+
       {/* Закладки листов — внизу, как в любом редакторе страниц. */}
+      {!phone && (
       <SheetTabs
         sheets={sheets}
         activeId={sheet.id}
@@ -1933,6 +2343,54 @@ export function EditorPage() {
         onDelete={(sheetId) => deleteSheet.mutate(sheetId)}
         adding={addSheet.isPending}
       />
+      )}
+
+      {phone && (
+        <>
+          <InsertSheet
+            open={insertOpen}
+            onClose={() => setInsertOpen(false)}
+            onInsert={(what) => addElement(what)}
+            fields={fields}
+            onBackground={pickBackground}
+            onImage={pickImage}
+            backgroundLoading={uploadBackground.isPending}
+            hasBackground={hasBackground}
+          />
+          <BottomSheet
+            open={panel !== null}
+            onClose={() => setPhoneSheet(null)}
+            title={panel === 'layers' ? 'Слои' : panel === 'fields' ? 'Поля' : selected.size ? 'Свойства блока' : 'Лист'}
+            className="h-[62vh]"
+          >
+            <div className="flex min-h-0 flex-1 flex-col">{panelBody}</div>
+          </BottomSheet>
+          <PositionSheet
+            open={phoneSheet === 'position'}
+            onClose={() => setPhoneSheet(null)}
+            box={single ? { x: single.x, y: single.y, w: single.w, h: single.h } : null}
+            onAlign={align}
+            onLayer={layerOrder}
+            onNudge={(dx, dy) => patchElements(selected, (el) => (el.locked ? el : { ...el, ...roundBox(nudgeBox(el, dx, dy, pageBox)) }))}
+            onBox={(box) => {
+              if (!single) return;
+              const safe = { ...box, w: Math.max(box.w, 5), h: Math.max(box.h, 5) };
+              updateBoxes({ [single.id]: moveBox(safe, 0, 0, pageBox.w, pageBox.h) }, true);
+            }}
+          />
+          <ContextSheet
+            open={ctxOpen}
+            locked={allLocked}
+            canSelectBehind={single !== null}
+            onClose={() => setCtxOpen(false)}
+            onDuplicate={() => cloneInto(selectedElements)}
+            onMulti={() => setMulti(true)}
+            onSelectBehind={selectBehind}
+            onLock={() => patchElements(selected, (el) => ({ ...el, locked: !allLocked }))}
+            onDelete={removeSelected}
+          />
+        </>
+      )}
 
       {fileMenu.dialogs}
 
