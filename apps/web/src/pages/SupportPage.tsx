@@ -23,7 +23,7 @@ export function SupportPage() {
 
   return (
     <PageLayout head={<SectionTitle>Поддержка</SectionTitle>}>
-      <div className="max-w-3xl">
+      <div className="mx-auto max-w-3xl">
         <SettingsStack>
           <Support />
           <div id="roadmap" className="scroll-mt-24">

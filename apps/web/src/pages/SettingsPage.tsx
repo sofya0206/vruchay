@@ -48,7 +48,10 @@ export function SettingsPage() {
       }
       head={<SectionTitle>{current?.title ?? 'Настройки'}</SectionTitle>}
     >
-      <div className="max-w-3xl">
+      {/* Колонка читается в ~70 знаков, поэтому она узкая; по центру, а не
+          у левого края — иначе на широком окне справа остаётся пустая
+          полоса шире самой колонки. */}
+      <div className="mx-auto max-w-3xl">
         <Outlet />
       </div>
     </SectionLayout>
