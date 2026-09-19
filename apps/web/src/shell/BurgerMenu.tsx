@@ -4,6 +4,7 @@ import { BookOpen, House, Menu, Settings, X } from 'lucide-react';
 import { IconButton } from '../ui/IconButton';
 import { cn } from '../ui/cn';
 import { NAV_ITEMS, activeNav } from './nav';
+import { LearnNavItem } from '../onboarding/LearnNavItem';
 
 /**
  * Разделы на узком экране — тот же список, что в колонке слева на широком.
@@ -100,6 +101,7 @@ export function BurgerMenu() {
                 <BookOpen size={20} strokeWidth={1.75} />
                 База знаний
               </Link>
+              <LearnNavItem onDone={() => setOpen(false)} />
             </div>
           </aside>
         </div>

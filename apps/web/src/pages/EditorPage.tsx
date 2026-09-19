@@ -58,10 +58,14 @@ import { useDocumentFileMenu } from '../editor/DocumentFileMenu';
 import { SheetTabs } from '../editor/SheetTabs';
 import type { MenuEntry } from '../editor/DocumentChrome';
 import { StatusChip } from '../ui/Field';
+import { Hotspot } from '../onboarding/Hotspot';
+import { onboarding } from '../onboarding/store';
+import { track } from '../onboarding/track';
 import { IconButton } from '../ui/IconButton';
 import { Menu, MenuItem } from '../ui/Menu';
 import { Select } from '../ui/Select';
 import { api } from '../api/client';
+import { useMe } from '../auth/useAuth';
 import { useOrgProfile } from '../api/org';
 import { useRecipientMutations } from '../api/recipients';
 import { useDocumentFields } from '../editor/useDocumentFields';
@@ -225,6 +229,10 @@ export function EditorPage() {
    */
   const fieldsOpen = useFieldsPanelOpen();
   const panel: Panel | null = fieldsOpen ? 'fields' : otherPanel;
+  // Панель «Данные» открыта — точка у вкладки больше не нужна.
+  useEffect(() => {
+    if (panel === 'fields') onboarding.markSeen('fields');
+  }, [panel]);
   const setPanel = (next: Panel | null) => {
     setFieldsPanelOpen(next === 'fields');
     if (next !== 'fields') setOtherPanel(next);
@@ -277,6 +285,14 @@ export function EditorPage() {
     queryKey: ['document', id],
     queryFn: () => api.get<DocumentDetail>(`/documents/${id}`),
   });
+
+  // Первое открытие листа — подсказки по нему, как тур: один раз, дальше из «?».
+  const email = useMe().data?.email;
+  useEffect(() => {
+    if (!doc.data || !email) return;
+    onboarding.load(email);
+    if (onboarding.autoTips('editor')) track({ flow: 'tips', step: 'editor.1', action: 'shown' });
+  }, [doc.data, email]);
 
   /*
    * Какой лист правим. Держим по идентификатору, а не по номеру: после
@@ -1814,6 +1830,7 @@ export function EditorPage() {
               </Tab>
               <Tab active={panel === 'fields'} onClick={() => setPanel('fields')} icon={<Variable size={14} />} badge={matches.length || undefined}>
                 Данные
+                <Hotspot id="fields" />
               </Tab>
               <Tab active={panel === 'layers'} onClick={() => setPanel('layers')} icon={<Layers size={14} />}>
                 Слои

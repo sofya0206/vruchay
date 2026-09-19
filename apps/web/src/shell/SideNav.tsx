@@ -8,6 +8,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '../ui/cn';
+import { LearnNavItem } from '../onboarding/LearnNavItem';
 import { NAV_ITEMS, activeNav } from './nav';
 
 /**
@@ -78,6 +79,7 @@ export function SideNav({ collapsed, onToggle }: { collapsed: boolean; onToggle:
             active={pathname.startsWith('/docs')}
             collapsed={collapsed}
           />
+          <LearnNavItem collapsed={collapsed} />
           <button
             type="button"
             onClick={onToggle}

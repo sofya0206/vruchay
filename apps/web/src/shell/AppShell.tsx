@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { InstallHint } from '../ui/InstallHint';
+import { useMe } from '../auth/useAuth';
+import { Guide } from '../onboarding/Guide';
+import { HintCard } from '../onboarding/HintCard';
+import { HelpButton } from '../onboarding/HelpButton';
+import { SectionTips } from '../onboarding/SectionTips';
+import { onboarding } from '../onboarding/store';
 import { AccountMenu } from './AccountMenu';
 import { Brand } from './Brand';
 import { BurgerMenu } from './BurgerMenu';
@@ -37,6 +43,12 @@ function isMaterial(pathname: string): boolean {
  */
 export function AppShell() {
   const { pathname } = useLocation();
+  const email = useMe().data?.email;
+
+  // Погасшие точки у каждого, кто вошёл, свои.
+  useEffect(() => {
+    if (email) onboarding.load(email);
+  }, [email]);
 
   /*
    * Колонка разделов: человек сворачивает её сам, и это запоминается.
@@ -84,6 +96,7 @@ export function AppShell() {
           </Link>
 
           <div className="ml-auto flex items-center gap-1">
+            <HelpButton />
             <AccountMenu />
           </div>
         </div>
@@ -114,6 +127,9 @@ export function AppShell() {
       </div>
 
       <InstallHint />
+      <HintCard />
+      <SectionTips />
+      <Guide />
     </div>
   );
 }
