@@ -119,17 +119,38 @@ export function WalkthroughPanel({ step, as: Heading = 'h3' }: { step: Step; as?
   );
 }
 
-/** Тот же рассказ на посадочной: секция с якорем, на который ведёт кнопка первого экрана. */
+/**
+ * Тот же рассказ на посадочной: секция с якорем, на который ведёт кнопка первого экрана.
+ *
+ * Все четыре шага лежат в одной ячейке сетки друг под другом: высота блока —
+ * по самому высокому, и при переключении закладки и текст не прыгают
+ * (экраны продукта разной высоты, а секция центрируется по вертикали).
+ * Невидимые шаги скрыты для читалки и клавиатуры.
+ */
 export function HowItWorks() {
   const [tab, setTab] = useState(WALKTHROUGH[0].id);
-  const step = WALKTHROUGH.find((t) => t.id === tab) ?? WALKTHROUGH[0];
 
   return (
     <section id="kak" className="vru-screen">
       <div className="mx-auto w-full max-w-[var(--width-page)] px-6 py-16">
         <WalkthroughTabs value={tab} onChange={setTab} className="vru-reveal" />
-        <div className="vru-reveal mt-8" style={{ '--reveal-i': 1 } as CSSProperties}>
-          <WalkthroughPanel step={step} />
+        <div className="vru-reveal mt-8 grid" style={{ '--reveal-i': 1 } as CSSProperties}>
+          {WALKTHROUGH.map((step) => {
+            const active = step.id === tab;
+            return (
+              <div
+                key={step.id}
+                className={`[grid-area:1/1] transition-opacity duration-300 ${
+                  active ? 'opacity-100' : 'pointer-events-none opacity-0'
+                }`}
+                aria-hidden={!active}
+                // inert: скрытый шаг не ловит фокус с клавиатуры.
+                inert={!active}
+              >
+                <WalkthroughPanel step={step} />
+              </div>
+            );
+          })}
         </div>
       </div>
     </section>
