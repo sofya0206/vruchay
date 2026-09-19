@@ -36,6 +36,11 @@ export interface InlineTextEditorProps {
   /** Куда деть каретку при входе: в конец либо в позицию. */
   focusAt?: 'end' | number;
   /**
+   * Плавающая панель оформления над блоком. На телефоне её нет: панель
+   * там стоит внизу, над клавиатурой (PhoneFormatBar).
+   */
+  toolbar?: boolean;
+  /**
    * Сразу открыть настройки n-го поля блока, считая с нуля.
    *
    * Правая кнопка по фишке на неактивном блоке входит в правку и тут же
@@ -54,6 +59,7 @@ export function InlineTextEditor({
   onChange,
   onDone,
   focusAt = 'end',
+  toolbar = true,
   openField = null,
 }: InlineTextEditorProps) {
   const [suggestion, setSuggestion] = useState<SuggestionState | null>(null);
@@ -153,7 +159,7 @@ export function InlineTextEditor({
   return (
     <FieldContext.Provider value={context}>
       <EditorContent editor={editor} style={{ width: '100%' }} />
-      <FormatToolbar editor={editor} fields={fields} base={element.props} />
+      {toolbar && <FormatToolbar editor={editor} fields={fields} base={element.props} />}
       <SuggestionList state={suggestion} />
       {fieldPos !== null && (
         <FieldPopover

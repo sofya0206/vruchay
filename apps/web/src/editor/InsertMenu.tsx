@@ -2,12 +2,17 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ChevronDown,
   ChevronRight,
+  Circle,
+  Image as ImageIcon,
   Link2,
+  Minus,
   Plus,
   QrCode,
+  Square,
   Type,
 } from 'lucide-react';
 import type { FieldInfo } from './fields';
+import { BottomSheet } from '../ui/BottomSheet';
 
 export type InsertKind =
   | { type: 'text'; field?: FieldInfo }
@@ -45,7 +50,7 @@ export function InsertMenu({
 
   useEffect(() => {
     if (!open) return;
-    const close = (e: MouseEvent) => {
+    const close = (e: PointerEvent) => {
       if (!wrap.current?.contains(e.target as Node)) {
         setOpen(false);
         setSubmenu(null);
@@ -58,10 +63,10 @@ export function InsertMenu({
       if (submenu) setSubmenu(null);
       else setOpen(false);
     };
-    document.addEventListener('mousedown', close);
+    document.addEventListener('pointerdown', close);
     document.addEventListener('keydown', esc);
     return () => {
-      document.removeEventListener('mousedown', close);
+      document.removeEventListener('pointerdown', close);
       document.removeEventListener('keydown', esc);
     };
   }, [open, submenu]);
@@ -200,7 +205,10 @@ function Item({
       aria-haspopup={onHover ? 'menu' : undefined}
       aria-expanded={onHover ? submenu : undefined}
       onClick={onClick}
-      onMouseEnter={onHover}
+      // Наведение — только мышью. Касание на планшете присылает эмуляцию
+      // наведения прямо перед нажатием, и подменю открывалось, а нажатие
+      // тут же его закрывало.
+      onPointerEnter={(e) => e.pointerType === 'mouse' && onHover?.()}
       className="flex w-full items-start gap-3 px-3 py-2.5 text-left hover:bg-[var(--surface-sunken)] disabled:opacity-50"
     >
       <span className="mt-0.5 text-[var(--text-muted)]">{icon}</span>
@@ -246,5 +254,113 @@ function SubItem({
       <span className="min-w-0 flex-1 truncate text-sm">{title}</span>
       <span className="shrink-0 text-xs text-[var(--text-muted)]">{hint}</span>
     </button>
+  );
+}
+
+/**
+ * То же меню «Вставить» нижним листом — для телефона.
+ *
+ * Вложенных списков нет: на экране в 375 точек второй уровень уходил бы
+ * за край. Поля таблицы — фишками, редкое — плитками.
+ */
+export function InsertSheet({
+  open,
+  onClose,
+  onInsert,
+  fields = [],
+  onBackground,
+  onImage,
+  backgroundLoading = false,
+  hasBackground = false,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onInsert: (what: InsertKind) => void;
+  fields?: FieldInfo[];
+  onBackground: () => void;
+  onImage: () => void;
+  backgroundLoading?: boolean;
+  hasBackground?: boolean;
+}) {
+  const pick = (what: InsertKind) => {
+    onInsert(what);
+    onClose();
+  };
+  const columns = fields.filter((f) => f.kind === 'column');
+  const system = fields.filter((f) => f.kind === 'system');
+  const label = (text: string) => (
+    <p className="px-5 pt-3.5 pb-2 text-[12px] font-medium tracking-wider text-[var(--text-muted)] uppercase">{text}</p>
+  );
+  const chips = (items: FieldInfo[]) => (
+    <div className="flex flex-wrap gap-2 px-5 pb-1">
+      {items.map((f) => (
+        <button
+          key={f.source}
+          type="button"
+          role="menuitem"
+          onClick={() => pick({ type: 'text', field: f })}
+          className="inline-flex h-10 items-center gap-1.5 rounded-full border border-[var(--line-strong)] px-3.5 text-[15px] text-[var(--text)] active:bg-[var(--surface-sunken)]"
+        >
+          <Plus size={14} className="text-[var(--accent)]" strokeWidth={2.4} />
+          {f.title}
+        </button>
+      ))}
+    </div>
+  );
+  const tile = (icon: React.ReactNode, title: string, hint: string, onClick: () => void, disabled = false) => (
+    <button
+      type="button"
+      role="menuitem"
+      disabled={disabled}
+      onClick={() => {
+        onClose();
+        onClick();
+      }}
+      className="flex h-[84px] flex-col items-center justify-center gap-1.5 rounded-2xl bg-[var(--surface-sunken)] text-[var(--text)] active:bg-[var(--accent-soft)] disabled:opacity-50"
+    >
+      {icon}
+      <span className="text-sm font-medium">{title}</span>
+      <span className="-mt-1 text-[11px] text-[var(--text-muted)]">{hint}</span>
+    </button>
+  );
+
+  return (
+    <BottomSheet open={open} onClose={onClose} title="Вставить на лист" className="h-[82vh]">
+      <div role="menu" className="min-h-0 flex-1 overflow-y-auto pb-4">
+        {label('Текст')}
+        <div className="px-5 pb-1">
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => pick({ type: 'text' })}
+            className="flex h-12 w-full items-center gap-3 rounded-xl bg-[var(--surface-sunken)] px-4 text-left active:bg-[var(--accent-soft)]"
+          >
+            <Type size={20} className="text-[var(--text-muted)]" />
+            <span className="text-[15px] font-medium">Текстовый блок</span>
+            <span className="ml-auto text-[13px] text-[var(--text-muted)]">без подстановки</span>
+          </button>
+        </div>
+        {columns.length > 0 && (
+          <>
+            {label('Из таблицы получателей')}
+            {chips(columns)}
+          </>
+        )}
+        {label('Подставит сервис')}
+        {chips(system)}
+        {label('Ещё')}
+        <div className="grid grid-cols-4 gap-2.5 px-5">
+          {tile(<QrCode size={24} />, 'QR-код', 'проверка', () => onInsert({ type: 'qr' }))}
+          {tile(<ImageIcon size={24} />, 'Картинка', 'логотип', onImage)}
+          {tile(<Minus size={24} />, 'Линия', 'подпись', () => onInsert({ type: 'shape', kind: 'line' }))}
+          {tile(<Square size={24} />, 'Фигура', 'рамка', () => onInsert({ type: 'shape', kind: 'rect' }))}
+        </div>
+        <div className="grid grid-cols-4 gap-2.5 px-5 pt-2.5">
+          {tile(<Circle size={24} />, 'Овал', 'печать', () => onInsert({ type: 'shape', kind: 'ellipse' }))}
+          {tile(<Link2 size={24} />, 'Ссылка', 'адрес', () => onInsert({ type: 'link' }))}
+          {tile(<ImageIcon size={24} />, hasBackground ? 'Бланк' : 'Бланк', hasBackground ? 'заменить' : 'фон листа', onBackground, backgroundLoading)}
+        </div>
+      </div>
+    </BottomSheet>
   );
 }

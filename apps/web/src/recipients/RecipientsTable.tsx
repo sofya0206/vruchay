@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { GripVertical,
   Ban,
+  CheckCheck,
   CheckCircle2,
   Columns3,
   Download,
@@ -15,6 +16,7 @@ import { GripVertical,
   Rows3,
   Table2,
   Trash2,
+  Upload,
   X,
 } from 'lucide-react';
 import {
@@ -49,6 +51,8 @@ import { useFieldsPanelOpen } from '../editor/fields-sidebar-store';
 import { useDocumentFileMenu } from '../editor/DocumentFileMenu';
 import type { MenuEntry } from '../editor/DocumentChrome';
 import { IconButton } from '../ui/IconButton';
+import { PushOffer } from '../push/PushOffer';
+import { BigListNote } from './BigListNote';
 import { Dialog } from '../ui/Dialog';
 import { Checkbox } from '../ui/Checkbox';
 import type { DocumentDetail } from '../api/types';
@@ -468,7 +472,7 @@ export function RecipientsTable({
 
       <div className="ml-auto flex items-center gap-2">
         <FieldsToggle />
-        <span className="tabular text-sm text-[var(--text-muted)]">
+        <span className="tabular text-sm text-[var(--text-muted)] max-md:hidden">
           отмечено {checkedCount} из {rows.length}
         </span>
 
@@ -551,6 +555,9 @@ export function RecipientsTable({
           />
         }
       />
+
+      {running && <PushOffer />}
+      <BigListNote />
 
       <input
         ref={xlsInput}
@@ -808,7 +815,7 @@ export function RecipientsTable({
                           size="sm"
                           label={`Удалить колонку ${columnTitle(col)}`}
                           onClick={() => m.deleteColumn.mutate(col.id)}
-                          className="size-6 opacity-0 group-hover:opacity-100 hover:text-[var(--danger)]"
+                          className="size-6 opacity-0 group-hover:opacity-100 hover:text-[var(--danger)] pointer-coarse:size-10 pointer-coarse:opacity-100"
                         >
                           <X size={12} />
                         </IconButton>
@@ -874,7 +881,7 @@ export function RecipientsTable({
                         size="sm"
                         label="Удалить строку"
                         onClick={() => m.deleteRow.mutate(row.id)}
-                        className="size-7 opacity-0 group-hover:opacity-100 hover:text-[var(--danger)]"
+                        className="size-7 opacity-0 group-hover:opacity-100 hover:text-[var(--danger)] pointer-coarse:size-10 pointer-coarse:opacity-100"
                       >
                         <Trash2 size={14} />
                       </IconButton>
@@ -886,6 +893,34 @@ export function RecipientsTable({
           )}
         </div>
         {fieldsOpen && <FieldsSidebar documentId={documentId} />}
+      </div>
+
+      {/* На телефоне главное действие — внизу, под большим пальцем; в шапке
+          ему места нет и не достать. Загрузка списка — рядом значком. */}
+      <div
+        className="flex shrink-0 gap-2.5 border-t border-[var(--line)] bg-[var(--surface)] px-4 pt-3 md:hidden"
+        style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
+      >
+        <button
+          type="button"
+          aria-label="Загрузить список"
+          onClick={() => xlsInput.current?.click()}
+          className="grid size-12 shrink-0 place-items-center rounded-xl border border-[var(--line-strong)] text-[var(--text)]"
+        >
+          <Upload size={20} />
+        </button>
+        <button
+          type="button"
+          disabled={running || checkedCount === 0}
+          onClick={() => setAsking(true)}
+          className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--accent-button)] text-base font-medium text-[var(--accent-contrast)] disabled:opacity-50"
+        >
+          {running ? <LoaderCircle size={18} className="animate-spin" /> : <CheckCheck size={18} />}
+          {running ? 'Выпускаем' : 'Выпуск'}
+          {!running && checkedCount > 0 && (
+            <span className="tabular grid h-6 min-w-6 place-items-center rounded-full bg-white/20 px-2 text-sm font-semibold">{checkedCount}</span>
+          )}
+        </button>
       </div>
 
       {parsed && (

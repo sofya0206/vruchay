@@ -1,8 +1,11 @@
-import { Search, X } from 'lucide-react';
+import { useState } from 'react';
+import { Search, SlidersHorizontal, X } from 'lucide-react';
 import { Input, Label } from '../ui/Field';
 import { DateField } from '../ui/DateField';
 import { Select } from '../ui/Select';
 import { Button } from '../ui/Button';
+import { BottomSheet } from '../ui/BottomSheet';
+import { usePhone } from '../ui/useMediaQuery';
 import type { RegistryFacets, RegistryFilters as Filters } from '../api/registry';
 
 interface Props {
@@ -53,28 +56,17 @@ export function documentOptions(
  * в каком материале выпускалась грамота.
  */
 export function RegistryFilters({ value, facets, onChange, onReset }: Props) {
+  const phone = usePhone();
+  const [open, setOpen] = useState(false);
   const set = <K extends keyof Filters>(key: K, next: Filters[K]) =>
     onChange({ ...value, [key]: next });
 
   const active =
     value.documentId || value.event || value.state || value.mail || value.from || value.to;
 
-  return (
-    <div className="space-y-3">
-      <div className="relative">
-        <Search
-          size={16}
-          className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-[var(--text-muted)]"
-        />
-        <Input
-          className="pl-9"
-          placeholder="Фамилия, адрес почты или проверочный код"
-          value={value.search}
-          onChange={(e) => set('search', e.target.value)}
-          aria-label="Поиск по реестру"
-        />
-      </div>
+  const activeCount = [value.documentId, value.event, value.state, value.mail, value.from || value.to].filter(Boolean).length;
 
+  const grid = (
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {/* Обёртка перестала быть label: подпись к кнопке-списку
             привязывается через aria-label, а <Label> рисует её глазу. */}
@@ -163,6 +155,48 @@ export function RegistryFilters({ value, facets, onChange, onReset }: Props) {
           />
         </div>
       </div>
+  );
+
+  return (
+    <div className="space-y-3">
+      {/* На телефоне поиск и кнопка «Фильтры» в одну строку, сами отборы —
+          нижним листом: шесть полей столбиком выталкивали документы за экран. */}
+      <div className="flex gap-2">
+        <div className="relative min-w-0 flex-1">
+          <Search
+            size={16}
+            className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-[var(--text-muted)]"
+          />
+          <Input
+            className="pl-9 max-md:h-11"
+            placeholder="Фамилия, почта или код"
+            value={value.search}
+            onChange={(e) => set('search', e.target.value)}
+            aria-label="Поиск по реестру"
+          />
+        </div>
+        {phone && (
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="relative inline-flex h-11 shrink-0 items-center gap-2 rounded-lg border border-[var(--line-strong)] px-3 text-sm font-medium"
+          >
+            <SlidersHorizontal size={16} />
+            Фильтры
+            {activeCount > 0 && (
+              <span className="grid h-5 min-w-5 place-items-center rounded-full bg-[var(--accent)] px-1 text-[11px] font-semibold text-white">{activeCount}</span>
+            )}
+          </button>
+        )}
+      </div>
+
+      {phone ? (
+        <BottomSheet open={open} onClose={() => setOpen(false)} title="Фильтры">
+          <div className="px-3 pb-2">{grid}</div>
+        </BottomSheet>
+      ) : (
+        grid
+      )}
 
       {(active || value.search) && (
         <Button size="sm" variant="ghost" icon={<X size={14} />} onClick={onReset}>

@@ -40,7 +40,7 @@ export function RetentionPolicy() {
         <Timer size={18} className="text-[var(--accent)]" />
         Сроки хранения
       </h2>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)]">
+      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
         Закон запрещает держать данные дольше, чем требует цель. Оператор этих данных — вы,
         поэтому срок корзины выбираете тоже вы.
       </p>

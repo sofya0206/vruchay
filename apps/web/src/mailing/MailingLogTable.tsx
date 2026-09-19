@@ -89,7 +89,15 @@ export function MailingLogTable({
           }
         />
       ) : (
-        <div className="overflow-x-auto rounded-2xl ring-1 ring-[var(--line)]">
+        <>
+        {/* На телефоне — карточками: таблица в 832 точки уезжала вбок,
+            и состояние письма — то, ради чего сюда смотрят, — было за краем. */}
+        <ul className="divide-y divide-[var(--line)] overflow-hidden rounded-2xl ring-1 ring-[var(--line)] md:hidden">
+          {items.map((item) => (
+            <CardRow key={item.id} item={item} />
+          ))}
+        </ul>
+        <div className="overflow-x-auto rounded-2xl ring-1 ring-[var(--line)] max-md:hidden">
           <table className="w-full min-w-[52rem] text-sm">
             <thead className="bg-[var(--surface-sunken)] text-left text-[var(--text-muted)]">
               <tr>
@@ -107,6 +115,7 @@ export function MailingLogTable({
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {truncated && (
@@ -129,6 +138,35 @@ const STATUS_ICONS: Record<LogItem['status'], LucideIcon> = {
   bounced: X,
   failed: X,
 };
+
+const TONE_COLORS = {
+  neutral: 'bg-[var(--surface-sunken)] text-[var(--text-muted)]',
+  progress: 'bg-[var(--award-soft)] text-[var(--award)]',
+  done: 'bg-[var(--ok-soft)] text-[var(--ok)]',
+  danger: 'bg-[var(--danger-soft)] text-[var(--danger)]',
+} as const;
+
+/** Письмо на телефоне: кому и состояние — первой строкой, тема и время — второй. */
+function CardRow({ item }: { item: LogItem }) {
+  const Icon = STATUS_ICONS[item.status];
+  return (
+    <li className="flex flex-col gap-1 px-4 py-3">
+      <span className="flex items-center justify-between gap-3">
+        <span className="min-w-0 truncate text-[15px] font-medium">{item.toEmail}</span>
+        <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${TONE_COLORS[statusTone(item.status)]}`}>
+          <Icon size={12} strokeWidth={2} />
+          {STATUS_LABELS[item.status]}
+        </span>
+      </span>
+      <span className="truncate text-[13px] text-[var(--text-muted)]">{item.subject}</span>
+      <span className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+        <span className="tabular-nums">{formatLetterTime(item.sentAt ?? item.queuedAt)}</span>
+        {item.documentTitle && <span className="min-w-0 truncate">· {item.documentTitle}</span>}
+      </span>
+      {item.problem && <span className="text-[13px] text-[var(--danger)]">{item.problem.reason}</span>}
+    </li>
+  );
+}
 
 function Row({ item }: { item: LogItem }) {
   const tone = statusTone(item.status);

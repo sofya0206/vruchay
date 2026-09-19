@@ -135,7 +135,10 @@ export function PropertiesPanel(props: Props) {
       {single && (
         <div>
           <Label>Положение и размер, мм</Label>
-          <div className="grid grid-cols-4 gap-1.5">
+          {/* Четыре в ряд — на колонке в 320 точек. На телефоне панель во всю
+              ширину, но у поля там стрелки под палец, и «225.5» в четверть
+              строки не влезало: там по два в ряд. */}
+          <div className="grid grid-cols-4 gap-1.5 max-md:grid-cols-2 max-md:gap-2">
             {(['x', 'y', 'w', 'h'] as const).map((key) => (
               <label key={key} className="block">
                 <span className="block text-center text-[10px] uppercase text-[var(--text-muted)]">{key}</span>

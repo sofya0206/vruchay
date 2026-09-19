@@ -198,6 +198,7 @@ model Organization {
   supportTickets SupportTicket[]
   roadmapVotes   RoadmapVote[]
   plans         Plan[]
+  pushSubscriptions PushSubscription[]
 
   @@map("organizations")
 }
@@ -242,6 +243,8 @@ model User {
   loginEvents  LoginEvent[]
   supportTickets   SupportTicket[]
   supportMessages  SupportMessage[]
+  pushSubscriptions PushSubscription[]
+  generationJobs    GenerationJob[]
 
   @@map("users")
 }
@@ -800,12 +803,20 @@ model GenerationJob {
    */
   attempt    Int       @default(1)
 
+  /**
+   * Кто запустил выпуск — ему и уходит push «готово» (ADR-0004).
+   * Пусто у заданий, запущенных до появления поля, у выпусков по форме
+   * на сайте и у тех, чей автор удалён из системы.
+   */
+  createdById String?  @map("created_by_id") @db.Uuid
+
   createdAt  DateTime  @default(now()) @map("created_at")
   startedAt  DateTime? @map("started_at")
   finishedAt DateTime? @map("finished_at")
 
-  org      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  document Document     @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  document  Document     @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  createdBy User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
   files    File[]       @relation("JobFiles")
   rowFailures GenerationRowFailure[]
 
@@ -1719,6 +1730,35 @@ model RoadmapVote {
   @@id([itemId, orgId])
   @@index([orgId])
   @@map("roadmap_votes")
+}
+
+/**
+ * Подписка браузера на push-уведомления (ADR-0004).
+ *
+ * Принадлежит человеку в организации: сотрудник двух организаций получает
+ * уведомления о выпусках той, в которой их запускал. Адрес подписки выдаёт
+ * push-сервис браузера (FCM, APNs, Mozilla) — он же и ключ: один браузер,
+ * одна подписка, сколько бы раз человек ни нажимал «Включить».
+ *
+ * Персональных данных здесь нет, и в сами уведомления они не кладутся:
+ * тело push уходит через сторонний сервис доставки за пределы контура.
+ */
+model PushSubscription {
+  id         String   @id @default(uuid()) @db.Uuid
+  orgId      String   @map("org_id") @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  endpoint   String   @unique
+  p256dh     String
+  auth       String
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at")
+  lastSeenAt DateTime @default(now()) @map("last_seen_at")
+
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, orgId])
+  @@map("push_subscriptions")
 }
 
 /// Сколько раз показали, прошли и закрыли каждый слайд обучения и каждую

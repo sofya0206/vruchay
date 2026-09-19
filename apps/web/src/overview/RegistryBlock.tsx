@@ -18,6 +18,7 @@ import {
 import { cn } from '../ui/cn';
 import { Input, StatusChip } from '../ui/Field';
 import { Card, Empty } from './Block';
+import { plural } from './format';
 
 const LAST_SHOWN = 6;
 
@@ -105,7 +106,7 @@ export function RegistryBlock() {
               className="pl-9 pr-9 text-sm"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Фамилия, почта или проверочный код"
+              placeholder="Фамилия, почта или код"
               aria-label="Найти в реестре выданного"
               autoComplete="off"
             />
@@ -114,14 +115,14 @@ export function RegistryBlock() {
                 type="button"
                 onClick={clear}
                 aria-label="Очистить поиск"
-                className="absolute top-1/2 right-2 grid size-6 -translate-y-1/2 place-items-center rounded text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
+                className="absolute top-1/2 right-2 grid size-6 -translate-y-1/2 place-items-center rounded text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)] pointer-coarse:right-0.5 pointer-coarse:size-10"
               >
                 <X size={14} />
               </button>
             )}
           </div>
         </form>
-        <div role="tablist" aria-label="Состояние" className="flex flex-wrap gap-1">
+        <div role="tablist" aria-label="Состояние" className="no-scrollbar flex gap-1 max-md:-mx-1 max-md:w-full max-md:overflow-x-auto max-md:px-1 max-md:py-0.5 md:flex-wrap">
           {TABS.map((item) => (
             <button
               key={item.id}
@@ -130,7 +131,7 @@ export function RegistryBlock() {
               aria-selected={tab === item.id}
               onClick={() => setTab(item.id)}
               className={cn(
-                'inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-sm transition-colors',
+                'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-sm transition-colors pointer-coarse:h-10',
                 tab === item.id
                   ? 'bg-[var(--surface)] font-medium text-[var(--text)] ring-1 ring-[var(--line-strong)]'
                   : 'text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]',
@@ -167,7 +168,38 @@ export function RegistryBlock() {
           className={cn('overflow-x-auto transition-opacity', stale && 'opacity-60')}
           aria-busy={stale}
         >
-          <table className="w-full min-w-[46rem] table-fixed border-collapse text-sm">
+          {/* На телефоне — карточками. Таблица в 736 точек там прокручивалась
+              вбок, и «Состояние» с «Письмом» — то, ради чего организатор
+              и смотрит реестр на мероприятии, — оставались за краем. */}
+          <ul className="divide-y divide-[var(--line)] md:hidden">
+            {rows.map((row) => (
+              <li key={row.fileId}>
+                <Link
+                  to={searchPath(row.name)}
+                  className="flex flex-col gap-1.5 px-4 py-3 active:bg-[var(--surface-sunken)]"
+                >
+                  <span className="flex items-start justify-between gap-3">
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium">{row.name}</span>
+                      <span className="block truncate text-xs text-[var(--text-muted)]">
+                        {row.documentTitle}
+                        {row.eventName ? ` · ${row.eventName}` : ''}
+                      </span>
+                    </span>
+                    <StatusChip tone={stateTone(row)}>{stateLabel(row)}</StatusChip>
+                  </span>
+                  <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--text-muted)]">
+                    <StatusChip tone={mailTone(row.mail?.status)}>{mailLabel(row.mail?.status)}</StatusChip>
+                    <span className="tabular-nums">{formatDate(row.issuedAt)}</span>
+                    <span className="tabular-nums">
+                      {row.verifyCount} {plural(row.verifyCount, 'проверка', 'проверки', 'проверок')}
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <table className="w-full min-w-[46rem] table-fixed border-collapse text-sm max-md:hidden">
             {/* Ширины заданы, иначе длинная фамилия растягивает свою колонку,
                 и «Состояние» с «Проверок» уезжают за край карточки. */}
             <colgroup>

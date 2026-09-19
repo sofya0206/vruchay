@@ -55,7 +55,7 @@ export function Interface() {
           <Moon size={18} className="text-[var(--accent)]" />
           Тема
         </h2>
-        <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)]">
+        <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
           Как выглядит кабинет. Сам документ на любой теме остаётся белым — таким, каким его
           напечатают.
         </p>
@@ -97,7 +97,7 @@ export function Interface() {
           <CalendarDays size={18} className="text-[var(--accent)]" />
           Формат дат
         </h2>
-        <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)]">
+        <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
           Как показывать даты в кабинете — в списках, журналах и реестре. Дата на самом документе
           задаётся в макете и от этой настройки не зависит.
         </p>

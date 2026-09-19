@@ -236,9 +236,10 @@ function Small({
       aria-label={title}
       aria-pressed={pressed}
       onClick={onClick}
-      className={`grid h-6 w-6 place-items-center rounded transition-opacity ${
+      // На сенсорном экране наведения нет: стрелки видны всегда и под палец.
+      className={`grid h-6 w-6 place-items-center rounded transition-opacity pointer-coarse:size-10 ${
         pressed ? 'text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text)]'
-      } ${quiet ? 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100' : ''}`}
+      } ${quiet ? 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100' : ''}`}
     >
       {children}
       {tooltip}

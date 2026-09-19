@@ -144,7 +144,7 @@ export function Popover({
         'fixed z-50 overflow-auto bg-[var(--surface-raised)] shadow-lg ring-1 ring-[var(--line)] ' +
         // Нижний лист на телефоне у самого края экрана — здесь запас снизу
         // нужен: без него последний пункт упирался бы в границу экрана.
-        (box.sheet ? 'rounded-t-2xl pb-2' : 'rounded-xl')
+        (box.sheet ? 'rounded-t-2xl pb-[max(8px,env(safe-area-inset-bottom))]' : 'rounded-xl')
       }
       /*
        * Предел высоты — по месту, которое реально осталось, а не постоянное

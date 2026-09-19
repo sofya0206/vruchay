@@ -15,6 +15,7 @@ export function SettingsPage() {
 
   return (
     <SectionLayout
+      columnTitle="Настройки"
       column={
         <nav aria-label="Разделы настроек">
           <ColumnList>

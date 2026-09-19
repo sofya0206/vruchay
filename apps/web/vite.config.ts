@@ -37,6 +37,10 @@ export default defineConfig({
         globIgnores: ['**/fonts/!(jost-*)'],
       },
       manifest: {
+        // Постоянный идентификатор приложения: без него браузер считает
+        // приложением адрес start_url, и смена стартовой страницы превратила
+        // бы установленное «Вручай» в чужое, второе.
+        id: '/',
         name: 'Вручай — наградные документы',
         short_name: 'Вручай',
         description: 'Сертификаты, грамоты и дипломы: создание и рассылка участникам',
@@ -54,6 +58,21 @@ export default defineConfig({
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable',
+          },
+        ],
+        // Долгое нажатие на значок на телефоне: сразу туда, куда ходят
+        // чаще всего, минуя главную.
+        shortcuts: [
+          {
+            name: 'Документы',
+            url: '/documents',
+            icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' }],
+          },
+          {
+            name: 'Реестр выданного',
+            short_name: 'Реестр',
+            url: '/registry',
+            icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' }],
           },
         ],
       },

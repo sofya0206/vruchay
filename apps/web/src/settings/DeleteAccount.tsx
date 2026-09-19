@@ -46,7 +46,7 @@ export function DeleteAccount() {
         <TriangleAlert size={18} className="text-[var(--danger)]" />
         Удалить учётную запись
       </h2>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)]">
+      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
         Уйдут ваши имя, адрес входа, пароль, второй фактор и сессии. Выданные документы
         останутся: их проверяют по QR-коду посторонние люди, и погасить проверку молча
         нельзя. Записи в журнале организации тоже останутся — иначе он перестанет отвечать

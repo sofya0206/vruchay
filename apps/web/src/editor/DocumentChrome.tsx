@@ -1,6 +1,19 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { FilePlus2, FileText, LayoutTemplate, LoaderCircle, MoreHorizontal } from 'lucide-react';
+import {
+  BadgeCheck,
+  ChevronLeft,
+  FilePlus2,
+  FileText,
+  LayoutTemplate,
+  ListChecks,
+  LoaderCircle,
+  MoreHorizontal,
+  Scale,
+  type LucideIcon,
+} from 'lucide-react';
+import { useState } from 'react';
+import { BottomSheet } from '../ui/BottomSheet';
 import { MATERIAL_TABS, materialTabPath, workspacePath, type MaterialTab } from '../mailing/workspace-tabs';
 import { IconButton } from '../ui/IconButton';
 import { Menu, MenuDivider, MenuItem } from '../ui/Menu';
@@ -47,6 +60,7 @@ export function DocumentChrome({
   toolbar,
   action,
   isTemplate = false,
+  titleActions,
 }: {
   documentId: string;
   title: string;
@@ -69,35 +83,59 @@ export function DocumentChrome({
    * действия не должно переезжать от вкладки к вкладке.
    */
   action?: ReactNode;
+  /**
+   * Действия в строке названия — только на телефоне. Туда встаёт отмена
+   * с повтором: отдельная строка панели ради двух значков съедала высоту
+   * у листа.
+   */
+  titleActions?: ReactNode;
 }) {
   return (
     <header className="shrink-0 border-b border-[var(--line)] bg-[var(--surface)]">
-      <div className="flex h-12 items-center gap-1 border-b border-[var(--line)] px-3">
-        <h1 className="flex min-w-0 max-w-[32ch] shrink items-center gap-1 text-sm font-medium">
-          <LibraryLink isTemplate={isTemplate} />
+      {/* На телефоне строка переносится: название и действия сверху, лента
+          вкладок — второй строкой во всю ширину. В одну строку лента
+          сжималась до нуля, и из листа нельзя было попасть в таблицу. */}
+      <div className="flex flex-wrap items-center gap-1 px-3 max-md:pt-1 md:h-12 md:flex-nowrap md:border-b md:border-[var(--line)]">
+        <h1 className="flex min-w-0 items-center gap-1 text-sm font-medium max-md:flex-1 md:max-w-[32ch] md:shrink">
+          {/* На телефоне — стрелка под палец вместо значка библиотеки. */}
+          <Link
+            to={isTemplate ? '/documents/templates' : '/documents'}
+            aria-label={isTemplate ? 'Все шаблоны' : 'Все документы'}
+            className="-ml-2 grid size-11 shrink-0 place-items-center rounded-lg text-[var(--text-muted)] active:bg-[var(--surface-sunken)] md:hidden"
+          >
+            <ChevronLeft size={22} />
+          </Link>
+          <span className="max-md:hidden">
+            <LibraryLink isTemplate={isTemplate} />
+          </span>
           <DocumentTitle documentId={documentId} title={title} />
         </h1>
 
-        <span aria-hidden className="mx-2 h-5 w-px shrink-0 bg-[var(--line)]" />
+        <span aria-hidden className="mx-2 h-5 w-px shrink-0 bg-[var(--line)] max-md:hidden" />
 
         {/* Лента прокручивается внутри себя: страница вбок не едет даже
             тогда, когда шесть вкладок в ширину не помещаются. */}
         <nav
           aria-label="Стороны материала"
-          className="flex min-w-0 flex-1 items-stretch gap-0.5 self-stretch overflow-x-auto"
+          className="no-scrollbar flex min-w-0 flex-1 items-stretch gap-0.5 self-stretch overflow-x-auto max-md:order-last max-md:h-11 max-md:basis-full max-md:overflow-visible"
         >
-          {MATERIAL_TABS.map((item) => (
-            <SpineTab
-              key={item.id}
-              to={materialTabPath(documentId, item.id)}
-              active={item.id === tab}
-            >
-              {item.label}
-            </SpineTab>
-          ))}
+          <div className="contents max-md:hidden">
+            {MATERIAL_TABS.map((item) => (
+              <SpineTab key={item.id} to={materialTabPath(documentId, item.id)} active={item.id === tab}>
+                {item.label}
+              </SpineTab>
+            ))}
+          </div>
+          <div className="contents md:hidden">
+            <PhoneTabs documentId={documentId} tab={tab} />
+          </div>
         </nav>
 
-        <div className="flex shrink-0 items-center gap-1 pl-2">
+        {titleActions && <div className="flex shrink-0 items-center md:hidden">{titleActions}</div>}
+
+        {/* На телефоне «Выпуск» живёт внизу вкладки «Получатели», в шапке
+            он не помещается рядом с названием. */}
+        <div className="flex shrink-0 items-center gap-1 pl-2 [&>a:first-child]:max-md:hidden [&>button:first-child]:max-md:hidden">
           {isTemplate ? (
             <Link
               to={`/documents?new=1&template=${documentId}`}
@@ -109,7 +147,7 @@ export function DocumentChrome({
           ) : action ?? <ReleaseLink to={workspacePath(documentId)} />}
           <Menu
             trigger={({ open, toggle }) => (
-              <IconButton label="Ещё действия" aria-expanded={open} onClick={toggle} size="sm" className="size-9">
+              <IconButton label="Ещё действия" aria-expanded={open} onClick={toggle} size="sm" className="size-11 md:size-9">
                 <MoreHorizontal size={18} />
               </IconButton>
             )}
@@ -127,7 +165,7 @@ export function DocumentChrome({
                 >
                   <span className="flex-1 whitespace-nowrap">{entry.label}</span>
                   {entry.shortcut && (
-                    <span className="shrink-0 text-xs text-[var(--text-muted)]">{entry.shortcut}</span>
+                    <span className="shrink-0 text-xs text-[var(--text-muted)] pointer-coarse:hidden">{entry.shortcut}</span>
                   )}
                 </MenuItem>
               ),
@@ -136,8 +174,10 @@ export function DocumentChrome({
         </div>
       </div>
 
+      {/* На телефоне панель в одну строку с прокруткой, а не в три строки
+          переносами: иначе она съедала треть экрана у листа. */}
       {toolbar && (
-        <div className="flex flex-wrap items-center gap-1 px-2 py-1" role="toolbar">
+        <div className="flex items-center gap-1 px-2 py-1 max-md:overflow-x-auto md:flex-wrap" role="toolbar">
           {toolbar}
         </div>
       )}
@@ -227,7 +267,7 @@ function SpineTab({ to, active, children }: { to: string; active: boolean; child
     <Link
       to={to}
       aria-current={active ? 'page' : undefined}
-      className={`-mb-px inline-flex shrink-0 items-center whitespace-nowrap border-b-2 px-2.5 text-sm transition-colors ${
+      className={`-mb-px inline-flex shrink-0 items-center whitespace-nowrap border-b-2 px-2.5 text-sm transition-colors max-md:flex-1 max-md:justify-center max-md:px-1 max-md:text-[15px] ${
         active
           ? 'border-[var(--accent)] font-medium text-[var(--accent)]'
           : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text)]'
@@ -235,6 +275,64 @@ function SpineTab({ to, active, children }: { to: string; active: boolean; child
     >
       {children}
     </Link>
+  );
+}
+
+/*
+ * На телефоне шесть подписей в ширину не помещаются. Видны три стороны,
+ * с которыми работают на ходу, остальные — под «Ещё» нижним листом:
+ * так делают вкладки, которые не влезают, в приложениях Google и Apple.
+ * Открыта сторона из «Ещё» — её название встаёт на место слова «Ещё».
+ */
+const PHONE_TABS: MaterialTab[] = ['sheet', 'table', 'mail'];
+const MORE_TABS: { id: MaterialTab; icon: LucideIcon; hint: string }[] = [
+  { id: 'rules', icon: Scale, hint: 'Кому какой документ' },
+  { id: 'check', icon: ListChecks, hint: 'Ошибки в строках' },
+  { id: 'verify', icon: BadgeCheck, hint: 'Срок и страница проверки' },
+];
+
+function PhoneTabs({ documentId, tab }: { documentId: string; tab: MaterialTab }) {
+  const [open, setOpen] = useState(false);
+  const label = (id: MaterialTab) => MATERIAL_TABS.find((t) => t.id === id)?.label ?? '';
+  const inMore = MORE_TABS.some((t) => t.id === tab);
+  return (
+    <>
+      {PHONE_TABS.map((id) => (
+        <SpineTab key={id} to={materialTabPath(documentId, id)} active={id === tab}>
+          {label(id)}
+        </SpineTab>
+      ))}
+      <button
+        type="button"
+        aria-haspopup="dialog"
+        onClick={() => setOpen(true)}
+        className={`-mb-px inline-flex flex-1 items-center justify-center border-b-2 px-1 text-[15px] whitespace-nowrap ${
+          inMore ? 'border-[var(--accent)] font-medium text-[var(--accent)]' : 'border-transparent text-[var(--text-muted)]'
+        }`}
+      >
+        {inMore ? label(tab) : 'Ещё'}
+      </button>
+      <BottomSheet open={open} onClose={() => setOpen(false)} title="Ещё">
+        <div className="px-2 pb-3">
+          {MORE_TABS.map((item) => (
+            <Link
+              key={item.id}
+              to={materialTabPath(documentId, item.id)}
+              onClick={() => setOpen(false)}
+              className={`flex min-h-14 items-center gap-3 rounded-xl px-3 ${
+                item.id === tab ? 'bg-[var(--accent-soft)] text-[var(--accent)]' : 'text-[var(--text)] active:bg-[var(--surface-sunken)]'
+              }`}
+            >
+              <item.icon size={20} strokeWidth={1.75} className="shrink-0" />
+              <span className="flex min-w-0 flex-col">
+                <span className="text-base font-medium">{label(item.id)}</span>
+                <span className="text-[13px] text-[var(--text-muted)]">{item.hint}</span>
+              </span>
+            </Link>
+          ))}
+        </div>
+      </BottomSheet>
+    </>
   );
 }
 

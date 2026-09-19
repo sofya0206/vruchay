@@ -22,6 +22,29 @@ export function SheetThumbnail({
 }) {
   const box = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0);
+  /*
+   * Лист рисуется, только когда карточка подъехала к экрану, — и дальше
+   * остаётся. В библиотеке полсотни карточек по десятку блоков в каждой:
+   * нарисованные разом, они держали экран по полсекунды на телефоне при
+   * каждой смене папки. Запас в полэкрана — чтобы при прокрутке лист уже
+   * был на месте, а не появлялся на глазах.
+   */
+  const [near, setNear] = useState(typeof IntersectionObserver === 'undefined');
+  useEffect(() => {
+    const el = box.current;
+    if (!el || near) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setNear(true);
+          io.disconnect();
+        }
+      },
+      { rootMargin: '50% 0px' },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [near]);
 
   useEffect(() => {
     const el = box.current;
@@ -56,7 +79,7 @@ export function SheetThumbnail({
     // в измеренный прямоугольник, и лист вылез бы ровно на их величину.
     <div className="h-full w-full p-3">
       <div ref={box} className="grid h-full w-full place-items-center">
-        {scale > 0 && (
+        {scale > 0 && near && (
           <div
             className="overflow-hidden bg-[var(--sheet-paper)] shadow-sm"
             style={{ width: `${widthMm * scale}mm`, height: `${heightMm * scale}mm` }}

@@ -21,7 +21,7 @@ export function InviteFriend() {
         <Gift size={18} className="text-[var(--accent)]" />
         Пригласить друга
       </h2>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)]">
+      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
         Если сервис вам пригодился, расскажите о нём знакомому организатору. Вы оба получите
         бесплатные документы: он — на старте, вы — когда он начнёт работать.
       </p>

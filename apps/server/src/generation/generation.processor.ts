@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { formatRegNumber, issuedAtOf } from '@gramota/shared';
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue, Worker } from 'bullmq';
 import IORedis from 'ioredis';
@@ -13,6 +13,7 @@ import { generatePublicCode } from '../verify/public-code';
 import { expiresAtFor } from '../verify/expiry';
 import { verifyUrl } from '../verify/verify-url';
 import { PdfSignerService } from '../signing/pdf-signer.service';
+import { PushService } from '../push/push.service';
 import { PdfRenderer } from './pdf-renderer';
 import { GenerationService, STUCK_AFTER_MS } from './generation.service';
 import { DEFAULT_NAME_TEMPLATE, buildFileName } from './file-name';
@@ -80,6 +81,12 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
     private readonly renderer: PdfRenderer,
     private readonly generation: GenerationService,
     private readonly signer: PdfSignerService,
+    /*
+     * Уведомление автору о конце выпуска. Необязательное: тесты собирают
+     * воркер руками и push им ни к чему, а без ключей VAPID служба и так
+     * ничего не шлёт.
+     */
+    @Optional() private readonly push?: PushService,
   ) {}
 
   onModuleInit(): void {
@@ -326,7 +333,7 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
   private async giveUp(jobId: string | undefined, err: Error): Promise<void> {
     if (!jobId) return;
     try {
-      await this.prisma.generationJob.updateMany({
+      const closed = await this.prisma.generationJob.updateMany({
         where: { id: jobId, status: { in: ['queued', 'running'] } },
         data: {
           status: 'failed',
@@ -338,6 +345,12 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
             'за остальные ничего не списано — выпуск можно продолжить с того же места.',
         },
       });
+      if (closed.count === 1) {
+        await this.notifyAuthor(jobId, {
+          title: 'Выпуск прервался',
+          body: 'Созданные документы сохранены, выпуск можно продолжить',
+        });
+      }
     } catch (dbErr) {
       this.logger.error(
         `Не удалось закрыть задание ${jobId} после отказа очереди ` +
@@ -370,7 +383,7 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
         this.prisma.file.count({ where: { jobId, kind: 'generated', s3Key: { not: '' } } }),
         this.prisma.generationRowFailure.count({ where: { jobId } }),
       ]);
-      await this.prisma.generationJob.updateMany({
+      const closed = await this.prisma.generationJob.updateMany({
         where: { id: jobId, status: { in: ['queued', 'running'] } },
         data: {
           status: 'failed',
@@ -380,6 +393,12 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
           error: jobStopMessage(problem.reason),
         },
       });
+      if (closed.count === 1) {
+        await this.notifyAuthor(jobId, {
+          title: 'Выпуск остановлен',
+          body: done ? `Успели создать ${done}. Откройте выпуск, чтобы продолжить` : 'Откройте выпуск, чтобы узнать причину',
+        });
+      }
     } catch (err) {
       this.logger.error(
         `Не удалось остановить задание ${jobId}: ` +
@@ -784,7 +803,7 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
       ]);
       if (issued + failed < total) return;
 
-      await this.prisma.generationJob.updateMany({
+      const closed = await this.prisma.generationJob.updateMany({
         where: { id: jobId, status: { in: ['queued', 'running'] } },
         data: {
           // Упавшим считаем только выпуск, не давший ни одного документа:
@@ -798,11 +817,53 @@ export class GenerationProcessor implements OnModuleInit, OnModuleDestroy {
         },
       });
       this.logger.log(`Задание ${jobId}: создано ${issued}, ошибок ${failed}`);
+      // Закрыть задание удаётся ровно одной части — она и уведомляет:
+      // иначе параллельные части прислали бы «готово» по нескольку раз.
+      if (closed.count === 1) {
+        await this.notifyAuthor(
+          jobId,
+          issued === 0
+            ? { title: 'Выпуск не удался', body: `Ни один из ${total} документов не создан` }
+            : {
+                title: 'Документы готовы',
+                body: failed
+                  ? `Создано ${issued} из ${total}, не удалось — ${failed}`
+                  : `Создано ${issued} из ${total}`,
+              },
+        );
+      }
     } catch (err) {
       // Не закрыли — закроет следующая часть или продолжение выпуска.
       this.logger.warn(
         `Не удалось закрыть задание ${jobId}: ` +
           `${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  /**
+   * Push автору выпуска (ADR-0004): «готово», «прервался», «остановлен».
+   *
+   * Ведёт в рабочее место материала — там и файлы, и продолжение выпуска.
+   * Ни названия материала, ни имён в тексте нет: тело push уходит через
+   * сторонний сервис доставки.
+   */
+  private async notifyAuthor(jobId: string, text: { title: string; body: string }): Promise<void> {
+    if (!this.push) return;
+    try {
+      const job = await this.prisma.generationJob.findUnique({
+        where: { id: jobId },
+        select: { orgId: true, documentId: true, createdById: true },
+      });
+      if (!job?.createdById) return;
+      await this.push.notifyUser(job.createdById, job.orgId, {
+        ...text,
+        url: `/mailing/${job.documentId}`,
+        tag: `job-${jobId}`,
+      });
+    } catch (err) {
+      this.logger.warn(
+        `Не удалось уведомить о задании ${jobId}: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
   }

@@ -6,7 +6,9 @@ import {
   type ReactNode,
 } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { BottomSheet } from './BottomSheet';
 import { cn } from './cn';
+import { useMediaQuery } from './useMediaQuery';
 
 /**
  * Выпадающее меню — одно на кабинет.
@@ -14,22 +16,31 @@ import { cn } from './cn';
  * Кнопка-триггер и список под ней. Закрывается по Esc, по клику вне,
  * при смене адреса и после выбора пункта. Пункты — `MenuItem` (кнопка
  * или ссылка) и `MenuDivider`; заголовок-подпись — `MenuLabel`.
+ *
+ * На сенсорном экране список выезжает нижним листом: кнопка «…» стоит
+ * у верхнего края, и выпадашка под ней открывалась там, куда большой
+ * палец не достаёт. Признак — грубый указатель, а не ширина окна:
+ * планшету с пальцем лист нужен так же, как телефону.
  */
 export function Menu({
   trigger,
   children,
   align = 'right',
   className = '',
+  title = 'Действия',
 }: {
   /** Рисует кнопку: получает открыт ли список и обработчик нажатия. */
   trigger: (props: { open: boolean; toggle: () => void }) => ReactNode;
   children: ReactNode;
   align?: 'left' | 'right';
   className?: string;
+  /** Заголовок нижнего листа на сенсорном экране. */
+  title?: string;
 }) {
   const [open, setOpen] = useState(false);
   const { pathname } = useLocation();
   const root = useRef<HTMLDivElement>(null);
+  const touch = useMediaQuery('(pointer: coarse)');
 
   useEffect(() => setOpen(false), [pathname]);
 
@@ -48,6 +59,24 @@ export function Menu({
       document.removeEventListener('keydown', onKey);
     };
   }, [open]);
+
+  const closeOnPick = (e: React.MouseEvent) => {
+    // Любой выбранный пункт закрывает меню; разделители и подписи — нет.
+    if ((e.target as HTMLElement).closest('[role="menuitem"]')) setOpen(false);
+  };
+
+  if (touch) {
+    return (
+      <div ref={root} className={cn('relative', className)}>
+        {trigger({ open, toggle: () => setOpen((v) => !v) })}
+        <BottomSheet open={open} onClose={() => setOpen(false)} title={title}>
+          <div role="menu" onClick={closeOnPick}>
+            {children}
+          </div>
+        </BottomSheet>
+      </div>
+    );
+  }
 
   return (
     <div ref={root} className={cn('relative', className)}>
@@ -72,7 +101,9 @@ export function Menu({
 }
 
 const itemClass =
-  'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[15px] text-[var(--text)] transition-colors hover:bg-[var(--surface-sunken)] disabled:opacity-50 disabled:hover:bg-transparent';
+  'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[15px] text-[var(--text)] transition-colors hover:bg-[var(--surface-sunken)] disabled:opacity-50 disabled:hover:bg-transparent ' +
+  // Под палец: 48 точек в высоту, как у пунктов системных листов.
+  'pointer-coarse:min-h-12 pointer-coarse:px-3 pointer-coarse:text-base';
 
 export function MenuItem({
   icon,

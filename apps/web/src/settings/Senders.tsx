@@ -58,7 +58,7 @@ export function Senders() {
         <AtSign size={18} className="text-[var(--accent)]" />
         Адреса рассылки
       </h2>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)]">
+      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
         С этих адресов участники получают письма с документами. На них же придёт ответ, если
         участник ответит на письмо.
       </p>

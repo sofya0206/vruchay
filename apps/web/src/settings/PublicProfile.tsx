@@ -110,7 +110,7 @@ export function PublicProfile() {
         <Globe size={18} className="text-[var(--accent)]" />
         Страница проверки и публичный реестр
       </h2>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)]">
+      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
         Страницу проверки открывает любой, кто знает код с документа. Что на ней показывать о
         человеке — решаете вы как оператор персональных данных.
       </p>

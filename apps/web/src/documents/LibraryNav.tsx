@@ -32,6 +32,7 @@ import {
   type Folder as FolderItem,
 } from '../api/folders';
 import { ConfirmDialog } from '../ui/Dialog';
+import { usePhone } from '../ui/useMediaQuery';
 import { SectionLayout, columnRowClass } from '../ui/SectionLayout';
 import { cn } from '../ui/cn';
 import { useTooltip } from '../ui/Tooltip';
@@ -85,7 +86,7 @@ function CreateLink({ label, className = '' }: { label: string; className?: stri
     <Link
       to="/documents?new=1"
       className={
-        'inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--accent)] px-4 py-2 ' +
+        'inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--accent)] px-4 py-2 max-md:h-11 ' +
         'text-sm font-medium whitespace-nowrap text-[var(--accent-contrast)] transition-colors ' +
         `hover:bg-[var(--accent-hover)] ${className}`
       }
@@ -131,6 +132,12 @@ export function LibraryNav({ archiveCount }: { archiveCount?: number | null }) {
   );
   /** Папка, удаление которой ждёт подтверждения. */
   const [deleting, setDeleting] = useState<FolderItem | null>(null);
+  /*
+   * Телефон: колонка живёт в нижнем листе раздела, и сворачивать папки
+   * там незачем — стрелка раскрытия только мешала. Папки видны всегда.
+   */
+  const phone = usePhone();
+  const showFolders = expanded || phone;
 
   const folders = useFolders();
   const create = useCreateFolder();
@@ -276,19 +283,17 @@ export function LibraryNav({ archiveCount }: { archiveCount?: number | null }) {
   ];
 
   return (
-    <nav aria-label="Разделы библиотеки" className="mt-3">
-      {/* На узком экране колонка превратилась бы в две трети экрана телефона,
-          поэтому там это лента, которая прокручивается вбок. */}
-      <div className="flex gap-1 overflow-x-auto md:block md:overflow-visible">
-        <ul className="flex gap-1 md:flex-col" {...dragHandlers}>
+    <nav aria-label="Разделы библиотеки" className="mt-3 max-md:mt-0">
+      <div>
+        <ul className="flex flex-col gap-1" {...dragHandlers}>
           <RootRow
             active={onDocuments && !openFolderId}
             expanded={expanded}
-            onCollapse={() => setExpanded(false)}
+            onCollapse={() => !phone && setExpanded(false)}
             onToggle={() => setExpanded((v) => !v)}
             onMenu={(e) => openMenu(e, null)}
           />
-          {expanded &&
+          {showFolders &&
             list.map((folder) =>
               renamingId === folder.id ? (
                 <li key={folder.id}>
@@ -321,7 +326,7 @@ export function LibraryNav({ archiveCount }: { archiveCount?: number | null }) {
                 />
               ),
             )}
-          {expanded && creating && (
+          {showFolders && creating && (
             <li>
               <FolderNameForm
                 busy={create.isPending}
@@ -335,8 +340,8 @@ export function LibraryNav({ archiveCount }: { archiveCount?: number | null }) {
               документам». Правую кнопку в вебе почти никто не пробует, и
               первая папка не заводилась вовсе — поэтому здесь есть строка,
               которую видно. */}
-          {expanded && !creating && (
-            <li className="hidden md:block">
+          {showFolders && !creating && (
+            <li>
               <button
                 type="button"
                 onClick={startFolder}
@@ -607,7 +612,7 @@ function FolderRow({
       {tooltip}
 
       {folder.count ? (
-        <span className="tabular pointer-events-none absolute right-2 text-xs text-[var(--text-muted)] transition-opacity md:group-hover:opacity-0">
+        <span className="tabular pointer-events-none absolute right-2 text-xs text-[var(--text-muted)] transition-opacity max-md:hidden md:group-hover:opacity-0">
           {folder.count}
         </span>
       ) : null}
@@ -816,7 +821,7 @@ function RootRow({
         onClick={onToggle}
         aria-expanded={expanded}
         aria-label={expanded ? 'Свернуть папки' : 'Показать папки'}
-        className="shrink-0 px-2 py-2 text-[var(--text-muted)] hover:text-[var(--text)]"
+        className="shrink-0 px-2 py-2 text-[var(--text-muted)] hover:text-[var(--text)] max-md:hidden"
       >
         <ChevronDown
           size={15}
@@ -849,6 +854,7 @@ export function LibraryLayout({
 }) {
   return (
     <SectionLayout
+      columnTitle="Документы"
       column={
         <>
           <div className="hidden md:block">
@@ -870,3 +876,4 @@ export function LibraryLayout({
     </SectionLayout>
   );
 }
+

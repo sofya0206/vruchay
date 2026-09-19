@@ -1,6 +1,7 @@
-import type { ReactNode } from 'react';
-import { NavLink } from 'react-router-dom';
-import type { LucideIcon } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
+import { ChevronsUpDown, type LucideIcon } from 'lucide-react';
+import { BottomSheet } from './BottomSheet';
 import { cn } from './cn';
 
 /**
@@ -18,6 +19,7 @@ export function SectionLayout({
   tools,
   bar,
   children,
+  columnTitle = 'Разделы',
 }: {
   /** Содержимое левой колонки: кнопка создания, списки. */
   column: ReactNode;
@@ -25,29 +27,60 @@ export function SectionLayout({
   tools?: ReactNode;
   bar?: ReactNode;
   children: ReactNode;
+  /** Заголовок нижнего листа с колонкой на телефоне. */
+  columnTitle?: string;
 }) {
+  /*
+   * Телефон: колонки нет, её разделы открываются нижним листом по нажатию
+   * на заголовок — как «Мой диск» в Google Диске или название страницы
+   * в Notion. Лента значков над списком была непонятной без подписей,
+   * а с подписями не помещалась и листалась вбок.
+   */
+  const [open, setOpen] = useState(false);
+  const { pathname, search } = useLocation();
+  useEffect(() => setOpen(false), [pathname, search]);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-      <aside className="border-b border-[var(--line)] md:w-60 md:shrink-0 md:border-r md:border-b-0">
-        <div className="p-3 md:sticky md:top-[var(--app-header)] md:max-h-[calc(100vh-var(--app-header))] md:overflow-y-auto">
+      <aside className="border-b border-[var(--line)] max-md:hidden md:w-60 md:shrink-0 md:border-r md:border-b-0">
+        <div className="p-3 max-md:px-2 max-md:py-2 md:sticky md:top-[var(--app-header)] md:max-h-[calc(100vh-var(--app-header))] md:overflow-y-auto">
           {column}
         </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="z-10 flex flex-wrap items-center gap-3 border-b border-[var(--line)] bg-[var(--surface)] px-6 py-3 md:sticky md:top-[var(--app-header)]">
-          <div className="min-w-[10rem] flex-1">{head}</div>
-          {tools}
+        {/* На телефоне заголовок — своей строкой, инструменты (поиск) — второй
+            во всю ширину: в одну строку поле поиска сжималось до обрывка. */}
+        <div className="z-10 flex flex-wrap items-center gap-3 border-b border-[var(--line)] bg-[var(--surface)] px-6 py-3 max-md:gap-2 max-md:px-4 md:sticky md:top-[var(--app-header)]">
+          <div className="min-w-[10rem] flex-1 max-md:hidden">{head}</div>
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            aria-haspopup="dialog"
+            aria-label={`${columnTitle}: выбрать`}
+            className="-mx-1 flex min-w-0 basis-full items-center gap-1.5 rounded-lg px-1 py-0.5 text-left active:bg-[var(--surface-sunken)] md:hidden"
+          >
+            <span className="min-w-0">{head}</span>
+            <ChevronsUpDown size={16} className="shrink-0 text-[var(--text-muted)]" />
+          </button>
+          {tools && <div className="flex min-w-0 items-center gap-2 max-md:w-full max-md:[&>*:first-child]:flex-1">{tools}</div>}
         </div>
 
-        <main className="min-w-0 flex-1 px-6 py-6">{children}</main>
+        <main className="min-w-0 flex-1 px-6 py-6 max-md:px-4 max-md:py-4">{children}</main>
 
         {bar && (
-          <div className="sticky bottom-0 z-10 flex flex-wrap items-center gap-3 border-t border-[var(--line)] bg-[var(--surface)] px-6 py-2.5 text-sm">
+          <div
+            className="sticky bottom-0 z-10 flex flex-wrap items-center gap-3 border-t border-[var(--line)] bg-[var(--surface)] px-4 pt-2.5 text-sm sm:px-6"
+            // Полоса «домой» у айфонов без кнопки: панель над ней, а не под ней.
+            style={{ paddingBottom: 'max(10px, env(safe-area-inset-bottom))' }}
+          >
             {bar}
           </div>
         )}
       </div>
+      <BottomSheet open={open} onClose={() => setOpen(false)} title={columnTitle}>
+        <div className="px-2 pb-3">{column}</div>
+      </BottomSheet>
     </div>
   );
 }
@@ -94,10 +127,10 @@ export function SectionTitle({ children, count }: { children: ReactNode; count?:
   );
 }
 
-/** Список колонки: на телефоне — лента вбок, на десктопе — столбик. */
+/** Список колонки — столбик; на телефоне он живёт в нижнем листе раздела. */
 export function ColumnList({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <ul className={cn('flex gap-1 overflow-x-auto md:flex-col md:overflow-visible', className)}>
+    <ul className={cn('flex flex-col gap-1', className)}>
       {children}
     </ul>
   );
@@ -120,9 +153,11 @@ export function ColumnList({ children, className = '' }: { children: ReactNode; 
 export function columnRowClass({ active, nested }: { active?: boolean; nested?: boolean } = {}): string {
   return cn(
     'flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-3 py-2 text-sm whitespace-nowrap transition-colors md:px-2 md:py-1.5',
+    // Телефон: строка нижнего листа — под палец, обычным кеглем.
+    'max-md:min-h-12 max-md:rounded-xl max-md:text-base',
     // Вложенная строка отступает на ширину значка родителя: папки читаются
     // как ветка «Моих документов», а не как второй плоский список.
-    nested && 'md:pl-5 md:text-[13px]',
+    nested && 'max-md:pl-9 md:pl-5 md:text-[13px]',
     active
       ? 'bg-[var(--accent-soft)] font-medium text-[var(--accent)]'
       : 'text-[var(--text-muted)] hover:bg-[var(--row-hover)] hover:text-[var(--text)]',
@@ -165,9 +200,9 @@ export function ColumnRow({
         onContextMenu={onContextMenu}
         className={columnRowClass({ active, nested })}
       >
-        <Icon size={16} strokeWidth={1.75} className={cn('shrink-0', !active && tint)} />
-        <span className="md:flex-1 md:truncate">{children}</span>
-        {count ? <span className="tabular text-xs text-[var(--text-muted)]">{count}</span> : null}
+        <Icon size={16} strokeWidth={1.75} className={cn('shrink-0 max-md:size-5', !active && tint)} />
+        <span className="flex-1 truncate">{children}</span>
+        {count ? <span className="tabular text-xs text-[var(--text-muted)] max-md:text-sm">{count}</span> : null}
       </NavLink>
       {trailing}
     </li>

@@ -1,5 +1,5 @@
 /// <reference lib="webworker" />
-import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching';
+import { precacheAndRoute, cleanupOutdatedCaches, matchPrecache } from 'workbox-precaching';
 
 declare const self: ServiceWorkerGlobalScope;
 
@@ -11,6 +11,33 @@ declare const self: ServiceWorkerGlobalScope;
  * в сеть: показать секретарю организации устаревший список получателей или
  * застывший прогресс генерации — хуже, чем честно показать ошибку сети.
  */
+
+/** Заглушка «нет связи» — лежит в public/, попадает в предзагрузку вместе с оболочкой. */
+const OFFLINE_PAGE = '/offline.html';
+
+/*
+ * Переходы по страницам — сначала сеть, без неё заглушка.
+ *
+ * Стоит раньше предзагрузки намеренно: иначе на «/» без сети отдавалась бы
+ * сохранённая оболочка кабинета, она поднималась бы и крутила загрузку
+ * без конца — API в кэш не кладём. Заглушка честно говорит, что связи нет.
+ *
+ * Страницу печати не трогаем вовсе: её открывает браузер воркера по токену,
+ * и подменять ему ответ нельзя ни при каких обстоятельствах.
+ */
+self.addEventListener('fetch', (event) => {
+  const { request } = event;
+  if (request.mode !== 'navigate') return;
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin || url.pathname.startsWith('/api/') || url.pathname === '/render') return;
+
+  event.respondWith(
+    fetch(request).catch(async () => {
+      const cached = await matchPrecache(OFFLINE_PAGE);
+      return cached ?? Response.error();
+    }),
+  );
+});
 
 precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();

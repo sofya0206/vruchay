@@ -13,6 +13,7 @@ export function IntegrationsPage() {
 
   return (
     <SectionLayout
+      columnTitle="Интеграции"
       column={
         <nav aria-label="Площадки">
           <ColumnList>

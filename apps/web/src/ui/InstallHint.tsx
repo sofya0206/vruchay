@@ -59,7 +59,9 @@ export function InstallHint() {
   if (!promptEvent && !showIosHint) return null;
 
   return (
-    <div className="fixed inset-x-4 bottom-4 z-40 mx-auto max-w-md rounded-xl bg-[var(--surface)] p-4 shadow-lg ring-1 ring-[var(--line)]">
+    // На телефоне — сверху, под шапкой: внизу там стоят главные кнопки
+    // экранов («Создать документ», панель редактора), и подсказка их закрывала.
+    <div className="fixed inset-x-4 bottom-4 z-40 mx-auto max-w-md rounded-xl bg-[var(--surface)] p-4 shadow-lg ring-1 ring-[var(--line)] max-md:top-[calc(var(--app-header)+8px)] max-md:bottom-auto">
       <div className="flex items-start gap-3">
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]">
           <Download size={17} />
@@ -93,7 +95,7 @@ export function InstallHint() {
         <button
           onClick={dismiss}
           aria-label="Скрыть предложение"
-          className="rounded-lg p-1 text-[var(--text-muted)] hover:bg-[var(--surface-sunken)]"
+          className="-mt-2 -mr-2 grid size-11 shrink-0 place-items-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] md:m-0 md:size-7"
         >
           <X size={16} />
         </button>

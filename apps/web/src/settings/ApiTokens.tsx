@@ -36,7 +36,7 @@ export function ApiTokens() {
           {open ? 'скрыть' : 'показать'}
         </span>
       </button>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)]">
+      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
         Нужно, только если вы подключаете сервис к своей программе или сайту. Для обычной работы
         в кабинете это не требуется.
       </p>

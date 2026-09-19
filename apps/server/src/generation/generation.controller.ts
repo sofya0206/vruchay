@@ -70,7 +70,12 @@ export class GenerationController {
     @Param('id', uuidParam) id: string,
     @Body(new ZodValidationPipe(startSchema)) dto: StartDto,
   ) {
-    const { job, rowIds } = await this.generation.start(user.orgId, id, dto.format);
+    const { job, rowIds } = await this.generation.start(
+      user.orgId,
+      id,
+      dto.format,
+      user.viaToken ? null : user.userId,
+    );
     const chunks = await this.enqueueOrFail(job, rowIds);
 
     await this.audit.record({

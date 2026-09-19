@@ -51,13 +51,15 @@ function NewMailingLink({ className = '' }: { className?: string }) {
     <Link
       to={mailListPath('new')}
       className={
-        'inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--accent)] px-4 py-2 ' +
+        'inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--accent)] px-4 py-2 max-md:h-11 max-md:px-3.5 ' +
         'text-sm font-medium whitespace-nowrap text-[var(--accent-contrast)] transition-colors ' +
         `hover:bg-[var(--accent-hover)] ${className}`
       }
     >
       <Plus size={16} />
-      Новая рассылка
+      {/* На телефоне короче: длинная подпись сжимала поиск рядом до обрывка. */}
+      <span className="max-md:hidden">Новая рассылка</span>
+      <span className="md:hidden">Рассылка</span>
     </Link>
   );
 }
@@ -67,7 +69,7 @@ export function MailNav({ counts }: { counts: MailingLog['summary'] }) {
   const current = mailList(params.get('list'));
 
   return (
-    <nav aria-label="Папки писем" className="mt-3">
+    <nav aria-label="Папки писем" className="mt-3 max-md:mt-0">
       <ColumnList>
         {LETTER_LISTS.map((item) => (
           <ColumnRow
@@ -85,7 +87,7 @@ export function MailNav({ counts }: { counts: MailingLog['summary'] }) {
       {/* Волосяная линия вместо подписи группы: письма и списки
           получателей — разная работа, но подписывать их отдельно значит
           занять две строки колонки ради двух слов. */}
-      <ColumnList className="md:mt-2 md:border-t md:border-[var(--line)] md:pt-2">
+      <ColumnList className="mt-2 border-t border-[var(--line)] pt-2">
         <ColumnRow to={mailListPath('stats')} icon={ICONS.stats} active={current === 'stats'}>
           Сводка
         </ColumnRow>
@@ -121,6 +123,7 @@ export function MailLayout({
 }) {
   return (
     <SectionLayout
+      columnTitle="Письма"
       column={
         <>
           <div className="hidden md:block">
