@@ -20,7 +20,20 @@ function read(): boolean {
   }
 }
 
-let open = read();
+/*
+ * На узком экране панель ложится поверх листа, поэтому при загрузке она
+ * свёрнута, что бы ни запомнилось на широком: иначе открытый материал
+ * с телефона встречал бы не лист, а список полей во весь экран.
+ */
+function wide(): boolean {
+  try {
+    return window.matchMedia('(min-width: 768px)').matches;
+  } catch {
+    return true;
+  }
+}
+
+let open = read() && wide();
 
 export function setFieldsPanelOpen(next: boolean) {
   if (next === open) return;
