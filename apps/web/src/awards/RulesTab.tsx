@@ -135,7 +135,7 @@ export function RulesTab({ documentId, ruleSetId }: Props) {
 
   return (
     <div className="min-h-0 flex-1 overflow-auto">
-      <div className="mx-auto flex max-w-6xl flex-col gap-4 p-4 lg:flex-row">
+      <div className="flex max-w-6xl flex-col gap-4 p-6 lg:flex-row">
         <div className="min-w-0 flex-1 space-y-4">
           <section className="grid gap-3 rounded-xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)] sm:grid-cols-3">
             <div className="sm:col-span-3">

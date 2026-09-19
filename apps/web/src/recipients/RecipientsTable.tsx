@@ -36,6 +36,7 @@ import { Field, Input, StatusChip } from '../ui/Field';
 import { cn } from '../ui/cn';
 import { ProgressBar } from '../ui/Progress';
 import { Outcome } from '../ui/Outcome';
+import { SkeletonRows } from '../ui/Skeleton';
 import { ImportDialog } from './ImportDialog';
 import { planPaste } from './clipboard';
 import { GenerateDialog, type GenerateMode } from './GenerateDialog';
@@ -231,15 +232,30 @@ export function RecipientsTable({
   // другая, а одинаковая шапка там может значить другое.
   useEffect(() => setManualNames({}), [documentId]);
 
-  /* Во всю высоту: страница рисуется без оболочки кабинета, и короткая
-     строчка на пустом экране читается как сломанная страница. */
-  if (table.isPending)
+  /* Пока таблицы нет, шапка материала и лента вкладок уже стоят на месте:
+     иначе переход «Письмо → Получатели» на миг снимал шапку целиком,
+     и она вставала обратно вместе с данными — рывок на весь экран.
+     Панель значков ещё нечем наполнить, поэтому под ней пустая полоса
+     той же высоты, чтобы таблица потом легла точно туда, где скелетон. */
+  if (table.isPending || !table.data)
     return (
-      <div className="grid h-full place-items-center text-[var(--text-muted)]">Загрузка таблицы…</div>
-    );
-  if (!table.data)
-    return (
-      <div className="grid h-full place-items-center text-[var(--text-muted)]">Таблица недоступна</div>
+      <div className="flex h-[calc(100dvh-var(--app-header))] min-h-0 flex-col">
+        <DocumentChrome
+          documentId={documentId}
+          title={doc.title}
+          actions={fileMenu.entries}
+          tab="table"
+          toolbar={<span aria-hidden className="size-8" />}
+        />
+        {table.isPending ? (
+          <SkeletonRows rows={8} label="Загружаем таблицу" />
+        ) : (
+          <div className="grid flex-1 place-items-center text-[var(--text-muted)]">
+            Таблица недоступна
+          </div>
+        )}
+        {fileMenu.dialogs}
+      </div>
     );
 
   const { columns, rows, checkedCount } = table.data;
