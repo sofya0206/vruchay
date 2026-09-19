@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Archive, FileText, LayoutTemplate, Plus, Search } from 'lucide-react';
 import { UsageBar } from '../documents/UsageBar';
 import { LibraryLayout } from '../documents/LibraryNav';
@@ -82,7 +82,16 @@ export function DocumentsPage({
           (search ? `&search=${encodeURIComponent(search)}` : '') +
           (folderId ? `&folderId=${folderId}` : ''),
       ),
+    // Пока грузится другая папка, на экране остаётся прежний список, а не
+    // пустое место: переключение не мигает и не прыгает прокруткой.
+    placeholderData: keepPreviousData,
   });
+
+  // Другая папка — список с начала: прежняя прокрутка к новому списку
+  // отношения не имеет.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [folderId, trash, templates]);
 
   // Счётчик архива нужен и когда мы его не смотрим: иначе про удалённое
   // просто забывают, а оно через неделю исчезает насовсем.

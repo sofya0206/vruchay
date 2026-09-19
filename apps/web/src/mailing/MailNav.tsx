@@ -69,9 +69,8 @@ export function MailNav({ counts }: { counts: MailingLog['summary'] }) {
   const current = mailList(params.get('list'));
 
   return (
-    // На телефоне обе группы — одной сеткой значков, а не двумя строками.
-    <nav aria-label="Папки писем" className="mt-3 max-md:mt-0 max-md:grid max-md:grid-cols-[repeat(auto-fit,minmax(44px,1fr))] max-md:gap-1">
-      <ColumnList className="max-md:contents">
+    <nav aria-label="Папки писем" className="mt-3 max-md:mt-0">
+      <ColumnList>
         {LETTER_LISTS.map((item) => (
           <ColumnRow
             key={item.id}
@@ -88,7 +87,7 @@ export function MailNav({ counts }: { counts: MailingLog['summary'] }) {
       {/* Волосяная линия вместо подписи группы: письма и списки
           получателей — разная работа, но подписывать их отдельно значит
           занять две строки колонки ради двух слов. */}
-      <ColumnList className="max-md:contents md:mt-2 md:border-t md:border-[var(--line)] md:pt-2">
+      <ColumnList className="mt-2 border-t border-[var(--line)] pt-2">
         <ColumnRow to={mailListPath('stats')} icon={ICONS.stats} active={current === 'stats'}>
           Сводка
         </ColumnRow>
@@ -124,6 +123,7 @@ export function MailLayout({
 }) {
   return (
     <SectionLayout
+      columnTitle="Письма"
       column={
         <>
           <div className="hidden md:block">

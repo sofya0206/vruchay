@@ -8,12 +8,12 @@ import {
   LayoutTemplate,
   ListChecks,
   LoaderCircle,
-  Mail,
   MoreHorizontal,
   Scale,
-  Users,
   type LucideIcon,
 } from 'lucide-react';
+import { useState } from 'react';
+import { BottomSheet } from '../ui/BottomSheet';
 import { MATERIAL_TABS, materialTabPath, workspacePath, type MaterialTab } from '../mailing/workspace-tabs';
 import { IconButton } from '../ui/IconButton';
 import { Menu, MenuDivider, MenuItem } from '../ui/Menu';
@@ -119,16 +119,16 @@ export function DocumentChrome({
           aria-label="Стороны материала"
           className="no-scrollbar flex min-w-0 flex-1 items-stretch gap-0.5 self-stretch overflow-x-auto max-md:order-last max-md:h-11 max-md:basis-full max-md:overflow-visible"
         >
-          {MATERIAL_TABS.map((item) => (
-            <SpineTab
-              key={item.id}
-              id={item.id}
-              to={materialTabPath(documentId, item.id)}
-              active={item.id === tab}
-            >
-              {item.label}
-            </SpineTab>
-          ))}
+          <div className="contents max-md:hidden">
+            {MATERIAL_TABS.map((item) => (
+              <SpineTab key={item.id} to={materialTabPath(documentId, item.id)} active={item.id === tab}>
+                {item.label}
+              </SpineTab>
+            ))}
+          </div>
+          <div className="contents md:hidden">
+            <PhoneTabs documentId={documentId} tab={tab} />
+          </div>
         </nav>
 
         {titleActions && <div className="flex shrink-0 items-center md:hidden">{titleActions}</div>}
@@ -262,34 +262,77 @@ function LibraryLink({ isTemplate }: { isTemplate: boolean }) {
  * Ссылка, а не кнопка: у каждой стороны материала свой адрес, и его надо
  * уметь открыть в соседней вкладке браузера и послать коллеге.
  */
-/** Значки сторон материала — для телефона, где подписи всех шести не помещаются. */
-const TAB_ICONS: Record<MaterialTab, LucideIcon> = {
-  sheet: FileText,
-  table: Users,
-  rules: Scale,
-  check: ListChecks,
-  mail: Mail,
-  verify: BadgeCheck,
-};
-
-function SpineTab({ id, to, active, children }: { id: MaterialTab; to: string; active: boolean; children: ReactNode }) {
-  const Icon = TAB_ICONS[id];
+function SpineTab({ to, active, children }: { to: string; active: boolean; children: ReactNode }) {
   return (
     <Link
       to={to}
       aria-current={active ? 'page' : undefined}
-      aria-label={typeof children === 'string' ? children : undefined}
-      className={`-mb-px inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-2.5 text-sm transition-colors max-md:flex-1 max-md:justify-center max-md:px-1 ${
+      className={`-mb-px inline-flex shrink-0 items-center whitespace-nowrap border-b-2 px-2.5 text-sm transition-colors max-md:flex-1 max-md:justify-center max-md:px-1 max-md:text-[15px] ${
         active
-          ? 'border-[var(--accent)] font-medium text-[var(--accent)] max-md:flex-[2.2]'
+          ? 'border-[var(--accent)] font-medium text-[var(--accent)]'
           : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text)]'
       }`}
     >
-      {/* Телефон: значки, а подпись — только у открытой вкладки. Шесть
-          подписей в ширину не помещались, и ленту приходилось листать. */}
-      <Icon size={20} strokeWidth={1.75} className="shrink-0 md:hidden" />
-      <span className={active ? 'max-md:text-[14px]' : 'max-md:sr-only'}>{children}</span>
+      {children}
     </Link>
+  );
+}
+
+/*
+ * На телефоне шесть подписей в ширину не помещаются. Видны три стороны,
+ * с которыми работают на ходу, остальные — под «Ещё» нижним листом:
+ * так делают вкладки, которые не влезают, в приложениях Google и Apple.
+ * Открыта сторона из «Ещё» — её название встаёт на место слова «Ещё».
+ */
+const PHONE_TABS: MaterialTab[] = ['sheet', 'table', 'mail'];
+const MORE_TABS: { id: MaterialTab; icon: LucideIcon; hint: string }[] = [
+  { id: 'rules', icon: Scale, hint: 'Кому какой документ' },
+  { id: 'check', icon: ListChecks, hint: 'Ошибки в строках' },
+  { id: 'verify', icon: BadgeCheck, hint: 'Срок и страница проверки' },
+];
+
+function PhoneTabs({ documentId, tab }: { documentId: string; tab: MaterialTab }) {
+  const [open, setOpen] = useState(false);
+  const label = (id: MaterialTab) => MATERIAL_TABS.find((t) => t.id === id)?.label ?? '';
+  const inMore = MORE_TABS.some((t) => t.id === tab);
+  return (
+    <>
+      {PHONE_TABS.map((id) => (
+        <SpineTab key={id} to={materialTabPath(documentId, id)} active={id === tab}>
+          {label(id)}
+        </SpineTab>
+      ))}
+      <button
+        type="button"
+        aria-haspopup="dialog"
+        onClick={() => setOpen(true)}
+        className={`-mb-px inline-flex flex-1 items-center justify-center border-b-2 px-1 text-[15px] whitespace-nowrap ${
+          inMore ? 'border-[var(--accent)] font-medium text-[var(--accent)]' : 'border-transparent text-[var(--text-muted)]'
+        }`}
+      >
+        {inMore ? label(tab) : 'Ещё'}
+      </button>
+      <BottomSheet open={open} onClose={() => setOpen(false)} title="Ещё">
+        <div className="px-2 pb-3">
+          {MORE_TABS.map((item) => (
+            <Link
+              key={item.id}
+              to={materialTabPath(documentId, item.id)}
+              onClick={() => setOpen(false)}
+              className={`flex min-h-14 items-center gap-3 rounded-xl px-3 ${
+                item.id === tab ? 'bg-[var(--accent-soft)] text-[var(--accent)]' : 'text-[var(--text)] active:bg-[var(--surface-sunken)]'
+              }`}
+            >
+              <item.icon size={20} strokeWidth={1.75} className="shrink-0" />
+              <span className="flex min-w-0 flex-col">
+                <span className="text-base font-medium">{label(item.id)}</span>
+                <span className="text-[13px] text-[var(--text-muted)]">{item.hint}</span>
+              </span>
+            </Link>
+          ))}
+        </div>
+      </BottomSheet>
+    </>
   );
 }
 
