@@ -1,10 +1,11 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AtSign, Plus, Send, Trash2 } from 'lucide-react';
+import { Plus, Send, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { settingsApi, type Sender } from '../api/settings';
 import { ApiError } from '../api/client';
 import { Button } from '../ui/Button';
+import { SectionHead } from '../ui/Settings';
 import { Input, Label, Textarea } from '../ui/Field';
 import { Select } from '../ui/Select';
 
@@ -54,14 +55,7 @@ export function Senders() {
 
   return (
     <section>
-      <h2 className="flex items-center gap-2 text-lg font-medium">
-        <AtSign size={18} className="text-[var(--accent)]" />
-        Адреса рассылки
-      </h2>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
-        С этих адресов участники получают письма с документами. На них же придёт ответ, если
-        участник ответит на письмо.
-      </p>
+      <SectionHead title="Адреса рассылки" about={<>С этих адресов участники получают письма с документами. На них же придёт ответ, если участник ответит на письмо.</>} />
 
       {verified.length === 0 ? (
         <div className="mt-4 max-w-2xl rounded-xl bg-[var(--surface-sunken)] p-4 text-sm text-[var(--text-muted)]">

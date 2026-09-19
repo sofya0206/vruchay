@@ -1,10 +1,11 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, LifeBuoy, MessageSquarePlus } from 'lucide-react';
+import { ChevronLeft, MessageSquarePlus } from 'lucide-react';
 import { supportApi, useTicket, useTickets, type TicketStatus } from '../api/support';
 import { usePreferences } from '../api/org';
 import { ApiError } from '../api/client';
 import { Button } from '../ui/Button';
+import { SectionHead } from '../ui/Settings';
 import { Input, Label, StatusChip, Textarea } from '../ui/Field';
 import { formatDateTime } from './preferences';
 
@@ -33,14 +34,7 @@ export function Support() {
 
   return (
     <section>
-      <h2 className="flex items-center gap-2 text-lg font-medium">
-        <LifeBuoy size={18} className="text-[var(--accent)]" />
-        Поддержка
-      </h2>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
-        Отвечаем в рабочие часы по Москве. Если документы уже раздают, а что-то не работает — так и
-        напишите в первой строке: такие обращения разбираем первыми.
-      </p>
+      <SectionHead title="Поддержка" about={<>Отвечаем в рабочие часы по Москве. Если документы уже раздают, а что-то не работает — так и напишите в первой строке: такие обращения разбираем первыми.</>} />
 
       {creating ? (
         <NewTicket

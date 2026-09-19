@@ -1,6 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
 import {
-  BookOpen,
   House,
   PanelLeftClose,
   PanelLeftOpen,
@@ -8,7 +7,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '../ui/cn';
-import { LearnNavItem } from '../onboarding/LearnNavItem';
+import { HelpMenu } from './HelpMenu';
 import { NAV_ITEMS, activeNav } from './nav';
 
 /**
@@ -72,14 +71,7 @@ export function SideNav({ collapsed, onToggle }: { collapsed: boolean; onToggle:
             active={pathname.startsWith('/settings')}
             collapsed={collapsed}
           />
-          <Item
-            to="/docs"
-            label="База знаний"
-            icon={BookOpen}
-            active={pathname.startsWith('/docs')}
-            collapsed={collapsed}
-          />
-          <LearnNavItem collapsed={collapsed} />
+          <HelpMenu collapsed={collapsed} />
           <button
             type="button"
             onClick={onToggle}

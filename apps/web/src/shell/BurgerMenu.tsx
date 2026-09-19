@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { BookOpen, House, Menu, Settings, X } from 'lucide-react';
+import { BookOpen, Gift, House, LifeBuoy, Menu, Settings, X } from 'lucide-react';
 import { IconButton } from '../ui/IconButton';
 import { cn } from '../ui/cn';
 import { NAV_ITEMS, activeNav } from './nav';
@@ -102,6 +102,14 @@ export function BurgerMenu() {
                 База знаний
               </Link>
               <LearnNavItem onDone={() => setOpen(false)} />
+              <Link to="/support" className={row(pathname.startsWith('/support'))}>
+                <LifeBuoy size={20} strokeWidth={1.75} />
+                Поддержка
+              </Link>
+              <Link to="/referral" className={row(pathname.startsWith('/referral'))}>
+                <Gift size={20} strokeWidth={1.75} />
+                Пригласить друга
+              </Link>
             </div>
           </aside>
         </div>

@@ -1,8 +1,9 @@
-import { CalendarDays, Monitor, Moon, Sun, type LucideIcon } from 'lucide-react';
+import { Monitor, Moon, Sun, type LucideIcon } from 'lucide-react';
 import { errorText } from '../api/client';
 import { usePreferences, useUpdatePreferences, type DateFormat, type UiTheme } from '../api/org';
 import { formatDate } from './preferences';
 import { useTheme } from './theme';
+import { SectionHead } from '../ui/Settings';
 
 const THEMES: { value: UiTheme; title: string; about: string; icon: LucideIcon }[] = [
   {
@@ -64,14 +65,7 @@ export function Interface() {
   return (
     <section className="space-y-10">
       <div>
-        <h2 className="flex items-center gap-2 text-lg font-medium">
-          <Moon size={18} className="text-[var(--accent)]" />
-          Тема
-        </h2>
-        <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
-          Как выглядит кабинет. Сам документ на любой теме остаётся белым — таким, каким его
-          напечатают.
-        </p>
+        <SectionHead title="Тема" about={<>Как выглядит кабинет. Сам документ на любой теме остаётся белым — таким, каким его напечатают.</>} />
 
         <div
           className="mt-4 grid max-w-2xl gap-3 sm:grid-cols-3"
@@ -111,14 +105,7 @@ export function Interface() {
       </div>
 
       <div>
-        <h2 className="flex items-center gap-2 text-lg font-medium">
-          <CalendarDays size={18} className="text-[var(--accent)]" />
-          Формат дат
-        </h2>
-        <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
-          Как показывать даты в кабинете — в списках, журналах и реестре. Дата на самом документе
-          задаётся в макете и от этой настройки не зависит.
-        </p>
+        <SectionHead title="Формат дат" about={<>Как показывать даты в кабинете — в списках, журналах и реестре. Дата на самом документе задаётся в макете и от этой настройки не зависит.</>} />
 
         <div className="mt-4 grid max-w-2xl gap-3 sm:grid-cols-3">
           {FORMATS.map((f) => {

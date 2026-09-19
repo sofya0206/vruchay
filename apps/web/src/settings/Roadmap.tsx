@@ -1,5 +1,6 @@
-import { Map, ThumbsUp } from 'lucide-react';
+import { ThumbsUp } from 'lucide-react';
 import { useRoadmap, useRoadmapVote, type RoadmapStatus } from '../api/support';
+import { SectionHead } from '../ui/Settings';
 
 const STATUS_TITLE: Record<RoadmapStatus, string> = {
   planned: 'Задумано',
@@ -20,14 +21,7 @@ export function Roadmap() {
 
   return (
     <div>
-      <h2 className="flex items-center gap-2 text-lg font-medium">
-        <Map size={18} className="text-[var(--accent)]" />
-        Что дальше
-      </h2>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
-        Что мы собираемся делать. Голос — один от организации; он не назначает срок, а показывает
-        нам, с чего начать.
-      </p>
+      <SectionHead title="Что дальше" about={<>Что мы собираемся делать. Голос — один от организации; он не назначает срок, а показывает нам, с чего начать.</>} />
 
       {data?.length === 0 && (
         <p className="mt-3 text-sm text-[var(--text-muted)]">

@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { LogOut, MonitorSmartphone } from 'lucide-react';
 import { ApiError, errorText } from '../api/client';
 import {
   useLoginHistory,
@@ -11,6 +10,7 @@ import { usePreferences } from '../api/org';
 import { formatDateTime } from './preferences';
 import { Button } from '../ui/Button';
 import { StatusChip } from '../ui/Field';
+import { SettingRow, SettingRows, SettingsSection, SettingsStack } from '../ui/Settings';
 
 /** Почему вход не удался — по-русски, а не кодом из базы. */
 const OUTCOME: Record<LoginOutcome, string> = {
@@ -48,66 +48,58 @@ export function Sessions() {
   const others = (sessions.data ?? []).filter((s) => !s.current).length;
 
   return (
-    <section>
-      <h2 className="flex items-center gap-2 text-lg font-medium">
-        <MonitorSmartphone size={18} className="text-[var(--accent)]" />
-        Устройства
-      </h2>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
-        Где вы вошли прямо сейчас. Забытый вход на чужом компьютере закрывается отсюда — для этого
-        не нужно ни менять пароль, ни искать тот компьютер.
-      </p>
+    <SettingsStack>
+      <SettingsSection
+        title="Устройства"
+        about="Где вы вошли прямо сейчас. Забытый вход закрывается отсюда, менять пароль не нужно."
+        action={
+          others > 0 && (
+            <Button
+              size="sm"
+              variant="danger"
+              onClick={() => report(revokeOthers.mutateAsync())}
+              disabled={revokeOthers.isPending}
+            >
+              Завершить остальные · {others}
+            </Button>
+          )
+        }
+      >
+        <SettingRows>
+          {sessions.data?.map((s) => (
+            <SettingRow
+              key={s.id}
+              title={
+                <span className="flex items-center gap-2">
+                  {s.device}
+                  {s.current && <StatusChip tone="done">это устройство</StatusChip>}
+                </span>
+              }
+              about={`${s.ip ?? 'адрес неизвестен'} · вход ${formatDateTime(s.createdAt, format)} · был здесь ${formatDateTime(s.lastSeenAt, format)}`}
+            >
+              {!s.current && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => report(revoke.mutateAsync(s.id))}
+                  disabled={revoke.isPending}
+                >
+                  Завершить
+                </Button>
+              )}
+            </SettingRow>
+          ))}
+        </SettingRows>
 
-      <ul className="mt-4 max-w-2xl space-y-2">
-        {sessions.data?.map((s) => (
-          <li
-            key={s.id}
-            className="flex flex-wrap items-center gap-3 rounded-xl bg-[var(--surface)] p-3 ring-1 ring-[var(--line)]"
-          >
-            <div className="min-w-48 flex-1">
-              <p className="flex items-center gap-2 text-sm">
-                {s.device}
-                {s.current && <StatusChip tone="done">Это устройство</StatusChip>}
-              </p>
-              <p className="mt-0.5 text-xs text-[var(--text-muted)]">
-                {s.ip ?? 'адрес неизвестен'} · вход {formatDateTime(s.createdAt, format)} · был
-                здесь {formatDateTime(s.lastSeenAt, format)}
-              </p>
-            </div>
-            {!s.current && (
-              <Button
-                size="sm"
-                variant="danger"
-                icon={<LogOut size={14} />}
-                onClick={() => report(revoke.mutateAsync(s.id))}
-                disabled={revoke.isPending}
-              >
-                Завершить
-              </Button>
-            )}
-          </li>
-        ))}
-      </ul>
-
-      {others > 0 && (
-        <Button
-          className="mt-3"
-          variant="danger"
-          onClick={() => report(revokeOthers.mutateAsync())}
-          disabled={revokeOthers.isPending}
-        >
-          Завершить остальные ({others})
-        </Button>
-      )}
-
-      {error && (
-        <p role="alert" className="mt-2 max-w-2xl text-sm text-[var(--danger)]">
-          {error}
-        </p>
-      )}
+        {error && (
+          <p role="alert" className="mt-2 text-sm text-[var(--danger)]">
+            {error}
+          </p>
+        )}
+      </SettingsSection>
 
       <LoginHistory />
-    </section>
+    </SettingsStack>
   );
 }
 
@@ -117,29 +109,24 @@ function LoginHistory() {
   const format = prefs.data?.dateFormat;
 
   return (
-    <div className="mt-8">
-      <h3 className="font-medium">Журнал входов</h3>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
-        Последние попытки войти в вашу учётную запись — и удачные, и нет.
-      </p>
-
+    <SettingsSection title="Журнал входов" about="Последние попытки войти, удачные и нет">
       {events.data?.length === 0 && (
-        <p className="mt-3 text-sm text-[var(--text-muted)]">Пока ни одной записи.</p>
+        <p className="text-sm text-[var(--text-muted)]">Пока ни одной записи.</p>
       )}
 
-      <ul className="mt-3 max-w-2xl divide-y divide-[var(--line)] rounded-xl bg-[var(--surface)] ring-1 ring-[var(--line)]">
+      <SettingRows>
         {events.data?.map((e) => (
-          <li key={e.id} className="flex flex-wrap items-center gap-3 p-3 text-sm">
+          <div key={e.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-2.5 text-sm">
             <span className={e.outcome === 'success' ? '' : 'text-[var(--danger)]'}>
               {OUTCOME[e.outcome]}
             </span>
             <span className="text-[var(--text-muted)]">{e.device}</span>
-            <span className="ml-auto text-xs text-[var(--text-muted)]">
+            <span className="tabular ml-auto text-xs text-[var(--text-muted)]">
               {e.ip ?? '—'} · {formatDateTime(e.createdAt, format)}
             </span>
-          </li>
+          </div>
         ))}
-      </ul>
-    </div>
+      </SettingRows>
+    </SettingsSection>
   );
 }

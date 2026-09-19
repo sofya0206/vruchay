@@ -6,6 +6,7 @@ import { KeyRound, ShieldCheck, ShieldOff } from 'lucide-react';
 import { securityApi, useTotpStatus, type TotpSetup } from '../api/security';
 import { ApiError } from '../api/client';
 import { Button } from '../ui/Button';
+import { SectionHead } from '../ui/Settings';
 import { Input, Label, StatusChip } from '../ui/Field';
 
 /**
@@ -62,14 +63,7 @@ export function TwoFactor() {
 
   return (
     <section>
-      <h2 className="flex items-center gap-2 text-lg font-medium">
-        <ShieldCheck size={18} className="text-[var(--accent)]" />
-        Вход по коду
-      </h2>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
-        Второй шаг после пароля: шесть цифр из приложения на телефоне. Украденного пароля станет
-        мало, чтобы войти в кабинет и выпустить документы от вашего имени.
-      </p>
+      <SectionHead title="Вход по коду" about={<>Второй шаг после пароля: шесть цифр из приложения на телефоне. Украденного пароля станет мало, чтобы войти в кабинет и выпустить документы от вашего имени.</>} />
 
       <div className="mt-4 max-w-xl space-y-4 rounded-2xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]">
         <div className="flex flex-wrap items-center gap-3">

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Building2, Check, UserRound } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { errorText } from '../api/client';
 import { useOrgProfile, useOrgMutations } from '../api/org';
 import { Button } from '../ui/Button';
-import { Input, Label } from '../ui/Field';
+import { Input, StatusChip } from '../ui/Field';
+import { SettingRow, SettingRows, SettingsSection } from '../ui/Settings';
 
 /**
  * Название организации и своё имя.
@@ -13,10 +14,8 @@ import { Input, Label } from '../ui/Field';
  * друга и на витрине отзывов. Опечатка расходилась по всем трём местам
  * без всякой возможности её исправить.
  *
- * Разделены на два блока: имя человека живёт в разделе «Аккаунт» рядом
- * с паролем и вторым фактором, название организации — в «Организации»
- * рядом с реквизитами. Раньше это был один экран, и найти в нём
- * что-то конкретное можно было только сверху вниз.
+ * Имя человека живёт в разделе «Аккаунт» рядом с паролем и вторым
+ * фактором, название организации — в «Организации» рядом с оплатой.
  */
 function useSavedFlag() {
   const [saved, setSaved] = useState(false);
@@ -31,9 +30,72 @@ function useSavedFlag() {
 
 function Saved() {
   return (
-    <span className="flex items-center gap-1.5 text-sm text-[var(--accent)]">
+    <span className="flex items-center gap-1.5 text-sm text-[var(--ok)]">
       <Check size={15} /> Сохранено
     </span>
+  );
+}
+
+/** Поле с кнопкой: кнопка серая, пока значение не изменилось. */
+function NameRow({
+  title,
+  about,
+  value,
+  initial,
+  min = 1,
+  maxLength,
+  placeholder,
+  pending,
+  error,
+  onChange,
+  onSave,
+  saved,
+}: {
+  title: string;
+  about: string;
+  value: string;
+  initial: string | undefined;
+  min?: number;
+  maxLength: number;
+  placeholder: string;
+  pending: boolean;
+  error: unknown;
+  onChange: (v: string) => void;
+  onSave: () => void;
+  saved: boolean;
+}) {
+  const changed = initial !== undefined && value.trim() !== initial && value.trim().length >= min;
+  return (
+    <SettingRow
+      title={title}
+      about={error ? <span className="text-[var(--danger)]">{errorText(error)}</span> : about}
+    >
+      {saved && <Saved />}
+      <form
+        className="flex items-center gap-2 max-sm:w-full"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (changed) onSave();
+        }}
+      >
+        <Input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          maxLength={maxLength}
+          placeholder={placeholder}
+          aria-label={title}
+          className="w-64 py-1.5 text-sm max-sm:w-full"
+        />
+        <Button
+          type="submit"
+          size="sm"
+          variant={changed ? 'primary' : 'secondary'}
+          disabled={!changed || pending}
+        >
+          {pending ? 'Сохраняем…' : 'Сохранить'}
+        </Button>
+      </form>
+    </SettingRow>
   );
 }
 
@@ -47,48 +109,25 @@ export function OrgName() {
     if (data) setOrgName(data.orgName);
   }, [data]);
 
-  const changed = data ? orgName.trim() !== data.orgName && orgName.trim().length >= 2 : false;
-
   return (
-    <section>
-      <h2 className="flex items-center gap-2 text-lg font-medium">
-        <Building2 size={18} className="text-[var(--accent)]" />
-        Название организации
-      </h2>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
-        Участники увидят его в письме — в поле «от кого», а проверяющие — на странице
-        проверки документа.
-      </p>
-
-      <div className="mt-4 max-w-md rounded-2xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]">
-        <Label>Название организации</Label>
-        <Input
+    <SettingsSection title="Организация">
+      <SettingRows>
+        <NameRow
+          title="Название"
+          about="В письмах участникам и на странице проверки документа"
           value={orgName}
-          onChange={(e) => setOrgName(e.target.value)}
+          initial={data?.orgName}
+          min={2}
           maxLength={200}
           placeholder="Центр «Развитие»"
+          pending={renameOrg.isPending}
+          error={renameOrg.isError ? renameOrg.error : null}
+          onChange={setOrgName}
+          onSave={() => renameOrg.mutate(orgName, { onSuccess: show })}
+          saved={saved}
         />
-        <p className="mt-1.5 text-sm text-[var(--text-muted)]">
-          Так и напишите, как принято у вас: «Учебный центр «Развитие»», «МБОУ СОШ №12».
-        </p>
-        <div className="mt-2 flex items-center gap-3">
-          <Button
-            size="sm"
-            variant="primary"
-            disabled={!changed || renameOrg.isPending}
-            onClick={() => renameOrg.mutate(orgName, { onSuccess: show })}
-          >
-            {renameOrg.isPending ? 'Сохраняем…' : 'Сохранить название'}
-          </Button>
-          {saved && <Saved />}
-        </div>
-        {renameOrg.isError && (
-          <p role="alert" className="mt-1.5 text-sm text-[var(--danger)]">
-            {errorText(renameOrg.error)}
-          </p>
-        )}
-      </div>
-    </section>
+      </SettingRows>
+    </SettingsSection>
   );
 }
 
@@ -102,47 +141,26 @@ export function MyProfile() {
     if (data) setUserName(data.userName);
   }, [data]);
 
-  const changed = data ? userName.trim() !== data.userName : false;
-
   return (
-    <section>
-      <h2 className="flex items-center gap-2 text-lg font-medium">
-        <UserRound size={18} className="text-[var(--accent)]" />
-        Профиль
-      </h2>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
-        Имя видят только коллеги внутри кабинета — оно стоит в журнале действий рядом
-        с тем, что вы сделали.
-      </p>
-
-      <div className="mt-4 max-w-md rounded-2xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]">
-        <Label>Ваше имя</Label>
-        <Input
+    <SettingsSection title="Профиль">
+      <SettingRows>
+        <NameRow
+          title="Имя"
+          about="Видят коллеги в журнале действий"
           value={userName}
-          onChange={(e) => setUserName(e.target.value)}
+          initial={data?.userName}
           maxLength={200}
           placeholder="Мария Новикова"
+          pending={renameMe.isPending}
+          error={renameMe.isError ? renameMe.error : null}
+          onChange={setUserName}
+          onSave={() => renameMe.mutate(userName, { onSuccess: show })}
+          saved={saved}
         />
-        <p className="mt-1.5 text-sm text-[var(--text-muted)]">
-          Ваш адрес входа: {data?.email ?? '—'}. Его сменить нельзя — по нему вы входите.
-        </p>
-        <div className="mt-2 flex items-center gap-3">
-          <Button
-            size="sm"
-            variant="primary"
-            disabled={!changed || renameMe.isPending}
-            onClick={() => renameMe.mutate(userName, { onSuccess: show })}
-          >
-            {renameMe.isPending ? 'Сохраняем…' : 'Сохранить имя'}
-          </Button>
-          {saved && <Saved />}
-        </div>
-        {renameMe.isError && (
-          <p role="alert" className="mt-1.5 text-sm text-[var(--danger)]">
-            {errorText(renameMe.error)}
-          </p>
-        )}
-      </div>
-    </section>
+        <SettingRow title="Почта для входа" about={data?.email ?? '—'}>
+          <StatusChip tone="neutral">не меняется</StatusChip>
+        </SettingRow>
+      </SettingRows>
+    </SettingsSection>
   );
 }

@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { settingsApi, type MailDomain } from '../api/settings';
 import { ApiError } from '../api/client';
 import { Button } from '../ui/Button';
+import { SectionHead } from '../ui/Settings';
 import { Input, Label, StatusChip } from '../ui/Field';
 
 /**
@@ -39,15 +40,7 @@ export function MailDomains() {
 
   return (
     <section className="space-y-4">
-      <header>
-        <h2 className="text-lg font-medium">Домен для отправки</h2>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Настраивать не обязательно: письма уже уходят, отправителем в них стоит название
-          вашей организации. Свой домен нужен, если хотите, чтобы и адрес был вашим.
-          Подтверждается записями в DNS — они появляются в интернете от пятнадцати минут
-          до двух суток.
-        </p>
-      </header>
+      <SectionHead title="Домен для отправки" about={<>Настраивать не обязательно: письма уже уходят, отправителем в них стоит название вашей организации. Свой домен нужен, если хотите, чтобы и адрес был вашим. Подтверждается записями в DNS — они появляются в интернете от пятнадцати минут до двух суток.</>} />
 
       <form onSubmit={onAdd} className="flex flex-wrap items-end gap-3">
         <div className="min-w-56 flex-1">

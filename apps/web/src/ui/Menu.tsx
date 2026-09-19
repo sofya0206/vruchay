@@ -26,6 +26,7 @@ export function Menu({
   trigger,
   children,
   align = 'right',
+  side = 'bottom',
   className = '',
   title = 'Действия',
 }: {
@@ -33,6 +34,8 @@ export function Menu({
   trigger: (props: { open: boolean; toggle: () => void }) => ReactNode;
   children: ReactNode;
   align?: 'left' | 'right';
+  /** Куда раскрывать: вниз от кнопки или вверх — для кнопок у нижнего края. */
+  side?: 'bottom' | 'top';
   className?: string;
   /** Заголовок нижнего листа на сенсорном экране. */
   title?: string;
@@ -89,7 +92,8 @@ export function Menu({
             if ((e.target as HTMLElement).closest('[role="menuitem"]')) setOpen(false);
           }}
           className={cn(
-            'card absolute top-full z-30 mt-1 min-w-56 bg-[var(--surface-raised)] p-1.5 shadow-lg',
+            'card absolute z-30 min-w-56 bg-[var(--surface-raised)] p-1.5 shadow-lg',
+            side === 'top' ? 'bottom-full mb-1' : 'top-full mt-1',
             align === 'right' ? 'right-0' : 'left-0',
           )}
         >

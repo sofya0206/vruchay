@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Check, Copy, Gift, Send, MessageCircle } from 'lucide-react';
+import { Check, Copy, Send, MessageCircle } from 'lucide-react';
 import { useReferral, type ReferralSummary } from '../api/referral';
 import { Button } from '../ui/Button';
+import { SectionHead } from '../ui/Settings';
 
 /**
  * Раздел «Пригласить друга».
@@ -17,14 +18,7 @@ export function InviteFriend() {
 
   return (
     <section>
-      <h2 className="flex items-center gap-2 text-lg font-medium">
-        <Gift size={18} className="text-[var(--accent)]" />
-        Пригласить друга
-      </h2>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
-        Если сервис вам пригодился, расскажите о нём знакомому организатору. Вы оба получите
-        бесплатные документы: он — на старте, вы — когда он начнёт работать.
-      </p>
+      <SectionHead title="Пригласить друга" about={<>Если сервис вам пригодился, расскажите о нём знакомому организатору. Вы оба получите бесплатные документы: он — на старте, вы — когда он начнёт работать.</>} />
 
       {isLoading && <p className="mt-4 text-sm text-[var(--text-muted)]">Загружаем…</p>}
       {data && <InviteBody data={data} />}

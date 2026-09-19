@@ -1,5 +1,6 @@
 import { Check, Minus } from 'lucide-react';
 import { useRoles } from '../api/team';
+import { SettingsSection } from '../ui/Settings';
 
 /**
  * Что может каждая роль.
@@ -14,18 +15,15 @@ export function RolePermissions() {
   if (!data) return null;
 
   return (
-    <div className="mt-8">
-      <h3 className="font-medium">Права ролей</h3>
-      <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)] max-md:hidden">
-        Владелец у организации один — он же распоряжается оплатой. Управляющий делает всё то же,
-        кроме денег и передачи организации.
-      </p>
-
-      <div className="mt-3 overflow-x-auto">
+    <SettingsSection
+      title="Что может каждая роль"
+      about="Владелец один, он же распоряжается оплатой. Управляющий делает всё то же, кроме денег."
+    >
+      <div className="overflow-x-auto">
         <table className="w-full min-w-96 border-collapse text-sm">
           <thead>
-            <tr className="border-b border-[var(--line)] text-left">
-              <th className="py-2 pr-4 font-medium">Что можно</th>
+            <tr className="border-b border-[var(--line)] text-left text-xs tracking-wide text-[var(--text-muted)] uppercase">
+              <th className="py-2 pr-4 font-medium" />
               {data.roles.map((r) => (
                 <th key={r.role} className="px-3 py-2 text-center font-medium">
                   {r.title}
@@ -36,11 +34,11 @@ export function RolePermissions() {
           <tbody>
             {data.permissions.map((p) => (
               <tr key={p.key} className="border-b border-[var(--line)] last:border-0">
-                <td className="py-2 pr-4">{p.title}</td>
+                <td className="py-2.5 pr-4">{p.title}</td>
                 {data.roles.map((r) => (
-                  <td key={r.role} className="px-3 py-2 text-center">
+                  <td key={r.role} className="px-3 py-2.5 text-center">
                     {p.roles[r.role] ? (
-                      <Check size={16} className="mx-auto text-[var(--accent)]" aria-label="да" />
+                      <Check size={16} className="mx-auto text-[var(--ok)]" aria-label="да" />
                     ) : (
                       <Minus
                         size={16}
@@ -55,6 +53,6 @@ export function RolePermissions() {
           </tbody>
         </table>
       </div>
-    </div>
+    </SettingsSection>
   );
 }
