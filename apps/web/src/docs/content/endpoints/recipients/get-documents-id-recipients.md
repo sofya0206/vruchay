@@ -41,6 +41,8 @@ rate_limit: none
 | `rows[].data` | object | Значения по именам колонок: `{"name": "…", "email": "…"}` |
 | `rows[].checked` | boolean | Отмечена к выпуску |
 | `rows[].lastFileId` | UUID \| null | Последний выпущенный по строке файл |
+| `rows[].mailStatus` | string \| null | Последнее письмо о нынешнем файле строки: `queued`, `sent`, `delivered`, `opened`, `bounced`, `failed`; `null` — не отправлялось. Письмо о прежнем, перевыпущенном файле не учитывается |
+| `rows[].changedSinceIssue` | boolean | Данные строки поправили после выпуска её файла — на руках у получателя документ со старыми данными. У файлов, выпущенных без снимка данных, всегда `false` |
 | `rows[].createdAt`, `rows[].updatedAt` | string (ISO 8601) | Даты создания и изменения |
 | `checkedCount` | number | Сколько строк отмечено (считается по всей таблице, без предела в 10 000) |
 
@@ -58,6 +60,8 @@ rate_limit: none
       "data": { "name": "Иванова Мария Сергеевна", "email": "ivanova@example.com" },
       "checked": true,
       "lastFileId": null,
+      "mailStatus": null,
+      "changedSinceIssue": false,
       "createdAt": "2026-09-03T10:15:00.000Z",
       "updatedAt": "2026-09-03T10:15:00.000Z"
     }

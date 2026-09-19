@@ -31,6 +31,7 @@ import {
   type SendResult,
 } from '../api/recipients';
 import { PreviewDialog } from './PreviewDialog';
+import { RowOutcomeChip } from './RowOutcomeChip';
 import { Button } from '../ui/Button';
 import { Field, Input, StatusChip } from '../ui/Field';
 import { cn } from '../ui/cn';
@@ -769,6 +770,11 @@ export function RecipientsTable({
                   <th className="w-12 border-r border-b border-[var(--line)] px-2 py-2 text-right text-xs font-normal text-[var(--text-muted)]">
                     №
                   </th>
+                  {/* Итог сразу за номером: при широкой таблице колонки данных
+                      уезжают вбок, а судьба строки должна оставаться на виду. */}
+                  <th className="border-r border-b border-[var(--line)] px-3 py-2 text-left text-sm font-medium whitespace-nowrap">
+                    Итог
+                  </th>
                   {/* Заголовок — по-человечески, переменная под ним мелким.
                       Раньше колонки назывались «%name» и «%email»: для
                       человека это не название столбца, а шифр.
@@ -833,6 +839,9 @@ export function RecipientsTable({
                     </td>
                     <td className="tabular border-r border-b border-[var(--line)] px-2 py-1 text-right text-xs text-[var(--text-muted)]">
                       {index + 1}
+                    </td>
+                    <td className="border-r border-b border-[var(--line)] px-3 py-1">
+                      <RowOutcomeChip row={row} />
                     </td>
                     {columns.map((col) => (
                       <td key={col.id} className="border-r border-b border-[var(--line)] p-0">
