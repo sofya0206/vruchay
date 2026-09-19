@@ -2,14 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ChevronDown,
   ChevronRight,
-  Circle,
-  Image as ImageIcon,
   ImagePlus,
   Link2,
-  Minus,
   Plus,
   QrCode,
-  Square,
   Type,
 } from 'lucide-react';
 import type { FieldInfo } from './fields';
@@ -31,9 +27,6 @@ export type InsertKind =
 export function InsertMenu({
   onInsert,
   fields = [],
-  onBackground,
-  backgroundLoading = false,
-  hasBackground = false,
   onImage,
   imageLoading = false,
   iconOnly = false,
@@ -41,12 +34,6 @@ export function InsertMenu({
   onInsert: (what: InsertKind) => void;
   /** Что можно подставить: колонки таблицы и то, что подставляет сервис. */
   fields?: FieldInfo[];
-  /** Выбор файла бланка. Открывается системным окном, поэтому не onInsert. */
-  onBackground: () => void;
-  /** Загружается ли бланк прямо сейчас. */
-  backgroundLoading?: boolean;
-  /** Есть ли уже бланк: от этого зависит подсказка первого шага. */
-  hasBackground?: boolean;
   /** Выбор картинки для отдельного блока — тоже системным окном. */
   onImage: () => void;
   /** Загружается ли картинка прямо сейчас. */
@@ -130,20 +117,8 @@ export function InsertMenu({
           // и обрезка съедала бы его целиком.
           className="absolute left-0 top-full z-20 mt-1 w-72 rounded-xl bg-[var(--surface)] py-1 shadow-lg ring-1 ring-[var(--line)]"
         >
-          {/* Бланк первым: это первый шаг работы. */}
-          <Item
-            icon={<ImageIcon size={15} />}
-            label={backgroundLoading ? 'Загружаем бланк…' : hasBackground ? 'Заменить бланк' : 'Бланк'}
-            hint={hasBackground ? 'Другая картинка вместо нынешней' : 'С этого начинают: картинка вашей грамоты'}
-            disabled={backgroundLoading}
-            onClick={() => {
-              setOpen(false);
-              onBackground();
-            }}
-          />
-
-          <div className="my-1 border-t border-[var(--line)]" />
-
+          {/* Бланка здесь нет: у него свой значок в панели рядом с «+».
+              Меню — про то, что кладут поверх бланка. */}
           {/* У текста третий уровень: сразу вставить блок с нужным полем.
               Человек, размечающий грамоту, думает не «положу текст, потом
               впишу поле», а «сюда пойдёт имя». */}
@@ -208,23 +183,8 @@ export function InsertMenu({
             onClick={() => pick({ type: 'link' })}
           />
 
-          <div className="relative">
-            <Item
-              icon={<Square size={15} />}
-              label="Фигура"
-              hint="Линия, рамка, подложка под текст"
-              submenu={submenu === 'shape'}
-              onClick={() => setSubmenu((v) => (v === 'shape' ? null : 'shape'))}
-              onHover={() => setSubmenu('shape')}
-            />
-            {submenu === 'shape' && (
-              <Sub>
-                <SubItem icon={<Minus size={14} />} title="Линия" hint="под подпись" onClick={() => pick({ type: 'shape', kind: 'line' })} />
-                <SubItem icon={<Square size={14} />} title="Прямоугольник" hint="рамка или подложка" onClick={() => pick({ type: 'shape', kind: 'rect' })} />
-                <SubItem icon={<Circle size={14} />} title="Овал" hint="печать, медальон" onClick={() => pick({ type: 'shape', kind: 'ellipse' })} />
-              </Sub>
-            )}
-          </div>
+          {/* Фигуры — значком в панели рядом с «+»: они нужны в любой
+              момент раскладки, а не только при первой вставке. */}
         </div>
       )}
     </div>

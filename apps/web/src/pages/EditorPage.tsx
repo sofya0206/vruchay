@@ -5,6 +5,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   Check,
   ChevronLeft,
+  Circle,
   ChevronRight,
   ChevronsRight,
   CopyPlus,
@@ -18,15 +19,18 @@ import {
   Lock,
   LockOpen,
   Magnet,
+  Minus,
   Paintbrush,
   Printer,
   Proportions,
   Redo2,
   SlidersHorizontal,
+  Square,
   SquareDashed,
   Table2,
   Trash2,
   TriangleAlert,
+  Type,
   Undo2,
   Variable,
   Wand2,
@@ -53,6 +57,7 @@ import { SheetTabs } from '../editor/SheetTabs';
 import type { MenuEntry } from '../editor/DocumentChrome';
 import { StatusChip } from '../ui/Field';
 import { IconButton } from '../ui/IconButton';
+import { Menu, MenuItem } from '../ui/Menu';
 import { Select } from '../ui/Select';
 import { api } from '../api/client';
 import { useOrgProfile } from '../api/org';
@@ -1217,9 +1222,6 @@ export function EditorPage() {
         iconOnly
         onInsert={addElement}
         fields={fields}
-        onBackground={pickBackground}
-        backgroundLoading={uploadBackground.isPending}
-        hasBackground={hasBackground}
         onImage={pickImage}
         imageLoading={uploadImage.isPending}
       />
@@ -1230,6 +1232,30 @@ export function EditorPage() {
       >
         <ImageUp size={16} />
       </ToolButton>
+      {/* Текст и фигура — то, что кладут на лист чаще всего, поэтому
+          в один клик, как «T» и «□» у Figma и Canva. Текст с подстановкой
+          поля остаётся в «+»: там выбирают, какое именно. */}
+      <ToolButton title="Текст" onClick={() => addElement({ type: 'text' })}>
+        <Type size={16} />
+      </ToolButton>
+      <Menu
+        align="left"
+        trigger={({ open, toggle }) => (
+          <IconButton size="sm" label="Фигура" active={open} aria-expanded={open} onClick={toggle}>
+            <Square size={16} />
+          </IconButton>
+        )}
+      >
+        <MenuItem icon={<Minus size={16} />} onClick={() => addElement({ type: 'shape', kind: 'line' })}>
+          Линия
+        </MenuItem>
+        <MenuItem icon={<Square size={16} />} onClick={() => addElement({ type: 'shape', kind: 'rect' })}>
+          Прямоугольник
+        </MenuItem>
+        <MenuItem icon={<Circle size={16} />} onClick={() => addElement({ type: 'shape', kind: 'ellipse' })}>
+          Овал
+        </MenuItem>
+      </Menu>
 
       <ToolDivider />
 
