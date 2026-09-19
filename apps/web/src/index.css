@@ -760,3 +760,44 @@ textarea::-webkit-resizer {
   background: var(--danger-soft);
   color: var(--danger);
 }
+
+/*
+ * ─────────────────────────── Телефон ───────────────────────────
+ *
+ * Высота «почти весь экран» для нижнего листа и высота редактора.
+ * Сначала vh, поверх — dvh под @supports: браузеры без dvh (Chrome до 108,
+ * Safari до 15.4) берут первое. Два объявления подряд здесь не годятся —
+ * сборка (Lightning CSS в @tailwindcss/vite) выбрасывает «лишнее» первое,
+ * раз целевые браузеры dvh знают, и старый Android остаётся без высоты.
+ */
+.sheet-max-h {
+  max-height: 85vh;
+}
+.editor-height {
+  height: calc(100vh - var(--app-header));
+}
+@supports (height: 100dvh) {
+  .sheet-max-h {
+    max-height: 85dvh;
+  }
+  .editor-height {
+    height: calc(100dvh - var(--app-header));
+  }
+}
+
+/*
+ * Поле ввода мельче 16px Safari на iOS при нажатии увеличивает вместе со
+ * страницей, и после ввода человек остаётся в увеличенном экране с обрезанной
+ * вёрсткой. На сенсорном экране поднимаем кегль полей до 16px.
+ *
+ * Правило намеренно вне слоёв: утилиты Tailwind лежат в @layer, и `text-sm`
+ * у поля иначе перебил бы его. Редактируемый текст на холсте сюда не входит —
+ * там кегль задаёт макет листа, и трогать его нельзя.
+ */
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='file']),
+  textarea,
+  select {
+    font-size: max(16px, 1em);
+  }
+}

@@ -70,8 +70,18 @@ export class GenerationService {
     private readonly plans: PlansService,
   ) {}
 
-  /** Создаёт задание на отмеченные строки. Сама генерация идёт в воркере. */
-  async start(orgId: string, documentId: string, format: 'pdf' | 'jpg'): Promise<StartedJob> {
+  /**
+   * Создаёт задание на отмеченные строки. Сама генерация идёт в воркере.
+   *
+   * `createdById` — кому потом прийти push «готово». Пусто, когда выпуск
+   * запустил скрипт по токену API: уведомлять там некого.
+   */
+  async start(
+    orgId: string,
+    documentId: string,
+    format: 'pdf' | 'jpg',
+    createdById: string | null = null,
+  ): Promise<StartedJob> {
     const doc = await this.prisma.document.findFirst({
       where: { id: documentId, orgId, deletedAt: null },
       include: { sheets: { orderBy: { position: 'asc' } } },
@@ -124,7 +134,7 @@ export class GenerationService {
       await this.checkQuota(orgId, rows.length, await this.reserved(orgId, tx), tx);
 
       const job = await tx.generationJob.create({
-        data: { orgId, documentId, format, total: rows.length },
+        data: { orgId, documentId, format, total: rows.length, createdById },
       });
       return { job, rowIds: rows.map((r) => r.id) };
     });

@@ -122,7 +122,13 @@ export function VerifyDocumentPage() {
         // Пускать поисковики или нет — решает эмитент; по умолчанию нет.
         noindex={!data?.indexable}
       />
-      <div className="grid min-h-full place-items-center bg-[var(--ground)] px-6 py-16">
+      {/* На телефоне вердикт стоит сверху, а не посреди экрана: страницу
+          открывают сканом QR с бумаги, и ответ «подлинный / отозван»
+          должен быть виден сразу, без прокрутки и без пустого поля над ним. */}
+      <div
+        className="grid min-h-full justify-items-center bg-[var(--ground)] px-4 py-5 sm:place-items-center sm:px-6 sm:py-16"
+        style={{ paddingBottom: 'max(20px, env(safe-area-inset-bottom))' }}
+      >
         <main className="w-full max-w-md">
           {outcome.kind === 'pending' && (
             <p className="text-center text-[var(--text-muted)]">Проверяем…</p>
@@ -161,6 +167,15 @@ export function VerifyDocumentPage() {
 
 type Tone = 'ok' | 'warn' | 'bad' | 'muted';
 
+/*
+ * Строка «подпись — значение». Длинное значение (название организации,
+ * адрес) переносится внутри своей колонки, а не выталкивает строку за
+ * край экрана: на телефоне в 320 точек на неё остаётся точек двести.
+ */
+const ROW = 'flex justify-between gap-4';
+const LABEL = 'shrink-0 text-[var(--text-muted)]';
+const VALUE = 'min-w-0 text-right font-medium break-words';
+
 /**
  * Карточка вердикта. Цвет — на всей рамке, а не только на значке:
  * человек с бумагой в руках должен понять ответ с расстояния вытянутой
@@ -174,7 +189,7 @@ function Card({ tone, children }: { tone: Tone; children: React.ReactNode }) {
     muted: 'ring-1 ring-[var(--line)]',
   };
   return (
-    <div className={`rounded-2xl bg-[var(--surface)] p-8 text-center ${ring[tone]}`}>
+    <div className={`rounded-2xl bg-[var(--surface)] px-5 py-6 text-center sm:p-8 ${ring[tone]}`}>
       {children}
     </div>
   );
@@ -232,15 +247,15 @@ function Verdict({ data }: { data: VerifyResult }) {
         {data.state === 'revoked' && (
           <dl className="mt-4 space-y-1 text-left text-sm">
             {data.revokedReason && (
-              <div className="flex justify-between gap-4">
-                <dt className="text-[var(--text-muted)]">Причина</dt>
-                <dd className="text-right font-medium">{data.revokedReason}</dd>
+              <div className={ROW}>
+                <dt className={LABEL}>Причина</dt>
+                <dd className={VALUE}>{data.revokedReason}</dd>
               </div>
             )}
             {data.revokedAt && (
-              <div className="flex justify-between gap-4">
-                <dt className="text-[var(--text-muted)]">Отозван</dt>
-                <dd className="text-right font-medium">{formatDate(data.revokedAt)}</dd>
+              <div className={ROW}>
+                <dt className={LABEL}>Отозван</dt>
+                <dd className={VALUE}>{formatDate(data.revokedAt)}</dd>
               </div>
             )}
           </dl>
@@ -249,7 +264,7 @@ function Verdict({ data }: { data: VerifyResult }) {
           (data.replacedBy ? (
             <Link
               to={data.replacedBy.path}
-              className="mt-4 inline-block rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--accent-contrast)] hover:bg-[var(--accent-hover)]"
+              className="mt-4 inline-flex h-11 items-center justify-center rounded-lg bg-[var(--accent)] px-4 text-sm font-medium text-[var(--accent-contrast)] hover:bg-[var(--accent-hover)] max-sm:w-full"
             >
               Проверить действующий документ
             </Link>
@@ -269,36 +284,36 @@ function Verdict({ data }: { data: VerifyResult }) {
 
         <dl className="mt-6 space-y-2 border-t border-[var(--line)] pt-6 text-left text-sm">
           {Object.entries(data.fields).map(([key, value]) => (
-            <div key={key} className="flex justify-between gap-4">
-              <dt className="text-[var(--text-muted)]">{fieldLabel(key)}</dt>
-              <dd className="text-right font-medium">{value}</dd>
+            <div key={key} className={ROW}>
+              <dt className={LABEL}>{fieldLabel(key)}</dt>
+              <dd className={VALUE}>{value}</dd>
             </div>
           ))}
-          <div className="flex justify-between gap-4">
-            <dt className="text-[var(--text-muted)]">Выдан</dt>
-            <dd className="tabular text-right font-medium">{formatDate(data.issuedAt)}</dd>
+          <div className={ROW}>
+            <dt className={LABEL}>Выдан</dt>
+            <dd className={`tabular ${VALUE}`}>{formatDate(data.issuedAt)}</dd>
           </div>
           {data.expiresAt && (
-            <div className="flex justify-between gap-4">
-              <dt className="text-[var(--text-muted)]">
+            <div className={ROW}>
+              <dt className={LABEL}>
                 {data.expired ? 'Действовал до' : 'Действителен до'}
               </dt>
-              <dd className="tabular text-right font-medium">{formatDate(data.expiresAt)}</dd>
+              <dd className={`tabular ${VALUE}`}>{formatDate(data.expiresAt)}</dd>
             </div>
           )}
-          <div className="flex justify-between gap-4">
-            <dt className="text-[var(--text-muted)]">Номер</dt>
-            <dd className="text-right font-mono text-xs font-medium">{data.code}</dd>
+          <div className={ROW}>
+            <dt className={LABEL}>Номер</dt>
+            <dd className={`font-mono text-xs ${VALUE}`}>{data.code}</dd>
           </div>
           {data.signed && (
-            <div className="flex justify-between gap-4">
-              <dt className="text-[var(--text-muted)]">Электронная подпись</dt>
-              <dd className="text-right font-medium">Есть — видна в Adobe Reader</dd>
+            <div className={ROW}>
+              <dt className={LABEL}>Электронная подпись</dt>
+              <dd className={VALUE}>Есть — видна в Adobe Reader</dd>
             </div>
           )}
-          <div className="flex justify-between gap-4">
-            <dt className="text-[var(--text-muted)]">Выдан организацией</dt>
-            <dd className="text-right font-medium">
+          <div className={ROW}>
+            <dt className={LABEL}>Выдан организацией</dt>
+            <dd className={VALUE}>
               {data.issuer.publicPath ? (
                 <Link to={data.issuer.publicPath} className="text-[var(--accent)] hover:underline">
                   {data.issuer.name}
@@ -307,10 +322,7 @@ function Verdict({ data }: { data: VerifyResult }) {
                 data.issuer.name
               )}
               {data.issuer.verified && (
-                <span
-                  className="ml-1.5 inline-flex items-center gap-1 rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--accent)]"
-                  title="Организация подтвердила домен и реквизиты"
-                >
+                <span className="ml-1.5 inline-flex items-center gap-1 rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--accent)]">
                   <ShieldCheck size={11} /> Верифицированный эмитент
                 </span>
               )}
@@ -362,19 +374,21 @@ function Actions({ data }: { data: VerifyResult }) {
     : null;
 
   return (
-    <div className="mt-6 flex flex-wrap justify-center gap-2">
+    // На телефоне кнопки во всю ширину и высотой под палец — стопкой,
+    // а не парой мелких посередине карточки.
+    <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-center">
       <button
         type="button"
         onClick={() => void share()}
-        className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-[var(--text)] ring-1 ring-[var(--line-strong)] hover:bg-[var(--surface-sunken)]"
+        className="inline-flex h-11 items-center justify-center gap-1.5 rounded-lg px-4 text-sm text-[var(--text)] ring-1 ring-[var(--line-strong)] hover:bg-[var(--surface-sunken)] sm:h-9 sm:px-3"
       >
-        {copied ? <Check size={14} /> : <Share2 size={14} />}
+        {copied ? <Check size={16} /> : <Share2 size={16} />}
         {copied ? 'Ссылка скопирована' : 'Поделиться'}
       </button>
       {report && (
         <a
           href={report}
-          className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
+          className="inline-flex h-11 items-center justify-center gap-1.5 rounded-lg px-4 text-sm text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)] sm:h-9 sm:px-3"
         >
           <Flag size={14} />
           Сообщить о проблеме
@@ -415,7 +429,7 @@ function FileCheck({ expected }: { expected: string | null }) {
   }
 
   return (
-    <section className="mt-4 rounded-2xl bg-[var(--surface)] p-6 ring-1 ring-[var(--line)]">
+    <section className="mt-4 rounded-2xl bg-[var(--surface)] p-5 ring-1 ring-[var(--line)] sm:p-6">
       <h2 className="flex items-center gap-2 font-medium">
         <FileSearch size={16} className="text-[var(--text-muted)]" />
         Проверить мой файл
@@ -438,7 +452,7 @@ function FileCheck({ expected }: { expected: string | null }) {
               type="button"
               onClick={() => input.current?.click()}
               disabled={verdict.kind === 'busy'}
-              className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-[var(--accent-contrast)] hover:bg-[var(--accent-hover)] disabled:opacity-50"
+              className="h-11 rounded-lg bg-[var(--accent)] px-4 text-sm font-medium text-[var(--accent-contrast)] hover:bg-[var(--accent-hover)] disabled:opacity-50 max-sm:w-full sm:h-9 sm:px-3"
             >
               {verdict.kind === 'busy' ? 'Считаем…' : 'Выбрать файл'}
             </button>

@@ -45,6 +45,8 @@ import { Dialog } from '../ui/Dialog';
 import { Checkbox } from '../ui/Checkbox';
 import type { DocumentDetail } from '../api/types';
 import type { WorkspaceTab } from '../mailing/workspace-tabs';
+import { PushOffer } from '../push/PushOffer';
+import { BigListNote } from './BigListNote';
 
 /**
  * Таблица получателей — вторая сторона материала.
@@ -437,7 +439,7 @@ export function RecipientsTable({
     /* Точным счётом, а не `h-full`: оболочка кабинета не задаёт высоту
        своей колонке (иначе колонка разделов теряла прилипание на длинных
        страницах), и опереться на неё через `h-full` больше не на что. */
-    <div className="flex h-[calc(100dvh-var(--app-header))] min-h-0 flex-col">
+    <div className="editor-height flex min-h-0 flex-col">
       <DocumentChrome
         documentId={documentId}
         title={doc.title}
@@ -458,6 +460,9 @@ export function RecipientsTable({
           </Button>
         }
       />
+
+      {running && <PushOffer />}
+      <BigListNote />
 
       <input
         ref={xlsInput}
@@ -671,7 +676,7 @@ export function RecipientsTable({
                         size="sm"
                         label={`Удалить колонку ${columnTitle(col)}`}
                         onClick={() => m.deleteColumn.mutate(col.id)}
-                        className="size-6 opacity-0 group-hover:opacity-100 hover:text-[var(--danger)]"
+                        className="size-6 opacity-0 group-hover:opacity-100 hover:text-[var(--danger)] pointer-coarse:size-10 pointer-coarse:opacity-100"
                       >
                         <X size={12} />
                       </IconButton>
@@ -721,7 +726,7 @@ export function RecipientsTable({
                       size="sm"
                       label="Удалить строку"
                       onClick={() => m.deleteRow.mutate(row.id)}
-                      className="size-7 opacity-0 group-hover:opacity-100 hover:text-[var(--danger)]"
+                      className="size-7 opacity-0 group-hover:opacity-100 hover:text-[var(--danger)] pointer-coarse:size-10 pointer-coarse:opacity-100"
                     >
                       <Trash2 size={14} />
                     </IconButton>

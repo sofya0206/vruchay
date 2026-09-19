@@ -252,6 +252,20 @@ export const envSchema = z.object({
   SELLER_BANK: z.string().default(''),
   SELLER_BIK: z.string().default(''),
   SELLER_CORR_ACCOUNT: z.string().default(''),
+
+  /**
+   * Ключи VAPID для push-уведомлений о готовности выпуска (ADR-0004).
+   *
+   * Пусто — push выключен: кнопки «Сообщить, когда будет готово» в кабинете
+   * нет, сервер ничего не шлёт. Пара задаётся один раз и не меняется:
+   * новый ключ делает все прежние подписки недействительными, и люди
+   * перестают получать уведомления, пока не включат их заново.
+   * Сгенерировать: pnpm --filter @gramota/server exec web-push generate-vapid-keys
+   */
+  VAPID_PUBLIC_KEY: z.string().default(''),
+  VAPID_PRIVATE_KEY: z.string().default(''),
+  /** Контакт для push-сервисов (mailto: или https:). Пусто — PUBLIC_URL. */
+  VAPID_SUBJECT: z.string().default(''),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -84,13 +84,30 @@ export function OverviewPage() {
   // слева главная начинается на той же линии, что документы и реестр.
   return (
     <>
-      <main className="min-w-0 flex-1 px-6 py-6">
-        <div className="mb-4 flex justify-end">
+      <main className="min-w-0 flex-1 px-4 py-4 sm:px-6 sm:py-6">
+        <div className="mb-4 flex justify-end max-md:hidden">
           <Button
             variant="primary"
             icon={<Plus size={16} />}
             disabled={create.isPending}
             onClick={() => create.mutate(protocolTitle())}
+          >
+            Создать документ
+          </Button>
+        </div>
+        {/* На телефоне главное действие — внизу, под большим пальцем, а не
+            в правом верхнем углу, куда одной рукой не дотянуться. */}
+        <div
+          className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--line)] bg-[var(--surface)] px-4 pt-3 md:hidden"
+          style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
+        >
+          <Button
+            variant="primary"
+            size="lg"
+            icon={<Plus size={18} />}
+            disabled={create.isPending}
+            onClick={() => create.mutate(protocolTitle())}
+            className="h-12 w-full"
           >
             Создать документ
           </Button>
@@ -103,16 +120,21 @@ export function OverviewPage() {
         {/* Одна сетка на плитки и на нижний ряд: реестр занимает три
             колонки, письма с документами — четвёртую, ровно под четвёртой
             плиткой. Две сетки друг под другом ломали эту линию. */}
-        <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Плитки на телефоне — два на два, а не по одной во весь экран:
+            организатор на мероприятии смотрит сводку одним взглядом,
+            без прокрутки через четыре карточки. */}
+        <div className="grid grid-cols-2 items-start gap-3 sm:gap-4 lg:grid-cols-4">
           <Metrics data={data} />
-          <div className="min-w-0 sm:col-span-2 lg:col-span-3">
+          <div className="col-span-2 min-w-0 lg:col-span-3">
             <RegistryBlock />
           </div>
-          <div className="grid gap-4 sm:col-span-2 lg:col-span-1">
+          <div className="col-span-2 grid gap-4 lg:col-span-1">
             <Happening data={data} />
             <RecentDocuments data={data} />
           </div>
         </div>
+        {/* Место под приклеенной кнопкой, чтобы она не закрывала конец страницы. */}
+        <div aria-hidden className="h-20 md:hidden" />
       </main>
       {/* Снаружи `main`: подвал должен прижиматься к низу окна, а внутри
           страницы он прижимался бы к концу текста. */}

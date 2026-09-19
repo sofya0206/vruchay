@@ -91,7 +91,10 @@ export function LayersPanel({
             <GripVertical size={14} className="shrink-0 cursor-grab text-[var(--text-muted)]" />
             <span className="shrink-0 text-[var(--text-muted)]">{icon(el)}</span>
             <LayerName name={title(el)} />
-            <span className="flex shrink-0 items-center gap-0.5 opacity-60 group-hover:opacity-100">
+            {/* На сенсорном экране кнопки видны целиком: наведения там нет,
+                а перетаскивание строк (HTML5 drag) пальцем не работает —
+                порядок слоёв меняют только ими. */}
+            <span className="flex shrink-0 items-center gap-0.5 opacity-60 group-hover:opacity-100 pointer-coarse:opacity-100">
               <Small
                 title="На слой выше"
                 onClick={(e) => {
@@ -178,7 +181,7 @@ function Small({
       aria-label={title}
       aria-pressed={pressed}
       onClick={onClick}
-      className={`grid h-6 w-6 place-items-center rounded ${
+      className={`grid h-6 w-6 place-items-center rounded pointer-coarse:size-10 ${
         pressed ? 'text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text)]'
       }`}
     >

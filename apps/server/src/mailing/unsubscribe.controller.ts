@@ -90,14 +90,21 @@ function page(title: string, body: string): string {
     // домен, что и кабинет: страница живёт под /api, а не на стороннем адресе.
     '<link rel="stylesheet" href="/interface-font.css">' +
     '<style>' +
-    'body{margin:0;padding:48px 20px;background:#f6f5f1;color:#1a1a1a;' +
+    // Цвета — из UI-кита кабинета (apps/web/src/index.css): страницу
+    // открывают из письма, чаще всего с телефона, и она должна быть
+    // тем же «Вручай», а не чужим сайтом.
+    'body{margin:0;padding:24px 16px;background:#f5f3ff;color:#091135;' +
     "font:16px/1.6 'Jost',system-ui,-apple-system,'Segoe UI',sans-serif}" +
-    'main{max-width:32rem;margin:0 auto;background:#fff;border-radius:16px;padding:32px}' +
+    'main{max-width:32rem;margin:0 auto;background:#fff;border-radius:16px;padding:28px 24px;' +
+    'box-shadow:0 0 0 1px #e1e9f0}' +
     'h1{font-size:22px;margin:0 0 16px}' +
     'p{margin:0 0 12px}' +
-    '.muted{color:#5f6b64;font-size:14px}' +
-    '.button{display:inline-block;margin-top:12px;padding:10px 18px;border-radius:10px;' +
-    'background:#1f5d3f;color:#fff;text-decoration:none}' +
+    '.muted{color:#36394a;font-size:14px}' +
+    // Кнопка под палец: 48 точек в высоту, на телефоне во всю ширину.
+    '.button{display:inline-flex;align-items:center;justify-content:center;min-height:48px;' +
+    'box-sizing:border-box;margin-top:12px;padding:0 20px;border-radius:8px;' +
+    'background:#127ee3;color:#fff;text-decoration:none;font-weight:500}' +
+    '@media (max-width:560px){.button{width:100%}}' +
     '</style></head><body><main>' +
     `<h1>${escapeHtml(title)}</h1>${body}` +
     '</main></body></html>'

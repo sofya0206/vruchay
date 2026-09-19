@@ -12,6 +12,7 @@ import {
   Type,
 } from 'lucide-react';
 import type { FieldInfo } from './fields';
+import { BottomSheet } from '../ui/BottomSheet';
 
 export type InsertKind =
   | { type: 'text'; field?: FieldInfo }
@@ -58,7 +59,7 @@ export function InsertMenu({
 
   useEffect(() => {
     if (!open) return;
-    const close = (e: MouseEvent) => {
+    const close = (e: PointerEvent) => {
       if (!wrap.current?.contains(e.target as Node)) {
         setOpen(false);
         setSubmenu(null);
@@ -71,10 +72,10 @@ export function InsertMenu({
       if (submenu) setSubmenu(null);
       else setOpen(false);
     };
-    document.addEventListener('mousedown', close);
+    document.addEventListener('pointerdown', close);
     document.addEventListener('keydown', esc);
     return () => {
-      document.removeEventListener('mousedown', close);
+      document.removeEventListener('pointerdown', close);
       document.removeEventListener('keydown', esc);
     };
   }, [open, submenu]);
@@ -238,7 +239,10 @@ function Item({
       aria-haspopup={onHover ? 'menu' : undefined}
       aria-expanded={onHover ? submenu : undefined}
       onClick={onClick}
-      onMouseEnter={onHover}
+      // Наведение — только мышью. Касание на планшете присылает эмуляцию
+      // наведения прямо перед нажатием, и подменю открывалось, а нажатие
+      // тут же его закрывало.
+      onPointerEnter={(e) => e.pointerType === 'mouse' && onHover?.()}
       className="flex w-full items-start gap-3 px-3 py-2.5 text-left hover:bg-[var(--surface-sunken)] disabled:opacity-50"
     >
       <span className="mt-0.5 text-[var(--text-muted)]">{icon}</span>
@@ -284,5 +288,141 @@ function SubItem({
       <span className="min-w-0 flex-1 truncate text-sm">{title}</span>
       <span className="shrink-0 text-xs text-[var(--text-muted)]">{hint}</span>
     </button>
+  );
+}
+
+/**
+ * То же меню «Вставить» нижним листом — для телефона.
+ *
+ * Вложенные списки здесь раскрываются на месте, а не вылетают вправо:
+ * на экране в 375 точек справа от списка шириной 288 места нет, и второй
+ * уровень уходил бы за край. Наведения на телефоне тоже нет — раскрытие
+ * только нажатием.
+ */
+export function InsertSheet({
+  open,
+  onClose,
+  onInsert,
+  fields = [],
+  onBackground,
+  backgroundLoading = false,
+  hasBackground = false,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onInsert: (what: InsertKind) => void;
+  fields?: FieldInfo[];
+  onBackground: () => void;
+  backgroundLoading?: boolean;
+  hasBackground?: boolean;
+}) {
+  const [submenu, setSubmenu] = useState<'text' | 'shape' | null>(null);
+  const pick = (what: InsertKind) => {
+    onInsert(what);
+    setSubmenu(null);
+    onClose();
+  };
+  const columns = fields.filter((f) => f.kind === 'column');
+  const system = fields.filter((f) => f.kind === 'system');
+  const row =
+    'flex min-h-14 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left active:bg-[var(--surface-sunken)] disabled:opacity-50';
+  const sub = 'flex min-h-12 w-full items-center gap-3 rounded-lg py-2 pr-3 pl-11 text-left active:bg-[var(--surface-sunken)]';
+  const head = (icon: React.ReactNode, label: string, hint: string, extra?: React.ReactNode) => (
+    <>
+      <span className="text-[var(--text-muted)]">{icon}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-base font-medium">{label}</span>
+        <span className="block text-sm text-[var(--text-muted)]">{hint}</span>
+      </span>
+      {extra}
+    </>
+  );
+  const chevron = (on: boolean) => (
+    <ChevronDown size={18} className={`text-[var(--text-muted)] transition-transform ${on ? 'rotate-180' : ''}`} />
+  );
+
+  return (
+    <BottomSheet open={open} onClose={onClose} title="Вставить на лист">
+      <div role="menu" aria-label="Вставить на лист">
+        <button
+          type="button"
+          role="menuitem"
+          disabled={backgroundLoading}
+          onClick={() => {
+            onClose();
+            onBackground();
+          }}
+          className={row}
+        >
+          {head(
+            <ImageIcon size={20} />,
+            backgroundLoading ? 'Загружаем бланк…' : hasBackground ? 'Заменить бланк' : 'Бланк',
+            hasBackground ? 'Другая картинка вместо нынешней' : 'Фото или скан вашей грамоты',
+          )}
+        </button>
+
+        <button
+          type="button"
+          aria-expanded={submenu === 'text'}
+          onClick={() => setSubmenu((v) => (v === 'text' ? null : 'text'))}
+          className={row}
+        >
+          {head(<Type size={20} />, 'Текст', 'Имя, звание, дата — из таблицы', chevron(submenu === 'text'))}
+        </button>
+        {submenu === 'text' && (
+          <div className="pb-2">
+            {[...columns, ...system].map((f) => (
+              <button
+                key={f.source}
+                type="button"
+                role="menuitem"
+                onClick={() => pick({ type: 'text', field: f })}
+                className={sub}
+              >
+                <span className="min-w-0 flex-1 truncate text-base">{f.title}</span>
+                <span className="shrink-0 text-sm text-[var(--text-muted)]">
+                  {f.kind === 'column' ? 'из таблицы' : 'подставит сервис'}
+                </span>
+              </button>
+            ))}
+            <button type="button" role="menuitem" onClick={() => pick({ type: 'text' })} className={sub}>
+              <span className="text-base">Просто текст, без подстановки</span>
+            </button>
+          </div>
+        )}
+
+        <button type="button" role="menuitem" onClick={() => pick({ type: 'qr' })} className={row}>
+          {head(<QrCode size={20} />, 'QR-код', 'Ведёт на проверку подлинности')}
+        </button>
+        <button type="button" role="menuitem" onClick={() => pick({ type: 'link' })} className={row}>
+          {head(<Link2 size={20} />, 'Ссылка', 'Кликабельный адрес в PDF')}
+        </button>
+
+        <button
+          type="button"
+          aria-expanded={submenu === 'shape'}
+          onClick={() => setSubmenu((v) => (v === 'shape' ? null : 'shape'))}
+          className={row}
+        >
+          {head(<Square size={20} />, 'Фигура', 'Линия, рамка, подложка', chevron(submenu === 'shape'))}
+        </button>
+        {submenu === 'shape' && (
+          <div className="pb-2">
+            <button type="button" role="menuitem" onClick={() => pick({ type: 'shape', kind: 'line' })} className={sub}>
+              <Minus size={16} className="text-[var(--text-muted)]" />
+              <span className="text-base">Линия под подпись</span>
+            </button>
+            <button type="button" role="menuitem" onClick={() => pick({ type: 'shape', kind: 'rect' })} className={sub}>
+              <Square size={16} className="text-[var(--text-muted)]" />
+              <span className="text-base">Прямоугольник</span>
+            </button>
+            <button type="button" role="menuitem" onClick={() => pick({ type: 'shape', kind: 'ellipse' })} className={sub}>
+              <Circle size={16} className="text-[var(--text-muted)]" />
+              <span className="text-base">Овал</span>
+            </button>
+          </div>
+        )}
+      </div>
+    </BottomSheet>
   );
 }

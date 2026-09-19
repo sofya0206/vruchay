@@ -130,12 +130,12 @@ function Tile({
   children?: ReactNode;
 }) {
   return (
-    <li className="flex min-h-28 flex-col gap-1.5 rounded-[var(--radius-card)] bg-[var(--surface)] px-4 pt-3.5 pb-3 shadow-[var(--ring-line)]">
+    <li className="flex min-h-24 min-w-0 flex-col gap-1.5 rounded-[var(--radius-card)] bg-[var(--surface)] px-3 pt-3 pb-2.5 shadow-[var(--ring-line)] sm:min-h-28 sm:px-4 sm:pt-3.5 sm:pb-3">
       <p className="text-sm text-[var(--text-muted)]">{label}</p>
       <p className="flex items-baseline gap-1.5">
         <span
           className={cn(
-            'text-3xl font-semibold leading-none tabular-nums',
+            'text-2xl font-semibold leading-none tabular-nums sm:text-3xl',
             danger && 'text-[var(--danger)]',
           )}
         >

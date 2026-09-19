@@ -26,56 +26,82 @@ export interface PublicConfig {
   showVerifyLink: boolean;
 }
 
+/*
+ * Цвета, радиусы и шрифт — из UI-кита кабинета (apps/web/src/index.css:
+ * --accent, --text, --line и остальные). Стили живут на чужой странице,
+ * переменных кита там нет, поэтому значения переписаны числами — при смене
+ * кита их надо поправить и здесь. Jost подхватится, если он есть у сайта;
+ * иначе системный шрифт, грузить свой с нашего домена на чужую страницу
+ * не стали.
+ */
 export const TILDA_STYLES = `
 .vru-overlay{position:fixed;inset:0;z-index:99999;display:grid;place-items:center;
-  background:rgba(16,21,15,.45);font-family:system-ui,-apple-system,sans-serif}
-.vru-card{background:#fff;color:#16211c;border-radius:16px;padding:28px;max-width:380px;
-  width:calc(100% - 32px);box-shadow:0 12px 40px rgba(0,0,0,.18);text-align:center}
+  background:rgba(9,17,53,.4);font-family:'Jost',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
+.vru-card{position:relative;box-sizing:border-box;background:#fff;color:#091135;border-radius:16px;
+  padding:28px;max-width:380px;width:calc(100% - 32px);max-height:90vh;overflow-y:auto;
+  overscroll-behavior:contain;box-shadow:0 12px 40px rgba(9,17,53,.18);text-align:center}
 .vru-title{font-size:18px;font-weight:600;margin:0 0 8px}
-.vru-text{font-size:14px;color:#5f6b64;margin:0 0 18px;line-height:1.45}
-.vru-code{width:100%;font-size:24px;letter-spacing:.3em;text-align:center;padding:12px;
-  border:1px solid #cfccc2;border-radius:10px;outline:none}
-.vru-code:focus{border-color:#1f5d3f;box-shadow:0 0 0 3px rgba(31,93,63,.15)}
-.vru-btn{margin-top:14px;width:100%;padding:11px;border:0;border-radius:10px;cursor:pointer;
-  background:#1f5d3f;color:#fff;font-size:15px;font-weight:500}
+.vru-text{font-size:14px;color:#36394a;margin:0 0 18px;line-height:1.45}
+.vru-code{box-sizing:border-box;width:100%;font-size:24px;letter-spacing:.3em;text-align:center;padding:12px;
+  border:1px solid #b1bbcd;border-radius:8px;outline:none;color:#091135}
+.vru-code:focus{border-color:#0f77ff;box-shadow:0 0 0 3px rgba(15,119,255,.18)}
+.vru-btn{margin-top:14px;width:100%;padding:11px;border:0;border-radius:8px;cursor:pointer;
+  background:#127ee3;color:#fff;font:inherit;font-size:15px;font-weight:500}
+.vru-btn:hover{background:#0f6ac1}
 .vru-btn:disabled{opacity:.6;cursor:default}
-.vru-err{color:#a3302a;font-size:13px;margin-top:10px;min-height:18px}
-.vru-close{position:absolute;top:14px;right:16px;border:0;background:none;cursor:pointer;
-  font-size:22px;color:#5f6b64;line-height:1}
+.vru-err{color:#d92d3f;font-size:13px;margin-top:10px;min-height:18px}
+.vru-close{position:absolute;top:6px;right:6px;width:44px;height:44px;display:grid;place-items:center;
+  border:0;border-radius:8px;background:none;cursor:pointer;font-size:24px;color:#36394a;line-height:1}
+.vru-close:hover{background:#f5f3ff}
 .vru-field{text-align:left;margin-bottom:12px}
-.vru-label{display:block;font-size:13px;color:#5f6b64;margin-bottom:4px}
-.vru-input{width:100%;box-sizing:border-box;padding:10px 12px;font-size:15px;
-  border:1px solid #cfccc2;border-radius:10px;outline:none;background:#fff;color:#16211c}
-.vru-input:focus{border-color:#1f5d3f;box-shadow:0 0 0 3px rgba(31,93,63,.15)}
-.vru-input[readonly]{background:#f2f1ec;color:#5f6b64}
+.vru-label{display:block;font-size:13px;color:#36394a;margin-bottom:4px}
+.vru-input{width:100%;box-sizing:border-box;padding:10px 12px;font:inherit;font-size:16px;
+  border:1px solid #b1bbcd;border-radius:8px;outline:none;background:#fff;color:#091135}
+.vru-input:focus{border-color:#0f77ff;box-shadow:0 0 0 3px rgba(15,119,255,.18)}
+.vru-input[readonly]{background:#f5f3ff;color:#36394a}
 /* Флажок согласия. Рисуем свой: системный квадратик в каждой системе
-   свой и рядом с зелёной кнопкой виджета выглядит чужой заплатой.
+   свой и рядом с кнопкой виджета выглядит чужой заплатой.
    Вход остаётся настоящим — это чужая страница, и терять из-за
    внешности клавиатуру, диктор и required там нельзя. */
 .vru-check{appearance:none;-webkit-appearance:none;flex:0 0 auto;width:18px;height:18px;
-  margin:1px 0 0;border:1px solid #cfccc2;border-radius:5px;background:#fff;cursor:pointer;
+  margin:1px 0 0;border:1px solid #b1bbcd;border-radius:5px;background:#fff;cursor:pointer;
   display:inline-grid;place-content:center;transition:background .15s,border-color .15s}
 .vru-check::after{content:'';width:10px;height:6px;border:2px solid #fff;border-top:0;
   border-right:0;transform:rotate(-45deg) translate(1px,-1px);opacity:0}
-.vru-check:checked{background:#1f5d3f;border-color:#1f5d3f}
+.vru-check:checked{background:#127ee3;border-color:#127ee3}
 .vru-check:checked::after{opacity:1}
-.vru-check:focus-visible{outline:2px solid #1f5d3f;outline-offset:2px}
-.vru-ghost{margin-top:10px;width:100%;padding:10px;border:1px solid #cfccc2;border-radius:10px;
-  cursor:pointer;background:#fff;color:#16211c;font-size:14px}
+.vru-check:focus-visible{outline:2px solid #0f77ff;outline-offset:2px}
+.vru-ghost{margin-top:10px;width:100%;padding:10px;border:1px solid #e1e9f0;border-radius:8px;
+  cursor:pointer;background:#fff;color:#091135;font:inherit;font-size:14px}
+.vru-ghost:hover{background:#f5f3ff}
 .vru-share{display:flex;gap:8px;justify-content:center;margin-top:14px;flex-wrap:wrap}
 .vru-share a,.vru-share button{display:inline-flex;align-items:center;justify-content:center;
-  padding:8px 14px;border:1px solid #cfccc2;border-radius:10px;background:#fff;color:#16211c;
-  font-size:13px;text-decoration:none;cursor:pointer}
-.vru-verify{display:block;margin-top:12px;font-size:13px;color:#5f6b64}
+  padding:8px 14px;border:1px solid #e1e9f0;border-radius:8px;background:#fff;color:#091135;
+  font:inherit;font-size:13px;text-decoration:none;cursor:pointer}
+.vru-verify{display:block;margin-top:12px;font-size:13px;color:#127ee3}
 .vru-list{display:flex;flex-direction:column;gap:8px;margin:14px 0;text-align:left}
-.vru-item{display:flex;justify-content:space-between;gap:12px;padding:10px 12px;
-  border:1px solid #cfccc2;border-radius:10px;color:#16211c;text-decoration:none;font-size:14px}
-.vru-item:hover{border-color:#1f5d3f}
-.vru-item-date{color:#5f6b64;white-space:nowrap}
-.vru-spin{width:26px;height:26px;margin:0 auto 14px;border:3px solid #e3e1da;
-  border-top-color:#1f5d3f;border-radius:50%;animation:vru-rot .8s linear infinite}
+.vru-item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 12px;
+  border:1px solid #e1e9f0;border-radius:8px;color:#091135;text-decoration:none;font-size:14px}
+.vru-item:hover{border-color:#127ee3}
+.vru-item-date{color:#36394a;white-space:nowrap}
+.vru-spin{width:26px;height:26px;margin:0 auto 14px;border:3px solid #e1e9f0;
+  border-top-color:#127ee3;border-radius:50%;animation:vru-rot .8s linear infinite}
 @keyframes vru-rot{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.vru-spin{animation-duration:3s}}
+/* Телефон. Форму открывают сканом QR на мероприятии, почти всегда с телефона.
+   Окно — листом снизу: кнопка оказывается под большим пальцем, а длинный шаг
+   с согласием прокручивается внутри листа, а не уезжает за экран вместе
+   с клавиатурой. Поля 16px — мельче Safari на iOS увеличивает страницу. */
+@media (max-width:560px){
+  .vru-overlay{place-items:end center}
+  .vru-card{width:100%;max-width:none;max-height:92vh;border-radius:18px 18px 0 0;
+    padding:28px 20px max(20px,env(safe-area-inset-bottom))}
+}
+@media (pointer:coarse){
+  .vru-btn{min-height:48px}
+  .vru-ghost,.vru-share a,.vru-share button,.vru-item{min-height:44px}
+  .vru-verify{padding:12px 0}
+}
 `.trim();
 
 /** Экранирование для безопасной вставки строки в JavaScript-литерал. */
@@ -238,6 +264,9 @@ export function buildTildaScript(baseUrl: string, config: PublicConfig): string 
     var input = el('input', 'vru-code');
     input.inputMode = 'numeric';
     input.maxLength = 6;
+    // Код из письма телефон предложит подставить сам — без переключения в почту.
+    input.autocomplete = 'one-time-code';
+    input.setAttribute('enterkeyhint', 'done');
     input.setAttribute('aria-label', 'Код подтверждения');
     var btn = el('button', 'vru-btn', 'Подтвердить');
     var err = el('div', 'vru-err');
@@ -354,13 +383,21 @@ export function buildTildaScript(baseUrl: string, config: PublicConfig): string 
         ? 'Так они будут напечатаны в документе. Если что-то не так — поправьте.'
         : 'Так они будут напечатаны в документе.'));
 
-    var mk = function (label, value, type) {
+    var mk = function (label, value, type, auto) {
       var wrap = el('div', 'vru-field');
       var l = el('label', 'vru-label');
       l.textContent = label;
       var input = el('input', 'vru-input');
       input.type = type || 'text';
       input.value = value || '';
+      // Подсказки клавиатуре телефона: имя — с заглавной и из контакта,
+      // почта — без автозамены и заглавных, адрес подставляется сам.
+      input.id = 'vru-f-' + Math.random().toString(36).slice(2, 8);
+      l.htmlFor = input.id;
+      if (auto) input.autocomplete = auto;
+      input.setAttribute('autocapitalize', type === 'email' ? 'none' : 'words');
+      if (type === 'email') input.spellcheck = false;
+      input.setAttribute('enterkeyhint', 'next');
       if (!CFG.allowEdit) input.readOnly = true;
       wrap.appendChild(l);
       wrap.appendChild(input);
@@ -368,8 +405,8 @@ export function buildTildaScript(baseUrl: string, config: PublicConfig): string 
       return input;
     };
 
-    var nameInput = mk('Фамилия и имя', prefill.name);
-    var emailInput = mk('Куда прислать документ', prefill.email, 'email');
+    var nameInput = mk('Фамилия и имя', prefill.name, 'text', 'name');
+    var emailInput = mk('Куда прислать документ', prefill.email, 'email', 'email');
 
     var consent = el('label', 'vru-label');
     consent.style.display = 'flex';
@@ -387,7 +424,7 @@ export function buildTildaScript(baseUrl: string, config: PublicConfig): string 
     more.href = CFG.privacyUrl;
     more.target = '_blank';
     more.rel = 'noopener';
-    more.style.color = '#1f5d3f';
+    more.style.color = '#127ee3';
     span.appendChild(more);
     consent.appendChild(check);
     consent.appendChild(span);
@@ -438,6 +475,10 @@ export function buildTildaScript(baseUrl: string, config: PublicConfig): string 
     var input = el('input', 'vru-input');
     input.type = 'email';
     input.value = prefill.email || '';
+    input.autocomplete = 'email';
+    input.setAttribute('autocapitalize', 'none');
+    input.spellcheck = false;
+    input.setAttribute('enterkeyhint', 'go');
     input.setAttribute('aria-label', 'Почта');
     wrap.appendChild(input);
     box.appendChild(wrap);
@@ -466,6 +507,9 @@ export function buildTildaScript(baseUrl: string, config: PublicConfig): string 
     var input = el('input', 'vru-code');
     input.inputMode = 'numeric';
     input.maxLength = 6;
+    // Код из письма телефон предложит подставить сам — без переключения в почту.
+    input.autocomplete = 'one-time-code';
+    input.setAttribute('enterkeyhint', 'done');
     input.setAttribute('aria-label', 'Код подтверждения');
     var btn = el('button', 'vru-btn', 'Подтвердить');
     var err = el('div', 'vru-err');

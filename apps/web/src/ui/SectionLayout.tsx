@@ -43,7 +43,11 @@ export function SectionLayout({
         <main className="min-w-0 flex-1 px-6 py-6">{children}</main>
 
         {bar && (
-          <div className="sticky bottom-0 z-10 flex flex-wrap items-center gap-3 border-t border-[var(--line)] bg-[var(--surface)] px-6 py-2.5 text-sm">
+          <div
+            className="sticky bottom-0 z-10 flex flex-wrap items-center gap-3 border-t border-[var(--line)] bg-[var(--surface)] px-4 pt-2.5 text-sm sm:px-6"
+            // Полоса «домой» у айфонов без кнопки: панель над ней, а не под ней.
+            style={{ paddingBottom: 'max(10px, env(safe-area-inset-bottom))' }}
+          >
             {bar}
           </div>
         )}

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SheetLayout } from '@gramota/shared';
 
 const MAX_HISTORY = 50;
@@ -27,10 +27,24 @@ export function useLayoutHistory(initial: SheetLayout) {
    * выглядит как «кнопка не работает» — ровно так это и было воспринято.
    */
   const [depth, setDepth] = useState({ past: 0, future: 0 });
-  const syncDepth = useCallback(
-    () => setDepth({ past: past.current.length, future: future.current.length }),
-    [],
-  );
+  const syncDepth = useCallback(() => {
+    const next = { past: past.current.length, future: future.current.length };
+    // Те же числа — тот же объект: лишней отрисовки не будет.
+    setDepth((prev) => (prev.past === next.past && prev.future === next.future ? prev : next));
+  }, []);
+
+  /*
+   * Глубину истории сверяем ещё и после каждой отрисовки.
+   *
+   * Стопки `past` и `future` пополняются внутри функции обновления
+   * состояния, а React зовёт её не сразу, если в том же нажатии уже
+   * меняли что-то другое: тогда — при следующей отрисовке. Прямой вызов
+   * `syncDepth` следом за `setLayoutState` в таком случае читал стопки
+   * до правки, и «Отменить» оставалась серой после первого же шага.
+   * Так было со вставкой из нижнего листа на телефоне: лист закрывается
+   * в том же нажатии, что и вставляет блок.
+   */
+  useEffect(syncDepth, [layout, version, syncDepth]);
 
   const setLayout = useCallback(
     (next: SheetLayout | ((prev: SheetLayout) => SheetLayout), commit = true) => {

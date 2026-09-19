@@ -35,6 +35,11 @@ export interface InlineTextEditorProps {
   onDone: (doc: RichDoc) => void;
   /** Куда деть каретку при входе: в конец либо в позицию. */
   focusAt?: 'end' | number;
+  /**
+   * Плавающая панель оформления над блоком. На телефоне её нет: правка идёт
+   * в своём слое во весь экран, и панель там стоит внизу, над клавиатурой.
+   */
+  toolbar?: boolean;
 }
 
 export function InlineTextEditor({
@@ -47,6 +52,7 @@ export function InlineTextEditor({
   onChange,
   onDone,
   focusAt = 'end',
+  toolbar = true,
 }: InlineTextEditorProps) {
   const [suggestion, setSuggestion] = useState<SuggestionState | null>(null);
   const [fieldPos, setFieldPos] = useState<number | null>(null);
@@ -137,7 +143,7 @@ export function InlineTextEditor({
   return (
     <FieldContext.Provider value={context}>
       <EditorContent editor={editor} style={{ width: '100%' }} />
-      <FormatToolbar editor={editor} fields={fields} base={element.props} />
+      {toolbar && <FormatToolbar editor={editor} fields={fields} base={element.props} />}
       <SuggestionList state={suggestion} />
       {fieldPos !== null && (
         <FieldPopover

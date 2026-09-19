@@ -19,6 +19,7 @@ import { DeleteAccount } from './DeleteAccount';
 import { Billing } from './Billing';
 import { MailDomains } from './MailDomains';
 import { VerifyDomain } from './VerifyDomain';
+import { DesktopFirst } from '../ui/DesktopFirst';
 import { Senders } from './Senders';
 import { Team } from './Team';
 import { RolePermissions } from './RolePermissions';
@@ -84,10 +85,15 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     title: 'Домены',
     icon: Globe,
     element: (
-      <Stack>
-        <MailDomains />
-        <VerifyDomain />
-      </Stack>
+      <DesktopFirst
+        title="Настройку доменов"
+        why="Понадобится скопировать несколько длинных DNS-записей в панель регистратора — с двумя окнами рядом это минута, а с телефона легко ошибиться в одном знаке."
+      >
+        <Stack>
+          <MailDomains />
+          <VerifyDomain />
+        </Stack>
+      </DesktopFirst>
     ),
   },
   { path: 'senders', title: 'Адреса рассылки', icon: AtSign, element: <Senders /> },

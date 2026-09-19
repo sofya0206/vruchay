@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#4A3FCE" />
+    <title>Нет связи — Вручай</title>
+    <!--
+      Заглушка на случай, когда сети нет, а приложение открыто с экрана
+      «Домой» или по ссылке. Отдаёт её service worker (src/sw.ts) вместо
+      любой страницы, которую не удалось загрузить.
+
+      Самостоятельная, без скриптов приложения и внешних стилей: без сети
+      догрузить их неоткуда. Шрифт — Jost из кэша, если он там есть, иначе
+      системный.
+
+      Старого содержимого здесь нет намеренно. Документы, списки и статус
+      проверки хранятся на сервере, и показать вчерашнее «подлинный» вместо
+      сегодняшнего «отозван» хуже, чем честно сказать, что связи нет.
+    -->
+    <style>
+      :root {
+        color-scheme: light;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+      }
+      body {
+        display: grid;
+        place-items: center;
+        padding: max(24px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom));
+        background: #ffffff;
+        color: #0b1033;
+        font: 400 16px/1.5 'Jost', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        text-align: center;
+      }
+      main {
+        max-width: 360px;
+      }
+      .mark {
+        width: 56px;
+        height: 56px;
+        margin: 0 auto 20px;
+        border-radius: 16px;
+        background: #4a3fce;
+        display: grid;
+        place-items: center;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 24px;
+        line-height: 1.25;
+        font-weight: 600;
+      }
+      p {
+        margin: 0;
+        color: #36394a;
+      }
+      button {
+        margin-top: 24px;
+        width: 100%;
+        min-height: 48px;
+        border: 0;
+        border-radius: 12px;
+        background: #127ee3;
+        color: #ffffff;
+        font: inherit;
+        font-weight: 500;
+        cursor: pointer;
+      }
+      button:active {
+        background: #0f6cc4;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="mark" aria-hidden="true">
+        <svg width="56" height="56" viewBox="0 0 24 24" fill="#ffffff">
+          <path d="M7.5,6.19 H13.5 A2.77,2.77 0 0 1 13.5,11.72 H7.5 Z" />
+          <path d="M7.5,11.72 H13.69 A2.95,2.95 0 0 1 13.69,17.63 H7.5 Z" />
+        </svg>
+      </div>
+      <h1>Нет связи с интернетом</h1>
+      <p>
+        Документы, списки и проверка подлинности хранятся на сервере, поэтому без сети их не
+        показать. Как только связь появится, страница откроется сама.
+      </p>
+      <button type="button" id="retry">Повторить</button>
+    </main>
+    <!-- Отдельным файлом, а не в разметке: политика содержимого (Caddyfile)
+         запрещает встроенные скрипты, и onclick здесь просто не сработал бы. -->
+    <script src="/offline.js"></script>
+  </body>
+</html>

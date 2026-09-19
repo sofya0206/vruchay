@@ -25,14 +25,16 @@ export function Dialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center bg-[var(--scrim)] p-4"
+      // На телефоне окно прижато к низу и во всю ширину — как нижний лист:
+      // кнопки подтверждения оказываются под большим пальцем, а не посреди экрана.
+      className="fixed inset-0 z-50 grid place-items-center bg-[var(--scrim)] p-4 max-sm:place-items-end max-sm:p-0"
       role="dialog"
       aria-modal="true"
       aria-label={title}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
-        className={`flex max-h-full w-full flex-col overflow-hidden rounded-2xl bg-[var(--surface)] shadow-lg ${
+        className={`flex max-h-full w-full flex-col overflow-hidden rounded-2xl bg-[var(--surface)] shadow-lg max-sm:max-h-[85vh] max-sm:rounded-b-none ${
           wide ? 'max-w-4xl' : 'max-w-xl'
         }`}
       >
@@ -46,7 +48,10 @@ export function Dialog({
         <div className="min-h-0 flex-1 overflow-auto p-5">{children}</div>
 
         {footer && (
-          <footer className="flex items-center justify-end gap-2 border-t border-[var(--line)] px-5 py-3">
+          <footer
+            className="flex items-center justify-end gap-2 border-t border-[var(--line)] px-5 pt-3 max-sm:flex-col-reverse max-sm:items-stretch max-sm:[&>*]:h-11"
+            style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
+          >
             {footer}
           </footer>
         )}

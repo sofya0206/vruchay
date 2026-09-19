@@ -36,7 +36,8 @@ import {
   type TextElement,
   type TextProps,
 } from '@gramota/shared';
-import { InsertMenu, type InsertKind } from '../editor/InsertMenu';
+import { InsertMenu, InsertSheet, type InsertKind } from '../editor/InsertMenu';
+import { NudgePad, PhoneTextSheet, PhoneToolbar } from '../editor/PhoneEditor';
 import { DocumentChrome, ToolButton, ToolDivider } from '../editor/DocumentChrome';
 import { useDocumentFileMenu } from '../editor/DocumentFileMenu';
 import { SheetTabs } from '../editor/SheetTabs';
@@ -61,6 +62,7 @@ import { useLayoutHistory } from '../editor/useLayoutHistory';
 import { FitPageDialog } from '../editor/FitPageDialog';
 import { PageSizeDialog } from '../editor/PageSizeDialog';
 import { Tooltip } from '../ui/Tooltip';
+import { usePhone } from '../ui/useMediaQuery';
 import { ResizeDialog } from '../editor/ResizeDialog';
 import { fitPageToImage, readImageSize, type PageFit } from '../editor/fit-page';
 import { backgroundDpi, BLEED_MM, POOR_DPI, PRINT_DPI, resizeLayout, SAFE_MARGIN_MM, type ResizeMode } from '../editor/page-fit';
@@ -110,6 +112,14 @@ import {
 
 const AUTOSAVE_DELAY_MS = 1500;
 const HANDLES: ResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+/*
+ * На телефоне — без верхней и нижней середины. Строка текста на листе,
+ * вписанном в ширину экрана, высотой пикселей 25, и ручки «n» и «s» с зоной
+ * под палец накрыли бы её целиком: тянешь блок — хватаешь ручку.
+ */
+const PHONE_HANDLES: ResizeHandle[] = ['nw', 'ne', 'e', 'se', 'sw', 'w'];
+/** Сколько палец может дрогнуть, прежде чем касание станет перетаскиванием. */
+const TOUCH_SLOP_PX = 8;
 const CORNERS: ResizeHandle[] = ['nw', 'ne', 'se', 'sw'];
 /** Шаг сетки в мм — и шаг прилипания к ней, когда сетка включена. */
 const GRID_MM = 5;
@@ -121,9 +131,14 @@ interface GestureBase {
   startY: number;
   /** Было ли реальное перемещение: от этого зависит и история, и сохранение. */
   moved: boolean;
+  /** Жест пальцем: до сдвига дальше TOUCH_SLOP_PX он ещё касание, а не перетаскивание. */
+  touch?: boolean;
 }
 type Gesture =
-  | (GestureBase & { kind: 'move'; boxes: Record<string, Box> })
+  /** `tapEdit` — касание выбранного текста без сдвига открывает его правку. */
+  | (GestureBase & { kind: 'move'; boxes: Record<string, Box>; tapEdit?: string })
+  /** Холст пальцем. `tapClear` — касание пустого места без сдвига снимает выбор. */
+  | (GestureBase & { kind: 'pan'; left: number; top: number; tapClear: boolean })
   | (GestureBase & { kind: 'resize'; id: string; handle: ResizeHandle; box: Box })
   | (GestureBase & { kind: 'scale'; handle: ResizeHandle; frame: Rect; boxes: Record<string, Box>; sizes: Record<string, number> })
   | (GestureBase & { kind: 'rotate'; id: string; center: { x: number; y: number } })
@@ -204,6 +219,20 @@ export function EditorPage() {
   const backgroundInput = useRef<HTMLInputElement>(null);
   const clipboard = useRef<SheetElement[]>([]);
   const liveEditor = useRef<Editor | null>(null);
+  /*
+   * Телефон. Раскладка другая целиком — панель снизу, свойства под листом,
+   * текст в своём слое, — поэтому решаем один раз здесь, а не классами:
+   * редактор в предварительную отрисовку не попадает, и опасности,
+   * из-за которой публичные страницы обходятся одними классами, тут нет.
+   */
+  const phone = usePhone();
+  const [insertOpen, setInsertOpen] = useState(false);
+  const [nudgeOpen, setNudgeOpen] = useState(false);
+  /* Пальцы на холсте — для щипка. Жест одного пальца живёт в `gesture`. */
+  const touches = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{ dist: number; zoom: number; mid: { x: number; y: number } } | null>(null);
+  /** Точка листа под пальцами при щипке — она должна остаться под ними. */
+  const zoomAnchor = useRef<{ mm: { x: number; y: number }; client: { x: number; y: number } } | null>(null);
 
   // Адреса уехавших вкладок: `?view=table` и соседние. Разбираются
   // отдельно, в `moved-views.ts`, — там же объяснено зачем.
@@ -441,6 +470,22 @@ export function EditorPage() {
     return () => observer.disconnect();
   }, [doc.data]);
 
+  /*
+   * Щипок увеличивает вокруг пальцев, а не вокруг угла листа: после
+   * перерисовки в новом масштабе докручиваем холст так, чтобы точка листа,
+   * бывшая под пальцами, осталась под ними.
+   */
+  useLayoutEffect(() => {
+    const anchor = zoomAnchor.current;
+    const box = containerRef.current;
+    const sheetEl = sheetRef.current;
+    zoomAnchor.current = null;
+    if (!anchor || !box || !sheetEl) return;
+    const rect = sheetEl.getBoundingClientRect();
+    box.scrollLeft += rect.left + anchor.mm.x * PX_PER_MM * zoom - anchor.client.x;
+    box.scrollTop += rect.top + anchor.mm.y * PX_PER_MM * zoom - anchor.client.y;
+  }, [zoom]);
+
   // Ctrl+колёсико — масштаб, а не прокрутка страницы; пробел — панорамирование.
   useEffect(() => {
     const el = containerRef.current;
@@ -486,9 +531,12 @@ export function EditorPage() {
   const hadSelection = useRef(false);
   useEffect(() => {
     const has = selected.size > 0;
-    if (has && !hadSelection.current) setPanel((current) => current ?? 'props');
+    // На телефоне панель занимает половину экрана — на каждое касание её
+    // не открываем: всё частое уже на нижней панели.
+    if (has && !hadSelection.current && !phone) setPanel((current) => current ?? 'props');
+    if (!has) setNudgeOpen(false);
     hadSelection.current = has;
-  }, [selected]);
+  }, [selected, phone]);
 
   const selectedElements = useMemo(
     () => layout.filter((el) => selected.has(el.id)),
@@ -648,8 +696,38 @@ export function EditorPage() {
     const page = { w: doc.data.pageWidthMm, h: doc.data.pageHeightMm };
 
     function onMove(e: PointerEvent) {
+      if (e.pointerType === 'touch' && touches.current.has(e.pointerId)) {
+        touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        const p = pinch.current;
+        if (p && touches.current.size >= 2) {
+          const [a, b] = [...touches.current.values()];
+          const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+          const box = containerRef.current;
+          // Два пальца двигают холст вместе с щипком — как карта.
+          if (box) {
+            box.scrollLeft -= mid.x - p.mid.x;
+            box.scrollTop -= mid.y - p.mid.y;
+          }
+          p.mid = mid;
+          zoomAnchor.current = { mm: pointToMm(mid.x, mid.y), client: mid };
+          setZoom(clamp(p.zoom * (Math.hypot(a.x - b.x, a.y - b.y) / p.dist), 0.1, 4));
+          return;
+        }
+      }
+
       const g = gesture.current;
       if (!g) return;
+
+      if (g.kind === 'pan') {
+        const box = containerRef.current;
+        const dxPx = e.clientX - g.startX;
+        const dyPx = e.clientY - g.startY;
+        if (!box || (!g.moved && Math.hypot(dxPx, dyPx) < TOUCH_SLOP_PX)) return;
+        g.moved = true;
+        box.scrollLeft = g.left - dxPx;
+        box.scrollTop = g.top - dyPx;
+        return;
+      }
 
       if (g.kind === 'marquee') {
         const from = pointToMm(g.startX, g.startY);
@@ -666,6 +744,7 @@ export function EditorPage() {
 
       // Снимок в историю делаем один раз, на первом сдвиге.
       if (!g.moved) {
+        if (g.touch && Math.hypot(e.clientX - g.startX, e.clientY - g.startY) < TOUCH_SLOP_PX) return;
         g.moved = true;
         beginGesture();
       }
@@ -722,21 +801,44 @@ export function EditorPage() {
       }
     }
 
-    function onUp() {
+    function onUp(e: PointerEvent) {
+      if (e.pointerType === 'touch') {
+        touches.current.delete(e.pointerId);
+        // Щипок кончается целиком: оставшийся палец холст не тащит,
+        // иначе картинка дёрнулась бы к нему.
+        if (pinch.current) {
+          if (touches.current.size < 2) pinch.current = null;
+          gesture.current = null;
+          return;
+        }
+      }
       const g = gesture.current;
       if (g?.kind === 'marquee') setMarquee(null);
+      else if (g?.kind === 'pan') {
+        if (!g.moved && g.tapClear) {
+          setSelected(new Set());
+          setEditingId(null);
+        }
+      }
       // Без этого перетаскивание не попадало бы в автосохранение:
       // промежуточные кадры намеренно не двигают счётчик версии.
       else if (g?.moved) endGesture();
+      // Второе касание уже выбранного текста — правка, вместо двойного
+      // щелчка: двойное касание на телефоне занято масштабом страницы.
+      else if (g?.kind === 'move' && g.tapEdit) setEditingId(g.tapEdit);
       setGuides([]);
       gesture.current = null;
     }
 
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
+    // Отмену касания (системный жест, звонок) закрываем как отпускание:
+    // без этого жест оставался висеть и тянул блок за следующим касанием.
+    window.addEventListener('pointercancel', onUp);
     return () => {
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
     };
   }, [doc.data, zoom, layout, showGrid, snapping, updateBoxes, patchElements, beginGesture, endGesture, pointToMm, history]);
 
@@ -893,7 +995,7 @@ export function EditorPage() {
 
     history.setLayout((prev) => [...prev, el]);
     setSelected(new Set([el.id]));
-    setPanel('props');
+    if (!phone) setPanel('props');
   }
 
   /**
@@ -939,6 +1041,17 @@ export function EditorPage() {
     e.preventDefault();
     e.stopPropagation();
     if (editingId && editingId !== el.id) setEditingId(null);
+    const touch = e.pointerType === 'touch';
+    /*
+     * Пальцем невыбранный блок только выбирается, а тянуть дальше — значит
+     * двигать холст. Иначе каждая попытка пролистать лист сдвигала бы
+     * попавшуюся под палец фамилию, и испорченной вышла бы вся пачка.
+     */
+    if (touch && !selected.has(el.id)) {
+      setSelected(expandToGroups(layout, [el.id]));
+      startPan(e, false);
+      return;
+    }
     const additive = e.shiftKey;
     // Что окажется выделенным после этого клика — считаем сразу, чтобы жест
     // вёл именно эту группу, а не ту, что была до клика.
@@ -957,11 +1070,37 @@ export function EditorPage() {
     for (const item of layout) {
       if (next.has(item.id) && !item.locked) boxes[item.id] = { x: item.x, y: item.y, w: item.w, h: item.h };
     }
-    gesture.current = { kind: 'move', boxes, startX: e.clientX, startY: e.clientY, moved: false };
+    gesture.current = {
+      kind: 'move',
+      boxes,
+      startX: e.clientX,
+      startY: e.clientY,
+      moved: false,
+      touch,
+      tapEdit: touch && selected.size === 1 && el.type === 'text' ? el.id : undefined,
+    };
+  }
+
+  function startPan(e: React.PointerEvent, tapClear: boolean) {
+    const box = containerRef.current;
+    if (!box) return;
+    gesture.current = {
+      kind: 'pan',
+      startX: e.clientX,
+      startY: e.clientY,
+      left: box.scrollLeft,
+      top: box.scrollTop,
+      moved: false,
+      touch: true,
+      tapClear,
+    };
   }
 
   function startMarquee(e: React.PointerEvent) {
     if (e.button !== 0) return;
+    // Рамки выделения пальцем нет: касание пустого места листа двигает
+    // холст — его подхватит обработчик холста.
+    if (e.pointerType === 'touch') return;
     setEditingId(null);
     if (!e.shiftKey) setSelected(new Set());
     gesture.current = { kind: 'marquee', additive: e.shiftKey, base: selected, startX: e.clientX, startY: e.clientY, moved: false };
@@ -1029,6 +1168,75 @@ export function EditorPage() {
       onSelect: removeSelected,
     },
   ];
+
+  /*
+   * Два взгляда на лист: заготовка с фишками полей и настоящая строка
+   * таблицы. Второй — чтобы увидеть, как ляжет длинная фамилия, не
+   * выпуская ничего. На телефоне подписи короче, а стрелки строк — под палец.
+   */
+  const rowArrow = phone
+    ? 'grid size-10 place-items-center rounded-md active:bg-[var(--surface-sunken)]'
+    : 'rounded p-0.5 hover:bg-[var(--surface-sunken)]';
+  const viewToggle = (
+    <div className="flex shrink-0 items-center gap-1 rounded-lg p-0.5 ring-1 ring-[var(--line)]">
+      <Segment active={!dataMode} onClick={() => setViewMode('placeholders')} large={phone}>
+        Заготовка
+      </Segment>
+      <Segment
+        active={dataMode}
+        onClick={() => setViewMode('data')}
+        disabled={rowCount === 0}
+        title={rowCount === 0 ? 'Список пока пустой' : undefined}
+        large={phone}
+      >
+        {phone ? 'Данные' : 'Данные строки'}
+      </Segment>
+      {dataMode && rowCount > 0 && (
+        <span className="tabular flex items-center gap-0.5 pl-1 text-sm text-[var(--text-muted)]">
+          <button
+            type="button"
+            aria-label="Предыдущая строка"
+            onClick={() => setRowIndex((i) => Math.max(0, i - 1))}
+            className={rowArrow}
+          >
+            <ChevronLeft size={phone ? 18 : 14} />
+          </button>
+          {safeRow + 1} / {rowCount}
+          <button
+            type="button"
+            aria-label="Следующая строка"
+            onClick={() => setRowIndex((i) => Math.min(rowCount - 1, i + 1))}
+            className={rowArrow}
+          >
+            <ChevronRight size={phone ? 18 : 14} />
+          </button>
+        </span>
+      )}
+    </div>
+  );
+
+  const saveLabel =
+    saved === 'saved' ? 'Сохранено' : saved === 'saving' ? 'Сохраняем' : saved === 'error' ? 'Не удалось сохранить' : 'Есть правки';
+  const saveIcon =
+    saved === 'saved' ? (
+      <Check size={13} />
+    ) : saved === 'saving' ? (
+      <LoaderCircle size={13} className="animate-spin" />
+    ) : saved === 'error' ? (
+      <TriangleAlert size={13} />
+    ) : (
+      <Dot size={13} />
+    );
+  /* На телефоне — только значок: строка одна, а слово «Сохранено» длиннее кнопок.
+     Ошибку словом показываем и там — её нельзя не заметить. */
+  const saveChip = (
+    <StatusChip
+      tone={saved === 'saved' ? 'done' : saved === 'saving' ? 'progress' : saved === 'error' ? 'error' : 'neutral'}
+    >
+      {saveIcon}
+      {phone && saved !== 'error' ? <span className="sr-only">{saveLabel}</span> : saveLabel}
+    </StatusChip>
+  );
 
   /*
    * Панель значков под меню — только то, чем пользуются постоянно: отмена,
@@ -1138,89 +1346,54 @@ export function EditorPage() {
       />
 
       <div className="ml-auto flex items-center gap-2">
-        {/* Два взгляда на лист: заготовка с фишками полей и настоящая строка
-            таблицы. Второй — чтобы увидеть, как ляжет длинная фамилия, не
-            выпуская ничего. */}
-        <div className="flex items-center gap-1 rounded-lg p-0.5 ring-1 ring-[var(--line)]">
-          <Segment active={!dataMode} onClick={() => setViewMode('placeholders')}>
-            Заготовка
-          </Segment>
-          <Segment
-            active={dataMode}
-            onClick={() => setViewMode('data')}
-            disabled={rowCount === 0}
-            title={rowCount === 0 ? 'Список пока пустой' : undefined}
-          >
-            Данные строки
-          </Segment>
-          {dataMode && rowCount > 0 && (
-            <span className="tabular flex items-center gap-0.5 pl-1 text-sm text-[var(--text-muted)]">
-              <button
-                type="button"
-                aria-label="Предыдущая строка"
-                onClick={() => setRowIndex((i) => Math.max(0, i - 1))}
-                className="rounded p-0.5 hover:bg-[var(--surface-sunken)]"
-              >
-                <ChevronLeft size={14} />
-              </button>
-              {safeRow + 1} / {rowCount}
-              <button
-                type="button"
-                aria-label="Следующая строка"
-                onClick={() => setRowIndex((i) => Math.min(rowCount - 1, i + 1))}
-                className="rounded p-0.5 hover:bg-[var(--surface-sunken)]"
-              >
-                <ChevronRight size={14} />
-              </button>
-            </span>
-          )}
-        </div>
-
-        <StatusChip
-          tone={
-            saved === 'saved'
-              ? 'done'
-              : saved === 'saving'
-                ? 'progress'
-                : saved === 'error'
-                  ? 'error'
-                  : 'neutral'
-          }
-        >
-          {saved === 'saved' ? (
-            <>
-              <Check size={13} /> Сохранено
-            </>
-          ) : saved === 'saving' ? (
-            <>
-              <LoaderCircle size={13} className="animate-spin" /> Сохраняем
-            </>
-          ) : saved === 'error' ? (
-            <>
-              <TriangleAlert size={13} /> Не удалось сохранить
-            </>
-          ) : (
-            <>
-              <Dot size={13} /> Есть правки
-            </>
-          )}
-        </StatusChip>
+        {viewToggle}
+        {saveChip}
       </div>
     </>
   );
+
+  /*
+   * Верхняя строка на телефоне — одна и без переносов: отмена, взгляд на
+   * лист и отметка сохранения. Всё остальное уехало вниз, под большой палец.
+   */
+  const phoneToolbar = (
+    <>
+      <IconButton label="Отменить" onClick={history.undo} disabled={!history.canUndo}>
+        <Undo2 size={20} />
+      </IconButton>
+      <IconButton label="Вернуть" onClick={history.redo} disabled={!history.canRedo}>
+        <Redo2 size={20} />
+      </IconButton>
+      <div className="ml-auto flex min-w-0 items-center gap-1.5">
+        {viewToggle}
+        {saveChip}
+      </div>
+    </>
+  );
+
+  /** Сдвиг крестовиной — тем же путём, что стрелки клавиатуры. */
+  const nudgeSelected = (dx: number, dy: number) =>
+    patchElements(selected, (el) => (el.locked ? el : { ...el, ...roundBox(nudgeBox(el, dx, dy, pageBox)) }));
+
+  const editingElement =
+    phone && editingId ? layout.find((el): el is TextElement => el.id === editingId && el.type === 'text') : undefined;
 
   return (
     // Высота — точным счётом, а не `h-full`: оболочка кабинета больше не
     // задаёт высоту своей колонке (это ломало прилипание разделов на
     // длинных страницах, см. AppShell), и опереться на неё через `h-full`
     // стало не на что. Лист по-прежнему получает ровно экран без шапки.
-    <div className="flex h-[calc(100dvh-var(--app-header))] flex-col">
+    <div
+      className="editor-height flex flex-col"
+      // Полоса «домой» у айфонов без кнопки: нижняя панель не должна под ней лежать.
+      style={phone ? { paddingBottom: 'env(safe-area-inset-bottom)' } : undefined}
+    >
       <DocumentChrome
         documentId={id}
         title={page.title}
         actions={actions}
         tab="sheet"
-        toolbar={toolbar}
+        toolbar={phone ? phoneToolbar : toolbar}
       />
 
       {/* Поле выбора файла спрятано и живёт отдельно от меню: меню
@@ -1261,12 +1434,53 @@ export function EditorPage() {
         </p>
       )}
 
-      <div className="flex min-h-0 flex-1">
+      {/* На телефоне панель встаёт под лист, а не справа: колонка в 320 точек
+          оставила бы листу полоску. */}
+      <div className={phone ? 'flex min-h-0 flex-1 flex-col' : 'flex min-h-0 flex-1'}>
+        <div className="relative flex min-h-0 min-w-0 flex-1">
+        {/*
+          Лист по центру — автополями внутри гибкого ряда, а не `place-items:
+          center`: у сетки то, что вылезло за левый край при увеличении, уходит
+          в минус и прокруткой не достаётся.
+
+          `touch-action: none` — жесты пальцем холст разбирает сам: один палец
+          двигает холст или блок, два — масштаб. Мышь и перо это не трогает.
+        */}
         <div
           ref={containerRef}
-          className="relative grid flex-1 place-items-center overflow-auto bg-[var(--surface-sunken)] p-6"
-          style={panning ? { cursor: pan.current ? 'grabbing' : 'grab' } : undefined}
+          className={`relative flex flex-1 overflow-auto bg-[var(--surface-sunken)] ${phone ? 'p-3' : 'p-6'}`}
+          style={{
+            touchAction: 'none',
+            ...(panning ? { cursor: pan.current ? 'grabbing' : 'grab' } : null),
+          }}
+          onPointerDown={(e) => {
+            // Палец на пустом месте холста: двигает холст, а касание без
+            // сдвига снимает выбор. Блоки и ручки сюда жест не отдают.
+            if (e.pointerType === 'touch' && !gesture.current && !pinch.current) startPan(e, true);
+          }}
           onPointerDownCapture={(e) => {
+            if (e.pointerType === 'touch') {
+              touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+              if (touches.current.size >= 2) {
+                // Второй палец — щипок. Начатое первым пальцем закрываем
+                // тем, что успело сдвинуться, и дальше блоки не трогаем.
+                const g = gesture.current;
+                if (g?.moved && (g.kind === 'move' || g.kind === 'resize' || g.kind === 'scale' || g.kind === 'rotate')) {
+                  endGesture();
+                }
+                gesture.current = null;
+                setGuides([]);
+                const [a, b] = [...touches.current.values()];
+                pinch.current = {
+                  dist: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)),
+                  zoom,
+                  mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
+                };
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+              }
+            }
             if (!panning) return;
             e.preventDefault();
             e.stopPropagation();
@@ -1303,10 +1517,11 @@ export function EditorPage() {
             </div>
           )}
 
-          <div className="relative" style={{ padding: 18 }}>
-            {/* Линейки в миллиметрах — по краям листа. */}
-            <Ruler axis="x" lengthMm={page.pageWidthMm} zoom={zoom} />
-            <Ruler axis="y" lengthMm={page.pageHeightMm} zoom={zoom} />
+          <div className="relative m-auto" style={{ padding: phone ? 0 : 18 }}>
+            {/* Линейки в миллиметрах — по краям листа. На телефоне их нет:
+                цифры в 9 точек там не прочесть, а место у листа они съедают. */}
+            {!phone && <Ruler axis="x" lengthMm={page.pageWidthMm} zoom={zoom} />}
+            {!phone && <Ruler axis="y" lengthMm={page.pageHeightMm} zoom={zoom} />}
 
             <div
               ref={sheetRef}
@@ -1328,7 +1543,7 @@ export function EditorPage() {
                   selectedIds={selected}
                   onSelect={(elementId, additive) => elementId && select(elementId, additive)}
                   onEdit={(elementId) => setEditingId(elementId)}
-                  editingId={editingId}
+                  editingId={phone ? null : editingId}
                   renderEditing={(element) => (
                     <InlineTextEditor
                       key={element.id}
@@ -1430,7 +1645,7 @@ export function EditorPage() {
                     >
                       {single?.id === el.id && !el.locked && !editing && (
                         <>
-                          {HANDLES.map((handle) => (
+                          {(phone ? PHONE_HANDLES : HANDLES).map((handle) => (
                             <span
                               key={handle}
                               onPointerDown={(e) => {
@@ -1448,7 +1663,9 @@ export function EditorPage() {
                               }}
                               style={handleStyle(handle)}
                               className="absolute h-2.5 w-2.5 rounded-full border border-[var(--surface)] bg-[var(--focus)]"
-                            />
+                            >
+                              <TouchZone />
+                            </span>
                           ))}
                           {/* Ручка поворота — над верхним краем. Shift — с шагом в 15°. */}
                           <span
@@ -1466,9 +1683,11 @@ export function EditorPage() {
                               };
                             }}
                             title="Повернуть (Shift — с шагом 15°)"
-                            style={{ top: -22, left: 'calc(50% - 5px)', cursor: 'grab' }}
+                            style={{ top: phone ? -30 : -22, left: 'calc(50% - 5px)', cursor: 'grab' }}
                             className="absolute h-2.5 w-2.5 rounded-full border border-[var(--surface)] bg-[var(--accent)]"
-                          />
+                          >
+                            <TouchZone />
+                          </span>
                         </>
                       )}
                     </div>
@@ -1501,7 +1720,9 @@ export function EditorPage() {
                       }}
                       style={{ ...handleStyle(handle), pointerEvents: 'auto' }}
                       className="absolute h-3 w-3 rounded-sm border border-[var(--surface)] bg-[var(--focus)]"
-                    />
+                    >
+                      <TouchZone />
+                    </span>
                   ))}
                 </div>
               )}
@@ -1515,24 +1736,41 @@ export function EditorPage() {
             </div>
           </div>
         </div>
+        {/* Крестовина — поверх холста, но не внутри него: в прокручиваемом
+            холсте она уезжала бы вместе с листом. */}
+        {phone && nudgeOpen && selected.size > 0 && <NudgePad onNudge={nudgeSelected} />}
+        </div>
 
         {/* Панели справа нет, пока она не нужна: лист занимает весь экран,
             как в любом редакторе документов. Открывают её значком на панели
             или первым выделенным блоком. */}
         {panel && (
-          <aside className="flex w-80 shrink-0 flex-col border-l border-[var(--line)] bg-[var(--surface)]">
+          <aside
+            className={
+              phone
+                ? // Под листом, на половину экрана: лист остаётся виден сверху
+                  // и сразу показывает то, что меняют в панели.
+                  'flex h-[46%] shrink-0 flex-col rounded-t-2xl border-t border-[var(--line)] bg-[var(--surface)] shadow-[0_-8px_24px_-12px_rgba(9,17,53,0.25)]'
+                : 'flex w-80 shrink-0 flex-col border-l border-[var(--line)] bg-[var(--surface)]'
+            }
+          >
             <div className="flex border-b border-[var(--line)]">
-              <Tab active={panel === 'props'} onClick={() => setPanel('props')} icon={<SlidersHorizontal size={14} />}>
-                Свойства
+              <Tab large={phone} active={panel === 'props'} onClick={() => setPanel('props')} icon={<SlidersHorizontal size={14} />}>
+                {phone && selected.size === 0 ? 'Лист' : 'Свойства'}
               </Tab>
-              <Tab active={panel === 'fields'} onClick={() => setPanel('fields')} icon={<Table2 size={14} />} badge={matches.length || undefined}>
+              <Tab large={phone} active={panel === 'fields'} onClick={() => setPanel('fields')} icon={<Table2 size={14} />} badge={matches.length || undefined}>
                 Поля
               </Tab>
-              <Tab active={panel === 'layers'} onClick={() => setPanel('layers')} icon={<Layers size={14} />}>
+              <Tab large={phone} active={panel === 'layers'} onClick={() => setPanel('layers')} icon={<Layers size={14} />}>
                 Слои
               </Tab>
-              <IconButton size="sm" label="Закрыть панель" onClick={() => setPanel(null)} className="m-1 shrink-0">
-                <X size={15} />
+              <IconButton
+                size={phone ? 'md' : 'sm'}
+                label="Закрыть панель"
+                onClick={() => setPanel(null)}
+                className="m-1 shrink-0"
+              >
+                <X size={phone ? 20 : 15} />
               </IconButton>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto p-4">
@@ -1594,6 +1832,29 @@ export function EditorPage() {
         )}
       </div>
 
+      {phone && (
+        <PhoneToolbar
+          selectedCount={selected.size}
+          canEditText={single?.type === 'text' && !single.locked}
+          locked={selectedElements.length > 0 && selectedElements.every((el) => el.locked)}
+          panel={panel}
+          nudgeOpen={nudgeOpen}
+          onInsert={() => setInsertOpen(true)}
+          onPanel={togglePanel}
+          onBackground={pickBackground}
+          backgroundBusy={uploadBackground.isPending}
+          onFit={() => zoomTo('fit')}
+          onEditText={() => single && setEditingId(single.id)}
+          onNudge={() => setNudgeOpen((v) => !v)}
+          onDuplicate={() => cloneInto(selectedElements)}
+          onDelete={removeSelected}
+          onDone={() => {
+            setSelected(new Set());
+            setPanel(null);
+          }}
+        />
+      )}
+
       {/* Закладки листов — внизу, как в любом редакторе страниц. */}
       <SheetTabs
         sheets={sheets}
@@ -1609,6 +1870,52 @@ export function EditorPage() {
       />
 
       {fileMenu.dialogs}
+
+      {phone && (
+        <InsertSheet
+          open={insertOpen}
+          onClose={() => setInsertOpen(false)}
+          onInsert={addElement}
+          fields={fields}
+          onBackground={pickBackground}
+          backgroundLoading={uploadBackground.isPending}
+          hasBackground={hasBackground}
+        />
+      )}
+
+      {editingElement && (
+        <PhoneTextSheet
+          key={editingElement.id}
+          element={editingElement}
+          previewSize={{ width: page.pageWidthMm * PX_PER_MM, height: page.pageHeightMm * PX_PER_MM }}
+          preview={
+            <SheetRenderer
+              layout={layout}
+              pageWidthMm={page.pageWidthMm}
+              pageHeightMm={page.pageHeightMm}
+              backgroundUrl={background.data?.url}
+              data={previewData}
+              unfilled={dataMode ? 'blank' : 'token'}
+              fields={dataMode ? 'highlight' : 'chip'}
+              knownFields={known}
+              fieldLabels={labels}
+            />
+          }
+          fields={fields}
+          data={previewData}
+          known={known}
+          labels={labels}
+          onEditor={(editor) => {
+            liveEditor.current = editor;
+          }}
+          onChange={(richDoc) => setDoc(editingElement.id, richDoc, false)}
+          onDone={(richDoc) => {
+            liveEditor.current = null;
+            setDoc(editingElement.id, richDoc, true);
+            setEditingId(null);
+          }}
+        />
+      )}
 
       {sizeOpen && (
         <PageSizeDialog
@@ -1645,6 +1952,15 @@ export function EditorPage() {
       )}
     </div>
   );
+}
+
+/**
+ * Невидимая зона под палец вокруг ручки. Видимая ручка остаётся в 10 точек —
+ * крупнее она закрывала бы узкий блок, — а попадать пальцем есть куда.
+ * Мыши зона не нужна: там она перехватывала бы блок у соседних ручек.
+ */
+function TouchZone() {
+  return <span aria-hidden className="absolute -inset-3 hidden rounded-full pointer-coarse:block" />;
 }
 
 function handleStyle(handle: ResizeHandle): React.CSSProperties {
@@ -1711,12 +2027,15 @@ function Segment({
   onClick,
   disabled,
   title,
+  large = false,
   children,
 }: {
   active: boolean;
   onClick: () => void;
   disabled?: boolean;
   title?: string;
+  /** Под палец: 40 точек в высоту вместо 28. */
+  large?: boolean;
   children: React.ReactNode;
 }) {
   /*
@@ -1731,7 +2050,7 @@ function Segment({
         onClick={onClick}
         disabled={disabled}
         aria-pressed={active}
-        className={`rounded-md px-2.5 py-1 text-sm transition-colors disabled:opacity-50 ${
+        className={`rounded-md px-2.5 text-sm transition-colors disabled:opacity-50 ${large ? 'h-10' : 'py-1'} ${
           active ? 'bg-[var(--accent-soft)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text)]'
         }`}
       >
@@ -1746,12 +2065,14 @@ function Tab({
   onClick,
   icon,
   badge,
+  large = false,
   children,
 }: {
   active: boolean;
   onClick: () => void;
   icon: React.ReactNode;
   badge?: number;
+  large?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -1760,7 +2081,7 @@ function Tab({
       onClick={onClick}
       aria-selected={active}
       role="tab"
-      className={`flex flex-1 items-center justify-center gap-1.5 border-b-2 px-2 py-2 text-sm ${
+      className={`flex flex-1 items-center justify-center gap-1.5 border-b-2 px-2 text-sm ${large ? 'h-12' : 'py-2'} ${
         active ? 'border-[var(--accent)] text-[var(--accent)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text)]'
       }`}
     >
