@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import nodemailer, { type Transporter } from 'nodemailer';
-import { checkRecords } from './dns-check';
+import { checkRecords, dmarcRecord, ownershipRecord } from './dns-check';
 import type {
   DnsRecord,
   DomainStatus,
@@ -78,26 +78,14 @@ export class SmtpProvider implements MailProvider {
    */
   getDomainSetup(domain: string, verificationToken: string): Promise<DnsRecord[]> {
     return Promise.resolve([
-      {
-        // Уникальная запись — единственное доказательство владения доменом.
-        // Записи SPF и DMARC одинаковы у всех клиентов и подтверждением быть не могут.
-        type: 'TXT',
-        host: '_vruchay-verify',
-        value: `vruchay-verify=${verificationToken}`,
-        purpose: 'Подтверждение владения доменом. Уникальна для вашей организации',
-      },
+      ownershipRecord(verificationToken),
       {
         type: 'TXT',
         host: '@',
         value: `v=spf1 include:${this.config.get('SMTP_SPF_INCLUDE', { infer: true })} ~all`,
         purpose: 'SPF: разрешает нашему серверу отправлять письма от вашего домена',
       },
-      {
-        type: 'TXT',
-        host: '_dmarc',
-        value: 'v=DMARC1; p=none; rua=mailto:postmaster@' + domain,
-        purpose: 'DMARC: политика для писем, не прошедших проверку. Начинаем с p=none',
-      },
+      dmarcRecord(domain),
     ]);
   }
 

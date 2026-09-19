@@ -62,6 +62,15 @@ const TIME_FIELDS = ['occurred_at', 'occurredAt', 'timestamp', 'time', 'date', '
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/**
+ * Пометка номера служебного письма — кода подтверждения, проверочного
+ * письма самому себе, счёта. В журнале их нет, и события о них искать
+ * негде. Без пометки такое событие ушло бы в поиск по адресу получателя
+ * и легло на его письмо с документом: недоставленный код подтверждения
+ * пометил бы «не доставлено» грамоту, которая дошла.
+ */
+export const SERVICE_REF_PREFIX = 'svc-';
+
 /** Где может лежать идентификатор письма у самого провайдера. */
 const PROVIDER_ID_FIELDS = [
   'message_id',
@@ -103,6 +112,7 @@ export function parseMailWebhook(
     if (!resolved) continue;
 
     const reference = pickString(item, REFERENCE_FIELDS);
+    if (reference?.startsWith(SERVICE_REF_PREFIX)) continue;
     const ours = reference && UUID_RE.test(reference) ? reference : undefined;
 
     // Идентификатор провайдера и адрес получателя — запасные способы найти

@@ -64,6 +64,16 @@ S3_SECRET_KEY=ЗАПОЛНИТЬ
 S3_ORIGIN=https://s3.ru-1.storage.selcloud.ru
 
 # ─── Почта ───────────────────────────────────────────────────────────────
+# Основной путь — транзакционное API DashaMail: оно ходит по HTTPS, и
+# закрытые у Selectel почтовые порты его не касаются. Без ключа сервер
+# с MAIL_PROVIDER=dashamail не стартует — это нарочно.
+# Ключ: кабинет DashaMail → «Интеграции» → «Транзакционные письма».
+MAIL_PROVIDER=dashamail
+DASHAMAIL_API_KEY=ЗАПОЛНИТЬ
+
+# Запасной путь — SMTP-шлюз того же DashaMail, включается строкой
+# MAIL_PROVIDER=smtp. Держим заполненным, чтобы переключиться за минуту.
+#
 # Адрес шлюза — dashasender.ru, а не dashamail.ru: почтовый шлюз живёт
 # на отдельном домене. Значения из кабинета: «Email-транспорт» → SMTP.
 #
@@ -74,7 +84,6 @@ S3_ORIGIN=https://s3.ru-1.storage.selcloud.ru
 # 2525 — запасной порт подачи, который почтовые сервисы держат именно
 # на этот случай; шифрование там поднимается через STARTTLS, поэтому
 # SMTP_SECURE=false (приложение требует STARTTLS обязательным).
-MAIL_PROVIDER=smtp
 SMTP_HOST=smtps.dashasender.ru
 SMTP_PORT=2525
 SMTP_SECURE=false

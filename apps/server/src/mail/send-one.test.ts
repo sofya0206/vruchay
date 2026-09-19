@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MailService } from './mail.service';
 import { testConfig } from '../config/env.test-utils';
 import { isLastAttempt, MAIL_ATTEMPTS, MAIL_BACKOFF_MS } from './mail.processor';
-import type { OutgoingMessage } from './mail-provider.interface';
+import { PermanentSendError, type OutgoingMessage } from './mail-provider.interface';
 
 /*
  * Что происходит с письмом, когда почтовый шлюз ответил отказом.
@@ -27,6 +27,8 @@ const DOMAIN_POLICY = '554 5.7.1 Message rejected by domain policy';
 interface Stub {
   /** Чем ответил шлюз. Без него письмо уходит успешно. */
   failWith?: string;
+  /** Отказ провайдера с кодом, про который он сам знает: повтор не поможет. */
+  refuseWith?: string;
   kind?: 'transactional' | 'marketing';
   /** Файл, найденный по идентификатору вложения. null — чужой или удалённый. */
   file?: { originalName: string; s3Key: string; mime: string } | null;
@@ -92,6 +94,7 @@ function world(stub: Stub = {}): World {
     send: async (message: OutgoingMessage) => {
       sent.push(message);
       if (stub.failWith) throw new Error(stub.failWith);
+      if (stub.refuseWith) throw new PermanentSendError(stub.refuseWith);
       return { providerMessageId: 'msg-1' };
     },
   };
@@ -162,6 +165,18 @@ describe('отказ навсегда', () => {
 
     await expect(service.sendOne(EMAIL_ID, false)).resolves.toBeUndefined();
     expect(email.status).toBe('failed');
+  });
+
+  it('провайдер сказал «навсегда» — не повторяем, даже если текст незнакомый', async () => {
+    // Текст DashaMail правилам разбора не знаком, а по ним он считался бы
+    // временным: неверный ключ гонялся бы по трём попыткам с паузами.
+    const { service, email } = world({
+      refuseWith: 'DashaMail: адрес отправителя не подтверждён в DashaMail (код 52; ...)',
+    });
+
+    await expect(service.sendOne(EMAIL_ID, false)).resolves.toBeUndefined();
+    expect(email.status).toBe('failed');
+    expect(email.error).toContain('код 52');
   });
 });
 
