@@ -24,7 +24,7 @@ import {
   Ungroup,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { extractVariables, isSafeHrefTemplate, type SheetElement, type SheetLayout, type ShapeElement, type TextProps } from '@gramota/shared';
+import { isSafeHrefTemplate, type SheetElement, type SheetLayout, type ShapeElement, type TextProps } from '@gramota/shared';
 
 type QrElement = Extract<SheetElement, { type: 'qr' }>;
 type LinkElement = Extract<SheetElement, { type: 'link' }>;
@@ -279,21 +279,20 @@ export function PropertiesPanel(props: Props) {
   );
 }
 
-/** Переменные, которые заполняет раздел «О мероприятии». */
-const EVENT_VARIABLES = new Set(['event', 'event_date', 'event_place', 'hours', 'date', 'date_long', 'year']);
-
 type DocTab = 'event' | 'verify';
 
 /**
  * Настройки материала без выбранного блока: мероприятие и проверка по QR,
  * вкладками. Формат листа здесь не живёт — он в панели инструментов,
- * как размер холста в Canva и Figma. Вкладка мероприятия появляется,
- * когда на листе есть хоть одна его переменная: пока их нет, заполнять
- * нечего, и панель показывает только проверку.
+ * как размер холста в Canva и Figma.
+ *
+ * Обе вкладки видны всегда: раньше без переменных мероприятия на листе
+ * вместо вкладки стоял абзац «вставьте через „Вставить“», и панель
+ * читалась как инструкция, а не как настройки. Заполненное мероприятие
+ * подставится, как только его поле появится на листе.
  */
 function DocumentSettings({
   doc,
-  layout,
   onSaveEvent,
   onEventDraft,
 }: {
@@ -302,32 +301,22 @@ function DocumentSettings({
   onSaveEvent: NonNullable<Props['onSaveEvent']>;
   onEventDraft?: Props['onEventDraft'];
 }) {
-  const [picked, setPicked] = useState<DocTab>('event');
-  const hasEventVars = extractVariables(layout).some((name) => EVENT_VARIABLES.has(name));
-  const tab: DocTab = hasEventVars ? picked : 'verify';
+  const [tab, setTab] = useState<DocTab>('event');
 
   return (
     <div className="space-y-5">
-      {hasEventVars && (
-        <Tabs
-          items={[
-            { id: 'event', label: 'Мероприятие' },
-            { id: 'verify', label: 'Проверка' },
-          ]}
-          value={tab}
-          onChange={setPicked}
-          label="Настройки материала"
-          stretch
-        />
-      )}
+      <Tabs
+        items={[
+          { id: 'event', label: 'Мероприятие' },
+          { id: 'verify', label: 'Проверка' },
+        ]}
+        value={tab}
+        onChange={setTab}
+        label="Настройки материала"
+        stretch
+      />
       {tab === 'event' && <EventFields doc={doc} onSave={onSaveEvent} onDraft={onEventDraft} />}
       {tab === 'verify' && <VerifySettings doc={doc} onSave={onSaveEvent} />}
-      {!hasEventVars && (
-        <p className="border-t border-[var(--line)] pt-4 text-sm text-[var(--text-muted)]">
-          Вставьте на лист название, даты или место мероприятия через «Вставить» — здесь появятся их
-          настройки.
-        </p>
-      )}
     </div>
   );
 }

@@ -12,6 +12,7 @@ import {
   Dot,
   Grid3x3,
   ImagePlus,
+  FilePlus2,
   ImageUp,
   Layers,
   LoaderCircle,
@@ -25,7 +26,6 @@ import {
   Printer,
   Proportions,
   Redo2,
-  Shapes,
   SlidersHorizontal,
   Square,
   SquareDashed,
@@ -1489,34 +1489,6 @@ export function EditorPage() {
             void addImage(file, pointToMm(e.clientX, e.clientY));
           }}
         >
-          {/* Выбор пути на пустом листе — двумя крупными плитками, а не
-              абзацем подсказки: абзац читали как «сначала обязательно бланк»,
-              хотя собрать грамоту можно и на чистом листе. */}
-          {!sheet.backgroundFileId && layout.length === 0 && !buildHere.has(sheet.id) && (
-            <div className="pointer-events-none absolute inset-x-0 top-6 z-10 flex justify-center px-6">
-              <div className="pointer-events-auto grid w-full max-w-md grid-cols-2 gap-3">
-                <StartTile
-                  icon={<ImageUp size={22} />}
-                  label="Загрузить свой бланк"
-                  disabled={uploadBackground.isPending}
-                  onClick={pickBackground}
-                />
-                <StartTile
-                  icon={<Shapes size={22} />}
-                  label="Собрать здесь"
-                  onClick={() => setBuildHere((prev) => new Set(prev).add(sheet.id))}
-                />
-              </div>
-            </div>
-          )}
-          {sheet.backgroundFileId && layout.length === 0 && (
-            <div className="pointer-events-none absolute inset-x-0 top-6 z-10 flex justify-center">
-              <p className="rounded-full bg-[var(--surface)] px-4 py-2 text-sm text-[var(--text-muted)] shadow-sm ring-1 ring-[var(--line)]">
-                Бланк на месте. Двойной щелчок по листу — текст.
-              </p>
-            </div>
-          )}
-
           <div className="relative" style={{ padding: 18 }}>
             {/* Линейки в миллиметрах — по краям листа. */}
             <Ruler axis="x" lengthMm={page.pageWidthMm} zoom={zoom} />
@@ -1544,6 +1516,35 @@ export function EditorPage() {
                 if (mm) setCanvasMenu({ x: e.clientX, y: e.clientY, mm });
               }}
             >
+              {/* Выбор пути — двумя плитками прямо на пустом листе, как
+                  «Start from your content / Create from scratch» в Adobe
+                  Express. Абзац подсказки читали как «сначала обязательно
+                  бланк», хотя собрать грамоту можно и на чистом листе. */}
+              {!sheet.backgroundFileId && layout.length === 0 && !buildHere.has(sheet.id) && (
+                <div
+                  className="absolute inset-0 z-20 grid place-items-center p-4"
+                  // Нажатие по плиткам — не начало рамки выделения и не новый текст.
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onDoubleClick={(e) => e.stopPropagation()}
+                >
+                  <div className="grid w-full max-w-sm grid-cols-2 gap-3">
+                    <StartTile
+                      icon={<ImageUp size={22} />}
+                      label="Свой бланк"
+                      hint="PNG · JPG"
+                      disabled={uploadBackground.isPending}
+                      onClick={pickBackground}
+                      onFile={(file) => void onPickBackground(file)}
+                    />
+                    <StartTile
+                      icon={<FilePlus2 size={22} />}
+                      label="С нуля"
+                      hint="Чистый лист"
+                      onClick={() => setBuildHere((prev) => new Set(prev).add(sheet.id))}
+                    />
+                  </div>
+                </div>
+              )}
               <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}>
                 <SheetRenderer
                   layout={layout}
@@ -2145,33 +2146,61 @@ function Tab({
   );
 }
 
-/** Плитка выбора пути на пустом листе. */
+/**
+ * Плитка выбора пути на пустом листе. Плитка бланка принимает и файл,
+ * брошенный прямо на неё: так его ставят фоном, а не картинкой на лист.
+ */
 function StartTile({
   icon,
   label,
+  hint,
   onClick,
+  onFile,
   disabled,
 }: {
   icon: React.ReactNode;
   label: string;
+  hint: string;
   onClick: () => void;
+  onFile?: (file: File) => void;
   disabled?: boolean;
 }) {
+  const [over, setOver] = useState(false);
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
+      onDragOver={(e) => {
+        if (!onFile || !e.dataTransfer.types.includes('Files')) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setOver(true);
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => {
+        const file = e.dataTransfer.files[0];
+        if (!onFile || !file) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setOver(false);
+        onFile(file);
+      }}
       className={
-        'flex flex-col items-center gap-2 rounded-2xl bg-[var(--surface)] px-4 py-5 text-sm font-medium ' +
-        'shadow-sm ring-1 ring-[var(--line)] transition-shadow hover:shadow-md hover:ring-[var(--accent)] ' +
-        'disabled:opacity-60'
+        'flex flex-col items-center gap-1.5 rounded-2xl border-2 bg-[var(--surface)] px-3 py-5 ' +
+        // Пунктир — только у плитки, на которую можно бросить файл.
+        (onFile ? 'border-dashed ' : '') +
+        'transition-colors disabled:opacity-60 ' +
+        (over
+          ? 'border-[var(--accent)] bg-[var(--accent-soft)]'
+          : 'border-[var(--line)] hover:border-[var(--accent)]')
       }
     >
       <span className="grid size-11 place-items-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">
         {icon}
       </span>
-      {label}
+      <span className="text-sm font-medium">{label}</span>
+      <span className="text-xs text-[var(--text-muted)]">{hint}</span>
     </button>
   );
 }
