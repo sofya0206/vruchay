@@ -53,7 +53,7 @@ export function ResizeDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4"
+      className="fixed inset-0 z-50 grid place-items-center bg-[var(--scrim)] p-4"
       role="dialog"
       aria-modal="true"
       aria-label="Смена размера листа"

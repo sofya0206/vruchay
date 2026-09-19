@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import {
+import { GripVertical,
   Ban,
-  CheckCheck,
   CheckCircle2,
   Columns3,
   Download,
@@ -27,17 +26,26 @@ import {
   type HeaderChoice,
   type ParsedSheet,
   type RecipientColumn,
+  type RecipientRow,
   type SendResult,
 } from '../api/recipients';
 import { PreviewDialog } from './PreviewDialog';
+import { RowOutcomeChip } from './RowOutcomeChip';
 import { Button } from '../ui/Button';
-import { Input, Label, StatusChip } from '../ui/Field';
+import { Field, Input, StatusChip } from '../ui/Field';
+import { cn } from '../ui/cn';
+import { ProgressBar } from '../ui/Progress';
+import { Outcome } from '../ui/Outcome';
+import { SkeletonRows } from '../ui/Skeleton';
 import { ImportDialog } from './ImportDialog';
 import { planPaste } from './clipboard';
 import { GenerateDialog, type GenerateMode } from './GenerateDialog';
 import { DownloadDialog } from './DownloadDialog';
 import { InviteNudge } from '../referral/InviteNudge';
-import { DocumentChrome, ToolButton, ToolDivider } from '../editor/DocumentChrome';
+import { DocumentChrome, ReleaseButton, ToolButton, ToolDivider } from '../editor/DocumentChrome';
+import { FieldsSidebar } from '../editor/FieldsSidebar';
+import { FieldsToggle } from '../editor/FieldsToggle';
+import { useFieldsPanelOpen } from '../editor/fields-sidebar-store';
 import { useDocumentFileMenu } from '../editor/DocumentFileMenu';
 import type { MenuEntry } from '../editor/DocumentChrome';
 import { IconButton } from '../ui/IconButton';
@@ -45,8 +53,6 @@ import { Dialog } from '../ui/Dialog';
 import { Checkbox } from '../ui/Checkbox';
 import type { DocumentDetail } from '../api/types';
 import type { WorkspaceTab } from '../mailing/workspace-tabs';
-import { PushOffer } from '../push/PushOffer';
-import { BigListNote } from './BigListNote';
 
 /**
  * Таблица получателей — вторая сторона материала.
@@ -68,8 +74,51 @@ export function RecipientsTable({
 }) {
   const documentId = doc.id;
   const fileMenu = useDocumentFileMenu(doc);
+  const fieldsOpen = useFieldsPanelOpen();
   const table = useRecipients(documentId);
   const m = useRecipientMutations(documentId);
+  const [dragCol, setDragCol] = useState<string | null>(null);
+  const [overCol, setOverCol] = useState<string | null>(null);
+
+  /**
+   * Перетаскивание колонки за ручку в шапке. Указательные события
+   * вместо HTML5 drag-and-drop: тот не работает с пальца и на тачпаде
+   * ведёт себя как попало. Цель ищем по координатам — под пальцем
+   * элемент не меняется, пока захват удерживает событие.
+   */
+  function startColumnDrag(e: React.PointerEvent, columnId: string) {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const handle = e.currentTarget as HTMLElement;
+    // Захват держит события на ручке, даже когда палец ушёл с неё;
+    // без активного указателя (автотест) браузер бросает исключение.
+    try {
+      handle.setPointerCapture(e.pointerId);
+    } catch {
+      /* без захвата события всё равно всплывают до ручки */
+    }
+    setDragCol(columnId);
+    let target: string | null = null;
+    const onMove = (ev: PointerEvent) => {
+      const th = document.elementFromPoint(ev.clientX, ev.clientY)?.closest<HTMLElement>('th[data-col]');
+      target = th?.dataset.col ?? null;
+      setOverCol(target);
+    };
+    const onUp = () => {
+      handle.removeEventListener('pointermove', onMove);
+      handle.removeEventListener('pointerup', onUp);
+      handle.removeEventListener('pointercancel', onUp);
+      setDragCol(null);
+      setOverCol(null);
+      if (!target || target === columnId) return;
+      const order = columns.map((c) => c.id).filter((id) => id !== columnId);
+      order.splice(order.indexOf(target), 0, columnId);
+      m.reorderColumns.mutate(order);
+    };
+    handle.addEventListener('pointermove', onMove);
+    handle.addEventListener('pointerup', onUp);
+    handle.addEventListener('pointercancel', onUp);
+  }
   const [jobId, setJobId] = useState<string | null>(null);
   const { job, start, cancel, resume } = useGeneration(documentId, jobId);
   const send = useSend(documentId);
@@ -88,6 +137,8 @@ export function RecipientsTable({
   const [newColumn, setNewColumn] = useState('');
   /** Открыто ли окно новой колонки: поле переехало из панели в меню «Вставка». */
   const [addingColumn, setAddingColumn] = useState(false);
+  /** Отказ сервера на новую колонку — под полем окна, а не в общей полосе за ним. */
+  const [columnError, setColumnError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState(false);
   const [asking, setAsking] = useState(false);
@@ -181,19 +232,36 @@ export function RecipientsTable({
   // другая, а одинаковая шапка там может значить другое.
   useEffect(() => setManualNames({}), [documentId]);
 
-  /* Во всю высоту: страница рисуется без оболочки кабинета, и короткая
-     строчка на пустом экране читается как сломанная страница. */
-  if (table.isPending)
+  /* Пока таблицы нет, шапка материала и лента вкладок уже стоят на месте:
+     иначе переход «Письмо → Получатели» на миг снимал шапку целиком,
+     и она вставала обратно вместе с данными — рывок на весь экран.
+     Панель значков ещё нечем наполнить, поэтому под ней пустая полоса
+     той же высоты, чтобы таблица потом легла точно туда, где скелетон. */
+  if (table.isPending || !table.data)
     return (
-      <div className="grid h-full place-items-center text-[var(--text-muted)]">Загрузка таблицы…</div>
-    );
-  if (!table.data)
-    return (
-      <div className="grid h-full place-items-center text-[var(--text-muted)]">Таблица недоступна</div>
+      <div className="flex h-[calc(100dvh-var(--app-header))] min-h-0 flex-col">
+        <DocumentChrome
+          documentId={documentId}
+          title={doc.title}
+          isTemplate={doc.isTemplate}
+          actions={fileMenu.entries}
+          tab="table"
+          toolbar={<span aria-hidden className="size-8" />}
+        />
+        {table.isPending ? (
+          <SkeletonRows rows={8} label="Загружаем таблицу" />
+        ) : (
+          <div className="grid flex-1 place-items-center text-[var(--text-muted)]">
+            Таблица недоступна
+          </div>
+        )}
+        {fileMenu.dialogs}
+      </div>
     );
 
   const { columns, rows, checkedCount } = table.data;
   const allChecked = rows.length > 0 && rows.every((r) => r.checked);
+  const widths = Object.fromEntries(columns.map((col) => [col.name, fitChars(rows, col.name)]));
   // Задание стоит «в очереди», но за ним никто не пришёл: пакет не доехал
   // до очереди, и сам собой он не тронется. Сервис поднимет такое задание
   // сторожем в течение нескольких минут, но человеку у экрана незачем
@@ -271,6 +339,32 @@ export function RecipientsTable({
     } catch (err) {
       setError((err as Error).message);
     }
+  }
+
+  /*
+   * Новая колонка из окна.
+   *
+   * Имя колонки становится переменной %имя, поэтому сервер пускает только
+   * латиницу и объясняет отказ сам. Без onError его ответ пропадал: окно
+   * молча стояло с «Командой» в поле. Набранное не стираем — его правят,
+   * а не набирают заново.
+   */
+  function submitColumn() {
+    const name = newColumn.trim();
+    if (!name || m.addColumn.isPending) return;
+    setColumnError(null);
+    m.addColumn.mutate(name, {
+      onSuccess: () => {
+        setNewColumn('');
+        setAddingColumn(false);
+      },
+      onError: (err) => setColumnError(err.message),
+    });
+  }
+
+  function closeAddColumn() {
+    setAddingColumn(false);
+    setColumnError(null);
   }
 
   /*
@@ -373,6 +467,7 @@ export function RecipientsTable({
       </ToolButton>
 
       <div className="ml-auto flex items-center gap-2">
+        <FieldsToggle />
         <span className="tabular text-sm text-[var(--text-muted)]">
           отмечено {checkedCount} из {rows.length}
         </span>
@@ -439,30 +534,23 @@ export function RecipientsTable({
     /* Точным счётом, а не `h-full`: оболочка кабинета не задаёт высоту
        своей колонке (иначе колонка разделов теряла прилипание на длинных
        страницах), и опереться на неё через `h-full` больше не на что. */
-    <div className="editor-height flex min-h-0 flex-col">
+    <div className="flex h-[calc(100dvh-var(--app-header))] min-h-0 flex-col">
       <DocumentChrome
         documentId={documentId}
         title={doc.title}
+        isTemplate={doc.isTemplate}
         actions={actions}
         tab="table"
         toolbar={toolbar}
         action={
-          <Button
-            variant="primary"
-            size="sm"
-            icon={
-              running ? <LoaderCircle size={15} className="animate-spin" /> : <CheckCheck size={15} />
-            }
+          <ReleaseButton
+            count={checkedCount}
+            running={running}
             disabled={running || checkedCount === 0}
             onClick={() => setAsking(true)}
-          >
-            {running ? 'Выпускаем' : `Выпустить ${checkedCount || ''}`}
-          </Button>
+          />
         }
       />
-
-      {running && <PushOffer />}
-      <BigListNote />
 
       <input
         ref={xlsInput}
@@ -519,6 +607,21 @@ export function RecipientsTable({
               </button>
             </>
           )}
+        </div>
+      )}
+
+      {/* Ход выпуска: полоса, число, оценка времени. Чип в панели
+          остаётся коротким сигналом, полоса — тем, на что смотрят. */}
+      {job && running && (
+        <div className="border-b border-[var(--line)] px-4 py-3">
+          <ProgressBar done={job.done} failed={job.failed} total={job.total} />
+        </div>
+      )}
+
+      {/* Итог: три цветных счётчика вместо фразы. */}
+      {job?.status === 'done' && (
+        <div className="border-b border-[var(--line)] px-4 py-3">
+          <Outcome done={job.done} failed={job.failed} doneLabel="выпущено" />
         </div>
       )}
 
@@ -615,127 +718,174 @@ export function RecipientsTable({
         </p>
       )}
 
-      <div className="min-h-0 flex-1 overflow-auto">
-        {rows.length === 0 ? (
-          <div className="grid h-full place-items-center p-10 text-center">
-            <div>
-              <FileUp size={26} className="mx-auto mb-3 text-[var(--text-muted)]" strokeWidth={1.5} />
-              <p className="font-medium">Список получателей пуст</p>
-              <p className="mt-1 max-w-md text-sm text-[var(--text-muted)]">
-                Загрузите файл Excel или CSV — подойдёт обычный список участников,
-                шапку и лишние строки сервис распознает сам. Или скопируйте таблицу
-                в Excel и вставьте сюда через Ctrl+V.
-              </p>
-              {/* Кнопка здесь обязательна: на панели значок без подписи,
-                  и на пустом экране по нему не догадаться. */}
-              <div className="mt-4 flex justify-center gap-2">
-                <Button
-                  variant="primary"
-                  icon={<FileSpreadsheet size={15} />}
-                  disabled={m.parseFile.isPending}
-                  onClick={() => xlsInput.current?.click()}
-                >
-                  {m.parseFile.isPending ? 'Читаем файл…' : 'Загрузить файл'}
-                </Button>
-                <Button icon={<Plus size={15} />} onClick={() => m.addRow.mutate()}>
-                  Добавить строку
-                </Button>
+      <div className="flex min-h-0 flex-1">
+        <div className="min-h-0 min-w-0 flex-1 overflow-auto">
+          {rows.length === 0 ? (
+            <div className="grid h-full place-items-center p-10 text-center">
+              <div>
+                <FileUp size={26} className="mx-auto mb-3 text-[var(--text-muted)]" strokeWidth={1.5} />
+                <p className="font-medium">Список получателей пуст</p>
+                <p className="mt-1 max-w-md text-sm text-[var(--text-muted)]">
+                  Загрузите файл Excel или CSV — подойдёт обычный список участников,
+                  шапку и лишние строки сервис распознает сам. Или скопируйте таблицу
+                  в Excel и вставьте сюда через Ctrl+V.
+                </p>
+                {/* Кнопка здесь обязательна: на панели значок без подписи,
+                    и на пустом экране по нему не догадаться. */}
+                <div className="mt-4 flex justify-center gap-2">
+                  <Button
+                    variant="primary"
+                    icon={<FileSpreadsheet size={15} />}
+                    disabled={m.parseFile.isPending}
+                    onClick={() => xlsInput.current?.click()}
+                  >
+                    {m.parseFile.isPending ? 'Читаем файл…' : 'Загрузить файл'}
+                  </Button>
+                  <Button icon={<Plus size={15} />} onClick={() => m.addRow.mutate()}>
+                    Добавить строку
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
-        ) : (
-          <table className="w-full border-collapse text-sm">
-            <thead className="sticky top-0 z-10 bg-[var(--surface-sunken)]">
-              <tr>
-                <th className="w-10 border-r border-b border-[var(--line)] px-3 py-2">
-                  <Checkbox
-                    checked={allChecked}
-                    onChange={() => m.setChecked.mutate({ checked: !allChecked })}
-                    aria-label="Отметить все"
-                  />
-                </th>
-                {/* Номер строки — как в любой таблице: по нему называют место
-                    ошибки («в двенадцатой опечатка»), и без него сверять
-                    список с бумажным протоколом нечем. */}
-                <th className="w-12 border-r border-b border-[var(--line)] px-2 py-2 text-right text-xs font-normal text-[var(--text-muted)]">
-                  №
-                </th>
-                {/* Заголовок — по-человечески, переменная под ним мелким.
-                    Раньше колонки назывались «%name» и «%email»: для
-                    человека это не название столбца, а шифр.
-                    Переменную всё равно показываем — она нужна, когда
-                    человек вписывает её в макет. */}
-                {columns.map((col) => (
-                  <th
-                    key={col.id}
-                    className="group border-r border-b border-[var(--line)] px-3 py-2 text-left text-sm font-medium"
-                  >
-                    <span className="inline-flex items-center gap-1.5">
-                      {columnTitle(col)}
-                      <IconButton
-                        size="sm"
-                        label={`Удалить колонку ${columnTitle(col)}`}
-                        onClick={() => m.deleteColumn.mutate(col.id)}
-                        className="size-6 opacity-0 group-hover:opacity-100 hover:text-[var(--danger)] pointer-coarse:size-10 pointer-coarse:opacity-100"
-                      >
-                        <X size={12} />
-                      </IconButton>
-                    </span>
-                    <span className="block font-mono text-xs font-normal text-[var(--text-muted)]">
-                      %{col.name}
-                    </span>
-                  </th>
-                ))}
-                <th className="w-10 border-b border-[var(--line)]" />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, index) => (
-                <tr key={row.id} className="group hover:bg-[var(--surface-sunken)]/60">
-                  <td className="border-r border-b border-[var(--line)] px-3 py-1 text-center">
+          ) : (
+            <table className="w-full border-collapse text-sm">
+              <thead className="sticky top-0 z-10 bg-[var(--surface-sunken)]">
+                <tr>
+                  <th className="w-10 border-r border-b border-[var(--line)] px-3 py-2">
                     <Checkbox
-                      checked={row.checked}
-                      onChange={() => m.updateRow.mutate({ rowId: row.id, checked: !row.checked })}
-                      aria-label="Включить в генерацию"
+                      checked={allChecked}
+                      onChange={() => m.setChecked.mutate({ checked: !allChecked })}
+                      aria-label="Отметить все"
                     />
-                  </td>
-                  <td className="tabular border-r border-b border-[var(--line)] px-2 py-1 text-right text-xs text-[var(--text-muted)]">
-                    {index + 1}
-                  </td>
+                  </th>
+                  {/* Номер строки — как в любой таблице: по нему называют место
+                      ошибки («в двенадцатой опечатка»), и без него сверять
+                      список с бумажным протоколом нечем. */}
+                  <th className="w-12 border-r border-b border-[var(--line)] px-2 py-2 text-right text-xs font-normal text-[var(--text-muted)]">
+                    №
+                  </th>
+                  {/* Итог сразу за номером: при широкой таблице колонки данных
+                      уезжают вбок, а судьба строки должна оставаться на виду. */}
+                  <th className="border-r border-b border-[var(--line)] px-3 py-2 text-left text-sm font-medium whitespace-nowrap">
+                    Итог
+                  </th>
+                  {/* Заголовок — по-человечески, переменная под ним мелким.
+                      Раньше колонки назывались «%name» и «%email»: для
+                      человека это не название столбца, а шифр.
+                      Переменную всё равно показываем — она нужна, когда
+                      человек вписывает её в макет. */}
                   {columns.map((col) => (
-                    <td key={col.id} className="border-r border-b border-[var(--line)] p-0">
-                      <input
-                        defaultValue={row.data[col.name] ?? ''}
-                        onBlur={(e) => {
-                          const value = e.target.value;
-                          if (value !== (row.data[col.name] ?? '')) {
-                            trackSave(
-                              m.updateRow.mutateAsync({
-                                rowId: row.id,
-                                data: { [col.name]: value },
-                              }),
-                            );
-                          }
-                        }}
-                        className="w-full bg-transparent px-3 py-1.5 outline-none focus:bg-[var(--surface)] focus:ring-2 focus:ring-[var(--focus)]"
+                    <th
+                      key={col.id}
+                      data-col={col.id}
+                      // Тянуть можно за весь заголовок, как в Airtable и Notion;
+                      // ручка слева лишь подсказывает, что это возможно.
+                      onPointerDown={(e) => {
+                        if ((e.target as HTMLElement).closest('button')) return;
+                        startColumnDrag(e, col.id);
+                      }}
+                      // В одну строку: в узкой колонке «E-mail» рвался по дефису,
+                      // а «Фамилия, имя, отчество» раздувал шапку на три строки.
+                      className={`group relative cursor-grab touch-none border-r border-b border-[var(--line)] px-3 py-2 text-left text-sm font-medium whitespace-nowrap select-none active:cursor-grabbing ${
+                        dragCol === col.id ? 'opacity-40' : ''
+                      }`}
+                    >
+                      {/* Линия вставки у левого края целевой колонки. */}
+                      {dragCol && overCol === col.id && overCol !== dragCol && (
+                        <span className="pointer-events-none absolute inset-y-1 -left-px w-0.5 rounded bg-[var(--accent)]" />
+                      )}
+                      <span className="inline-flex items-center gap-1.5">
+                        {/* Ручка: колонки переставляются перетаскиванием, мышью
+                            и пальцем — указательные события работают и там, и там. */}
+                        <span
+                          aria-hidden
+                          className="-ml-1 text-[var(--text-muted)] opacity-0 transition-opacity group-hover:opacity-100"
+                        >
+                          <GripVertical size={13} />
+                        </span>
+                        {columnTitle(col)}
+                        <IconButton
+                          size="sm"
+                          label={`Удалить колонку ${columnTitle(col)}`}
+                          onClick={() => m.deleteColumn.mutate(col.id)}
+                          className="size-6 opacity-0 group-hover:opacity-100 hover:text-[var(--danger)]"
+                        >
+                          <X size={12} />
+                        </IconButton>
+                      </span>
+                      <span className="block font-mono text-xs font-normal text-[var(--text-muted)]">
+                        %{col.name}
+                      </span>
+                    </th>
+                  ))}
+                  <th className="w-10 border-b border-[var(--line)]" />
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, index) => (
+                  <tr key={row.id} className="group hover:bg-[var(--surface-sunken)]/60">
+                    <td className="border-r border-b border-[var(--line)] px-3 py-1 text-center">
+                      <Checkbox
+                        checked={row.checked}
+                        onChange={() => m.updateRow.mutate({ rowId: row.id, checked: !row.checked })}
+                        aria-label="Включить в генерацию"
                       />
                     </td>
-                  ))}
-                  <td className="border-b border-[var(--line)] px-2 text-center">
-                    <IconButton
-                      size="sm"
-                      label="Удалить строку"
-                      onClick={() => m.deleteRow.mutate(row.id)}
-                      className="size-7 opacity-0 group-hover:opacity-100 hover:text-[var(--danger)] pointer-coarse:size-10 pointer-coarse:opacity-100"
-                    >
-                      <Trash2 size={14} />
-                    </IconButton>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+                    <td className="tabular border-r border-b border-[var(--line)] px-2 py-1 text-right text-xs text-[var(--text-muted)]">
+                      {index + 1}
+                    </td>
+                    <td className="border-r border-b border-[var(--line)] px-3 py-1">
+                      <RowOutcomeChip row={row} />
+                    </td>
+                    {columns.map((col) => (
+                      <td key={col.id} className="border-r border-b border-[var(--line)] p-0">
+                        <input
+                          defaultValue={row.data[col.name] ?? ''}
+                          size={widths[col.name]}
+                          // Нижний предел: когда шапки не влезают и таблица уезжает
+                          // вбок, колонка иначе сжималась до ширины заголовка
+                          // и почта превращалась в «a@exam…».
+                          style={{ minWidth: `calc(${Math.min(widths[col.name], 12)}ch + 1.5rem)` }}
+                          // Фамилии и названия организаций проверка орфографии
+                          // подчёркивает сплошь — красное в каждой строке ничего не значит.
+                          spellCheck={false}
+                          onBlur={(e) => {
+                            // Иначе ячейка так и остаётся прокрученной к концу
+                            // и показывает «ФУ, г. Екатеринбург» без начала.
+                            e.currentTarget.scrollLeft = 0;
+                            const value = e.target.value;
+                            if (value !== (row.data[col.name] ?? '')) {
+                              trackSave(
+                                m.updateRow.mutateAsync({
+                                  rowId: row.id,
+                                  data: { [col.name]: value },
+                                }),
+                              );
+                            }
+                          }}
+                          // Рамка внутри ячейки: снаружи она легла бы на линии
+                          // соседних клеток, а верх ушёл бы под прилипшую шапку.
+                          className="w-full truncate bg-transparent px-3 py-1.5 outline-none focus:bg-[var(--surface)] focus:ring-2 focus:ring-[var(--focus)] focus:ring-inset"
+                        />
+                      </td>
+                    ))}
+                    <td className="border-b border-[var(--line)] px-2 text-center">
+                      <IconButton
+                        size="sm"
+                        label="Удалить строку"
+                        onClick={() => m.deleteRow.mutate(row.id)}
+                        className="size-7 opacity-0 group-hover:opacity-100 hover:text-[var(--danger)]"
+                      >
+                        <Trash2 size={14} />
+                      </IconButton>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+        {fieldsOpen && <FieldsSidebar documentId={documentId} />}
       </div>
 
       {parsed && (
@@ -800,50 +950,44 @@ export function RecipientsTable({
       {addingColumn && (
         <Dialog
           title="Добавить колонку"
-          onClose={() => setAddingColumn(false)}
+          onClose={closeAddColumn}
           footer={
             <>
               <Button
                 variant="primary"
                 disabled={!newColumn.trim() || m.addColumn.isPending}
-                onClick={() =>
-                  m.addColumn.mutate(newColumn.trim(), {
-                    onSuccess: () => {
-                      setNewColumn('');
-                      setAddingColumn(false);
-                    },
-                  })
-                }
+                onClick={submitColumn}
               >
                 {m.addColumn.isPending ? 'Добавляем…' : 'Добавить'}
               </Button>
-              <Button variant="ghost" onClick={() => setAddingColumn(false)}>
+              <Button variant="ghost" onClick={closeAddColumn}>
                 Отмена
               </Button>
             </>
           }
         >
-          <Label>Имя переменной</Label>
-          <Input
-            autoFocus
-            value={newColumn}
-            onChange={(e) => setNewColumn(e.target.value)}
-            placeholder="team"
-            className="font-mono"
-            onKeyDown={(e) => {
-              if (e.key !== 'Enter' || !newColumn.trim()) return;
-              m.addColumn.mutate(newColumn.trim(), {
-                onSuccess: () => {
-                  setNewColumn('');
-                  setAddingColumn(false);
-                },
-              });
-            }}
-          />
-          <p className="mt-2 text-sm text-[var(--text-muted)]">
-            Так колонка будет называться в макете: напишете на листе %{newColumn.trim() || 'team'} —
-            подставится её значение.
-          </p>
+          <Field
+            label="Имя переменной"
+            error={columnError}
+            help={
+              <>
+                Так колонка будет называться в макете: напишете на листе %
+                {newColumn.trim() || 'team'} — подставится её значение.
+              </>
+            }
+          >
+            <Input
+              autoFocus
+              value={newColumn}
+              onChange={(e) => {
+                setNewColumn(e.target.value);
+                setColumnError(null);
+              }}
+              placeholder="team"
+              className={cn('font-mono', columnError && 'ring-[var(--danger)] focus:ring-[var(--danger)]')}
+              onKeyDown={(e) => e.key === 'Enter' && submitColumn()}
+            />
+          </Field>
         </Dialog>
       )}
 
@@ -876,4 +1020,18 @@ function columnTitle(column: RecipientColumn): string {
     email: 'Адрес почты',
   };
   return column.title?.trim() || known[column.name] || column.name;
+}
+
+/**
+ * Желаемая ширина колонки в знаках — по самому длинному значению.
+ *
+ * Поле ввода без размера держит одну ширину на всех, около двадцати знаков:
+ * фамилии обрезались на полуслове, а колонки с двузначными номерами стояли
+ * такими же широкими. Размер лишь просит место — если всем не хватает,
+ * таблица делит ширину пропорционально этим просьбам.
+ */
+function fitChars(rows: RecipientRow[], name: string): number {
+  let longest = 0;
+  for (const row of rows) longest = Math.max(longest, (row.data[name] ?? '').length);
+  return Math.min(Math.max(longest + 1, 4), 36);
 }

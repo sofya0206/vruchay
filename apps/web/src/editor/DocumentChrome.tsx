@@ -1,9 +1,11 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCheck, ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react';
+import { FilePlus2, FileText, LayoutTemplate, LoaderCircle, MoreHorizontal } from 'lucide-react';
 import { MATERIAL_TABS, materialTabPath, workspacePath, type MaterialTab } from '../mailing/workspace-tabs';
 import { IconButton } from '../ui/IconButton';
 import { Menu, MenuDivider, MenuItem } from '../ui/Menu';
+import { useTooltip } from '../ui/Tooltip';
+import { DocumentTitle } from './DocumentTitle';
 
 /** Пункт меню «…» либо разделитель между смысловыми группами. */
 export type MenuEntry =
@@ -27,8 +29,10 @@ export type MenuEntry =
  * и подлинность — не разные разделы, а один материал с разных сторон:
  * при переходе меняется только содержимое под рамкой.
  *
- * Путь «Документы › Название» — и заголовок, и дорога назад: подписанная,
- * а не безымянная стрелка по истории браузера.
+ * Значок библиотеки и название — и заголовок, и дорога назад: значок ведёт
+ * в «Документы» (у шаблона — в «Шаблоны»), а не безымянной стрелкой
+ * по истории браузера. Словом путь не пишем: «Документы ›» перед каждым
+ * названием только оттесняло само название.
  *
  * Строки меню «Файл / Правка / Вставка» больше нет: половина её пунктов
  * стояла ещё раз на панели значков, а вторая половина повторяла ленту
@@ -42,9 +46,15 @@ export function DocumentChrome({
   tab,
   toolbar,
   action,
+  isTemplate = false,
 }: {
   documentId: string;
   title: string;
+  /**
+   * Шаблон не выпускается: главное действие у него — новый документ
+   * по нему, на том же месте, где у документа «Выпустить».
+   */
+  isTemplate?: boolean;
   /** Пункты меню «…». */
   actions: MenuEntry[];
   /** Какая сторона материала открыта — она подсвечена в ленте вкладок. */
@@ -62,39 +72,19 @@ export function DocumentChrome({
 }) {
   return (
     <header className="shrink-0 border-b border-[var(--line)] bg-[var(--surface)]">
-      {/* На телефоне строка переносится: путь и действия сверху, лента
-          вкладок — второй строкой во всю ширину. В одну строку лента
-          сжималась до нуля, и из листа нельзя было попасть в таблицу. */}
-      <div className="flex flex-wrap items-center gap-1 border-b border-[var(--line)] px-3 max-md:pt-1 md:h-12 md:flex-nowrap">
-        <h1 className="flex min-w-0 items-center gap-1 text-sm font-medium max-md:flex-1 md:max-w-[32ch] md:shrink">
-          {/* На телефоне вместо слова — стрелка под палец: слово «Документы»
-              съедало половину строки у названия. */}
-          <Link
-            to="/documents"
-            aria-label="К документам"
-            className="-ml-2 grid size-11 shrink-0 place-items-center rounded-lg text-[var(--text-muted)] active:bg-[var(--surface-sunken)] md:hidden"
-          >
-            <ChevronLeft size={22} />
-          </Link>
-          <Link
-            to="/documents"
-            className="shrink-0 text-[var(--text-muted)] transition-colors hover:text-[var(--text)] hover:underline max-md:hidden"
-          >
-            Документы
-          </Link>
-          <ChevronRight size={14} aria-hidden className="shrink-0 text-[var(--text-muted)] max-md:hidden" />
-          <span className="truncate max-md:text-base" title={title}>
-            {title}
-          </span>
+      <div className="flex h-12 items-center gap-1 border-b border-[var(--line)] px-3">
+        <h1 className="flex min-w-0 max-w-[32ch] shrink items-center gap-1 text-sm font-medium">
+          <LibraryLink isTemplate={isTemplate} />
+          <DocumentTitle documentId={documentId} title={title} />
         </h1>
 
-        <span aria-hidden className="mx-2 h-5 w-px shrink-0 bg-[var(--line)] max-md:hidden" />
+        <span aria-hidden className="mx-2 h-5 w-px shrink-0 bg-[var(--line)]" />
 
         {/* Лента прокручивается внутри себя: страница вбок не едет даже
             тогда, когда шесть вкладок в ширину не помещаются. */}
         <nav
           aria-label="Стороны материала"
-          className="flex min-w-0 flex-1 items-stretch gap-0.5 self-stretch overflow-x-auto max-md:order-last max-md:h-11 max-md:basis-full"
+          className="flex min-w-0 flex-1 items-stretch gap-0.5 self-stretch overflow-x-auto"
         >
           {MATERIAL_TABS.map((item) => (
             <SpineTab
@@ -108,19 +98,18 @@ export function DocumentChrome({
         </nav>
 
         <div className="flex shrink-0 items-center gap-1 pl-2">
-          {action ?? (
+          {isTemplate ? (
             <Link
-              to={workspacePath(documentId)}
-              aria-label="Выпустить: отметить получателей и выпустить документы"
-              className="inline-flex h-11 items-center gap-2 rounded-lg bg-[var(--accent)] px-3 text-sm font-medium text-[var(--accent-contrast)] transition-colors hover:bg-[var(--accent-hover)] md:h-9"
+              to={`/documents?new=1&template=${documentId}`}
+              className="inline-flex h-9 items-center gap-2 rounded-lg bg-[var(--accent)] px-3 text-sm font-medium text-[var(--accent-contrast)] transition-colors hover:bg-[var(--accent-hover)]"
             >
-              <CheckCheck size={15} />
-              Выпустить
+              <FilePlus2 size={15} />
+              Документ по шаблону
             </Link>
-          )}
+          ) : action ?? <ReleaseLink to={workspacePath(documentId)} />}
           <Menu
             trigger={({ open, toggle }) => (
-              <IconButton label="Ещё действия" aria-expanded={open} onClick={toggle} size="sm" className="size-11 md:size-9">
+              <IconButton label="Ещё действия" aria-expanded={open} onClick={toggle} size="sm" className="size-9">
                 <MoreHorizontal size={18} />
               </IconButton>
             )}
@@ -138,8 +127,7 @@ export function DocumentChrome({
                 >
                   <span className="flex-1 whitespace-nowrap">{entry.label}</span>
                   {entry.shortcut && (
-                    // Горячие клавиши на сенсорном экране ни к чему — клавиатуры нет.
-                    <span className="shrink-0 text-xs text-[var(--text-muted)] pointer-coarse:hidden">{entry.shortcut}</span>
+                    <span className="shrink-0 text-xs text-[var(--text-muted)]">{entry.shortcut}</span>
                   )}
                 </MenuItem>
               ),
@@ -148,17 +136,83 @@ export function DocumentChrome({
         </div>
       </div>
 
-      {/* На телефоне панель в одну строку с прокруткой, а не в три строки
-          переносами: иначе она съедала треть экрана у листа. */}
       {toolbar && (
-        <div
-          className="flex items-center gap-1 px-2 py-1 max-md:overflow-x-auto md:flex-wrap"
-          role="toolbar"
-        >
+        <div className="flex flex-wrap items-center gap-1 px-2 py-1" role="toolbar">
           {toolbar}
         </div>
       )}
     </header>
+  );
+}
+
+/*
+ * «Выпуск» — главное действие материала, одной формы на всех вкладках.
+ * Нажатие чуть поджимает кнопку: без отклика она казалась нарисованной.
+ */
+const releaseClass =
+  'inline-flex h-9 items-center gap-2 rounded-lg bg-[var(--accent-button)] px-3.5 text-sm font-medium text-[var(--accent-contrast)] transition-[background-color,scale] duration-150 hover:bg-[var(--accent-button-hover)] active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100';
+
+/**
+ * Кнопка выпуска на списке получателей.
+ *
+ * Число отмеченных — плашкой внутри, а не хвостом слова: «Выпустить 12»
+ * читалось как одна фраза, а счётчик должен читаться счётчиком.
+ */
+export function ReleaseButton({
+  count,
+  running,
+  disabled,
+  onClick,
+}: {
+  count: number;
+  running: boolean;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button type="button" className={releaseClass} disabled={disabled} onClick={onClick}>
+      {running && <LoaderCircle size={15} className="animate-spin" />}
+      {running ? 'Выпускаем' : 'Выпуск'}
+      {!running && count > 0 && (
+        <span className="tabular -mr-1 grid h-5 min-w-5 place-items-center rounded-md bg-[var(--accent-contrast)]/20 px-1.5 text-xs leading-none">
+          {count}
+        </span>
+      )}
+    </button>
+  );
+}
+
+/** На остальных вкладках выпуск на том же месте, но ведёт к списку. */
+function ReleaseLink({ to }: { to: string }) {
+  const { triggerProps, tooltip } = useTooltip('Отметить получателей и выпустить');
+  return (
+    <Link to={to} className={releaseClass} {...triggerProps}>
+      Выпуск
+      {tooltip}
+    </Link>
+  );
+}
+
+/**
+ * Дорога в библиотеку значком перед названием.
+ *
+ * Ссылка, а не кнопка: библиотеку открывают и в соседней вкладке браузера.
+ * Подпись — в подсказке и для скринридера, на экране только значок.
+ */
+function LibraryLink({ isTemplate }: { isTemplate: boolean }) {
+  const label = isTemplate ? 'Все шаблоны' : 'Все документы';
+  const { triggerProps, tooltip } = useTooltip(label);
+  const Icon = isTemplate ? LayoutTemplate : FileText;
+  return (
+    <Link
+      to={isTemplate ? '/documents/templates' : '/documents'}
+      aria-label={label}
+      className="grid size-8 shrink-0 place-items-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
+      {...triggerProps}
+    >
+      <Icon size={17} strokeWidth={1.75} />
+      {tooltip}
+    </Link>
   );
 }
 

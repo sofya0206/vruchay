@@ -96,7 +96,10 @@ export function VerifyPanel({ doc }: { doc: DocumentDetail }) {
     (mode === 'date' && /^\d{4}-\d{2}-\d{2}$/.test(date));
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8 px-6 py-6">
+    /* Слева, как остальные вкладки материала: центрированная колонка
+       уезжала вбок при каждом переходе. Ширина абзацев ограничена
+       внутри — `max-w-2xl` у текста и `max-w-md` у формы. */
+    <div className="max-w-3xl space-y-8 p-6">
       <section>
         <h2 className="flex items-center gap-2 text-lg font-medium">
           <CalendarClock size={18} className="text-[var(--accent)]" />

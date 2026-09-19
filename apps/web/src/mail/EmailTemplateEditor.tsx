@@ -1,12 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bold, Check, Italic, Paperclip } from 'lucide-react';
 import { api } from '../api/client';
 import { Button } from '../ui/Button';
 import { Input, Label } from '../ui/Field';
-import { parseBody, toHtml, toText, wrapSelection, type Run } from './email-body';
+import { DEFAULT_LETTER } from './letter-defaults';
+import { insertToken, parseBody, toHtml, toText, wrapSelection, type Run } from './email-body';
 import { Checkbox } from '../ui/Checkbox';
 import { useTooltip } from '../ui/Tooltip';
+import type { FieldTarget } from '../editor/FieldsSidebar';
+import { FieldsToggle } from '../editor/FieldsToggle';
 
 interface EmailTemplate {
   id: string;
@@ -15,16 +18,6 @@ interface EmailTemplate {
   attachGeneratedFile: boolean;
 }
 
-/** Что придёт участнику, если письмо не настраивали. */
-const DEFAULT_SUBJECT = 'Ваш документ, %name';
-const DEFAULT_BODY = [
-  'Здравствуйте, %name!',
-  '',
-  'Поздравляем! Ваш документ во вложении к этому письму.',
-  '',
-  'С уважением,',
-  'оргкомитет',
-].join('\n');
 
 /**
  * Письмо, которое получит участник вместе с документом.
@@ -41,13 +34,23 @@ const DEFAULT_BODY = [
  * набор тегов, и произвольная вёрстка разъехалась бы в Outlook незаметно
  * для отправителя.
  */
-export function EmailTemplateEditor({ documentId }: { documentId: string }) {
+export function EmailTemplateEditor({
+  documentId,
+  onFieldTarget,
+}: {
+  documentId: string;
+  /** Отдать рамке материала вставку поля — для панели «Данные». */
+  onFieldTarget?: (target: FieldTarget | null) => void;
+}) {
   const qc = useQueryClient();
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [attach, setAttach] = useState(true);
   const [saved, setSaved] = useState(false);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
+  /** Где стоял курсор последним — в теме или в тексте. */
+  const lastField = useRef<'subject' | 'body'>('body');
+  const subjectRef = useRef<HTMLInputElement | null>(null);
 
   /**
    * Начертание для выделенного куска.
@@ -78,8 +81,8 @@ export function EmailTemplateEditor({ documentId }: { documentId: string }) {
 
   useEffect(() => {
     if (template.data === undefined) return;
-    setSubject(template.data?.subject ?? DEFAULT_SUBJECT);
-    setBody(template.data ? toText(template.data.bodyHtml) : DEFAULT_BODY);
+    setSubject(template.data?.subject ?? DEFAULT_LETTER.subject);
+    setBody(template.data ? toText(template.data.bodyHtml) : DEFAULT_LETTER.body);
     setAttach(template.data?.attachGeneratedFile ?? true);
   }, [template.data]);
 
@@ -99,25 +102,51 @@ export function EmailTemplateEditor({ documentId }: { documentId: string }) {
 
   const variables = columns.data?.columns.map((c) => c.name) ?? [];
 
-  /** Переменная вставляется туда, где стоит курсор, а не в конец текста. */
-  function insert(name: string) {
-    const field = bodyRef.current;
-    const token = `%${name}`;
+  /**
+   * Переменная вставляется туда, где стоит курсор, а не в конец текста —
+   * и в то поле, где он стоял: в теме письма имя нужно не реже, чем в тексте.
+   */
+  const insert = useCallback((name: string) => {
+    const inSubject = lastField.current === 'subject';
+    const field = inSubject ? subjectRef.current : bodyRef.current;
+    const set = inSubject ? setSubject : setBody;
     if (!field) {
-      setBody((b) => b + token);
+      set((v) => insertToken(v, v.length, v.length, name).text);
       return;
     }
-    const { selectionStart: from, selectionEnd: to } = field;
-    setBody(body.slice(0, from) + token + body.slice(to));
+    const from = field.selectionStart ?? field.value.length;
+    const to = field.selectionEnd ?? from;
+    const next = insertToken(field.value, from, to, name);
+    set(next.text);
     requestAnimationFrame(() => {
       field.focus();
-      field.setSelectionRange(from + token.length, from + token.length);
+      field.setSelectionRange(next.caret, next.caret);
     });
-  }
+  }, []);
+
+  const target = useMemo<FieldTarget>(
+    () => ({
+      insert: (field) => insert(field.source),
+      columnsOnly: true,
+    }),
+    [insert],
+  );
+
+  useEffect(() => {
+    if (!onFieldTarget) return;
+    onFieldTarget(target);
+    return () => onFieldTarget(null);
+  }, [onFieldTarget, target]);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5 p-6">
-      <header>
+    /* По левому краю и без потолка на весь блок: у соседних вкладок
+       материала содержимое стоит слева, и центрированная колонка при
+       переходе к письму уезжала в сторону, а с открытой панелью полей —
+       ещё раз. Узкая колонка нужна только тексту: длинную строку темы
+       и абзац письма неудобно читать шире 3xl, остальное живёт на своей
+       ширине. */
+    <div className="space-y-5 p-6">
+      <header className="max-w-3xl">
         <h2 className="text-lg font-medium">Письмо участнику</h2>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
           Так выглядит письмо, которое придёт вместе с документом. Отправителем участник
@@ -125,16 +154,20 @@ export function EmailTemplateEditor({ documentId }: { documentId: string }) {
         </p>
       </header>
 
-      <div>
+      <div className="max-w-3xl">
         <Label>Тема письма</Label>
         <Input
           value={subject}
           onChange={(e) => setSubject(e.target.value)}
-          placeholder={DEFAULT_SUBJECT}
+          onFocus={(e) => {
+            lastField.current = 'subject';
+            subjectRef.current = e.currentTarget;
+          }}
+          placeholder={DEFAULT_LETTER.subject}
         />
       </div>
 
-      <div>
+      <div className="max-w-3xl">
         <Label>Текст письма</Label>
 
         {/* Кнопки, а не разметка руками: человек выделяет кусок и нажимает,
@@ -148,6 +181,9 @@ export function EmailTemplateEditor({ documentId }: { documentId: string }) {
           <FormatButton onClick={() => applyFormat('_')} title="Курсив">
             <Italic size={15} />
           </FormatButton>
+          {/* Поля — общей панелью справа, как на листе: вставка идёт
+              туда, где стоял курсор, в тему или в текст. */}
+          <FieldsToggle />
           <span className="ml-2 text-xs text-[var(--text-muted)]">
             Пустая строка — новый абзац. Адрес сайта сам станет ссылкой.
           </span>
@@ -155,6 +191,7 @@ export function EmailTemplateEditor({ documentId }: { documentId: string }) {
 
         <textarea
           ref={bodyRef}
+          onFocus={() => (lastField.current = 'body')}
           value={body}
           onChange={(e) => setBody(e.target.value)}
           rows={10}
@@ -163,30 +200,10 @@ export function EmailTemplateEditor({ documentId }: { documentId: string }) {
         />
       </div>
 
-      {variables.length > 0 && (
-        <div className="rounded-xl bg-[var(--surface-sunken)] p-3">
-          <p className="text-xs text-[var(--text-muted)]">
-            Подставить данные получателя — нажмите, чтобы добавить в текст:
-          </p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {variables.map((name) => (
-              <button
-                key={name}
-                type="button"
-                onClick={() => insert(name)}
-                className="rounded-lg bg-[var(--surface)] px-2 py-1 font-mono text-xs ring-1 ring-[var(--line)] hover:ring-[var(--accent)]"
-              >
-                %{name}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Убрано под спойлер: нужно редко — когда документ вручают на бумаге,
           а письмо служит уведомлением. На виду эта галочка только пугала:
           непонятно, зачем снимать то, ради чего всё и затевалось. */}
-      <details className="rounded-xl bg-[var(--surface-sunken)] px-4 py-3">
+      <details className="max-w-3xl rounded-xl bg-[var(--surface-sunken)] px-4 py-3">
         <summary className="cursor-pointer text-sm text-[var(--text-muted)]">
           Дополнительно
         </summary>
@@ -266,15 +283,15 @@ function Preview({
   const paragraphs = parseBody(fill(body));
 
   return (
-    <div className="rounded-xl bg-[var(--surface-sunken)] p-4">
+    <div className="max-w-3xl rounded-xl bg-[var(--surface-sunken)] p-4">
       <p className="text-xs text-[var(--text-muted)]">Как увидит участник</p>
       <p className="mt-2 font-medium">{fill(subject)}</p>
 
       {/* Белый фон и тёмный текст независимо от темы кабинета: письмо
           человек откроет в почте, а не здесь. */}
-      <div className="mt-2 rounded-lg bg-white px-4 py-3 text-[15px] leading-relaxed text-[#1a1a1a]">
+      <div className="mt-2 rounded-lg bg-[var(--sheet-paper)] px-4 py-3 text-[15px] leading-relaxed text-[var(--sheet-ink)]">
         {paragraphs.length === 0 ? (
-          <p className="text-sm text-neutral-400">Письмо пустое</p>
+          <p className="text-sm text-[var(--sheet-ink-muted)]">Письмо пустое</p>
         ) : (
           paragraphs.map((runs, i) => (
             <p key={i} className={i > 0 ? 'mt-3' : undefined}>

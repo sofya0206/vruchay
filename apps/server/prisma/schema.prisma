@@ -444,6 +444,21 @@ model Document {
   sourceDocument   Document?  @relation("DocumentCopies", fields: [sourceDocumentId], references: [id], onDelete: SetNull)
   copies           Document[] @relation("DocumentCopies")
 
+  /**
+   * Шаблон: макет, который организация берёт за основу новых документов.
+   *
+   * Флаг, а не отдельная модель: шаблону нужны ровно те же листы, фон,
+   * колонки и редактор, что и документу, — отдельная таблица заставила бы
+   * держать вторую копию макета и второй редактор. Документ из шаблона —
+   * копия макета и колонок, без получателей и без мероприятия (см.
+   * `DocumentsService.copyFrom`), поэтому шаблон никогда не держит чужих
+   * персональных данных и не выпускается сам.
+   *
+   * Шаблоны живут отдельным списком: в «Моих документах», рассылке,
+   * Тильде и сводке их нет.
+   */
+  isTemplate Boolean @default(false) @map("is_template")
+
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
   deletedAt      DateTime? @map("deleted_at")
@@ -470,6 +485,7 @@ model Document {
   @@index([orgId, deletedAt])
   // Библиотека фильтруется по папке внутри организации — это её главный запрос.
   @@index([orgId, folderId])
+  @@index([orgId, isTemplate, deletedAt])
   @@map("documents")
 }
 
@@ -945,6 +961,14 @@ model EmailTemplate {
    */
   advertiserName String? @map("advertiser_name")
 
+  /**
+   * Название рассылки без документа — приглашения, объявления, напоминания.
+   *
+   * Заполнено только у шаблонов без материала: у шаблона материала
+   * название и так есть, это название материала. По нему рассылка
+   * узнаётся в журнале писем и в сводке.
+   */
+  name     String?
   subject  String
   bodyHtml String  @map("body_html")
   /** Прикладывать ли к письму сгенерированный для этой строки файл. */
@@ -1036,7 +1060,11 @@ model Email {
   tildaRequests TildaRequest[]
 
   @@index([orgId, status])
+  /// Сводка по письмам считает организацию за отрезок времени.
+  @@index([orgId, queuedAt])
   @@index([documentId])
+  /// Рассылка без документа ищет свои письма по шаблону.
+  @@index([templateId])
   /// Карточка документа в реестре ищет письма ровно так: по выданному файлу.
   @@index([fileId])
   /// Ночная уборка выбирает письма старше срока хранения по всем организациям.

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import {
   applyFitStepToStyle,
@@ -30,6 +30,12 @@ export interface SheetRendererProps {
   pageWidthMm: number;
   pageHeightMm: number;
   backgroundUrl?: string | null;
+  /**
+   * Ссылки на картинки блоков по `fileId` — у печати, где сессии нет.
+   * Кабинет их не передаёт: там картинка идёт по постоянному адресу,
+   * который открывается под сессией.
+   */
+  imageUrls?: Record<string, string> | null;
   /** Значения полей: колонки таблицы получателей и служебные переменные. */
   data?: Record<string, string>;
   /**
@@ -73,6 +79,7 @@ export function SheetRenderer({
   pageWidthMm,
   pageHeightMm,
   backgroundUrl,
+  imageUrls,
   data,
   unfilled = 'blank',
   fields = unfilled === 'blank' ? 'value' : 'chip',
@@ -86,6 +93,26 @@ export function SheetRenderer({
   editingId,
   renderEditing,
 }: SheetRendererProps) {
+  /*
+   * Обработчики — через ref, а блокам — одни и те же обёртки.
+   *
+   * Родитель создаёт колбэки заново на каждой перерисовке, а при
+   * перетаскивании она идёт на каждом кадре. Новый колбэк у каждого блока
+   * перерисовывал весь лист ради одного сдвинутого блока — и жест дёргался.
+   */
+  const handlers = useRef({ onSelect, onEdit, onFieldClick });
+  useLayoutEffect(() => {
+    handlers.current = { onSelect, onEdit, onFieldClick };
+  });
+  const stable = useMemo(
+    () => ({
+      onSelect: (id: string, additive: boolean) => handlers.current.onSelect?.(id, additive),
+      onEdit: (id: string) => handlers.current.onEdit?.(id),
+      onFieldClick: (elementId: string, field: ResolvedField) => handlers.current.onFieldClick?.(elementId, field),
+    }),
+    [],
+  );
+
   return (
     <div
       className="relative overflow-hidden bg-white"
@@ -113,11 +140,12 @@ export function SheetRenderer({
             knownFields={knownFields}
             fieldLabels={fieldLabels}
             verifyUrl={verifyUrl}
+            imageUrls={imageUrls}
             interactive={Boolean(onSelect)}
             selected={selectedIds?.has(el.id) ?? false}
-            onSelect={onSelect}
-            onEdit={onEdit}
-            onFieldClick={onFieldClick}
+            onSelect={onSelect && stable.onSelect}
+            onEdit={onEdit && stable.onEdit}
+            onFieldClick={onFieldClick && stable.onFieldClick}
             editing={editingId === el.id}
             renderEditing={renderEditing}
           />
@@ -134,6 +162,7 @@ interface ElementViewProps {
   knownFields?: ReadonlySet<string> | null;
   fieldLabels?: Record<string, string>;
   verifyUrl?: string | null;
+  imageUrls?: Record<string, string> | null;
   interactive: boolean;
   selected: boolean;
   onSelect?: (id: string, additive: boolean) => void;
@@ -257,10 +286,23 @@ function roundPt(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-function ElementView(props: ElementViewProps) {
-  if (props.element.type === 'text') return <TextElementView {...props} element={props.element} />;
-  return <PlainElementView {...props} />;
-}
+/**
+ * Блок перерисовывается, только когда поменялся он сам или то, что он
+ * показывает. Правящийся блок — всегда: его рисует живой редактор, и тот
+ * зависит от состояния родителя, которого в пропсах блока не видно.
+ */
+const ElementView = memo(
+  function ElementView(props: ElementViewProps) {
+    if (props.element.type === 'text') return <TextElementView {...props} element={props.element} />;
+    return <PlainElementView {...props} />;
+  },
+  (prev, next) => {
+    if (prev.editing || next.editing) return false;
+    return (Object.keys(next) as (keyof ElementViewProps)[]).every(
+      (key) => key === 'renderEditing' || prev[key] === next[key],
+    );
+  },
+);
 
 /**
  * Текстовый блок — отдельным компонентом ради подгонки: у него есть
@@ -282,14 +324,13 @@ function TextElementView({
   renderEditing,
 }: ElementViewProps & { element: TextElement }) {
   const ref = useRef<HTMLDivElement>(null);
-  const fit = useAutoFit(ref, element.props.autoFit && !editing, element.props.lineHeight, [
-    element.props,
-    element.w,
-    element.h,
-    data,
-    unfilled,
-    fields,
-  ]);
+  const fit = useAutoFit(
+    ref,
+    element.props.autoFit,
+    element.props.lineHeight,
+    [element.props, element.w, element.h, data, unfilled, fields],
+    Boolean(editing),
+  );
 
   return (
     <div
@@ -351,6 +392,7 @@ function PlainElementView({
   data,
   unfilled,
   verifyUrl,
+  imageUrls,
   interactive,
   selected,
   onSelect,
@@ -383,8 +425,9 @@ function PlainElementView({
     return (
       <div {...common} style={box}>
         <img
-          src={`/api/documents/files/${element.props.fileId}/raw`}
+          src={imageUrls?.[element.props.fileId] ?? `/api/documents/files/${element.props.fileId}/raw`}
           alt=""
+          data-sheet-image
           draggable={false}
           className="h-full w-full object-contain select-none"
         />

@@ -28,11 +28,28 @@ export const parseQuerySchema = z.object({
 });
 export type ParseQueryDto = z.infer<typeof parseQuerySchema>;
 
-export const addColumnSchema = z.object({ name: columnName });
+/**
+ * Новая колонка: либо имя переменной, либо название по-человечески.
+ *
+ * Панель полей спрашивает название — «Команда», «Год рождения», — и имя
+ * переменной подбирает сервер тем же подбором, что и импорт файла.
+ * Латинское имя руками по-прежнему принимается: его присылает таблица
+ * получателей.
+ */
+export const addColumnSchema = z
+  .object({
+    name: columnName.optional(),
+    title: z.string().trim().min(1, 'Введите название колонки').max(120).optional(),
+  })
+  .refine((v) => v.name !== undefined || v.title !== undefined, 'Введите название колонки');
 export type AddColumnDto = z.infer<typeof addColumnSchema>;
 
 export const renameColumnSchema = z.object({ name: columnName });
 export type RenameColumnDto = z.infer<typeof renameColumnSchema>;
+
+/** Новый порядок колонок — все идентификаторы документа, слева направо. */
+export const reorderColumnsSchema = z.object({ order: z.array(z.string().uuid()).min(1).max(200) });
+export type ReorderColumnsDto = z.infer<typeof reorderColumnsSchema>;
 
 export const addRowSchema = z.object({ data: rowData.default({}) });
 export type AddRowDto = z.infer<typeof addRowSchema>;

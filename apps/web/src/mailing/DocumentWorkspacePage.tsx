@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
@@ -9,6 +10,8 @@ import { ValidationScreen } from '../validation/ValidationScreen';
 import { EmailTemplateEditor } from '../mail/EmailTemplateEditor';
 import { VerifyPanel } from '../verify/VerifyPanel';
 import { DocumentChrome } from '../editor/DocumentChrome';
+import { FieldsSidebar, type FieldTarget } from '../editor/FieldsSidebar';
+import { useFieldsPanelOpen } from '../editor/fields-sidebar-store';
 import { useDocumentFileMenu } from '../editor/DocumentFileMenu';
 import { workspaceTab, type WorkspaceTab } from './workspace-tabs';
 
@@ -41,6 +44,9 @@ export function DocumentWorkspacePage() {
   });
 
   const fileMenu = useDocumentFileMenu(doc.data);
+  /** Куда вставляет панель полей: письмо отдаёт свою каретку. */
+  const [fieldTarget, setFieldTarget] = useState<FieldTarget | null>(null);
+  const fieldsOpen = useFieldsPanelOpen();
 
   /*
    * Вкладку держим в адресе, а не в состоянии.
@@ -75,21 +81,34 @@ export function DocumentWorkspacePage() {
     // на длинных страницах), поэтому опереться на неё через `h-full` больше
     // не на что.
     <div className="flex h-[calc(100dvh-var(--app-header))] min-h-0 flex-col">
-      <DocumentChrome documentId={id} title={page.title} actions={fileMenu.entries} tab={tab} />
+      <DocumentChrome
+        documentId={id}
+        title={page.title}
+        isTemplate={page.isTemplate}
+        actions={fileMenu.entries}
+        tab={tab}
+      />
 
-      {tab === 'rules' ? (
-        <RulesTab documentId={id} ruleSetId={page.ruleSetId ?? null} />
-      ) : tab === 'check' ? (
-        <ValidationScreen documentId={id} onDone={() => open('table')} />
-      ) : tab === 'mail' ? (
-        <div className="min-h-0 flex-1 overflow-auto">
-          <EmailTemplateEditor documentId={id} />
+      <div className="flex min-h-0 flex-1">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          {tab === 'rules' ? (
+            <RulesTab documentId={id} ruleSetId={page.ruleSetId ?? null} />
+          ) : tab === 'check' ? (
+            <ValidationScreen documentId={id} onDone={() => open('table')} />
+          ) : tab === 'mail' ? (
+            <div className="min-h-0 flex-1 overflow-auto">
+              <EmailTemplateEditor documentId={id} onFieldTarget={setFieldTarget} />
+            </div>
+          ) : (
+            <div className="min-h-0 flex-1 overflow-auto">
+              <VerifyPanel doc={page} />
+            </div>
+          )}
         </div>
-      ) : (
-        <div className="min-h-0 flex-1 overflow-auto">
-          <VerifyPanel doc={page} />
-        </div>
-      )}
+        {/* Поля вставляют в письмо; на правилах, проверке и подлинности
+            вставлять некуда — там и кнопки нет. */}
+        {fieldsOpen && tab === 'mail' && <FieldsSidebar documentId={id} target={fieldTarget ?? undefined} />}
+      </div>
 
       {fileMenu.dialogs}
     </div>

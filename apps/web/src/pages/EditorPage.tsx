@@ -1,29 +1,41 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { ErrorState } from '../ui/ErrorState';
 import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   Check,
   ChevronLeft,
+  Circle,
   ChevronRight,
+  ChevronsRight,
   CopyPlus,
   Dot,
   Grid3x3,
+  ImagePlus,
+  FilePlus2,
   ImageUp,
   Layers,
   LoaderCircle,
+  Eye,
+  EyeOff,
+  Lock,
+  LockOpen,
   Magnet,
+  Minus,
   Paintbrush,
   Printer,
   Proportions,
   Redo2,
   SlidersHorizontal,
+  Square,
   SquareDashed,
   Table2,
   Trash2,
   TriangleAlert,
+  Type,
   Undo2,
   Variable,
-  X,
+  Wand2,
 } from 'lucide-react';
 import type { Editor } from '@tiptap/core';
 import {
@@ -36,18 +48,23 @@ import {
   type TextElement,
   type TextProps,
 } from '@gramota/shared';
-import { InsertMenu, InsertSheet, type InsertKind } from '../editor/InsertMenu';
-import { NudgePad, PhoneTextSheet, PhoneToolbar } from '../editor/PhoneEditor';
+
+type QrElement = Extract<SheetElement, { type: 'qr' }>;
+type LinkElement = Extract<SheetElement, { type: 'link' }>;
+import { InsertMenu, type InsertKind } from '../editor/InsertMenu';
+import { CanvasMenu } from '../editor/CanvasMenu';
 import { DocumentChrome, ToolButton, ToolDivider } from '../editor/DocumentChrome';
 import { useDocumentFileMenu } from '../editor/DocumentFileMenu';
 import { SheetTabs } from '../editor/SheetTabs';
 import type { MenuEntry } from '../editor/DocumentChrome';
 import { StatusChip } from '../ui/Field';
 import { IconButton } from '../ui/IconButton';
+import { Menu, MenuItem } from '../ui/Menu';
 import { Select } from '../ui/Select';
 import { api } from '../api/client';
 import { useOrgProfile } from '../api/org';
-import { useRecipients } from '../api/recipients';
+import { useRecipientMutations } from '../api/recipients';
+import { useDocumentFields } from '../editor/useDocumentFields';
 import type { DocumentDetail } from '../api/types';
 import type { EventValues } from '../editor/EventFields';
 import { canvasPreviewData } from '../editor/preview-data';
@@ -56,20 +73,22 @@ import { workspacePath } from '../mailing/workspace-tabs';
 import { SheetRenderer } from '../render/SheetRenderer';
 import { PropertiesPanel } from '../editor/PropertiesPanel';
 import { LayersPanel } from '../editor/LayersPanel';
-import { FIELD_DRAG_TYPE, FieldsPanel } from '../editor/FieldsPanel';
+import { FIELD_DRAG_TYPE, FieldsList } from '../editor/FieldsList';
+import { setFieldsPanelOpen, useFieldsPanelOpen } from '../editor/fields-sidebar-store';
 import { InlineTextEditor } from '../editor/rich/InlineTextEditor';
 import { useLayoutHistory } from '../editor/useLayoutHistory';
 import { FitPageDialog } from '../editor/FitPageDialog';
 import { PageSizeDialog } from '../editor/PageSizeDialog';
 import { Tooltip } from '../ui/Tooltip';
-import { usePhone } from '../ui/useMediaQuery';
+import { Button } from '../ui/Button';
 import { ResizeDialog } from '../editor/ResizeDialog';
 import { fitPageToImage, readImageSize, type PageFit } from '../editor/fit-page';
+import { insertedImageBox } from '../editor/image-box';
 import { backgroundDpi, BLEED_MM, POOR_DPI, PRINT_DPI, resizeLayout, SAFE_MARGIN_MM, type ResizeMode } from '../editor/page-fit';
 import {
   applyMatches,
+  fieldFromColumn,
   fieldLabels,
-  fieldRegistry,
   knownFieldKeys,
   proposeMatches,
   type FieldInfo,
@@ -83,6 +102,7 @@ import {
   pxToMm,
   resizeBox,
   roundBox,
+  squareBox,
   type Box,
   type ResizeHandle,
 } from '../editor/geometry';
@@ -112,17 +132,21 @@ import {
 
 const AUTOSAVE_DELAY_MS = 1500;
 const HANDLES: ResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
-/*
- * На телефоне — без верхней и нижней середины. Строка текста на листе,
- * вписанном в ширину экрана, высотой пикселей 25, и ручки «n» и «s» с зоной
- * под палец накрыли бы её целиком: тянешь блок — хватаешь ручку.
- */
-const PHONE_HANDLES: ResizeHandle[] = ['nw', 'ne', 'e', 'se', 'sw', 'w'];
-/** Сколько палец может дрогнуть, прежде чем касание станет перетаскиванием. */
-const TOUCH_SLOP_PX = 8;
 const CORNERS: ResizeHandle[] = ['nw', 'ne', 'se', 'sw'];
 /** Шаг сетки в мм — и шаг прилипания к ней, когда сетка включена. */
 const GRID_MM = 5;
+/** С какого расстояния на экране блок прилипает к направляющей. */
+const SNAP_PX = 6;
+/**
+ * Короче этого блок на экране считается тесным: ручки уходят за рамку,
+ * иначе они закрывали бы его и вместо сдвига получалось растягивание.
+ */
+const TIGHT_PX = 40;
+
+/** Размер листа в мм — или ничего, пока документ не загружен. */
+function pageBoxOf(doc: { pageWidthMm: number; pageHeightMm: number } | undefined) {
+  return doc ? { w: doc.pageWidthMm, h: doc.pageHeightMm } : null;
+}
 /** Сдвиг стрелками: пункт и десять пунктов, как просит бриф, — в миллиметрах. */
 const NUDGE_MM = 25.4 / 72;
 
@@ -131,21 +155,21 @@ interface GestureBase {
   startY: number;
   /** Было ли реальное перемещение: от этого зависит и история, и сохранение. */
   moved: boolean;
-  /** Жест пальцем: до сдвига дальше TOUCH_SLOP_PX он ещё касание, а не перетаскивание. */
-  touch?: boolean;
 }
 type Gesture =
-  /** `tapEdit` — касание выбранного текста без сдвига открывает его правку. */
-  | (GestureBase & { kind: 'move'; boxes: Record<string, Box>; tapEdit?: string })
-  /** Холст пальцем. `tapClear` — касание пустого места без сдвига снимает выбор. */
-  | (GestureBase & { kind: 'pan'; left: number; top: number; tapClear: boolean })
-  | (GestureBase & { kind: 'resize'; id: string; handle: ResizeHandle; box: Box })
+  /** `lines` — направляющие: считаются один раз на жест, остальные блоки стоят на месте. */
+  | (GestureBase & { kind: 'move'; boxes: Record<string, Box>; lines?: SnapLine[] })
+  /** `keepRatio` — угол тянет с сохранением пропорций: у картинки всегда, у прочих с Shift. */
+  | (GestureBase & { kind: 'resize'; id: string; handle: ResizeHandle; box: Box; keepRatio: boolean; square: boolean })
   | (GestureBase & { kind: 'scale'; handle: ResizeHandle; frame: Rect; boxes: Record<string, Box>; sizes: Record<string, number> })
   | (GestureBase & { kind: 'rotate'; id: string; center: { x: number; y: number } })
   | (GestureBase & { kind: 'marquee'; additive: boolean; base: ReadonlySet<string> });
 
 /** Открытая панель справа. `null` — панели нет, лист занимает весь экран. */
 type Panel = 'props' | 'layers' | 'fields';
+
+/** С этой ширины панель справа стоит рядом с листом, а не поверх него. */
+const WIDE_EDITOR = '(min-width: 768px)';
 
 /**
  * Страница редактирования материала.
@@ -169,6 +193,13 @@ export function EditorPage() {
   const navigate = useNavigate();
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
   const [editingId, setEditingId] = useState<string | null>(null);
+  /**
+   * Листы, на которых выбрали «Собрать здесь»: плитки выбора пути там
+   * больше не нужны, лист чистый и ждёт работы.
+   */
+  const [buildHere, setBuildHere] = useState<ReadonlySet<string>>(() => new Set());
+  /** Настройки какого поля открыть при входе в правку — по правой кнопке. */
+  const [openField, setOpenField] = useState<number | null>(null);
   const [zoom, setZoom] = useState(1);
   const [saved, setSaved] = useState<'saved' | 'saving' | 'dirty' | 'error'>('saved');
   const [viewMode, setViewMode] = useState<'placeholders' | 'data'>('placeholders');
@@ -178,14 +209,26 @@ export function EditorPage() {
   const [guides, setGuides] = useState<SnapLine[]>([]);
   const [marquee, setMarquee] = useState<Rect | null>(null);
   /*
-   * Панель справа закрыта, пока не за чем следить.
-   *
-   * На пустом холсте она показывала «Ничего не выбрано» и отъедала треть
-   * ширины у листа — того единственного, ради чего сюда приходят. Открывается
-   * сама, как только выбран блок, и значком на панели — когда нужны поля
-   * или слои.
+   * Панель справа открыта с самого начала, как в Figma и Pitch: свойства,
+   * данные и слои — её вкладки, и других кнопок для них нет. Свернуть её
+   * можно крестиком; свёрнутая оставляет полоску значков у края, и любой
+   * из них раскрывает панель сразу на нужной вкладке.
    */
-  const [panel, setPanel] = useState<Panel | null>(null);
+  // На узком экране — свёрнута: там она ложится поверх листа и закрыла бы его.
+  const [otherPanel, setOtherPanel] = useState<Exclude<Panel, 'fields'> | null>(() =>
+    window.matchMedia(WIDE_EDITOR).matches ? 'props' : null,
+  );
+  /*
+   * Поля — общая панель всего материала, а не только листа: открытая здесь,
+   * она остаётся открытой в письме и в таблице, поэтому живёт не в этом
+   * компоненте, а в `fields-sidebar-store`. Свойства и слои — свои.
+   */
+  const fieldsOpen = useFieldsPanelOpen();
+  const panel: Panel | null = fieldsOpen ? 'fields' : otherPanel;
+  const setPanel = (next: Panel | null) => {
+    setFieldsPanelOpen(next === 'fields');
+    if (next !== 'fields') setOtherPanel(next);
+  };
   const [showSafeArea, setShowSafeArea] = useState(false);
   /** Смена размера листа, ожидающая ответа «что делать с блоками». */
   const [resizeTo, setResizeTo] = useState<{ widthMm: number; heightMm: number } | null>(null);
@@ -217,22 +260,13 @@ export function EditorPage() {
   const sheetRef = useRef<HTMLDivElement>(null);
   const gesture = useRef<Gesture | null>(null);
   const backgroundInput = useRef<HTMLInputElement>(null);
+  const imageInput = useRef<HTMLInputElement>(null);
+  /** Тащат ли над холстом файл: лист подсвечивается, куда он ляжет. */
+  const [fileOver, setFileOver] = useState(false);
   const clipboard = useRef<SheetElement[]>([]);
+  /** Меню по правому клику на пустом месте: где показать и куда вставлять. */
+  const [canvasMenu, setCanvasMenu] = useState<{ x: number; y: number; mm: { x: number; y: number } } | null>(null);
   const liveEditor = useRef<Editor | null>(null);
-  /*
-   * Телефон. Раскладка другая целиком — панель снизу, свойства под листом,
-   * текст в своём слое, — поэтому решаем один раз здесь, а не классами:
-   * редактор в предварительную отрисовку не попадает, и опасности,
-   * из-за которой публичные страницы обходятся одними классами, тут нет.
-   */
-  const phone = usePhone();
-  const [insertOpen, setInsertOpen] = useState(false);
-  const [nudgeOpen, setNudgeOpen] = useState(false);
-  /* Пальцы на холсте — для щипка. Жест одного пальца живёт в `gesture`. */
-  const touches = useRef(new Map<number, { x: number; y: number }>());
-  const pinch = useRef<{ dist: number; zoom: number; mid: { x: number; y: number } } | null>(null);
-  /** Точка листа под пальцами при щипке — она должна остаться под ними. */
-  const zoomAnchor = useRef<{ mm: { x: number; y: number }; client: { x: number; y: number } } | null>(null);
 
   // Адреса уехавших вкладок: `?view=table` и соседние. Разбираются
   // отдельно, в `moved-views.ts`, — там же объяснено зачем.
@@ -257,7 +291,7 @@ export function EditorPage() {
     setActiveSheetId(null);
   }, [id]);
   const history = useLayoutHistory([]);
-  const { reset, beginGesture, endGesture } = history;
+  const { reset, beginGesture, endGesture, setLayout } = history;
 
   /*
    * Макет с сервера кладём в историю только при смене листа — и через
@@ -279,19 +313,10 @@ export function EditorPage() {
    * имена колонок становятся полями подстановки, а строки — образцом
    * на холсте, чтобы на месте поля стояла живая фамилия.
    */
-  const recipients = useRecipients(id);
+  const { recipients, columns, fields } = useDocumentFields(id);
+  const recipientMutations = useRecipientMutations(id);
   const org = useOrgProfile();
 
-  const columns = useMemo(
-    () => (recipients.data?.columns ?? []).map((c) => ({ id: c.id, name: c.name })),
-    [recipients.data],
-  );
-  const fields = useMemo<FieldInfo[]>(() => {
-    const registry = fieldRegistry(columns);
-    // Заголовки из загруженного файла — как назвал колонки сам человек.
-    const titles = new Map((recipients.data?.columns ?? []).map((c) => [c.name, c.title]));
-    return registry.map((f) => (f.kind === 'column' && titles.get(f.source) ? { ...f, title: titles.get(f.source)! } : f));
-  }, [columns, recipients.data]);
   const known = useMemo(() => knownFieldKeys(columns), [columns]);
   const labels = useMemo(() => fieldLabels(fields), [fields]);
 
@@ -348,6 +373,11 @@ export function EditorPage() {
       void background.refetch();
     },
     onError: () => setSaved('error'),
+  });
+
+  const uploadImage = useMutation({
+    mutationFn: (file: File) => api.upload<{ fileId: string; url: string }>(`/documents/${id}/assets`, file),
+    onSuccess: clearSaveError,
   });
 
   /** Что предложить, если бланк не тех пропорций, что лист. */
@@ -470,22 +500,7 @@ export function EditorPage() {
     return () => observer.disconnect();
   }, [doc.data]);
 
-  /*
-   * Щипок увеличивает вокруг пальцев, а не вокруг угла листа: после
-   * перерисовки в новом масштабе докручиваем холст так, чтобы точка листа,
-   * бывшая под пальцами, осталась под ними.
-   */
-  useLayoutEffect(() => {
-    const anchor = zoomAnchor.current;
-    const box = containerRef.current;
-    const sheetEl = sheetRef.current;
-    zoomAnchor.current = null;
-    if (!anchor || !box || !sheetEl) return;
-    const rect = sheetEl.getBoundingClientRect();
-    box.scrollLeft += rect.left + anchor.mm.x * PX_PER_MM * zoom - anchor.client.x;
-    box.scrollTop += rect.top + anchor.mm.y * PX_PER_MM * zoom - anchor.client.y;
-  }, [zoom]);
-
+  const hasCanvas = Boolean(doc.data);
   // Ctrl+колёсико — масштаб, а не прокрутка страницы; пробел — панорамирование.
   useEffect(() => {
     const el = containerRef.current;
@@ -512,7 +527,9 @@ export function EditorPage() {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
     };
-  }, []);
+    // Холст появляется только после загрузки материала: с пустыми
+    // зависимостями колесо вешалось на null и зум не работал вовсе.
+  }, [hasCanvas]);
 
   // Выделение не переживает исчезновение блока: удалили — сняли.
   useEffect(() => {
@@ -531,17 +548,18 @@ export function EditorPage() {
   const hadSelection = useRef(false);
   useEffect(() => {
     const has = selected.size > 0;
-    // На телефоне панель занимает половину экрана — на каждое касание её
-    // не открываем: всё частое уже на нижней панели.
-    if (has && !hadSelection.current && !phone) setPanel((current) => current ?? 'props');
-    if (!has) setNudgeOpen(false);
+    // Открытые поля не подменяем свойствами: из них как раз вставляют
+    // в только что выделенный блок.
+    if (has && !hadSelection.current && !fieldsOpen) setOtherPanel((current) => current ?? 'props');
     hadSelection.current = has;
-  }, [selected, phone]);
+  }, [selected, fieldsOpen]);
 
   const selectedElements = useMemo(
     () => layout.filter((el) => selected.has(el.id)),
     [layout, selected],
   );
+  const allLocked = selectedElements.length > 0 && selectedElements.every((el) => el.locked);
+  const allHidden = selectedElements.length > 0 && selectedElements.every((el) => el.hidden);
 
   const rows = recipients.data?.rows ?? [];
   const rowCount = rows.length;
@@ -612,6 +630,26 @@ export function EditorPage() {
     [patchElements, selected],
   );
 
+  const patchQrProps = useCallback(
+    (patch: Partial<QrElement['props']>, commit = true) =>
+      patchElements(
+        selected,
+        (el) => (el.type === 'qr' ? { ...el, props: { ...el.props, ...patch } } : el),
+        commit,
+      ),
+    [patchElements, selected],
+  );
+
+  const patchLinkProps = useCallback(
+    (patch: Partial<LinkElement['props']>, commit = true) =>
+      patchElements(
+        selected,
+        (el) => (el.type === 'link' ? { ...el, props: { ...el.props, ...patch } } : el),
+        commit,
+      ),
+    [patchElements, selected],
+  );
+
   const setDoc = useCallback(
     (elementId: string, richDoc: RichDoc, commit: boolean) =>
       patchElements(
@@ -660,6 +698,9 @@ export function EditorPage() {
     [doc.data, history, layout],
   );
 
+  const canInsertIntoText =
+    editingId !== null || (selectedElements.length === 1 && selectedElements[0].type === 'text');
+
   const insertField = useCallback(
     (field: FieldInfo) => {
       if (liveEditor.current) {
@@ -691,43 +732,39 @@ export function EditorPage() {
     [zoom],
   );
 
+  /*
+   * Всё, что жест читает на каждом кадре, — через ref, а не через
+   * зависимости эффекта. Иначе каждое движение мыши (оно меняет макет)
+   * снимало и заново вешало обработчики на окно — на каждом кадре.
+   */
+  const live = useRef({ layout, zoom, showGrid, snapping, page: pageBoxOf(doc.data), updateBoxes, patchElements, pointToMm });
+  useLayoutEffect(() => {
+    live.current = { layout, zoom, showGrid, snapping, page: pageBoxOf(doc.data), updateBoxes, patchElements, pointToMm };
+  });
+
   useEffect(() => {
-    if (!doc.data) return;
-    const page = { w: doc.data.pageWidthMm, h: doc.data.pageHeightMm };
+    /*
+     * Мышь присылает движения чаще, чем экран обновляется, — на 120 Гц
+     * вдвое чаще. Пересчитывать макет на каждое значит перерисовывать
+     * редактор по нескольку раз за кадр; берём последнее за кадр.
+     */
+    let frameId = 0;
+    let pending: PointerEvent | null = null;
+    let shownGuides: SnapLine[] = [];
 
-    function onMove(e: PointerEvent) {
-      if (e.pointerType === 'touch' && touches.current.has(e.pointerId)) {
-        touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-        const p = pinch.current;
-        if (p && touches.current.size >= 2) {
-          const [a, b] = [...touches.current.values()];
-          const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-          const box = containerRef.current;
-          // Два пальца двигают холст вместе с щипком — как карта.
-          if (box) {
-            box.scrollLeft -= mid.x - p.mid.x;
-            box.scrollTop -= mid.y - p.mid.y;
-          }
-          p.mid = mid;
-          zoomAnchor.current = { mm: pointToMm(mid.x, mid.y), client: mid };
-          setZoom(clamp(p.zoom * (Math.hypot(a.x - b.x, a.y - b.y) / p.dist), 0.1, 4));
-          return;
-        }
-      }
+    const showGuides = (next: SnapLine[]) => {
+      const same =
+        next.length === shownGuides.length &&
+        next.every((line, i) => line.axis === shownGuides[i].axis && line.at === shownGuides[i].at);
+      if (same) return;
+      shownGuides = next;
+      setGuides(next);
+    };
 
+    function apply(e: PointerEvent) {
       const g = gesture.current;
-      if (!g) return;
-
-      if (g.kind === 'pan') {
-        const box = containerRef.current;
-        const dxPx = e.clientX - g.startX;
-        const dyPx = e.clientY - g.startY;
-        if (!box || (!g.moved && Math.hypot(dxPx, dyPx) < TOUCH_SLOP_PX)) return;
-        g.moved = true;
-        box.scrollLeft = g.left - dxPx;
-        box.scrollTop = g.top - dyPx;
-        return;
-      }
+      const { layout, zoom, showGrid, snapping, page, updateBoxes, patchElements, pointToMm } = live.current;
+      if (!g || !page) return;
 
       if (g.kind === 'marquee') {
         const from = pointToMm(g.startX, g.startY);
@@ -744,7 +781,6 @@ export function EditorPage() {
 
       // Снимок в историю делаем один раз, на первом сдвиге.
       if (!g.moved) {
-        if (g.touch && Math.hypot(e.clientX - g.startX, e.clientY - g.startY) < TOUCH_SLOP_PX) return;
         g.moved = true;
         beginGesture();
       }
@@ -759,19 +795,27 @@ export function EditorPage() {
           const snapped = snapToGrid(frame, GRID_MM);
           next = next.map((b) => ({ ...b, x: b.x + snapped.x - frame.x, y: b.y + snapped.y - frame.y }));
         } else if (snapping && !e.altKey) {
+          g.lines ??= snapCandidates(layout, new Set(ids), page);
           const frame = boundingBox(next)!;
-          const result = snapBox(frame, snapCandidates(layout, new Set(ids), page));
+          // Порог — в пикселях экрана: в миллиметрах он на мелком масштабе
+          // не срабатывал вовсе, а на крупном держал блок у линии слишком долго.
+          const result = snapBox(frame, g.lines, SNAP_PX / (PX_PER_MM * zoom));
           next = next.map((b) => ({ ...b, x: b.x + result.box.x - frame.x, y: b.y + result.box.y - frame.y }));
           active = result.active;
         }
-        setGuides(active);
+        showGuides(active);
         updateBoxes(Object.fromEntries(ids.map((k, i) => [k, next[i]])), false);
         return;
       }
 
       if (g.kind === 'resize') {
-        let next = resizeBox(g.box, g.handle, dx, dy, page.w, page.h);
-        if (showGrid) next = snapToGrid(next, GRID_MM);
+        const proportional = g.handle.length === 2 && (g.keepRatio || e.shiftKey);
+        let next = proportional
+          ? scaleGroup([g.box], g.box, g.handle, dx, dy, page).boxes[0]
+          : resizeBox(g.box, g.handle, dx, dy, page.w, page.h);
+        // Сетка округляет стороны порознь — пропорции она бы сломала.
+        if (showGrid && !proportional) next = snapToGrid(next, GRID_MM);
+        if (g.square) next = squareBox(g.box, next, g.handle, page.w, page.h);
         updateBoxes({ [g.id]: next }, false);
         return;
       }
@@ -781,7 +825,7 @@ export function EditorPage() {
         const { boxes, scale } = scaleGroup(ids.map((k) => g.boxes[k]), g.frame, g.handle, dx, dy, page);
         const next = Object.fromEntries(ids.map((k, i) => [k, boxes[i]]));
         // Кегли — в той же пропорции: композиция уменьшается целиком.
-        history.setLayout(
+        setLayout(
           (prev) =>
             prev.map((el) =>
               next[el.id]
@@ -801,46 +845,41 @@ export function EditorPage() {
       }
     }
 
-    function onUp(e: PointerEvent) {
-      if (e.pointerType === 'touch') {
-        touches.current.delete(e.pointerId);
-        // Щипок кончается целиком: оставшийся палец холст не тащит,
-        // иначе картинка дёрнулась бы к нему.
-        if (pinch.current) {
-          if (touches.current.size < 2) pinch.current = null;
-          gesture.current = null;
-          return;
-        }
-      }
+    function flush() {
+      frameId = 0;
+      const e = pending;
+      pending = null;
+      if (e) apply(e);
+    }
+
+    function onMove(e: PointerEvent) {
+      if (!gesture.current) return;
+      pending = e;
+      if (!frameId) frameId = requestAnimationFrame(flush);
+    }
+
+    function onUp() {
+      // Последнее движение — сразу, а не в следующем кадре: иначе блок
+      // встал бы на шаг раньше того места, где его отпустили.
+      if (frameId) cancelAnimationFrame(frameId);
+      flush();
       const g = gesture.current;
       if (g?.kind === 'marquee') setMarquee(null);
-      else if (g?.kind === 'pan') {
-        if (!g.moved && g.tapClear) {
-          setSelected(new Set());
-          setEditingId(null);
-        }
-      }
       // Без этого перетаскивание не попадало бы в автосохранение:
       // промежуточные кадры намеренно не двигают счётчик версии.
       else if (g?.moved) endGesture();
-      // Второе касание уже выбранного текста — правка, вместо двойного
-      // щелчка: двойное касание на телефоне занято масштабом страницы.
-      else if (g?.kind === 'move' && g.tapEdit) setEditingId(g.tapEdit);
-      setGuides([]);
+      showGuides([]);
       gesture.current = null;
     }
 
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
-    // Отмену касания (системный жест, звонок) закрываем как отпускание:
-    // без этого жест оставался висеть и тянул блок за следующим касанием.
-    window.addEventListener('pointercancel', onUp);
     return () => {
+      if (frameId) cancelAnimationFrame(frameId);
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
-      window.removeEventListener('pointercancel', onUp);
     };
-  }, [doc.data, zoom, layout, showGrid, snapping, updateBoxes, patchElements, beginGesture, endGesture, pointToMm, history]);
+  }, [beginGesture, endGesture, setLayout]);
 
   /* ────────────────────────────── горячие клавиши ──────────────────────── */
 
@@ -940,8 +979,18 @@ export function EditorPage() {
   // их порядок между отрисовками.
   if (moved) return <Navigate to={moved} replace />;
 
-  if (doc.isPending) return <div className="p-6 text-slate-500">Загрузка документа…</div>;
-  if (!doc.data || !sheet) return <div className="p-6 text-slate-500">Документ не найден</div>;
+  if (doc.isPending) return <div className="p-6 text-[var(--text-muted)]">Загрузка документа…</div>;
+  if (doc.isError) {
+    return (
+      <ErrorState
+        title="Документ не открылся"
+        onRetry={() => void doc.refetch()}
+        retrying={doc.isFetching}
+        code={String(doc.error)}
+      />
+    );
+  }
+  if (!doc.data || !sheet) return <div className="p-6 text-[var(--text-muted)]">Документ не найден</div>;
 
   const page = doc.data;
   const pageBox = { w: page.pageWidthMm, h: page.pageHeightMm };
@@ -953,7 +1002,14 @@ export function EditorPage() {
    * в одном месте, и новый блок гарантированно такой же, каким его увидит
    * печать. Иначе редактор и рендер разошлись бы на первом же новом поле.
    */
-  function addElement(what: InsertKind) {
+  /** Точка листа в мм под указателем — для вставки туда, куда кликнули. */
+  function pointOnSheet(e: { clientX: number; clientY: number }) {
+    const rect = sheetRef.current?.getBoundingClientRect();
+    if (!rect) return null;
+    return { x: (e.clientX - rect.left) / (PX_PER_MM * zoom), y: (e.clientY - rect.top) / (PX_PER_MM * zoom) };
+  }
+
+  function addElement(what: InsertKind, at?: { x: number; y: number } | null) {
     const size =
       what.type === 'text'
         ? { w: 120, h: 20 }
@@ -971,7 +1027,10 @@ export function EditorPage() {
       what.type === 'text'
         ? what.field
           ? { doc: docWithField(what.field.source, what.field.fieldId) }
-          : { text: 'Награждается %name' }
+          : // Пустой, а не «Награждается %name»: человек просил текст, а не
+            // имя. Пустой блок сразу открывается на ввод (ниже), иначе его
+            // не видно.
+            { text: '' }
         : what.type === 'link'
           ? { url: 'https://vruchay.ru' }
           : what.type === 'shape'
@@ -983,8 +1042,8 @@ export function EditorPage() {
       {
         id: crypto.randomUUID(),
         type: what.type,
-        x: page.pageWidthMm / 2 - size.w / 2,
-        y: page.pageHeightMm / 2 - size.h / 2,
+        x: at ? clamp(at.x, 0, page.pageWidthMm - size.w) : page.pageWidthMm / 2 - size.w / 2,
+        y: at ? clamp(at.y, 0, page.pageHeightMm - size.h) : page.pageHeightMm / 2 - size.h / 2,
         w: size.w,
         h: size.h,
         rotation: 0,
@@ -995,7 +1054,35 @@ export function EditorPage() {
 
     history.setLayout((prev) => [...prev, el]);
     setSelected(new Set([el.id]));
-    if (!phone) setPanel('props');
+    // Пустой текст — сразу с кареткой, как в Miro и Figma: без неё на листе
+    // ничего не появляется, и кажется, что нажатие не сработало.
+    if (what.type === 'text' && !what.field) setEditingId(el.id);
+    // Блок, вставленный из панели полей, не уводит из неё к свойствам.
+    if (!fieldsOpen) setOtherPanel('props');
+    return el;
+  }
+
+  /**
+   * Картинка отдельным блоком: сначала файл на сервер, потом блок с его
+   * `fileId`. Наоборот нельзя — макет с картинкой, которой ещё нет,
+   * сервер не сохранит. `at` — куда бросили файл; без него — середина листа.
+   */
+  async function addImage(file: File, at?: { x: number; y: number }) {
+    const size = await readImageSize(file).catch(() => null);
+    const uploaded = await uploadImage.mutateAsync(file).catch(() => null);
+    if (!uploaded) return;
+
+    const box = insertedImageBox(size, pageBox, at);
+    const elementId = crypto.randomUUID();
+    history.setLayout((prev) => {
+      const maxZ = Math.max(-1, ...prev.map((el) => el.z));
+      const [el] = sheetLayout.parse([
+        { id: elementId, type: 'image', ...box, rotation: 0, z: maxZ + 1, props: { fileId: uploaded.fileId } },
+      ]);
+      return [...prev, el];
+    });
+    setSelected(new Set([elementId]));
+    if (!fieldsOpen) setOtherPanel('props');
   }
 
   /**
@@ -1041,17 +1128,6 @@ export function EditorPage() {
     e.preventDefault();
     e.stopPropagation();
     if (editingId && editingId !== el.id) setEditingId(null);
-    const touch = e.pointerType === 'touch';
-    /*
-     * Пальцем невыбранный блок только выбирается, а тянуть дальше — значит
-     * двигать холст. Иначе каждая попытка пролистать лист сдвигала бы
-     * попавшуюся под палец фамилию, и испорченной вышла бы вся пачка.
-     */
-    if (touch && !selected.has(el.id)) {
-      setSelected(expandToGroups(layout, [el.id]));
-      startPan(e, false);
-      return;
-    }
     const additive = e.shiftKey;
     // Что окажется выделенным после этого клика — считаем сразу, чтобы жест
     // вёл именно эту группу, а не ту, что была до клика.
@@ -1065,42 +1141,18 @@ export function EditorPage() {
       next = selected.has(el.id) ? selected : expandToGroups(layout, [el.id]);
     }
     setSelected(next);
-    if (el.locked) return;
+    // Правая кнопка только выделяет: перетаскивают левой, а правой
+    // открывают настройки поля (onContextMenu на слое жестов).
+    if (el.locked || e.button !== 0) return;
     const boxes: Record<string, Box> = {};
     for (const item of layout) {
       if (next.has(item.id) && !item.locked) boxes[item.id] = { x: item.x, y: item.y, w: item.w, h: item.h };
     }
-    gesture.current = {
-      kind: 'move',
-      boxes,
-      startX: e.clientX,
-      startY: e.clientY,
-      moved: false,
-      touch,
-      tapEdit: touch && selected.size === 1 && el.type === 'text' ? el.id : undefined,
-    };
-  }
-
-  function startPan(e: React.PointerEvent, tapClear: boolean) {
-    const box = containerRef.current;
-    if (!box) return;
-    gesture.current = {
-      kind: 'pan',
-      startX: e.clientX,
-      startY: e.clientY,
-      left: box.scrollLeft,
-      top: box.scrollTop,
-      moved: false,
-      touch: true,
-      tapClear,
-    };
+    gesture.current = { kind: 'move', boxes, startX: e.clientX, startY: e.clientY, moved: false };
   }
 
   function startMarquee(e: React.PointerEvent) {
     if (e.button !== 0) return;
-    // Рамки выделения пальцем нет: касание пустого места листа двигает
-    // холст — его подхватит обработчик холста.
-    if (e.pointerType === 'touch') return;
     setEditingId(null);
     if (!e.shiftKey) setSelected(new Set());
     gesture.current = { kind: 'marquee', additive: e.shiftKey, base: selected, startX: e.clientX, startY: e.clientY, moved: false };
@@ -1112,10 +1164,10 @@ export function EditorPage() {
   const dataMode = viewMode === 'data';
 
   /** Значок панели работает переключателем: второе нажатие её закрывает. */
-  const togglePanel = (next: Panel) => setPanel((current) => (current === next ? null : next));
 
   const hasBackground = Boolean(sheet.backgroundFileId);
   const pickBackground = () => backgroundInput.current?.click();
+  const pickImage = () => imageInput.current?.click();
 
   /*
    * Меню «…» листа: действия над материалом целиком и редкие правки.
@@ -1132,20 +1184,20 @@ export function EditorPage() {
     { separator: true },
     {
       icon: <SquareDashed size={16} />,
-      label: 'Выделить все блоки',
+      label: 'Выделить всё',
       shortcut: 'Ctrl+A',
       onSelect: () => setSelected(new Set(selectableIds(layout))),
     },
     {
       icon: <CopyPlus size={16} />,
-      label: 'Дублировать блок',
+      label: 'Дублировать',
       shortcut: 'Ctrl+D',
       disabled: selectedElements.length === 0,
       onSelect: () => cloneInto(selectedElements),
     },
     {
       icon: <Paintbrush size={16} />,
-      label: 'Скопировать оформление',
+      label: 'Копировать стиль',
       disabled: !selectedElements.some((el) => el.type === 'text'),
       onSelect: () => {
         const source = selectedElements.find((el): el is TextElement => el.type === 'text');
@@ -1154,89 +1206,20 @@ export function EditorPage() {
     },
     {
       icon: <Paintbrush size={16} />,
-      label: 'Применить оформление',
+      label: 'Вставить стиль',
       disabled: styleClipboard === null || selected.size === 0,
       onSelect: () => styleClipboard && patchTextProps(styleClipboard),
     },
     { separator: true },
     {
       icon: <Trash2 size={16} />,
-      label: 'Удалить блок',
+      label: 'Удалить',
       shortcut: 'Delete',
       danger: true,
       disabled: selected.size === 0,
       onSelect: removeSelected,
     },
   ];
-
-  /*
-   * Два взгляда на лист: заготовка с фишками полей и настоящая строка
-   * таблицы. Второй — чтобы увидеть, как ляжет длинная фамилия, не
-   * выпуская ничего. На телефоне подписи короче, а стрелки строк — под палец.
-   */
-  const rowArrow = phone
-    ? 'grid size-10 place-items-center rounded-md active:bg-[var(--surface-sunken)]'
-    : 'rounded p-0.5 hover:bg-[var(--surface-sunken)]';
-  const viewToggle = (
-    <div className="flex shrink-0 items-center gap-1 rounded-lg p-0.5 ring-1 ring-[var(--line)]">
-      <Segment active={!dataMode} onClick={() => setViewMode('placeholders')} large={phone}>
-        Заготовка
-      </Segment>
-      <Segment
-        active={dataMode}
-        onClick={() => setViewMode('data')}
-        disabled={rowCount === 0}
-        title={rowCount === 0 ? 'Список пока пустой' : undefined}
-        large={phone}
-      >
-        {phone ? 'Данные' : 'Данные строки'}
-      </Segment>
-      {dataMode && rowCount > 0 && (
-        <span className="tabular flex items-center gap-0.5 pl-1 text-sm text-[var(--text-muted)]">
-          <button
-            type="button"
-            aria-label="Предыдущая строка"
-            onClick={() => setRowIndex((i) => Math.max(0, i - 1))}
-            className={rowArrow}
-          >
-            <ChevronLeft size={phone ? 18 : 14} />
-          </button>
-          {safeRow + 1} / {rowCount}
-          <button
-            type="button"
-            aria-label="Следующая строка"
-            onClick={() => setRowIndex((i) => Math.min(rowCount - 1, i + 1))}
-            className={rowArrow}
-          >
-            <ChevronRight size={phone ? 18 : 14} />
-          </button>
-        </span>
-      )}
-    </div>
-  );
-
-  const saveLabel =
-    saved === 'saved' ? 'Сохранено' : saved === 'saving' ? 'Сохраняем' : saved === 'error' ? 'Не удалось сохранить' : 'Есть правки';
-  const saveIcon =
-    saved === 'saved' ? (
-      <Check size={13} />
-    ) : saved === 'saving' ? (
-      <LoaderCircle size={13} className="animate-spin" />
-    ) : saved === 'error' ? (
-      <TriangleAlert size={13} />
-    ) : (
-      <Dot size={13} />
-    );
-  /* На телефоне — только значок: строка одна, а слово «Сохранено» длиннее кнопок.
-     Ошибку словом показываем и там — её нельзя не заметить. */
-  const saveChip = (
-    <StatusChip
-      tone={saved === 'saved' ? 'done' : saved === 'saving' ? 'progress' : saved === 'error' ? 'error' : 'neutral'}
-    >
-      {saveIcon}
-      {phone && saved !== 'error' ? <span className="sr-only">{saveLabel}</span> : saveLabel}
-    </StatusChip>
-  );
 
   /*
    * Панель значков под меню — только то, чем пользуются постоянно: отмена,
@@ -1248,7 +1231,7 @@ export function EditorPage() {
       <ToolButton title="Отменить (Ctrl+Z)" onClick={history.undo} disabled={!history.canUndo}>
         <Undo2 size={16} />
       </ToolButton>
-      <ToolButton title="Вернуть (Ctrl+Shift+Z)" onClick={history.redo} disabled={!history.canRedo}>
+      <ToolButton title="Повторить (Ctrl+Shift+Z)" onClick={history.redo} disabled={!history.canRedo}>
         <Redo2 size={16} />
       </ToolButton>
 
@@ -1258,17 +1241,7 @@ export function EditorPage() {
         iconOnly
         onInsert={addElement}
         fields={fields}
-        onBackground={pickBackground}
-        backgroundLoading={uploadBackground.isPending}
-        hasBackground={hasBackground}
       />
-      <ToolButton
-        title="Поля подстановки"
-        active={panel === 'fields'}
-        onClick={() => togglePanel('fields')}
-      >
-        <Variable size={16} />
-      </ToolButton>
       <ToolButton
         title={hasBackground ? 'Заменить бланк' : 'Загрузить бланк'}
         onClick={pickBackground}
@@ -1276,43 +1249,80 @@ export function EditorPage() {
       >
         <ImageUp size={16} />
       </ToolButton>
-
-      <ToolDivider />
-
-      <ToolButton
-        title="Свойства блока"
-        active={panel === 'props'}
-        onClick={() => togglePanel('props')}
+      <ToolButton title="Картинка: логотип, подпись, печать" onClick={pickImage} disabled={uploadImage.isPending}>
+        <ImagePlus size={16} />
+      </ToolButton>
+      {/* Текст и фигура — то, что кладут на лист чаще всего, поэтому
+          в один клик, как «T» и «□» у Figma и Canva. Текст с подстановкой
+          поля остаётся в «+»: там выбирают, какое именно. */}
+      <ToolButton title="Текст" onClick={() => addElement({ type: 'text' })}>
+        <Type size={16} />
+      </ToolButton>
+      <Menu
+        align="left"
+        trigger={({ open, toggle }) => (
+          <IconButton size="sm" label="Фигура" active={open} aria-expanded={open} onClick={toggle}>
+            <Square size={16} />
+          </IconButton>
+        )}
       >
-        <SlidersHorizontal size={16} />
-      </ToolButton>
-      <ToolButton title="Слои" active={panel === 'layers'} onClick={() => togglePanel('layers')}>
-        <Layers size={16} />
-      </ToolButton>
+        <MenuItem icon={<Minus size={16} />} onClick={() => addElement({ type: 'shape', kind: 'line' })}>
+          Линия
+        </MenuItem>
+        <MenuItem icon={<Square size={16} />} onClick={() => addElement({ type: 'shape', kind: 'rect' })}>
+          Прямоугольник
+        </MenuItem>
+        <MenuItem icon={<Circle size={16} />} onClick={() => addElement({ type: 'shape', kind: 'ellipse' })}>
+          Овал
+        </MenuItem>
+      </Menu>
 
       <ToolDivider />
 
       <ToolButton
-        title="Сетка 5 мм и прилипание к ней"
+        title="Сетка 5 мм"
         active={showGrid}
         onClick={() => setShowGrid((v) => !v)}
       >
         <Grid3x3 size={16} />
       </ToolButton>
       <ToolButton
-        title="Прилипание к краям и центрам (Alt — временно выключить)"
+        title="Привязка к краям и центрам (Alt — отключить на время)"
         active={snapping}
         onClick={() => setSnapping((v) => !v)}
       >
         <Magnet size={16} />
       </ToolButton>
       <ToolButton
-        title="Безопасные поля печати: обрез 3 мм, поле принтера 5 мм"
+        title="Поля печати: обрез 3 мм, поле принтера 5 мм"
         active={showSafeArea}
         onClick={() => setShowSafeArea((v) => !v)}
       >
         <Printer size={16} />
       </ToolButton>
+
+      {/* Замок и глаз выделенного блока — здесь, как в контекстной панели
+          Canva: значок показывает состояние, подпись в панели свойств
+          была лишней. Если заперта часть выделенных — запираются все. */}
+      {selectedElements.length > 0 && (
+        <>
+          <ToolDivider />
+          <ToolButton
+            title={allLocked ? 'Отпереть: блок снова двигается' : 'Запереть: не двигать и не растягивать'}
+            active={allLocked}
+            onClick={() => patchElements(selected, (el) => ({ ...el, locked: !allLocked }))}
+          >
+            {allLocked ? <Lock size={16} /> : <LockOpen size={16} />}
+          </ToolButton>
+          <ToolButton
+            title={allHidden ? 'Показать на листе' : 'Скрыть с листа'}
+            active={allHidden}
+            onClick={() => patchElements(selected, (el) => ({ ...el, hidden: !allHidden }))}
+          >
+            {allHidden ? <EyeOff size={16} /> : <Eye size={16} />}
+          </ToolButton>
+        </>
+      )}
 
       <ToolDivider />
 
@@ -1346,54 +1356,52 @@ export function EditorPage() {
       />
 
       <div className="ml-auto flex items-center gap-2">
-        {viewToggle}
-        {saveChip}
+        <StatusChip
+          tone={
+            saved === 'saved'
+              ? 'done'
+              : saved === 'saving'
+                ? 'progress'
+                : saved === 'error'
+                  ? 'error'
+                  : 'neutral'
+          }
+        >
+          {saved === 'saved' ? (
+            <>
+              <Check size={13} /> Сохранено
+            </>
+          ) : saved === 'saving' ? (
+            <>
+              <LoaderCircle size={13} className="animate-spin" /> Сохраняем
+            </>
+          ) : saved === 'error' ? (
+            <>
+              <TriangleAlert size={13} /> Не удалось сохранить
+            </>
+          ) : (
+            <>
+              <Dot size={13} /> Есть правки
+            </>
+          )}
+        </StatusChip>
       </div>
     </>
   );
-
-  /*
-   * Верхняя строка на телефоне — одна и без переносов: отмена, взгляд на
-   * лист и отметка сохранения. Всё остальное уехало вниз, под большой палец.
-   */
-  const phoneToolbar = (
-    <>
-      <IconButton label="Отменить" onClick={history.undo} disabled={!history.canUndo}>
-        <Undo2 size={20} />
-      </IconButton>
-      <IconButton label="Вернуть" onClick={history.redo} disabled={!history.canRedo}>
-        <Redo2 size={20} />
-      </IconButton>
-      <div className="ml-auto flex min-w-0 items-center gap-1.5">
-        {viewToggle}
-        {saveChip}
-      </div>
-    </>
-  );
-
-  /** Сдвиг крестовиной — тем же путём, что стрелки клавиатуры. */
-  const nudgeSelected = (dx: number, dy: number) =>
-    patchElements(selected, (el) => (el.locked ? el : { ...el, ...roundBox(nudgeBox(el, dx, dy, pageBox)) }));
-
-  const editingElement =
-    phone && editingId ? layout.find((el): el is TextElement => el.id === editingId && el.type === 'text') : undefined;
 
   return (
     // Высота — точным счётом, а не `h-full`: оболочка кабинета больше не
     // задаёт высоту своей колонке (это ломало прилипание разделов на
     // длинных страницах, см. AppShell), и опереться на неё через `h-full`
     // стало не на что. Лист по-прежнему получает ровно экран без шапки.
-    <div
-      className="editor-height flex flex-col"
-      // Полоса «домой» у айфонов без кнопки: нижняя панель не должна под ней лежать.
-      style={phone ? { paddingBottom: 'env(safe-area-inset-bottom)' } : undefined}
-    >
+    <div className="flex h-[calc(100dvh-var(--app-header))] flex-col">
       <DocumentChrome
         documentId={id}
         title={page.title}
+        isTemplate={page.isTemplate}
         actions={actions}
         tab="sheet"
-        toolbar={phone ? phoneToolbar : toolbar}
+        toolbar={toolbar}
       />
 
       {/* Поле выбора файла спрятано и живёт отдельно от меню: меню
@@ -1410,16 +1418,27 @@ export function EditorPage() {
           e.target.value = '';
         }}
       />
+      <input
+        ref={imageInput}
+        type="file"
+        accept="image/png,image/jpeg"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void addImage(file);
+          e.target.value = '';
+        }}
+      />
 
       {/* Разговор про бланк — строкой под панелью, а не в самой панели:
           в ряду значков длинная фраза ломала строку и сдвигала всё
           остальное. */}
-      {uploadBackground.isError && (
+      {(uploadBackground.error ?? uploadImage.error) && (
         <p
           role="alert"
           className="shrink-0 border-b border-[var(--line)] bg-[var(--danger-soft)] px-4 py-2 text-sm text-[var(--danger)]"
         >
-          {(uploadBackground.error as Error).message}
+          {(uploadBackground.error ?? uploadImage.error)!.message}
         </p>
       )}
       {backgroundNote && (
@@ -1434,53 +1453,14 @@ export function EditorPage() {
         </p>
       )}
 
-      {/* На телефоне панель встаёт под лист, а не справа: колонка в 320 точек
-          оставила бы листу полоску. */}
-      <div className={phone ? 'flex min-h-0 flex-1 flex-col' : 'flex min-h-0 flex-1'}>
-        <div className="relative flex min-h-0 min-w-0 flex-1">
-        {/*
-          Лист по центру — автополями внутри гибкого ряда, а не `place-items:
-          center`: у сетки то, что вылезло за левый край при увеличении, уходит
-          в минус и прокруткой не достаётся.
-
-          `touch-action: none` — жесты пальцем холст разбирает сам: один палец
-          двигает холст или блок, два — масштаб. Мышь и перо это не трогает.
-        */}
+      <div className="relative flex min-h-0 flex-1">
         <div
           ref={containerRef}
-          className={`relative flex flex-1 overflow-auto bg-[var(--surface-sunken)] ${phone ? 'p-3' : 'p-6'}`}
-          style={{
-            touchAction: 'none',
-            ...(panning ? { cursor: pan.current ? 'grabbing' : 'grab' } : null),
-          }}
-          onPointerDown={(e) => {
-            // Палец на пустом месте холста: двигает холст, а касание без
-            // сдвига снимает выбор. Блоки и ручки сюда жест не отдают.
-            if (e.pointerType === 'touch' && !gesture.current && !pinch.current) startPan(e, true);
-          }}
+          // Граница для панели оформления текста: за холст она не выходит.
+          data-canvas
+          className="relative grid flex-1 place-items-center overflow-auto bg-[var(--surface-sunken)] p-6"
+          style={panning ? { cursor: pan.current ? 'grabbing' : 'grab' } : undefined}
           onPointerDownCapture={(e) => {
-            if (e.pointerType === 'touch') {
-              touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-              if (touches.current.size >= 2) {
-                // Второй палец — щипок. Начатое первым пальцем закрываем
-                // тем, что успело сдвинуться, и дальше блоки не трогаем.
-                const g = gesture.current;
-                if (g?.moved && (g.kind === 'move' || g.kind === 'resize' || g.kind === 'scale' || g.kind === 'rotate')) {
-                  endGesture();
-                }
-                gesture.current = null;
-                setGuides([]);
-                const [a, b] = [...touches.current.values()];
-                pinch.current = {
-                  dist: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)),
-                  zoom,
-                  mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
-                };
-                e.preventDefault();
-                e.stopPropagation();
-                return;
-              }
-            }
             if (!panning) return;
             e.preventDefault();
             e.stopPropagation();
@@ -1496,38 +1476,77 @@ export function EditorPage() {
           onPointerUpCapture={() => {
             pan.current = null;
           }}
+          // Файл, брошенный на холст, становится картинкой в точке броска.
+          // Перетаскивание поля из панели сюда не попадает: у него нет файлов.
+          onDragOver={(e) => {
+            if (!e.dataTransfer.types.includes('Files')) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+            if (!fileOver) setFileOver(true);
+          }}
+          onDragLeave={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFileOver(false);
+          }}
+          onDrop={(e) => {
+            const file = e.dataTransfer.files[0];
+            if (!file) return;
+            e.preventDefault();
+            setFileOver(false);
+            void addImage(file, pointToMm(e.clientX, e.clientY));
+          }}
         >
-          {!sheet.backgroundFileId && layout.length === 0 && (
-            <div className="absolute inset-x-0 top-6 z-10 flex justify-center px-6">
-              <div className="max-w-sm rounded-2xl bg-[var(--surface)] px-5 py-4 text-center shadow-sm ring-1 ring-[var(--line)]">
-                <p className="font-medium">Лист пока пустой</p>
-                <p className="mt-1 text-sm text-[var(--text-muted)]">
-                  Загрузите свой бланк фоном, а поверх поставьте текст: «Вставка» →
-                  «Загрузить бланк», потом «Добавить текстовый блок». Фамилия и другие
-                  колонки списка подставляются переменными вида %name.
-                </p>
+          {/* Выбор пути — двумя плитками поверх пустого листа, как «Start from
+              your content / Create from scratch» в Adobe Express. Лежат на
+              холсте, а не внутри листа: лист на узком экране ужимается до
+              десятой доли, и плитки ужимались бы вместе с ним. Когда места
+              на две в ряд нет, встают столбиком. */}
+          {!sheet.backgroundFileId && layout.length === 0 && !buildHere.has(sheet.id) && (
+            <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center p-4 @container">
+              <div className="pointer-events-auto grid w-full max-w-sm grid-cols-1 gap-3 @[17rem]:grid-cols-2">
+                <StartTile
+                  icon={<ImageUp size={22} />}
+                  label="Свой бланк"
+                  hint="PNG · JPG"
+                  disabled={uploadBackground.isPending}
+                  onClick={pickBackground}
+                  onFile={(file) => void onPickBackground(file)}
+                />
+                <StartTile
+                  icon={<FilePlus2 size={22} />}
+                  label="С нуля"
+                  hint="Чистый лист"
+                  onClick={() => setBuildHere((prev) => new Set(prev).add(sheet.id))}
+                />
               </div>
             </div>
           )}
-          {sheet.backgroundFileId && layout.length === 0 && (
-            <div className="pointer-events-none absolute inset-x-0 top-6 z-10 flex justify-center">
-              <p className="rounded-full bg-[var(--surface)] px-4 py-2 text-sm text-[var(--text-muted)] shadow-sm ring-1 ring-[var(--line)]">
-                Бланк на месте. Теперь «Вставка» → «Добавить текстовый блок».
-              </p>
-            </div>
-          )}
 
-          <div className="relative m-auto" style={{ padding: phone ? 0 : 18 }}>
-            {/* Линейки в миллиметрах — по краям листа. На телефоне их нет:
-                цифры в 9 точек там не прочесть, а место у листа они съедают. */}
-            {!phone && <Ruler axis="x" lengthMm={page.pageWidthMm} zoom={zoom} />}
-            {!phone && <Ruler axis="y" lengthMm={page.pageHeightMm} zoom={zoom} />}
+          <div className="relative" style={{ padding: 18 }}>
+            {/* Линейки в миллиметрах — по краям листа. */}
+            <Ruler axis="x" lengthMm={page.pageWidthMm} zoom={zoom} />
+            <Ruler axis="y" lengthMm={page.pageHeightMm} zoom={zoom} />
 
             <div
               ref={sheetRef}
-              className="relative shadow-lg"
+              className={`relative shadow-[var(--shadow-sheet)] ${fileOver ? 'ring-2 ring-[var(--accent)]' : ''}`}
               style={{ width: px(page.pageWidthMm), height: px(page.pageHeightMm) }}
               onPointerDown={startMarquee}
+              // Двойной клик по пустому месту — новый текст прямо там,
+              // как в Miro и Excalidraw. По блокам событие не доходит.
+              onDoubleClick={(e) => {
+                if (dataMode) return;
+                addElement({ type: 'text' }, pointOnSheet(e));
+              }}
+              onContextMenu={(e) => {
+                if (dataMode) return;
+                // Блок под правкой лежит на листе без слоя жестов, и правый
+                // щелчок из него всплывает сюда: по фишке открылось бы сразу
+                // два окна, по тексту — меню вставки вместо «копировать».
+                if ((e.target as Element).closest('[data-element-id]')) return;
+                e.preventDefault();
+                const mm = pointOnSheet(e);
+                if (mm) setCanvasMenu({ x: e.clientX, y: e.clientY, mm });
+              }}
             >
               <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}>
                 <SheetRenderer
@@ -1543,7 +1562,7 @@ export function EditorPage() {
                   selectedIds={selected}
                   onSelect={(elementId, additive) => elementId && select(elementId, additive)}
                   onEdit={(elementId) => setEditingId(elementId)}
-                  editingId={phone ? null : editingId}
+                  editingId={editingId}
                   renderEditing={(element) => (
                     <InlineTextEditor
                       key={element.id}
@@ -1556,7 +1575,9 @@ export function EditorPage() {
                         liveEditor.current = editor;
                       }}
                       onChange={(richDoc) => setDoc(element.id, richDoc, false)}
+                      openField={openField}
                       onDone={(richDoc) => {
+                        setOpenField(null);
                         liveEditor.current = null;
                         setDoc(element.id, richDoc, true);
                         setEditingId(null);
@@ -1582,7 +1603,7 @@ export function EditorPage() {
               {showSafeArea && (
                 <>
                   <div
-                    className="pointer-events-none absolute border border-dashed border-red-400/70"
+                    className="pointer-events-none absolute border border-dashed border-[var(--danger)]/70"
                     style={{ inset: px(BLEED_MM) }}
                   />
                   <div
@@ -1617,7 +1638,28 @@ export function EditorPage() {
                       onPointerDown={(e) => startMove(e, el)}
                       onDoubleClick={(e) => {
                         e.stopPropagation();
-                        if (el.type === 'text' && !el.locked) setEditingId(el.id);
+                        if (el.type === 'text' && !el.locked) {
+                          setOpenField(null);
+                          setEditingId(el.id);
+                        }
+                      }}
+                      onContextMenu={(e) => {
+                        // Меню вставки — только для пустого места листа.
+                        e.stopPropagation();
+                        if (el.type !== 'text' || el.locked) return;
+                        // Слой жестов лежит поверх текста, поэтому фишку под
+                        // указателем ищем по координатам, а не по цели события.
+                        const chips = Array.from(
+                          document.querySelectorAll(`[data-element-id="${CSS.escape(el.id)}"] [data-field]`),
+                        );
+                        const hit = document
+                          .elementsFromPoint(e.clientX, e.clientY)
+                          .find((node) => chips.includes(node));
+                        if (!hit) return;
+                        e.preventDefault();
+                        setSelected(new Set([el.id]));
+                        setOpenField(chips.indexOf(hit));
+                        setEditingId(el.id);
                       }}
                       onDragOver={(e) => {
                         if (el.type === 'text' && e.dataTransfer.types.includes(FIELD_DRAG_TYPE)) e.preventDefault();
@@ -1645,7 +1687,9 @@ export function EditorPage() {
                     >
                       {single?.id === el.id && !el.locked && !editing && (
                         <>
-                          {(phone ? PHONE_HANDLES : HANDLES).map((handle) => (
+                          {/* У картинки только углы: сторона растянула бы рамку,
+                              а картинка в ней осталась бы прежней формы. */}
+                          {(el.type === 'image' ? CORNERS : HANDLES).map((handle) => (
                             <span
                               key={handle}
                               onPointerDown={(e) => {
@@ -1658,14 +1702,14 @@ export function EditorPage() {
                                   startX: e.clientX,
                                   startY: e.clientY,
                                   box: { x: el.x, y: el.y, w: el.w, h: el.h },
+                                  keepRatio: el.type === 'image',
+                                  square: el.type === 'qr',
                                   moved: false,
                                 };
                               }}
-                              style={handleStyle(handle)}
+                              style={handleStyle(handle, { x: px(el.w) < TIGHT_PX, y: px(el.h) < TIGHT_PX })}
                               className="absolute h-2.5 w-2.5 rounded-full border border-[var(--surface)] bg-[var(--focus)]"
-                            >
-                              <TouchZone />
-                            </span>
+                            />
                           ))}
                           {/* Ручка поворота — над верхним краем. Shift — с шагом в 15°. */}
                           <span
@@ -1683,11 +1727,9 @@ export function EditorPage() {
                               };
                             }}
                             title="Повернуть (Shift — с шагом 15°)"
-                            style={{ top: phone ? -30 : -22, left: 'calc(50% - 5px)', cursor: 'grab' }}
+                            style={{ top: -22, left: 'calc(50% - 5px)', cursor: 'grab' }}
                             className="absolute h-2.5 w-2.5 rounded-full border border-[var(--surface)] bg-[var(--accent)]"
-                          >
-                            <TouchZone />
-                          </span>
+                          />
                         </>
                       )}
                     </div>
@@ -1720,9 +1762,7 @@ export function EditorPage() {
                       }}
                       style={{ ...handleStyle(handle), pointerEvents: 'auto' }}
                       className="absolute h-3 w-3 rounded-sm border border-[var(--surface)] bg-[var(--focus)]"
-                    >
-                      <TouchZone />
-                    </span>
+                    />
                   ))}
                 </div>
               )}
@@ -1736,124 +1776,149 @@ export function EditorPage() {
             </div>
           </div>
         </div>
-        {/* Крестовина — поверх холста, но не внутри него: в прокручиваемом
-            холсте она уезжала бы вместе с листом. */}
-        {phone && nudgeOpen && selected.size > 0 && <NudgePad onNudge={nudgeSelected} />}
-        </div>
 
         {/* Панели справа нет, пока она не нужна: лист занимает весь экран,
             как в любом редакторе документов. Открывают её значком на панели
             или первым выделенным блоком. */}
+        {!panel && (
+          <aside
+            aria-label="Свёрнутая панель"
+            className="flex w-11 shrink-0 flex-col items-center gap-1 border-l border-[var(--line)] bg-[var(--surface)] py-2"
+          >
+            <IconButton size="sm" label="Свойства" onClick={() => setPanel('props')}>
+              <SlidersHorizontal size={16} />
+            </IconButton>
+            <IconButton size="sm" label="Данные" onClick={() => setPanel('fields')} className="relative">
+              <Variable size={16} />
+              {matches.length > 0 && (
+                <span className="absolute right-1 top-1 size-2 rounded-full bg-[var(--accent)]" />
+              )}
+            </IconButton>
+            <IconButton size="sm" label="Слои" onClick={() => setPanel('layers')}>
+              <Layers size={16} />
+            </IconButton>
+          </aside>
+        )}
         {panel && (
+          // На узком экране панель выезжает поверх холста, а не делит с ним
+          // ширину: иначе лист ужимался до десятой доли и работать было не на чем.
           <aside
             className={
-              phone
-                ? // Под листом, на половину экрана: лист остаётся виден сверху
-                  // и сразу показывает то, что меняют в панели.
-                  'flex h-[46%] shrink-0 flex-col rounded-t-2xl border-t border-[var(--line)] bg-[var(--surface)] shadow-[0_-8px_24px_-12px_rgba(9,17,53,0.25)]'
-                : 'flex w-80 shrink-0 flex-col border-l border-[var(--line)] bg-[var(--surface)]'
+              'absolute inset-y-0 right-0 z-30 flex w-80 max-w-[calc(100%-2.75rem)] flex-col border-l border-[var(--line)] ' +
+              'bg-[var(--surface)] shadow-xl md:static md:max-w-none md:shrink-0 md:shadow-none'
             }
           >
             <div className="flex border-b border-[var(--line)]">
-              <Tab large={phone} active={panel === 'props'} onClick={() => setPanel('props')} icon={<SlidersHorizontal size={14} />}>
-                {phone && selected.size === 0 ? 'Лист' : 'Свойства'}
+              <Tab active={panel === 'props'} onClick={() => setPanel('props')} icon={<SlidersHorizontal size={14} />}>
+                Свойства
               </Tab>
-              <Tab large={phone} active={panel === 'fields'} onClick={() => setPanel('fields')} icon={<Table2 size={14} />} badge={matches.length || undefined}>
-                Поля
+              <Tab active={panel === 'fields'} onClick={() => setPanel('fields')} icon={<Variable size={14} />} badge={matches.length || undefined}>
+                Данные
               </Tab>
-              <Tab large={phone} active={panel === 'layers'} onClick={() => setPanel('layers')} icon={<Layers size={14} />}>
+              <Tab active={panel === 'layers'} onClick={() => setPanel('layers')} icon={<Layers size={14} />}>
                 Слои
               </Tab>
-              <IconButton
-                size={phone ? 'md' : 'sm'}
-                label="Закрыть панель"
-                onClick={() => setPanel(null)}
-                className="m-1 shrink-0"
-              >
-                <X size={phone ? 20 : 15} />
+              <IconButton size="sm" label="Свернуть панель" onClick={() => setPanel(null)} className="m-1 shrink-0">
+                <ChevronsRight size={15} />
               </IconButton>
             </div>
+            {panel === 'fields' ? (
+              <FieldsList
+                header={
+                  <SheetView
+                    dataMode={dataMode}
+                    onMode={(mode) => setViewMode(mode)}
+                    row={safeRow}
+                    rowCount={rowCount}
+                    onRow={setRowIndex}
+                  />
+                }
+                fields={fields}
+                samples={previewData}
+                action={{ label: 'Вставить', run: insertField }}
+                draggable
+                notice={
+                  matches.length > 0 ? (
+                    <div className="rounded-lg bg-[var(--warn-soft)] p-2.5 text-[13px] leading-5">
+                      <p>
+                        {matches.length === 1 ? 'Поле макета не нашло колонку' : 'Поля макета не нашли колонки'}:{' '}
+                        {matches.map((m) => `«${m.from}» → «${m.to.name}»`).join(', ')}.
+                      </p>
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        icon={<Wand2 size={14} />}
+                        onClick={() => history.setLayout(applyMatches(layout, matches))}
+                        className="mt-2"
+                      >
+                        Сопоставить
+                      </Button>
+                    </div>
+                  ) : undefined
+                }
+                onCreate={async (title) => {
+                  const field = fieldFromColumn(await recipientMutations.addColumn.mutateAsync({ title }));
+                  // В выделенный текст — сразу: ради этого поле обычно и
+                  // заводят. Без выделения новый блок посреди листа был бы
+                  // сюрпризом, поэтому поле просто появляется в списке.
+                  if (canInsertIntoText) insertField(field);
+                  return field;
+                }}
+              />
+            ) : (
             <div className="min-h-0 flex-1 overflow-y-auto p-4">
-              {panel === 'props' && (
-                <PropertiesPanel
-                  elements={selectedElements}
-                  page={pageBox}
-                  doc={doc.data}
-                  onSaveEvent={(values) => saveEvent.mutate(values)}
-                  onEventDraft={setEventDraft}
-                  onResizePage={(size) => setResizeTo(size)}
-                  onTextProps={patchTextProps}
-                  onShapeProps={patchShapeProps}
-                  onElement={(patch, commit) => patchElements(selected, (el) => ({ ...el, ...patch }) as SheetElement, commit)}
-                  onBox={(elementId, box) => {
-                    const safe = { ...box, w: Math.max(box.w, 5), h: Math.max(box.h, 5) };
-                    updateBoxes({ [elementId]: moveBox(safe, 0, 0, pageBox.w, pageBox.h) }, true);
-                  }}
-                  onAlign={align}
-                  onDistribute={distribute}
-                  onGroup={() => {
-                    const groupId = crypto.randomUUID();
-                    patchElements(selected, (el) => ({ ...el, groupId }));
-                  }}
-                  onUngroup={() => patchElements(selected, (el) => ({ ...el, groupId: null }))}
-                  onLayer={(where) => {
-                    let next = layout;
-                    for (const elementId of selected) next = moveLayer(next, elementId, where);
-                    history.setLayout(next);
-                  }}
-                  onApplyStyleToAll={applyStyleToAll}
-                  onCopyStyle={() => {
-                    const source = selectedElements.find((el): el is TextElement => el.type === 'text');
-                    if (source) setStyleClipboard(pickTextStyle(source.props));
-                  }}
-                  onPasteStyle={() => styleClipboard && patchTextProps(styleClipboard)}
-                  hasStyleClipboard={styleClipboard !== null}
-                  onDelete={removeSelected}
-                />
-              )}
-              {panel === 'fields' && (
-                <FieldsPanel
-                  fields={fields}
-                  matches={matches}
-                  onInsert={insertField}
-                  onAutoMatch={() => history.setLayout(applyMatches(layout, matches))}
-                />
-              )}
-              {panel === 'layers' && (
-                <LayersPanel
-                  layout={layout}
-                  selected={selected}
-                  onSelect={(elementId, additive) => select(elementId, additive)}
-                  onChange={(next: SheetLayout) => history.setLayout(next)}
-                />
-              )}
-            </div>
+                {panel === 'props' && (
+                  <PropertiesPanel
+                    elements={selectedElements}
+                    page={pageBox}
+                    doc={doc.data}
+                    layout={layout}
+                    onSaveEvent={(values) => saveEvent.mutate(values)}
+                    onEventDraft={setEventDraft}
+                    onTextProps={patchTextProps}
+                    onShapeProps={patchShapeProps}
+                    onQrProps={patchQrProps}
+                    onLinkProps={patchLinkProps}
+                    onElement={(patch, commit) => patchElements(selected, (el) => ({ ...el, ...patch }) as SheetElement, commit)}
+                    onBox={(elementId, box) => {
+                      const safe = { ...box, w: Math.max(box.w, 5), h: Math.max(box.h, 5) };
+                      updateBoxes({ [elementId]: moveBox(safe, 0, 0, pageBox.w, pageBox.h) }, true);
+                    }}
+                    onAlign={align}
+                    onDistribute={distribute}
+                    onGroup={() => {
+                      const groupId = crypto.randomUUID();
+                      patchElements(selected, (el) => ({ ...el, groupId }));
+                    }}
+                    onUngroup={() => patchElements(selected, (el) => ({ ...el, groupId: null }))}
+                    onLayer={(where) => {
+                      let next = layout;
+                      for (const elementId of selected) next = moveLayer(next, elementId, where);
+                      history.setLayout(next);
+                    }}
+                    onApplyStyleToAll={applyStyleToAll}
+                    onCopyStyle={() => {
+                      const source = selectedElements.find((el): el is TextElement => el.type === 'text');
+                      if (source) setStyleClipboard(pickTextStyle(source.props));
+                    }}
+                    onPasteStyle={() => styleClipboard && patchTextProps(styleClipboard)}
+                    hasStyleClipboard={styleClipboard !== null}
+                    onDelete={removeSelected}
+                  />
+                )}
+                {panel === 'layers' && (
+                  <LayersPanel
+                    layout={layout}
+                    selected={selected}
+                    onSelect={(elementId, additive) => select(elementId, additive)}
+                    onChange={(next: SheetLayout) => history.setLayout(next)}
+                  />
+                )}
+              </div>
+            )}
           </aside>
         )}
       </div>
-
-      {phone && (
-        <PhoneToolbar
-          selectedCount={selected.size}
-          canEditText={single?.type === 'text' && !single.locked}
-          locked={selectedElements.length > 0 && selectedElements.every((el) => el.locked)}
-          panel={panel}
-          nudgeOpen={nudgeOpen}
-          onInsert={() => setInsertOpen(true)}
-          onPanel={togglePanel}
-          onBackground={pickBackground}
-          backgroundBusy={uploadBackground.isPending}
-          onFit={() => zoomTo('fit')}
-          onEditText={() => single && setEditingId(single.id)}
-          onNudge={() => setNudgeOpen((v) => !v)}
-          onDuplicate={() => cloneInto(selectedElements)}
-          onDelete={removeSelected}
-          onDone={() => {
-            setSelected(new Set());
-            setPanel(null);
-          }}
-        />
-      )}
 
       {/* Закладки листов — внизу, как в любом редакторе страниц. */}
       <SheetTabs
@@ -1871,52 +1936,6 @@ export function EditorPage() {
 
       {fileMenu.dialogs}
 
-      {phone && (
-        <InsertSheet
-          open={insertOpen}
-          onClose={() => setInsertOpen(false)}
-          onInsert={addElement}
-          fields={fields}
-          onBackground={pickBackground}
-          backgroundLoading={uploadBackground.isPending}
-          hasBackground={hasBackground}
-        />
-      )}
-
-      {editingElement && (
-        <PhoneTextSheet
-          key={editingElement.id}
-          element={editingElement}
-          previewSize={{ width: page.pageWidthMm * PX_PER_MM, height: page.pageHeightMm * PX_PER_MM }}
-          preview={
-            <SheetRenderer
-              layout={layout}
-              pageWidthMm={page.pageWidthMm}
-              pageHeightMm={page.pageHeightMm}
-              backgroundUrl={background.data?.url}
-              data={previewData}
-              unfilled={dataMode ? 'blank' : 'token'}
-              fields={dataMode ? 'highlight' : 'chip'}
-              knownFields={known}
-              fieldLabels={labels}
-            />
-          }
-          fields={fields}
-          data={previewData}
-          known={known}
-          labels={labels}
-          onEditor={(editor) => {
-            liveEditor.current = editor;
-          }}
-          onChange={(richDoc) => setDoc(editingElement.id, richDoc, false)}
-          onDone={(richDoc) => {
-            liveEditor.current = null;
-            setDoc(editingElement.id, richDoc, true);
-            setEditingId(null);
-          }}
-        />
-      )}
-
       {sizeOpen && (
         <PageSizeDialog
           current={{ widthMm: page.pageWidthMm, heightMm: page.pageHeightMm }}
@@ -1930,6 +1949,16 @@ export function EditorPage() {
         />
       )}
 
+      {canvasMenu && (
+        <CanvasMenu
+          at={canvasMenu}
+          canPaste={clipboard.current.length > 0}
+          onInsert={(what) => addElement(what, canvasMenu.mm)}
+          onImage={pickImage}
+          onPaste={() => cloneInto(clipboard.current)}
+          onClose={() => setCanvasMenu(null)}
+        />
+      )}
       {resizeTo && (
         <ResizeDialog
           from={{ widthMm: page.pageWidthMm, heightMm: page.pageHeightMm }}
@@ -1955,17 +1984,21 @@ export function EditorPage() {
 }
 
 /**
- * Невидимая зона под палец вокруг ручки. Видимая ручка остаётся в 10 точек —
- * крупнее она закрывала бы узкий блок, — а попадать пальцем есть куда.
- * Мыши зона не нужна: там она перехватывала бы блок у соседних ручек.
+ * Ручка стоит на рамке, половиной внутри блока. По тесной стороне —
+ * целиком снаружи: на мелком масштабе строка в 20 мм занимает 14 пикселей,
+ * и ручки по 10 закрывали её всю — вместо сдвига блок растягивался.
  */
-function TouchZone() {
-  return <span aria-hidden className="absolute -inset-3 hidden rounded-full pointer-coarse:block" />;
-}
-
-function handleStyle(handle: ResizeHandle): React.CSSProperties {
-  const vertical = handle.includes('n') ? '-5px' : handle.includes('s') ? 'calc(100% - 5px)' : 'calc(50% - 5px)';
-  const horizontal = handle.includes('w') ? '-5px' : handle.includes('e') ? 'calc(100% - 5px)' : 'calc(50% - 5px)';
+function handleStyle(handle: ResizeHandle, tight: { x: boolean; y: boolean } = { x: false, y: false }): React.CSSProperties {
+  const vertical = handle.includes('n')
+    ? tight.y ? '-11px' : '-5px'
+    : handle.includes('s')
+      ? tight.y ? 'calc(100% + 1px)' : 'calc(100% - 5px)'
+      : 'calc(50% - 5px)';
+  const horizontal = handle.includes('w')
+    ? tight.x ? '-11px' : '-5px'
+    : handle.includes('e')
+      ? tight.x ? 'calc(100% + 1px)' : 'calc(100% - 5px)'
+      : 'calc(50% - 5px)';
   const cursors: Record<ResizeHandle, string> = {
     nw: 'nwse-resize',
     n: 'ns-resize',
@@ -2022,41 +2055,72 @@ function Ruler({ axis, lengthMm, zoom }: { axis: 'x' | 'y'; lengthMm: number; zo
   );
 }
 
-function Segment({
-  active,
-  onClick,
-  disabled,
-  title,
-  large = false,
-  children,
+/**
+ * Что показывать на листе — в шапке панели полей.
+ *
+ * Раньше это был переключатель «Заготовка / Данные строки» на панели
+ * инструментов, рядом с отдельной кнопкой «Поля»: две кнопки про одни
+ * и те же поля. Слово «заготовка» не объясняло, что на листе окажутся
+ * названия полей, — теперь так и написано.
+ */
+function SheetView({
+  dataMode,
+  onMode,
+  row,
+  rowCount,
+  onRow,
 }: {
-  active: boolean;
-  onClick: () => void;
-  disabled?: boolean;
-  title?: string;
-  /** Под палец: 40 точек в высоту вместо 28. */
-  large?: boolean;
-  children: React.ReactNode;
+  dataMode: boolean;
+  onMode: (mode: 'placeholders' | 'data') => void;
+  row: number;
+  rowCount: number;
+  onRow: (row: number) => void;
 }) {
-  /*
-   * Подсказка снаружи кнопки, а не на ней: она объясняет, почему вкладка
-   * недоступна, а выключенная кнопка событий указателя не получает —
-   * на ней самой объяснение не показалось бы никогда.
-   */
+  const option = (active: boolean) =>
+    `h-7 rounded-md px-2 text-[13px] transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+      active
+        ? 'bg-[var(--surface)] font-medium text-[var(--text)] shadow-[var(--shadow-sm,0_1px_2px_rgba(12,43,100,0.12))]'
+        : 'text-[var(--text-muted)] hover:text-[var(--text)]'
+    }`;
   return (
-    <Tooltip label={title}>
-      <button
-        type="button"
-        onClick={onClick}
-        disabled={disabled}
-        aria-pressed={active}
-        className={`rounded-md px-2.5 text-sm transition-colors disabled:opacity-50 ${large ? 'h-10' : 'py-1'} ${
-          active ? 'bg-[var(--accent-soft)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text)]'
-        }`}
-      >
-        {children}
-      </button>
-    </Tooltip>
+    <div className="shrink-0 border-b border-[var(--line)] px-3 pb-3 pt-2.5">
+      <p className="mb-1.5 text-xs font-medium text-[var(--text-muted)]">На листе показывать</p>
+      <div role="radiogroup" aria-label="На листе показывать" className="grid grid-cols-2 gap-0.5 rounded-lg bg-[var(--surface-sunken)] p-0.5">
+        <button type="button" role="radio" aria-checked={!dataMode} onClick={() => onMode('placeholders')} className={option(!dataMode)}>
+          Названия полей
+        </button>
+        <Tooltip label={rowCount === 0 ? 'Список получателей пока пустой' : undefined}>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={dataMode}
+            disabled={rowCount === 0}
+            onClick={() => onMode('data')}
+            className={`w-full ${option(dataMode)}`}
+          >
+            Данные из таблицы
+          </button>
+        </Tooltip>
+      </div>
+      {dataMode && rowCount > 0 && (
+        <div className="mt-2 flex items-center justify-between">
+          <IconButton size="sm" label="Предыдущая строка" disabled={row === 0} onClick={() => onRow(Math.max(0, row - 1))}>
+            <ChevronLeft size={16} />
+          </IconButton>
+          <span className="tabular text-[13px] text-[var(--text-muted)]">
+            Строка {row + 1} из {rowCount}
+          </span>
+          <IconButton
+            size="sm"
+            label="Следующая строка"
+            disabled={row >= rowCount - 1}
+            onClick={() => onRow(Math.min(rowCount - 1, row + 1))}
+          >
+            <ChevronRight size={16} />
+          </IconButton>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -2065,14 +2129,12 @@ function Tab({
   onClick,
   icon,
   badge,
-  large = false,
   children,
 }: {
   active: boolean;
   onClick: () => void;
   icon: React.ReactNode;
   badge?: number;
-  large?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -2081,15 +2143,74 @@ function Tab({
       onClick={onClick}
       aria-selected={active}
       role="tab"
-      className={`flex flex-1 items-center justify-center gap-1.5 border-b-2 px-2 text-sm ${large ? 'h-12' : 'py-2'} ${
+      className={`flex flex-1 items-center justify-center gap-1.5 border-b-2 px-2 py-2 text-sm ${
         active ? 'border-[var(--accent)] text-[var(--accent)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text)]'
       }`}
     >
       {icon}
       {children}
       {badge ? (
-        <span className="rounded-full bg-[var(--accent)] px-1.5 text-[10px] font-medium text-white">{badge}</span>
+        <span className="rounded-full bg-[var(--accent)] px-1.5 text-[10px] font-medium text-[var(--accent-contrast)]">{badge}</span>
       ) : null}
+    </button>
+  );
+}
+
+/**
+ * Плитка выбора пути на пустом листе. Плитка бланка принимает и файл,
+ * брошенный прямо на неё: так его ставят фоном, а не картинкой на лист.
+ */
+function StartTile({
+  icon,
+  label,
+  hint,
+  onClick,
+  onFile,
+  disabled,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  hint: string;
+  onClick: () => void;
+  onFile?: (file: File) => void;
+  disabled?: boolean;
+}) {
+  const [over, setOver] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      onDragOver={(e) => {
+        if (!onFile || !e.dataTransfer.types.includes('Files')) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setOver(true);
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => {
+        const file = e.dataTransfer.files[0];
+        if (!onFile || !file) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setOver(false);
+        onFile(file);
+      }}
+      className={
+        'flex flex-col items-center gap-1.5 rounded-2xl border-2 bg-[var(--surface)] px-3 py-5 ' +
+        // Пунктир — только у плитки, на которую можно бросить файл.
+        (onFile ? 'border-dashed ' : '') +
+        'transition-colors disabled:opacity-60 ' +
+        (over
+          ? 'border-[var(--accent)] bg-[var(--accent-soft)]'
+          : 'border-[var(--line)] hover:border-[var(--accent)]')
+      }
+    >
+      <span className="grid size-11 place-items-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">
+        {icon}
+      </span>
+      <span className="text-sm font-medium whitespace-nowrap">{label}</span>
+      <span className="text-xs whitespace-nowrap text-[var(--text-muted)]">{hint}</span>
     </button>
   );
 }

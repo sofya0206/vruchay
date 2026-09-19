@@ -12,6 +12,8 @@ import { Select } from '../ui/Select';
 import { BareInput, Card, FieldCard } from './ui';
 import { EmbedCode } from './EmbedCode';
 import { TildaGuide } from './TildaGuide';
+import { Collapse } from '../ui/Collapse';
+import { SkeletonRows } from '../ui/Skeleton';
 
 /**
  * Интеграция с Тильдой.
@@ -442,39 +444,50 @@ function IntegrationBlock({
           {showRequests ? 'Скрыть заявки' : `Показать заявки (${integration._count?.requests ?? 0})`}
         </Button>
 
-        {showRequests && (
+        {/* Раскрытие плавное, а не рывком: таблица вырастает из потока,
+            и карточки ниже съезжают вместе с ней. Пока заявки грузятся,
+            место под них уже занято скелетоном — второго прыжка,
+            когда придут данные, не будет. */}
+        <Collapse open={showRequests}>
           <div className="mt-2 overflow-x-auto">
-            <table className="w-full text-left">
-              <thead className="text-sm uppercase text-[var(--text-muted)]">
-                <tr>
-                  <th className="py-2 pr-4 font-medium">Участник</th>
-                  <th className="py-2 pr-4 font-medium">Адрес</th>
-                  <th className="py-2 pr-4 font-medium">Состояние</th>
-                  <th className="py-2 font-medium">Когда</th>
-                </tr>
-              </thead>
-              <tbody>
-                {requests.data?.map((r) => (
-                  <tr key={r.id} className="border-t border-[var(--line)]">
-                    <td className="py-2 pr-4">{r.fields.name ?? '—'}</td>
-                    <td className="py-2 pr-4">{r.email}</td>
-                    <td className="py-2 pr-4">{requestLabel(r.status)}</td>
-                    <td className="py-2 text-[var(--text-muted)]">
-                      {new Date(r.createdAt).toLocaleString('ru-RU')}
-                    </td>
-                  </tr>
-                ))}
-                {requests.data?.length === 0 && (
+            {requests.isPending ? (
+              <SkeletonRows
+                rows={Math.min(Math.max(integration._count?.requests ?? 1, 1), 5)}
+                label="Загружаем заявки"
+              />
+            ) : (
+              <table className="w-full text-left">
+                <thead className="text-sm uppercase text-[var(--text-muted)]">
                   <tr>
-                    <td colSpan={4} className="py-3 text-[var(--text-muted)]">
-                      Заявок пока нет
-                    </td>
+                    <th className="py-2 pr-4 font-medium">Участник</th>
+                    <th className="py-2 pr-4 font-medium">Адрес</th>
+                    <th className="py-2 pr-4 font-medium">Состояние</th>
+                    <th className="py-2 font-medium">Когда</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {requests.data?.map((r) => (
+                    <tr key={r.id} className="border-t border-[var(--line)]">
+                      <td className="py-2 pr-4">{r.fields.name ?? '—'}</td>
+                      <td className="py-2 pr-4">{r.email}</td>
+                      <td className="py-2 pr-4">{requestLabel(r.status)}</td>
+                      <td className="py-2 text-[var(--text-muted)]">
+                        {new Date(r.createdAt).toLocaleString('ru-RU')}
+                      </td>
+                    </tr>
+                  ))}
+                  {requests.data?.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="py-3 text-[var(--text-muted)]">
+                        Заявок пока нет
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            )}
           </div>
-        )}
+        </Collapse>
       </Card>
 
       <Card>

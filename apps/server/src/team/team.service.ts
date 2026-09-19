@@ -8,7 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { InjectRedis } from '../common/redis.module';
 import { hashPassword, validatePasswordStrength, verifyPassword } from '../auth/password';
-import { escapeHtml } from '../mail/mail-template';
+import { escapeHtml, mailButton } from '../mail/mail-template';
 import { PERMISSIONS, ROLE_TITLE } from './role-permissions';
 
 /** Приглашение живёт неделю: успеть открыть письмо, но не бесконечно. */
@@ -251,9 +251,8 @@ export class TeamService {
       `<p style="font-size:15px">Вас пригласили работать в «${escapeHtml(orgName)}» на сервисе «Вручай» — ` +
       `здесь готовят и рассылают грамоты, дипломы и сертификаты.</p>` +
       `<p style="font-size:15px">Нажмите кнопку и придумайте пароль — на это уйдёт минута.</p>` +
-      `<p><a href="${link}" style="display:inline-block;background:#1F5D3F;color:#fff;` +
-      `padding:12px 20px;border-radius:10px;text-decoration:none;font-size:15px">Войти в сервис</a></p>` +
-      `<p style="font-size:13px;color:#666">Ссылка работает 7 дней. Если вы не ждали приглашения — ` +
+      mailButton(link, 'Войти в сервис') +
+      `<p style="font-size:13px;color:#36394a">Ссылка работает 7 дней. Если вы не ждали приглашения — ` +
       `просто не открывайте её, ничего не произойдёт.</p>`;
 
     await this.safeSend(email, `Приглашение в «${orgName}» — Вручай`, html);

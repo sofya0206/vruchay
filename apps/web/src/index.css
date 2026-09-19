@@ -62,6 +62,18 @@
 }
 
 /*
+ * shadow-sm/md/lg по всему кабинету — тень из темы, а не встроенная серая:
+ * встроенная в тёмной невидима, а токены ниже знают, какая нужна.
+ * `inline reference` — чтобы Tailwind не объявил переменную заново
+ * и не замкнул её саму на себя.
+ */
+@theme inline reference {
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+}
+
+/*
  * Две утилиты, из которых собран весь кабинет: карточка и волосяная линия.
  * Радиусы и тени в остальном коде не пишутся вручную — берутся отсюда.
  */
@@ -79,12 +91,26 @@
   --ground: #ffffff;
   --surface: #ffffff;
   --surface-sunken: #f5f3ff;
+  /*
+   * Поднятая поверхность — меню, диалоги, подсказки. В светлой она та же
+   * белая, что и карточка: глубину даёт тень. В тёмной тени не видно,
+   * и плавающее поднимается на ступень светлее, как у Apple и Material.
+   */
+  --surface-raised: #ffffff;
   --line: #e1e9f0;
   --line-strong: #b1bbcd;
   --text: #091135;
   --text-muted: #36394a;
-  --accent: #127ee3;
-  --accent-hover: #0f6ac1;
+  /*
+   * Синий чуть темнее прежнего #127ee3: тот давал 4,1 : 1 на белом
+   * и не проходил WCAG AA для текста ссылок и мелких подписей.
+   */
+  --accent: #0f6ac1;
+  --accent-hover: #0d5da9;
+  /* Фон главной кнопки. В светлой тот же синий; в тёмной темнее ссылки,
+     чтобы белая надпись на нём читалась 4,5 : 1. */
+  --accent-button: #0f6ac1;
+  --accent-button-hover: #0d5da9;
   --accent-soft: #eaf3fe;
   --accent-contrast: #ffffff;
   /*
@@ -92,9 +118,9 @@
    * не выражаются. Выведены из той же холодной гаммы: «в работе» — синий
    * контурный акцент, ошибка — красный, подобранный к кобальту по светлоте.
    */
-  --award: #0f77ff;
+  --award: #0b63d6;
   --award-soft: #e7f1ff;
-  --danger: #d92d3f;
+  --danger: #c9273a;
   --danger-soft: #fdecee;
   /*
    * Семантика состояний. Раньше «готово», «в очереди» и «заменено»
@@ -103,9 +129,9 @@
    * взгляда, но не срочно, красный — сломано. Синий остаётся за «идёт»
    * и за единственной главной кнопкой.
    */
-  --ok: #178a56;
+  --ok: #14764a;
   --ok-soft: #e3f5ec;
-  --warn: #b8690e;
+  --warn: #9e5a0c;
   --warn-soft: #fdf1df;
   --focus: #0f77ff;
   --accent-line: #0f77ff;
@@ -138,6 +164,8 @@
   /* Теней в покое нет: глубина даётся подложкой и волосяной линией. */
   --ring-line: inset 0 0 0 1px var(--line);
   --shadow-lg: 0 1px 2px 0 rgba(12, 43, 100, 0.12), 0 6px 16px 0 rgba(12, 43, 100, 0.12);
+  --shadow-md: 0 1px 2px 0 rgba(12, 43, 100, 0.1), 0 4px 10px 0 rgba(12, 43, 100, 0.1);
+  --shadow-sm: 0 1px 2px 0 rgba(12, 43, 100, 0.08);
   --shadow-sheet: 0 1px 2px 0 rgba(12, 43, 100, 0.1), 0 12px 32px 0 rgba(12, 43, 100, 0.12);
   --shadow-focus:
     0 0 0 1px rgb(15, 119, 255), 0 1px 2px 0 rgba(12, 43, 100, 0.32),
@@ -180,13 +208,110 @@
 }
 
 /*
- * Тёмная тема временно снята: в дизайн-системе тёмной палитры нет, а старая
- * зелёная рядом с новой синей читалась бы как другой продукт. Переключатель
- * в настройках оставлен и продолжает выставлять data-theme — сюда вернутся
- * значения, когда тёмную отрисуют.
+ * Тёмная тема: «ночь в кабинете, свет на листе».
+ *
+ * Нейтрали выведены из чернильного #091135, а не из серого: подложка,
+ * карточка и поднятая поверхность — три ступени светлоты одной ночи.
+ * Глубину даёт ступень и волосяная линия, тень остаётся только у того,
+ * что плавает. Токены бумаги (--sheet-*) не переопределяются намеренно:
+ * документ печатают на белом, и на экране он остаётся белым — как лист
+ * под настольной лампой.
+ *
+ * Значения объявлены дважды: для системной тёмной темы (без атрибута —
+ * человек выбрал «как в системе») и для явного выбора. Явный светлый
+ * выбор при тёмной системе побеждает через :not([data-theme="light"]).
+ * Правя одно — править и второе.
  */
 :root {
   color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+  color-scheme: dark;
+  --ground: #0b0f1d;
+  --surface: #121729;
+  --surface-sunken: #1a2036;
+  --surface-raised: #1a2036;
+  --line: #242b45;
+  --line-strong: #3a4468;
+  --text: #e6eaf5;
+  --text-muted: #9aa4c2;
+  --accent: #3d8ef5;
+  --accent-hover: #5a9ff8;
+  --accent-button: #2470d2;
+  --accent-button-hover: #2a7add;
+  --accent-soft: rgba(61, 142, 245, 0.14);
+  --accent-contrast: #ffffff;
+  --award: #5aa3ff;
+  --award-soft: rgba(90, 163, 255, 0.16);
+  --danger: #f0616f;
+  --danger-soft: rgba(240, 97, 111, 0.16);
+  --ok: #3fc07a;
+  --ok-soft: rgba(63, 192, 122, 0.16);
+  --warn: #e0a34a;
+  --warn-soft: rgba(224, 163, 74, 0.16);
+  --focus: #5aa3ff;
+  --accent-line: #5aa3ff;
+  --surface-blue: #141c33;
+  --scrim: rgba(3, 6, 18, 0.64);
+  --row-hover: rgba(230, 234, 245, 0.05);
+  /* Тени на тёмном сливаются с фоном, поэтому у плавающего — блик сверху и глубокая тень. */
+  --shadow-lg:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.06), 0 1px 2px 0 rgba(0, 0, 0, 0.5),
+    0 12px 32px 0 rgba(0, 0, 0, 0.55);
+  --shadow-md: inset 0 1px 0 0 rgba(255, 255, 255, 0.05), 0 4px 12px 0 rgba(0, 0, 0, 0.45);
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+  /* Лист — единственный белый предмет на экране: тень с едва заметным холодным ореолом. */
+  --shadow-sheet:
+    0 1px 2px 0 rgba(0, 0, 0, 0.5), 0 24px 64px 0 rgba(0, 0, 0, 0.6),
+    0 0 120px 0 rgba(90, 163, 255, 0.07);
+  --shadow-focus:
+    0 0 0 1px rgb(90, 163, 255), 0 1px 2px 0 rgba(0, 0, 0, 0.5), 0 6px 16px 0 rgba(0, 0, 0, 0.5);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --ground: #0b0f1d;
+  --surface: #121729;
+  --surface-sunken: #1a2036;
+  --surface-raised: #1a2036;
+  --line: #242b45;
+  --line-strong: #3a4468;
+  --text: #e6eaf5;
+  --text-muted: #9aa4c2;
+  --accent: #3d8ef5;
+  --accent-hover: #5a9ff8;
+  --accent-button: #2470d2;
+  --accent-button-hover: #2a7add;
+  --accent-soft: rgba(61, 142, 245, 0.14);
+  --accent-contrast: #ffffff;
+  --award: #5aa3ff;
+  --award-soft: rgba(90, 163, 255, 0.16);
+  --danger: #f0616f;
+  --danger-soft: rgba(240, 97, 111, 0.16);
+  --ok: #3fc07a;
+  --ok-soft: rgba(63, 192, 122, 0.16);
+  --warn: #e0a34a;
+  --warn-soft: rgba(224, 163, 74, 0.16);
+  --focus: #5aa3ff;
+  --accent-line: #5aa3ff;
+  --surface-blue: #141c33;
+  --scrim: rgba(3, 6, 18, 0.64);
+  --row-hover: rgba(230, 234, 245, 0.05);
+  /* Тени на тёмном сливаются с фоном, поэтому у плавающего — блик сверху и глубокая тень. */
+  --shadow-lg:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.06), 0 1px 2px 0 rgba(0, 0, 0, 0.5),
+    0 12px 32px 0 rgba(0, 0, 0, 0.55);
+  --shadow-md: inset 0 1px 0 0 rgba(255, 255, 255, 0.05), 0 4px 12px 0 rgba(0, 0, 0, 0.45);
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+  /* Лист — единственный белый предмет на экране: тень с едва заметным холодным ореолом. */
+  --shadow-sheet:
+    0 1px 2px 0 rgba(0, 0, 0, 0.5), 0 24px 64px 0 rgba(0, 0, 0, 0.6),
+    0 0 120px 0 rgba(90, 163, 255, 0.07);
+  --shadow-focus:
+    0 0 0 1px rgb(90, 163, 255), 0 1px 2px 0 rgba(0, 0, 0, 0.5), 0 6px 16px 0 rgba(0, 0, 0, 0.5);
 }
 
 html,
@@ -213,9 +338,27 @@ h2 {
   font-variant-numeric: tabular-nums;
 }
 
-:where(a, button, input, select, textarea):focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
+/*
+ * В базовом слое, а не вне слоёв: иначе правило перебивало `outline-none`
+ * у любого поля — стили вне слоёв сильнее утилит Tailwind при любой
+ * специфичности. Поле со своей рамкой фокуса (поля кита, ячейки таблицы,
+ * название в шапке) рисовало две: свою и эту, на 2 px снаружи, — а в таблице
+ * верх внешней ещё и срезала прилипшая шапка.
+ */
+@layer base {
+  :where(a, button, input, select, textarea):focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+}
+
+/*
+ * Строки панели полей лежат в карточке, обрезанной по краям: рамка
+ * фокуса снаружи строки срезалась бы у первой и последней. Утапливаем
+ * её внутрь — рамка та же, общая для кабинета.
+ */
+.field-row:focus-visible {
+  outline-offset: -2px;
 }
 
 /*
@@ -370,6 +513,22 @@ textarea::-webkit-resizer {
  * а цвет — откуда и не пропало ли. Размеры в em, а не в пикселях: фишка
  * живёт внутри текста любого кегля и масштабируется вместе с ним.
  */
+/*
+ * Скелетон: мягкое мерцание слева направо. Под reduced-motion остаётся
+ * ровная плашка — общее правило выше уже гасит анимацию.
+ */
+@keyframes vru-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.vru-skeleton {
+  background: linear-gradient(90deg, var(--surface-sunken) 25%, var(--line) 50%, var(--surface-sunken) 75%);
+  background-size: 200% 100%;
+  animation: vru-shimmer 1.6s linear infinite;
+}
+
 .merge-chip {
   display: inline;
   box-decoration-break: clone;

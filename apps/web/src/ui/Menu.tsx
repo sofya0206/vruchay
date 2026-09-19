@@ -89,7 +89,7 @@ export function Menu({
             if ((e.target as HTMLElement).closest('[role="menuitem"]')) setOpen(false);
           }}
           className={cn(
-            'card absolute top-full z-30 mt-1 min-w-56 p-1.5 shadow-lg',
+            'card absolute top-full z-30 mt-1 min-w-56 bg-[var(--surface-raised)] p-1.5 shadow-lg',
             align === 'right' ? 'right-0' : 'left-0',
           )}
         >

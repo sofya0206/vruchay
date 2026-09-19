@@ -126,3 +126,86 @@ describe('renameFieldInLayout', () => {
     expect(renameFieldInLayout([{ type: 'video' }], { fieldId: COLUMN, source: 'name' }, 'fio')).toBeNull();
   });
 });
+
+/*
+ * Колонка из панели полей приходит названием, а не именем переменной:
+ * человек пишет «Команда», и латиницу за него подбирает сервер.
+ */
+describe('addColumn', () => {
+  function addStub(names: string[]) {
+    const created: { name: string; title: string | null; position: number }[] = [];
+    const prisma = {
+      document: {
+        findFirst: async ({ where }: { where: { orgId: string } }) =>
+          where.orgId === ORG ? { id: DOCUMENT } : null,
+      },
+      recipientColumn: {
+        findMany: async () => names.map((name) => ({ name })),
+        create: async ({ data }: { data: { name: string; title: string | null; position: number } }) => {
+          created.push(data);
+          return { id: COLUMN, documentId: DOCUMENT, ...data };
+        },
+      },
+    };
+    return { service: new RecipientsService(prisma as never), created };
+  }
+
+  it('по русскому названию подбирает латинское имя и хранит название', async () => {
+    const { service, created } = addStub(['name', 'email']);
+    await service.addColumn(ORG, DOCUMENT, { title: 'Год рождения' });
+    expect(created).toEqual([{ documentId: DOCUMENT, name: 'god_rozhdeniya', title: 'Год рождения', position: 2 }]);
+  });
+
+  it('знакомое название становится знакомым именем, занятое — с суффиксом', async () => {
+    const { service, created } = addStub(['name', 'email', 'team']);
+    await service.addColumn(ORG, DOCUMENT, { title: 'Команда' });
+    expect(created[0].name).toBe('team_2');
+  });
+
+  it('латинское имя без названия принимает как есть', async () => {
+    const { service, created } = addStub(['name']);
+    await service.addColumn(ORG, DOCUMENT, { name: 'coach' });
+    expect(created[0]).toMatchObject({ name: 'coach', title: null, position: 1 });
+  });
+
+  it('чужой документ — 404', async () => {
+    const { service } = addStub([]);
+    await expect(service.addColumn('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', DOCUMENT, { title: 'Команда' })).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+});
+
+describe('перестановка колонок', () => {
+  const A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
+  const B = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2';
+  const C = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3';
+  function make() {
+    const positions: Record<string, number> = {};
+    const prisma = {
+      document: { findFirst: async ({ where }: { where: { orgId: string } }) => (where.orgId === ORG ? { id: DOCUMENT } : null) },
+      recipientColumn: {
+        findMany: async () => [{ id: A }, { id: B }, { id: C }],
+        update: ({ where, data }: { where: { id: string }; data: { position: number } }) => {
+          positions[where.id] = data.position;
+          return Promise.resolve();
+        },
+      },
+      $transaction: (ops: Promise<unknown>[]) => Promise.all(ops),
+    };
+    return { service: new RecipientsService(prisma as never), positions };
+  }
+
+  it('ставит колонки в заданном порядке, неупомянутые — следом', async () => {
+    const { service, positions } = make();
+    await expect(service.reorderColumns(ORG, DOCUMENT, [C, A])).resolves.toEqual({ order: [C, A, B] });
+    expect(positions).toEqual({ [C]: 0, [A]: 1, [B]: 2 });
+  });
+
+  it('чужая колонка — «не найдена»', async () => {
+    const { service } = make();
+    await expect(service.reorderColumns(ORG, DOCUMENT, ['dddddddd-dddd-4ddd-8ddd-dddddddddddd'])).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+});

@@ -87,6 +87,11 @@ export class GenerationService {
       include: { sheets: { orderBy: { position: 'asc' } } },
     });
     if (!doc) throw new NotFoundException('Документ не найден');
+    // Шаблон — заготовка на много мероприятий, а выпуск всегда про одно:
+    // выданный с шаблона документ не нашёлся бы ни в одном мероприятии.
+    if (doc.isTemplate) {
+      throw new BadRequestException('Это шаблон — создайте по нему документ и выпускайте из него');
+    }
 
     const hasContent = doc.sheets.some(
       (s) => Array.isArray(s.layout) && (s.layout as unknown[]).length > 0,

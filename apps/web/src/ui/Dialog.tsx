@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { Button } from './Button';
 import { IconButton } from './IconButton';
@@ -17,24 +17,67 @@ export function Dialog({
   footer?: ReactNode;
   wide?: boolean;
 }) {
+  const panel = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
+  /*
+   * Фокус: внутрь при открытии, по кругу внутри, назад при закрытии.
+   * Без этого Tab уходил за окно на страницу под затемнением, а после
+   * закрытия фокус терялся в начале документа.
+   */
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    const root = panel.current;
+    if (!root) return;
+    const focusable = () =>
+      Array.from(
+        root.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((el) => el.offsetParent !== null || el === document.activeElement);
+    // Первое поле формы, а не крестик «Закрыть»: человек открыл окно,
+    // чтобы что-то ввести или подтвердить.
+    const first = focusable().find((el) => el.getAttribute('aria-label') !== 'Закрыть') ?? root;
+    first.focus();
+
+    const trap = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      const list = focusable();
+      if (list.length === 0) return;
+      const head = list[0];
+      const tail = list[list.length - 1];
+      if (e.shiftKey && document.activeElement === head) {
+        e.preventDefault();
+        tail.focus();
+      } else if (!e.shiftKey && document.activeElement === tail) {
+        e.preventDefault();
+        head.focus();
+      }
+    };
+    root.addEventListener('keydown', trap);
+    return () => {
+      root.removeEventListener('keydown', trap);
+      opener?.focus?.();
+    };
+  }, []);
+
   return (
     <div
-      // На телефоне окно прижато к низу и во всю ширину — как нижний лист:
-      // кнопки подтверждения оказываются под большим пальцем, а не посреди экрана.
-      className="fixed inset-0 z-50 grid place-items-center bg-[var(--scrim)] p-4 max-sm:place-items-end max-sm:p-0"
+      className="fixed inset-0 z-50 grid place-items-center bg-[var(--scrim)] p-4"
       role="dialog"
       aria-modal="true"
       aria-label={title}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
-        className={`flex max-h-full w-full flex-col overflow-hidden rounded-2xl bg-[var(--surface)] shadow-lg max-sm:max-h-[85vh] max-sm:rounded-b-none ${
+        ref={panel}
+        tabIndex={-1}
+        className={`flex max-h-full w-full flex-col overflow-hidden rounded-2xl bg-[var(--surface-raised)] outline-none shadow-lg ${
           wide ? 'max-w-4xl' : 'max-w-xl'
         }`}
       >
@@ -48,10 +91,7 @@ export function Dialog({
         <div className="min-h-0 flex-1 overflow-auto p-5">{children}</div>
 
         {footer && (
-          <footer
-            className="flex items-center justify-end gap-2 border-t border-[var(--line)] px-5 pt-3 max-sm:flex-col-reverse max-sm:items-stretch max-sm:[&>*]:h-11"
-            style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
-          >
+          <footer className="flex items-center justify-end gap-2 border-t border-[var(--line)] px-5 py-3">
             {footer}
           </footer>
         )}

@@ -1,7 +1,7 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Archive, FileText, Plus, Search } from 'lucide-react';
+import { Archive, FileText, LayoutTemplate, Plus, Search } from 'lucide-react';
 import { UsageBar } from '../documents/UsageBar';
 import { LibraryLayout } from '../documents/LibraryNav';
 import { TRASH_DAYS } from '@gramota/shared';
@@ -9,13 +9,14 @@ import { api } from '../api/client';
 import type { DocumentDetail, DocumentList, DocumentSummary } from '../api/types';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Field';
-import { Select } from '../ui/Select';
 import { DocumentCard } from '../documents/DocumentCard';
-import { PageSizePicker, type PageSizeValue } from '../documents/PageSizePicker';
+import { CreateDocumentPanel } from '../documents/CreateDocumentPanel';
 import { useFolders } from '../api/folders';
 import { LibrarySortSelect, type LibrarySort } from '../documents/LibraryFilters';
 import { RenameDialog } from '../documents/RenameDialog';
 import { EmptyState } from '../ui/EmptyState';
+import { ErrorState } from '../ui/ErrorState';
+import { SkeletonCards } from '../ui/Skeleton';
 
 /**
  * Библиотека материалов.
@@ -29,17 +30,19 @@ import { EmptyState } from '../ui/EmptyState';
  * колонка слева показывает оба списка сразу, и удалённое больше не нужно
  * помнить, чтобы найти.
  */
-export function DocumentsPage({ archived = false }: { archived?: boolean }) {
+export function DocumentsPage({
+  archived = false,
+  templates = false,
+}: {
+  archived?: boolean;
+  /** Раздел шаблонов: карточки по нажатию дают новый документ. */
+  templates?: boolean;
+}) {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<LibrarySort>('updated');
-  const [title, setTitle] = useState('');
-  /** `null` — человек ещё не трогал выбор: тогда берём открытую папку. */
-  const [newFolderId, setNewFolderId] = useState<string | '' | null>(null);
-  // A4 альбомная — то, на чём печатают грамоты чаще всего.
-  const [size, setSize] = useState<PageSizeValue>({ widthMm: 297, heightMm: 210 });
   /** Материал, который переименовывают в окне. */
   const [renaming, setRenaming] = useState<DocumentSummary | null>(null);
 
@@ -56,23 +59,26 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
    * показываем все материалы, а не пустой список по несуществующей папке.
    */
   const folders = useFolders();
-  const raw = !trash ? params.get('folder') : null;
+  const raw = !trash && !templates ? params.get('folder') : null;
   const folder = (folders.data ?? []).find((f) => f.id === raw) ?? null;
   const folderId = folder?.id ?? null;
 
-  const scratch = !trash && params.get('new') === '1';
+  const scratch = !trash && !templates && params.get('new') === '1';
+  /** Шаблон, с которого начать, — из карточки в разделе «Шаблоны». */
+  const fromTemplate = scratch ? params.get('template') : null;
   /** Форму закрываем, папку оставляем: человек вернётся в тот же список. */
   const closeScratch = () => {
     const next = new URLSearchParams(params);
     next.delete('new');
+    next.delete('template');
     setParams(next, { replace: true });
   };
 
   const documents = useQuery({
-    queryKey: ['documents', search, trash, folderId, sort],
+    queryKey: ['documents', search, trash, templates, folderId, sort],
     queryFn: () =>
       api.get<DocumentList>(
-        `/documents?limit=50&trashed=${trash}&sort=${sort}` +
+        `/documents?limit=50&trashed=${trash}&templates=${templates}&sort=${sort}` +
           (search ? `&search=${encodeURIComponent(search)}` : '') +
           (folderId ? `&folderId=${folderId}` : ''),
       ),
@@ -84,22 +90,6 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
     queryKey: ['documents-trash-count'],
     queryFn: () => api.get<DocumentList>('/documents?limit=1&trashed=true'),
     select: (d) => d.total,
-  });
-
-  const create = useMutation({
-    mutationFn: (v: { title: string; folderId?: string }) =>
-      api.post<DocumentDetail>('/documents', {
-        title: v.title,
-        pageWidthMm: size.widthMm,
-        pageHeightMm: size.heightMm,
-        ...(v.folderId ? { folderId: v.folderId } : {}),
-      }),
-    onSuccess: () => {
-      setTitle('');
-      setNewFolderId(null);
-      closeScratch();
-      void qc.invalidateQueries({ queryKey: ['documents'] });
-    },
   });
 
   /** После любого действия обновляем и список, и счётчик архива. */
@@ -137,6 +127,16 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
     },
   });
 
+  /* Шаблон — копия документа, поэтому после сохранения ведём к шаблонам:
+     там видно, что он появился и что сам документ остался на месте. */
+  const saveAsTemplate = useMutation({
+    mutationFn: (id: string) => api.post<DocumentDetail>(`/documents/${id}/template`, {}),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['documents'] });
+      navigate('/documents/templates');
+    },
+  });
+
   /** Переложить материал в другую папку. `null` — вынуть из папок совсем. */
   const move = useMutation({
     mutationFn: (v: { id: string; folderId: string | null }) =>
@@ -144,9 +144,6 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['documents'] }),
   });
 
-
-  /** Что стоит в выборе папки: тронутое человеком или открытая папка. */
-  const formFolderId = newFolderId ?? folderId ?? '';
 
   /*
    * Esc — шаг назад по уровням: сначала снимается поиск, потом закрывается
@@ -185,13 +182,6 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
     return () => document.removeEventListener('keydown', onKey);
   });
 
-  function onCreate(e: FormEvent) {
-    e.preventDefault();
-    if (title.trim()) {
-      create.mutate({ title: title.trim(), folderId: formFolderId || undefined });
-    }
-  }
-
   const items = documents.data?.items ?? [];
   const nothingFound = documents.data?.items.length === 0;
 
@@ -203,7 +193,7 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
           {/* Открытая папка стоит в заголовке: иначе на половине списка
               непонятно, почему материалов пять, когда их пятьдесят. */}
           <h1 className="truncate text-lg font-medium">
-            {trash ? 'Архив' : (folder?.name ?? 'Мои документы')}
+            {trash ? 'Архив' : templates ? 'Шаблоны' : (folder?.name ?? 'Мои документы')}
           </h1>
           {documents.data && (
             <span className="tabular text-sm text-[var(--text-muted)]">{documents.data.total}</span>
@@ -228,7 +218,7 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
       bar={
         <>
           <span className="tabular text-[var(--text-muted)]">
-            {trash ? 'В архиве' : 'Документов'}: {documents.data?.total ?? 0}
+            {trash ? 'В архиве' : templates ? 'Шаблонов' : 'Документов'}: {documents.data?.total ?? 0}
           </span>
           <div className="ml-auto">
             <LibrarySortSelect sort={sort} onSort={setSort} />
@@ -239,65 +229,28 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
       {/* Остаток пробы — до всего остального: человек должен знать,
             сколько у него есть, ещё до того как начнёт награждение,
             а не упереться в предел на сорок седьмом документе. */}
-      {!trash && <UsageBar />}
+      {!trash && !templates && <UsageBar />}
 
-      {/* Размер выбирается до создания, а не после: поменять его у документа,
-          на котором уже расставлен текст, значит сдвинуть весь макет. */}
       {scratch && (
-        <form onSubmit={onCreate} className="card mb-6 space-y-3 p-4">
-          <div className="flex items-baseline justify-between gap-2">
-            <h2 className="font-medium">Материал с чистого листа</h2>
-            <button
-              type="button"
-              onClick={closeScratch}
-              className="text-sm text-[var(--text-muted)] underline underline-offset-4 hover:text-[var(--text)]"
-            >
-              Вернуться к списку
-            </button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Название нового документа, например «Сертификат участника семинара»"
-              className="min-w-64 flex-1"
-              autoFocus
-            />
-            {/* Внутри папки она и подставлена: человек нажал «Создать»,
-                стоя в своей папке, — материал ждут там же. Выбрать другую
-                или «Вне папок» по-прежнему можно. Пока папок нет, выбирать
-                не из чего — тогда поля нет вовсе. */}
-            {(folders.data ?? []).length > 0 && (
-              <Select
-                value={formFolderId}
-                onChange={setNewFolderId}
-                options={[
-                  { value: '', label: 'Вне папок' },
-                  ...(folders.data ?? []).map((f) => ({ value: f.id, label: f.name })),
-                ]}
-                aria-label="Папка нового материала"
-                className="w-56"
-              />
-            )}
-            <Button
-              type="submit"
-              variant="primary"
-              icon={<Plus size={16} />}
-              disabled={create.isPending || !title.trim()}
-            >
-              Создать
-            </Button>
-          </div>
-          <PageSizePicker value={size} onChange={setSize} />
-        </form>
+        <CreateDocumentPanel
+          // Ключ — чтобы нажатие другого шаблона при открытой панели выбрало его.
+          key={fromTemplate ?? 'blank'}
+          initialTemplateId={fromTemplate}
+          initialFolderId={folderId}
+          onClose={closeScratch}
+        />
       )}
 
       <section>
         <div className="mb-3">
-          <h2 className="font-medium">{trash ? 'Удалённые' : 'Документы'}</h2>
+          <h2 className="font-medium">
+            {trash ? 'Удалённые' : templates ? 'Шаблоны организации' : 'Документы'}
+          </h2>
           <p className="mt-0.5 text-sm text-[var(--text-muted)]">
             {trash ? (
               <>Удалённое хранится {TRASH_DAYS} дней, потом стирается насовсем</>
+            ) : templates ? (
+              <>Нажмите на шаблон — получите новый документ с его макетом</>
             ) : folder ? (
               <>Материалы этой папки</>
             ) : (
@@ -306,12 +259,26 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
           </p>
         </div>
 
-        {documents.isPending && <p className="text-[var(--text-muted)]">Загрузка…</p>}
+        {documents.isPending && <SkeletonCards label="Открываем документы" />}
+
+        {documents.isError && (
+          <ErrorState
+            title="Документы не открылись"
+            onRetry={() => void documents.refetch()}
+            retrying={documents.isFetching}
+            code={String(documents.error)}
+          />
+        )}
 
         {nothingFound &&
           (trash ? (
             <EmptyState icon={Archive} title="Архив пуст">
               Удалённые материалы лежат здесь {TRASH_DAYS} дней — успеете передумать
+            </EmptyState>
+          ) : templates && !search ? (
+            <EmptyState icon={LayoutTemplate} title="Шаблонов пока нет">
+              В меню документа — «Сохранить как шаблон». Получатели и мероприятие в шаблон
+              не попадают.
             </EmptyState>
           ) : search ? (
             <EmptyState icon={FileText} title="Ничего не нашлось">
@@ -354,6 +321,7 @@ export function DocumentsPage({ archived = false }: { archived?: boolean }) {
               onDelete={(d) => remove.mutate(d.id)}
               onRestore={(d) => restore.mutate(d.id)}
               onPurge={(d) => purge.mutate(d.id)}
+              onSaveAsTemplate={templates ? undefined : (d) => saveAsTemplate.mutate(d.id)}
             />
           ))}
         </ul>

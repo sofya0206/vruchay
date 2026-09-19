@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Download, FileSpreadsheet, RefreshCw, Send, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { Loading } from '../ui/Loading';
+import { ErrorState } from '../ui/ErrorState';
+import { SkeletonRows } from '../ui/Skeleton';
 import { PageLayout, SectionTitle } from '../ui/SectionLayout';
 import { Tabs } from '../ui/Tabs';
 import { EmptyState as Empty } from '../ui/EmptyState';
@@ -189,11 +190,13 @@ export function RegistryPage() {
       ) : (
         <>
           <div className="mt-6 flex flex-wrap items-center gap-2">
-            <p className="text-sm text-[var(--text-muted)]">
-              {total > 0
-                ? `Найдено ${total.toLocaleString('ru-RU')} ${plural(total, 'документ', 'документа', 'документов')}` +
-                  (selected.size > 0 ? `, отмечено ${selected.size}` : '')
-                : 'Ничего не найдено'}
+            <p className="text-sm text-[var(--text-muted)]" aria-live="polite">
+              {registry.isPending || registry.isError
+                ? ''
+                : total > 0
+                  ? `Найдено ${total.toLocaleString('ru-RU')} ${plural(total, 'документ', 'документа', 'документов')}` +
+                    (selected.size > 0 ? `, отмечено ${selected.size}` : '')
+                  : 'Ничего не найдено'}
             </p>
 
             <div className="ml-auto flex flex-wrap gap-2">
@@ -305,7 +308,14 @@ export function RegistryPage() {
 
           <div className="mt-4">
             {registry.isPending ? (
-              <Loading label="Открываем реестр" />
+              <SkeletonRows rows={8} label="Открываем реестр" className="card" />
+            ) : registry.isError ? (
+              <ErrorState
+                title="Реестр не открылся"
+                onRetry={() => void registry.refetch()}
+                retrying={registry.isFetching}
+                code={String(registry.error)}
+              />
             ) : rows.length === 0 ? (
               <EmptyState hasFilters={query.length > 0} />
             ) : (

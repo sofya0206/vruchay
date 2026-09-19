@@ -1,25 +1,14 @@
 import { useEffect, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
-import { ChevronLeft, Download, Mail, TriangleAlert, X } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { ChevronLeft, Download, Mail, Paperclip, Pencil, TriangleAlert, X } from 'lucide-react';
 import { api } from '../api/client';
 import { useMailTemplate } from '../api/recipients';
 import type { RecipientRow } from '../api/recipients';
 import { toHtml, toText } from '../mail/email-body';
-import { Input, Label } from '../ui/Field';
+import { DEFAULT_LETTER } from '../mail/letter-defaults';
 import { Button } from '../ui/Button';
 
 export type GenerateMode = 'files' | 'files-and-send';
-
-/** Что придёт участнику, если письмо не настраивали. */
-const DEFAULT_SUBJECT = 'Ваш документ, %name';
-const DEFAULT_BODY = [
-  'Здравствуйте, %name!',
-  '',
-  'Поздравляем! Ваш документ во вложении к этому письму.',
-  '',
-  'С уважением,',
-  'оргкомитет',
-].join('\n');
 
 /**
  * Что сделать с отмеченными строками.
@@ -28,10 +17,14 @@ const DEFAULT_BODY = [
  * создавала файлы. Человек при этом был уверен, что разослал грамоты,
  * и узнавал правду, когда участники начинали спрашивать, где документ.
  *
- * Письмо настраивается здесь же, вторым шагом. Отправлять человека
- * в отдельную вкладку нельзя: про неё не знают и о ней забывают, а узнают
- * об этом в момент, когда рассылка уже не состоялась. Текст по умолчанию
- * готов к отправке — можно просто нажать «Разослать».
+ * Письмо показывается здесь же, вторым шагом: про отдельную вкладку
+ * не знают и о ней забывают. Но только показывается — править его
+ * можно в одном месте, во вкладке письма (кнопка «Изменить»). Раньше
+ * здесь был второй редактор: он жил своими полями, при каждой рассылке
+ * записывал шаблон заново и молча включал вложение, снятое во вкладке.
+ *
+ * Сохраняет окно только когда письма нет вовсе: без шаблона сервер
+ * рассылать отказывается, а текст по умолчанию готов к отправке.
  */
 export function GenerateDialog({
   documentId,
@@ -46,10 +39,9 @@ export function GenerateDialog({
   onConfirm: (mode: GenerateMode) => void;
   onGoToMail: () => void;
 }) {
+  const qc = useQueryClient();
   const template = useMailTemplate(documentId);
   const [step, setStep] = useState<'choose' | 'letter'>('choose');
-  const [subject, setSubject] = useState(DEFAULT_SUBJECT);
-  const [body, setBody] = useState(DEFAULT_BODY);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -58,21 +50,25 @@ export function GenerateDialog({
     return () => document.removeEventListener('keydown', onKey);
   }, [onCancel]);
 
-  // Настроенное письмо подставляем в поля: второй шаг показывает то, что
-  // реально уйдёт, а не образец.
-  useEffect(() => {
-    if (!template.data) return;
-    setSubject(template.data.subject);
-    setBody(toText(template.data.bodyHtml));
-  }, [template.data]);
+  // Что уйдёт на самом деле: сохранённое письмо, а без него — текст
+  // по умолчанию, который и будет сохранён перед рассылкой.
+  const saved = template.data;
+  const letter = saved
+    ? { subject: saved.subject, body: toText(saved.bodyHtml), attach: saved.attachGeneratedFile }
+    : { ...DEFAULT_LETTER, attach: true };
 
-  const save = useMutation({
+  const saveDefault = useMutation({
     mutationFn: () =>
       api.post(`/mail/templates/${documentId}`, {
-        subject,
-        bodyHtml: toHtml(body),
+        subject: DEFAULT_LETTER.subject,
+        bodyHtml: toHtml(DEFAULT_LETTER.body),
         attachGeneratedFile: true,
       }),
+    onSuccess: () => {
+      // Редактор во вкладке письма и раздел «Письма» читают тот же шаблон.
+      void qc.invalidateQueries({ queryKey: ['email-template', documentId] });
+      void qc.invalidateQueries({ queryKey: ['mailing-template', documentId] });
+    },
   });
 
   // Считаем по тем же правилам, по каким сервер потом решает, кому слать.
@@ -82,7 +78,7 @@ export function GenerateDialog({
   async function send() {
     setError(null);
     try {
-      await save.mutateAsync();
+      if (!saved) await saveDefault.mutateAsync();
       onConfirm('files-and-send');
     } catch (err) {
       setError((err as Error).message);
@@ -91,7 +87,7 @@ export function GenerateDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4"
+      className="fixed inset-0 z-50 grid place-items-center bg-[var(--scrim)] p-4"
       role="dialog"
       aria-modal="true"
       aria-label="Создание документов"
@@ -143,7 +139,9 @@ export function GenerateDialog({
               description={
                 nobodyToSend
                   ? 'Сейчас недоступно: ни у кого не указан адрес почты.'
-                  : 'Каждому уйдёт письмо с его документом во вложении. Текст письма покажем на следующем шаге.'
+                  : letter.attach
+                    ? 'Каждому уйдёт письмо с его документом во вложении. Письмо покажем на следующем шаге.'
+                    : 'Каждому уйдёт письмо без вложения — так настроено письмо. Покажем его на следующем шаге.'
               }
               disabled={nobodyToSend}
               primary
@@ -157,8 +155,8 @@ export function GenerateDialog({
                 ) : (
                   <>
                     Без адреса почты: <span className="tabular font-medium">{withoutEmail}</span> из{' '}
-                    <span className="tabular">{rows.length}</span>. Их документы будут созданы,
-                    но письма им не уйдут.
+                    <span className="tabular">{rows.length}</span>. Их документы будут созданы, но
+                    письма им не уйдут.
                   </>
                 )}
               </Notice>
@@ -166,27 +164,12 @@ export function GenerateDialog({
           </div>
         ) : (
           <div className="space-y-4 p-5">
-            <p className="text-sm text-[var(--text-muted)]">
-              Так придёт письмо участнику. Можно оставить как есть — текст готов.
-            </p>
-
-            <div>
-              <Label>Тема</Label>
-              <Input value={subject} onChange={(e) => setSubject(e.target.value)} />
-            </div>
-
-            <div>
-              <Label>Текст</Label>
-              <textarea
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                rows={8}
-                spellCheck
-                className="w-full rounded-xl bg-[var(--surface)] px-3 py-2 text-sm ring-1 ring-[var(--line)] focus:ring-2 focus:ring-[var(--accent)] focus:outline-none"
-              />
-              <p className="mt-1.5 text-xs text-[var(--text-muted)]">
-                <span className="font-mono">%name</span> подставит имя получателя. Документ
-                прикладывается к письму файлом.
+            <div className="space-y-3 rounded-xl bg-[var(--surface-sunken)] p-4 text-sm">
+              <p className="font-medium">{letter.subject}</p>
+              <p className="whitespace-pre-wrap">{letter.body}</p>
+              <p className="flex items-center gap-1.5 text-[var(--text-muted)]">
+                <Paperclip size={14} />
+                {letter.attach ? 'Документ во вложении' : 'Без вложения'}
               </p>
             </div>
 
@@ -197,16 +180,18 @@ export function GenerateDialog({
             )}
 
             <div className="flex flex-wrap items-center gap-3">
-              <Button variant="primary" onClick={() => void send()} disabled={save.isPending}>
-                {save.isPending ? 'Отправляем…' : `Создать и разослать: ${rows.length - withoutEmail}`}
-              </Button>
-              <button
-                type="button"
-                onClick={onGoToMail}
-                className="text-sm text-[var(--text-muted)] underline underline-offset-2 hover:text-[var(--text)]"
+              <Button
+                variant="primary"
+                onClick={() => void send()}
+                disabled={template.isPending || saveDefault.isPending}
               >
-                Подробные настройки письма
-              </button>
+                {saveDefault.isPending
+                  ? 'Отправляем…'
+                  : `Создать и разослать: ${rows.length - withoutEmail}`}
+              </Button>
+              <Button variant="ghost" icon={<Pencil size={15} />} onClick={onGoToMail}>
+                Изменить
+              </Button>
             </div>
           </div>
         )}

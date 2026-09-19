@@ -6,6 +6,7 @@ import {
   FilePlus2,
   FolderOpen,
   FolderInput,
+  LayoutTemplate,
   PencilLine,
   Trash2,
 } from 'lucide-react';
@@ -17,8 +18,8 @@ import { Button } from '../ui/Button';
 import { Label } from '../ui/Field';
 import { Select } from '../ui/Select';
 import { Dialog } from '../ui/Dialog';
-import { RenameDialog } from '../documents/RenameDialog';
 import type { MenuEntry } from './DocumentChrome';
+import { DOCUMENT_TITLE_ID } from './DocumentTitle';
 
 /**
  * Меню «Файл» — действия над материалом целиком.
@@ -28,9 +29,14 @@ import type { MenuEntry } from './DocumentChrome';
  * было нельзя — приходилось уходить со страницы, искать его в списке и потом
  * возвращаться, теряя место на листе.
  *
- * Возвращает и пункты меню, и окна к ним: окно переименования без пункта
+ * Возвращает и пункты меню, и окна к ним: окно переноса без пункта
  * бессмысленно, а пункт без окна ничего не делает, поэтому они и заводятся
  * одним вызовом.
+ *
+ * Своего окна у переименования нет: название правится на месте в шапке,
+ * и пункт меню просто ставит туда курсор — как «Файл → Переименовать»
+ * в Google Docs. Два разных способа одного действия на одном экране
+ * заставляли бы гадать, чем они отличаются.
  */
 export function useDocumentFileMenu(doc: DocumentDetail | undefined): {
   entries: MenuEntry[];
@@ -38,7 +44,6 @@ export function useDocumentFileMenu(doc: DocumentDetail | undefined): {
 } {
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const [renaming, setRenaming] = useState(false);
   const [moving, setMoving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [folderId, setFolderId] = useState<string | ''>('');
@@ -49,15 +54,6 @@ export function useDocumentFileMenu(doc: DocumentDetail | undefined): {
     void qc.invalidateQueries({ queryKey: ['document', doc?.id] });
     void qc.invalidateQueries({ queryKey: ['documents'] });
   };
-
-  const rename = useMutation({
-    mutationFn: (value: string) =>
-      api.patch<DocumentDetail>(`/documents/${doc!.id}`, { title: value }),
-    onSuccess: () => {
-      setRenaming(false);
-      refresh();
-    },
-  });
 
   const move = useMutation({
     mutationFn: (value: string | null) =>
@@ -78,12 +74,24 @@ export function useDocumentFileMenu(doc: DocumentDetail | undefined): {
     },
   });
 
+  /* Шаблон — копия, и открываем именно её: иначе правки, которые человек
+     начнёт тут же вносить «в шаблон», уйдут в сам документ. */
+  const saveAsTemplate = useMutation({
+    mutationFn: () => api.post<DocumentDetail>(`/documents/${doc!.id}/template`, {}),
+    onSuccess: (created) => {
+      void qc.invalidateQueries({ queryKey: ['documents'] });
+      navigate(`/documents/${created.id}`);
+    },
+  });
+
+  const isTemplate = Boolean(doc?.isTemplate);
+
   const remove = useMutation({
     mutationFn: () => api.delete<{ ok: true }>(`/documents/${doc!.id}`),
     onSuccess: () => {
       setDeleting(false);
       void qc.invalidateQueries({ queryKey: ['documents'] });
-      navigate('/documents');
+      navigate(isTemplate ? '/documents/templates' : '/documents');
     },
   });
 
@@ -101,20 +109,34 @@ export function useDocumentFileMenu(doc: DocumentDetail | undefined): {
     { separator: true },
     {
       icon: <Copy size={16} />,
-      label: 'Создать копию документа',
+      label: isTemplate ? 'Создать копию шаблона' : 'Создать копию документа',
       disabled: !doc || duplicate.isPending,
       onSelect: () => duplicate.mutate(),
     },
+    // У шаблона «Документ по шаблону» — главная кнопка в шапке, не пункт меню.
+    ...(isTemplate
+      ? []
+      : [
+          {
+            icon: <LayoutTemplate size={16} />,
+            label: 'Сохранить как шаблон',
+            disabled: !doc || saveAsTemplate.isPending,
+            onSelect: () => saveAsTemplate.mutate(),
+          },
+        ]),
     {
       icon: <PencilLine size={16} />,
       label: 'Переименовать',
       disabled: !doc,
-      onSelect: () => setRenaming(true),
+      // После кадра: пункт меню ещё держит фокус от нажатия.
+      onSelect: () =>
+        requestAnimationFrame(() => document.getElementById(DOCUMENT_TITLE_ID)?.focus()),
     },
     {
       icon: <FolderInput size={16} />,
       label: 'Переместить',
-      disabled: !doc,
+      // Шаблоны общие на организацию и по папкам не раскладываются.
+      disabled: !doc || isTemplate,
       onSelect: () => {
         setFolderId(doc?.folderId ?? '');
         setMoving(true);
@@ -132,16 +154,6 @@ export function useDocumentFileMenu(doc: DocumentDetail | undefined): {
 
   const dialogs = (
     <>
-      {renaming && (
-        <RenameDialog
-          initial={doc?.title ?? ''}
-          pending={rename.isPending}
-          error={rename.isError ? (rename.error as Error).message : undefined}
-          onSubmit={(value) => rename.mutate(value)}
-          onClose={() => setRenaming(false)}
-        />
-      )}
-
       {moving && (
         <Dialog
           title="Переместить материал"

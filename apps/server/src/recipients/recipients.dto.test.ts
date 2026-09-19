@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import {
+  addColumnSchema,
   importSchema,
   MAX_IMPORT_BODY_BYTES,
   parseQuerySchema,
@@ -126,5 +127,20 @@ describe('parseQuerySchema', () => {
     expect(parseQuerySchema.parse({ headers: 'none' }).headers).toBe('none');
     expect(parseQuerySchema.parse({ headers: 'headers' }).headers).toBe('headers');
     expect(parseQuerySchema.safeParse({ headers: 'первая' }).success).toBe(false);
+  });
+});
+
+describe('addColumnSchema', () => {
+  it('принимает название по-русски без имени переменной', () => {
+    expect(addColumnSchema.safeParse({ title: 'Год рождения' }).success).toBe(true);
+  });
+
+  it('имя переменной по-прежнему только латиницей', () => {
+    expect(addColumnSchema.safeParse({ name: 'Команда' }).success).toBe(false);
+  });
+
+  it('без имени и без названия не принимает', () => {
+    expect(addColumnSchema.safeParse({}).success).toBe(false);
+    expect(addColumnSchema.safeParse({ title: '   ' }).success).toBe(false);
   });
 });

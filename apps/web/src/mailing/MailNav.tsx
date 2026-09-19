@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { CheckCheck, Clock, Mail, Plus, Users, X, type LucideIcon } from 'lucide-react';
+import { ChartColumn, CheckCheck, Clock, Mail, Plus, Users, X, type LucideIcon } from 'lucide-react';
 import { ColumnList, ColumnRow, SectionLayout } from '../ui/SectionLayout';
 import type { MailingLog } from './api';
 import { LETTER_LISTS, listCount, mailList, mailListPath, type MailList } from './mail-lists';
@@ -23,6 +23,7 @@ const ICONS: Record<MailList, LucideIcon> = {
   queued: Clock,
   delivered: CheckCheck,
   undelivered: X,
+  stats: ChartColumn,
   lists: Users,
   new: Plus,
 };
@@ -85,6 +86,9 @@ export function MailNav({ counts }: { counts: MailingLog['summary'] }) {
           получателей — разная работа, но подписывать их отдельно значит
           занять две строки колонки ради двух слов. */}
       <ColumnList className="md:mt-2 md:border-t md:border-[var(--line)] md:pt-2">
+        <ColumnRow to={mailListPath('stats')} icon={ICONS.stats} active={current === 'stats'}>
+          Сводка
+        </ColumnRow>
         <ColumnRow
           to={mailListPath('lists')}
           icon={ICONS.lists}

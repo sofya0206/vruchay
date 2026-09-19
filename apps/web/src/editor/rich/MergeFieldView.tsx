@@ -23,6 +23,8 @@ export interface FieldContextValue {
   labels: Record<string, string>;
   /** Клик по фишке: открыть её настройки. Позиция — в документе редактора. */
   onOpen: (pos: number) => void;
+  /** Открыты ли настройки какого-нибудь поля — тогда подсказки молчат. */
+  settingsOpen?: boolean;
 }
 
 export const FieldContext = createContext<FieldContextValue>({
@@ -53,12 +55,15 @@ export function MergeFieldView({ node, selected, getPos }: ReactNodeViewProps) {
 
   /* Откуда берётся значение — здесь же, где поле правят. В самом листе
      (`render/RichText.tsx`) подсказки нет: он идёт в печать и в миниатюры. */
+  // Пока открыты настройки, подсказка легла бы поверх них.
   const { triggerProps, tooltip } = useTooltip(
-    field.state === 'unknown'
-      ? `Колонка «${label}» не найдена — её переименовали или удалили`
-      : system
-        ? `Подставит сервис: ${label}`
-        : `Из таблицы: ${label}`,
+    ctx.settingsOpen
+      ? undefined
+      : field.state === 'unknown'
+        ? `Колонка «${label}» не найдена — её переименовали или удалили`
+        : system
+          ? `Подставит сервис: ${label}`
+          : `Из таблицы: ${label}`,
     { describes: true },
   );
 
@@ -73,6 +78,13 @@ export function MergeFieldView({ node, selected, getPos }: ReactNodeViewProps) {
       style={markStyle(undefined)}
       {...triggerProps}
       onClick={(e: React.MouseEvent) => {
+        e.preventDefault();
+        const pos = getPos();
+        if (typeof pos === 'number') ctx.onOpen(pos);
+      }}
+      // Правая кнопка и касание двумя пальцами открывают то же самое:
+      // так настройки ищут по привычке из любого редактора.
+      onContextMenu={(e: React.MouseEvent) => {
         e.preventDefault();
         const pos = getPos();
         if (typeof pos === 'number') ctx.onOpen(pos);

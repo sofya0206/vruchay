@@ -41,6 +41,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: FileText,
     children: [
       { to: '/documents', label: 'Мои документы' },
+      { to: '/documents/templates', label: 'Шаблоны' },
       { to: '/documents/archive', label: 'Архив' },
     ],
   },
@@ -49,10 +50,13 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Письма',
     to: '/mailing',
     icon: Mail,
-    children: LETTER_LISTS.map((l) => ({
-      to: l.id === 'all' ? '/mailing' : `/mailing?list=${l.id}`,
-      label: l.label,
-    })),
+    children: [
+      ...LETTER_LISTS.map((l) => ({
+        to: l.id === 'all' ? '/mailing' : `/mailing?list=${l.id}`,
+        label: l.label,
+      })),
+      { to: '/mailing?list=stats', label: 'Сводка' },
+    ],
   },
   {
     key: 'registry',

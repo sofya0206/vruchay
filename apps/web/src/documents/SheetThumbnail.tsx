@@ -58,7 +58,7 @@ export function SheetThumbnail({
       <div ref={box} className="grid h-full w-full place-items-center">
         {scale > 0 && (
           <div
-            className="overflow-hidden bg-white shadow-sm"
+            className="overflow-hidden bg-[var(--sheet-paper)] shadow-sm"
             style={{ width: `${widthMm * scale}mm`, height: `${heightMm * scale}mm` }}
           >
             <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}>

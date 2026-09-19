@@ -1,11 +1,13 @@
-import type { ReactNode } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { useEffect, type ReactNode } from 'react';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useMe } from './auth/useAuth';
+import { clearReturnPath, readReturnPath, rememberReturnPath } from './auth/session-lost';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { ConfirmEmailPage } from './pages/ConfirmEmailPage';
 import { DocumentsPage } from './pages/DocumentsPage';
 import { AppShell } from './shell/AppShell';
+import { StatesPage } from './pages/StatesPage';
 import { OverviewPage } from './overview/OverviewPage';
 import { EditorPage } from './pages/EditorPage';
 import { RenderPage } from './pages/RenderPage';
@@ -109,7 +111,7 @@ export function App() {
         <Route path="/org/:slug" element={<IssuerPage />} />
         {publicRoutes()}
         <Route path="/docs/*" element={<KnowledgeBasePage />} />
-        <Route path="*" element={<NotFoundPage />} />
+        <Route path="*" element={<CabinetOrNotFound />} />
       </Routes>
     );
   }
@@ -125,11 +127,14 @@ export function App() {
       <Route element={<AppShell />}>
         <Route path="/" element={<OverviewPage />} />
         <Route path="/documents" element={<DocumentsPage />} />
+        {/* Витрина состояний — только в разработке, в сборку не попадает. */}
+        {import.meta.env.DEV && <Route path="/dev/states" element={<StatesPage />} />}
         {/* Архив — свой адрес, а не переключатель внутри списка: на него
             можно сослаться, а «Назад» возвращает к рабочим. Статический
             сегмент стоит выше `/documents/:id` в разборе адреса, поэтому
             редактор материала он не перехватывает. */}
         <Route path="/documents/archive" element={<DocumentsPage archived />} />
+        <Route path="/documents/templates" element={<DocumentsPage templates />} />
 
         {/* ─────────── МАРШРУТЫ РАЗДЕЛОВ БЛОКА 1 ───────────
             Ветка, которая делает свой раздел, заменяет ЗДЕСЬ одну строку
@@ -186,7 +191,7 @@ export function App() {
         <Route path="/docs/*" element={<KnowledgeBasePage embedded />} />
       </Route>
 
-      <Route path="/login" element={<Navigate to="/" replace />} />
+      <Route path="/login" element={<AfterLogin />} />
       {/* Вошедшему на этих страницах делать нечего: адрес уже подтверждён,
           организация есть. Отправляем в кабинет, а не показываем формы. */}
       <Route path="/register" element={<Navigate to="/" replace />} />
@@ -202,4 +207,31 @@ export function App() {
       </Routes>
     </>
   );
+}
+
+/**
+ * Вошли — туда, где были, когда вход пропал: к тому же материалу, а не
+ * на главную искать его заново. Обычный вход ведёт на главную.
+ */
+function AfterLogin() {
+  const to = readReturnPath() ?? '/';
+  useEffect(clearReturnPath, []);
+  return <Navigate to={to} replace />;
+}
+
+/** Разделы кабинета: их адрес без входа — повод войти, а не «не найдено». */
+const CABINET_PREFIXES = ['/documents', '/mailing', '/registry', '/settings', '/billing', '/invoices', '/analytics', '/integrations'];
+
+/**
+ * Ссылка на материал из письма коллеги или вкладка, открытая вчера,
+ * без входа показывали «Страница не найдена». Теперь — вход, а после
+ * него та самая страница.
+ */
+function CabinetOrNotFound() {
+  const { pathname, search } = useLocation();
+  const cabinet = CABINET_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+  useEffect(() => {
+    if (cabinet) rememberReturnPath(pathname + search);
+  }, [cabinet, pathname, search]);
+  return cabinet ? <Navigate to="/login" replace /> : <NotFoundPage />;
 }

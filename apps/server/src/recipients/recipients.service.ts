@@ -7,7 +7,9 @@ import {
   type SheetLayout,
 } from '@gramota/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { suggestColumnName } from '../import/column-names';
 import type { AddColumnDto, ImportDto, UpdateRowDto } from './recipients.dto';
+import { changedSinceIssue, lastMailByRow } from './row-outcome';
 
 /** Первые две колонки создаются вместе с документом: по ним работает вся выдача. */
 export const DEFAULT_COLUMNS = ['name', 'email'] as const;
@@ -28,7 +30,7 @@ export class RecipientsService {
 
   async getTable(orgId: string, documentId: string) {
     await this.assertDocument(orgId, documentId);
-    const [columns, rows, checkedCount] = await Promise.all([
+    const [columns, rows, checkedCount, emails] = await Promise.all([
       this.prisma.recipientColumn.findMany({
         where: { documentId },
         orderBy: { position: 'asc' },
@@ -37,25 +39,76 @@ export class RecipientsService {
         where: { documentId },
         orderBy: { position: 'asc' },
         take: 10000,
+        include: { lastFile: { select: { issuedData: true } } },
       }),
       this.prisma.recipientRow.count({ where: { documentId, checked: true } }),
+      // Одним запросом по материалу, а не списком строк: на десяти тысячах
+      // получателей список идентификаторов в запросе весил бы больше ответа.
+      this.prisma.email.findMany({
+        where: { documentId, orgId, rowId: { not: null } },
+        orderBy: { queuedAt: 'asc' },
+        select: { rowId: true, fileId: true, status: true },
+      }),
     ]);
-    return { columns, rows, checkedCount };
+    const mail = lastMailByRow(rows, emails);
+    return {
+      columns,
+      rows: rows.map(({ lastFile, ...row }) => ({
+        ...row,
+        mailStatus: mail.get(row.id) ?? null,
+        changedSinceIssue: changedSinceIssue(
+          row.data as Record<string, string>,
+          (lastFile?.issuedData ?? null) as Record<string, string> | null,
+        ),
+      })),
+      checkedCount,
+    };
   }
 
   async addColumn(orgId: string, documentId: string, dto: AddColumnDto) {
     await this.assertDocument(orgId, documentId);
-    const position = await this.prisma.recipientColumn.count({ where: { documentId } });
+    const existing = await this.prisma.recipientColumn.findMany({
+      where: { documentId },
+      select: { name: true },
+    });
+    // Схема пропускает только имя или название: без одного есть другое.
+    const name = dto.name ?? suggestColumnName(dto.title!, new Set(existing.map((c) => c.name)));
     try {
       return await this.prisma.recipientColumn.create({
-        data: { documentId, name: dto.name, position },
+        data: { documentId, name, title: dto.title ?? null, position: existing.length },
       });
     } catch (err) {
       if (isUniqueViolation(err)) {
-        throw new BadRequestException(`Колонка «${dto.name}» уже есть`);
+        throw new BadRequestException(`Колонка «${dto.title ?? name}» уже есть`);
       }
       throw err;
     }
+  }
+
+  /**
+   * Перестановка колонок: `order` — идентификаторы слева направо.
+   * Чужой или несуществующий идентификатор — «не найдена», как и везде.
+   * Колонки, которых в `order` нет, остаются за переставленными
+   * в прежнем порядке: список с клиента может отстать от базы.
+   */
+  async reorderColumns(orgId: string, documentId: string, order: string[]) {
+    await this.assertDocument(orgId, documentId);
+    const columns = await this.prisma.recipientColumn.findMany({
+      where: { documentId },
+      orderBy: { position: 'asc' },
+      select: { id: true },
+    });
+    const known = new Set(columns.map((c) => c.id));
+    if (order.some((id) => !known.has(id))) throw new NotFoundException('Колонка не найдена');
+    const rest = columns.map((c) => c.id).filter((id) => !order.includes(id));
+    const next = [...new Set([...order, ...rest])];
+    // Пара документ+позиция уникальна, поэтому в один проход не обойтись:
+    // сначала уводим все позиции в отрицательные, потом расставляем заново.
+    await this.prisma.$transaction([
+      ...next.map((id, i) => this.prisma.recipientColumn.update({ where: { id }, data: { position: -1 - i } })),
+      ...next.map((id, position) => this.prisma.recipientColumn.update({ where: { id }, data: { position } })),
+    ]);
+    return { order: next };
   }
 
   async renameColumn(orgId: string, documentId: string, columnId: string, name: string) {

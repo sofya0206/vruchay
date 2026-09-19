@@ -4,6 +4,7 @@ import { useOverview } from '../api/overview';
 import { useMe } from '../auth/useAuth';
 import { Button } from '../ui/Button';
 import { Loading } from '../ui/Loading';
+import { ErrorState } from '../ui/ErrorState';
 import { DocsLinks } from './DocsLinks';
 import { protocolTitle } from './format';
 import { Happening } from './Happening';
@@ -53,9 +54,12 @@ export function OverviewPage() {
   if (overview.isError || !overview.data) {
     return (
       <main className="mx-auto max-w-5xl px-6 py-8">
-        <p role="alert" className="text-[var(--danger)]">
-          Не удалось загрузить сводку. Обновите страницу — данные никуда не делись.
-        </p>
+        <ErrorState
+          title="Сводка не загрузилась"
+          onRetry={() => void overview.refetch()}
+          retrying={overview.isFetching}
+          code={String(overview.error)}
+        />
       </main>
     );
   }

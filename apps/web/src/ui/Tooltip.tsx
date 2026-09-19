@@ -219,7 +219,7 @@ function Bubble({
       role={describes ? 'tooltip' : undefined}
       aria-hidden={describes ? undefined : true}
       style={{ top: pos?.top ?? 0, left: pos?.left ?? 0 }}
-      className={`pointer-events-none fixed z-[60] max-w-xs rounded-md bg-[var(--text)] px-2 py-1 text-xs text-white shadow-md transition-opacity duration-100 ${
+      className={`pointer-events-none fixed z-[60] max-w-xs rounded-md bg-[var(--text)] px-2 py-1 text-xs text-[var(--ground)] shadow-md transition-opacity duration-100 ${
         pos ? 'opacity-100' : 'opacity-0'
       }`}
     >

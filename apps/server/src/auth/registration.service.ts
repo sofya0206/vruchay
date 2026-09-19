@@ -8,7 +8,7 @@ import { MailService } from '../mail/mail.service';
 import { InjectRedis } from '../common/redis.module';
 import { hashPassword, validatePasswordStrength } from './password';
 import { maskEmail } from '../common/redact';
-import { escapeHtml } from '../mail/mail-template';
+import { escapeHtml, mailButton } from '../mail/mail-template';
 import { ReferralService } from '../referral/referral.service';
 import type { SessionUser } from './auth.service';
 
@@ -61,7 +61,7 @@ export class RegistrationService {
         `<p>Кто-то попытался зарегистрироваться в сервисе «Вручай» с вашим адресом.</p>
          <p>Учётная запись с этим адресом уже существует. Если это были вы —
          просто войдите: <a href="${this.publicUrl()}/login">${this.publicUrl()}/login</a>.</p>
-         <p style="color:#5f6b64;font-size:13px">Если это были не вы, делать ничего не нужно:
+         <p style="color:#36394a;font-size:13px">Если это были не вы, делать ничего не нужно:
          без пароля в вашу учётную запись никто не войдёт.</p>`,
       );
       return;
@@ -152,14 +152,10 @@ export class RegistrationService {
       'Вручай — подтвердите адрес почты',
       `<p style="font-size:15px">Здравствуйте!</p>
        <p>Чтобы начать пользоваться сервисом «Вручай», подтвердите адрес почты:</p>
-       <p style="margin:24px 0">
-         <a href="${escapeHtml(link)}"
-            style="background:#1F5D3F;color:#fff;padding:12px 24px;border-radius:8px;
-                   text-decoration:none;font-size:15px">Подтвердить адрес</a>
-       </p>
-       <p style="font-size:13px;color:#5f6b64">Ссылка действует сутки. Если кнопка не работает,
+       ${mailButton(link, 'Подтвердить адрес')}
+       <p style="font-size:13px;color:#36394a">Ссылка действует сутки. Если кнопка не работает,
        откройте адрес вручную:<br><span style="word-break:break-all">${escapeHtml(link)}</span></p>
-       <p style="font-size:13px;color:#5f6b64">Если вы не регистрировались в «Вручай»,
+       <p style="font-size:13px;color:#36394a">Если вы не регистрировались в «Вручай»,
        просто удалите это письмо.</p>`,
     );
   }

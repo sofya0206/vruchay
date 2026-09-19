@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
 
@@ -13,12 +14,18 @@ export interface RecipientColumn {
   title?: string | null;
 }
 
+export type MailStatus = 'queued' | 'sent' | 'delivered' | 'opened' | 'bounced' | 'failed';
+
 export interface RecipientRow {
   id: string;
   position: number;
   data: Record<string, string>;
   checked: boolean;
   lastFileId: string | null;
+  /** Последнее письмо о нынешнем файле строки. null — не отправляли. */
+  mailStatus: MailStatus | null;
+  /** Данные строки поправили после выпуска: на руках устаревший документ. */
+  changedSinceIssue: boolean;
 }
 
 export interface RecipientTable {
@@ -111,6 +118,10 @@ export function useRecipients(documentId: string) {
   return useQuery({
     queryKey: ['recipients', documentId],
     queryFn: () => api.get<RecipientTable>(`/documents/${documentId}/recipients`),
+    // Пока письма стоят в очереди, итог строк меняется сам — без опроса
+    // человек смотрел бы на «в очереди» до перезагрузки страницы.
+    refetchInterval: (query) =>
+      query.state.data?.rows.some((r) => r.mailStatus === 'queued') ? 5000 : false,
   });
 }
 
@@ -134,8 +145,22 @@ export function useRecipientMutations(documentId: string) {
       onSuccess: refresh,
     }),
     addColumn: useMutation({
-      mutationFn: (name: string) => api.post(`${base}/columns`, { name }),
-      onSuccess: refresh,
+      // Строка — имя переменной латиницей (таблица получателей),
+      // { title } — название по-русски: имя тогда подбирает сервер.
+      mutationFn: (v: string | { title: string }) =>
+        api.post<RecipientColumn>(`${base}/columns`, typeof v === 'string' ? { name: v } : v),
+      onSuccess: () => {
+        void refresh();
+        // Письмо держит колонки отдельным запросом.
+        void qc.invalidateQueries({ queryKey: ['recipient-columns', documentId] });
+      },
+    }),
+    reorderColumns: useMutation({
+      mutationFn: (order: string[]) => api.post(`${base}/columns/order`, { order }),
+      onSuccess: () => {
+        void refresh();
+        void qc.invalidateQueries({ queryKey: ['recipient-columns', documentId] });
+      },
     }),
     deleteColumn: useMutation({
       mutationFn: (columnId: string) => api.delete(`${base}/columns/${columnId}`),
@@ -189,6 +214,16 @@ export function useGeneration(documentId: string, jobId: string | null) {
     // глобальный staleTime здесь только мешает.
     staleTime: 0,
   });
+
+  // Выпуск закончился — у строк появились файлы, и итог в таблице
+  // должен это показать, не дожидаясь перезагрузки.
+  const finished =
+    job.data && job.data.status !== 'queued' && job.data.status !== 'running'
+      ? `${job.data.id}:${job.data.status}`
+      : null;
+  useEffect(() => {
+    if (finished) void qc.invalidateQueries({ queryKey: ['recipients', documentId] });
+  }, [finished, documentId, qc]);
 
   const start = useMutation({
     mutationFn: () => api.post<GenerationJob>(`/documents/${documentId}/generate`, { format: 'pdf' }),
@@ -279,8 +314,10 @@ export function useSend(documentId: string) {
   return useMutation({
     mutationFn: () => api.post<SendResult>(`/mail/send/${documentId}`, {}),
     onSuccess: () => {
-      // Реестр показывает состояние писем — после рассылки он устарел.
+      // Реестр и итог строк показывают состояние писем — после рассылки
+      // они устарели.
       void qc.invalidateQueries({ queryKey: ['registry', documentId] });
+      void qc.invalidateQueries({ queryKey: ['recipients', documentId] });
     },
   });
 }

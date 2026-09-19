@@ -42,6 +42,7 @@ export function ColorPicker({
   disabled,
   label = 'Цвет',
   compact,
+  letter,
   className,
 }: {
   value: string;
@@ -50,8 +51,15 @@ export function ColorPicker({
   label?: string;
   /** Квадрат 32×32 без поля кода рядом — для панели оформления. */
   compact?: boolean;
+  /**
+   * Буква «А» с полоской цвета под ней, как в Word и Google Docs:
+   * сплошной квадрат среди значков панели читался как ещё одна кнопка,
+   * а не как цвет текста.
+   */
+  letter?: boolean;
   className?: string;
 }) {
+  const shown = normalizeHex(value) ?? '#ffffff';
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLDivElement>(null);
@@ -69,14 +77,24 @@ export function ColorPicker({
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          'shrink-0 rounded-lg ring-1 ring-[var(--line-strong)] transition-shadow',
+          'shrink-0 rounded-lg transition-shadow',
           'disabled:cursor-not-allowed disabled:opacity-40',
-          compact ? 'size-8' : 'h-[38px] w-11',
+          letter
+            ? 'grid size-8 place-items-center rounded-md hover:bg-[var(--surface-sunken)]'
+            : 'ring-1 ring-[var(--line-strong)]',
+          !letter && (compact ? 'size-8' : 'h-[38px] w-11'),
           open && 'ring-2 ring-[var(--focus)]',
           className,
         )}
-        style={{ background: normalizeHex(value) ?? '#ffffff' }}
-      />
+        style={letter ? undefined : { background: shown }}
+      >
+        {letter && (
+          <span aria-hidden className="flex flex-col items-center leading-none">
+            <span className="text-[15px] font-semibold text-[var(--text)]">А</span>
+            <span className="mt-0.5 h-[3px] w-4 rounded-sm ring-1 ring-[var(--line)]" style={{ background: shown }} />
+          </span>
+        )}
+      </button>
       {open && (
         <Popover open anchor={trigger} panelRef={panel} role="dialog" width={232}>
           <Palette value={value} onChange={onChange} label={label} />

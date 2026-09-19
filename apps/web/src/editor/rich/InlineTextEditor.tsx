@@ -36,10 +36,17 @@ export interface InlineTextEditorProps {
   /** Куда деть каретку при входе: в конец либо в позицию. */
   focusAt?: 'end' | number;
   /**
-   * Плавающая панель оформления над блоком. На телефоне её нет: правка идёт
-   * в своём слое во весь экран, и панель там стоит внизу, над клавиатурой.
+   * Плавающая панель оформления над блоком. На телефоне её нет: панель
+   * там стоит внизу, над клавиатурой (PhoneFormatBar).
    */
   toolbar?: boolean;
+  /**
+   * Сразу открыть настройки n-го поля блока, считая с нуля.
+   *
+   * Правая кнопка по фишке на неактивном блоке входит в правку и тут же
+   * открывает её настройки — одним жестом, как контекстное меню.
+   */
+  openField?: number | null;
 }
 
 export function InlineTextEditor({
@@ -53,6 +60,7 @@ export function InlineTextEditor({
   onDone,
   focusAt = 'end',
   toolbar = true,
+  openField = null,
 }: InlineTextEditorProps) {
   const [suggestion, setSuggestion] = useState<SuggestionState | null>(null);
   const [fieldPos, setFieldPos] = useState<number | null>(null);
@@ -126,19 +134,27 @@ export function InlineTextEditor({
     };
   }, [editor, onDone, suggestion, fieldPos]);
 
+  useEffect(() => {
+    if (!editor || openField === null) return;
+    let index = 0;
+    let found: number | null = null;
+    editor.state.doc.descendants((node, pos) => {
+      if (found !== null) return false;
+      if (node.type.name === 'mergeField') {
+        if (index === openField) found = pos;
+        index += 1;
+      }
+      return true;
+    });
+    if (found !== null) setFieldPos(found);
+  }, [editor, openField]);
+
   const context = useMemo(
-    () => ({ data, known, labels, onOpen: (pos: number) => setFieldPos(pos) }),
-    [data, known, labels],
+    () => ({ data, known, labels, onOpen: (pos: number) => setFieldPos(pos), settingsOpen: fieldPos !== null }),
+    [data, known, labels, fieldPos],
   );
 
   if (!editor) return null;
-
-  const fieldLabel = (() => {
-    if (fieldPos === null) return '';
-    const node = editor.state.doc.nodeAt(fieldPos);
-    const source = (node?.attrs as { source?: string } | undefined)?.source ?? '';
-    return labels[source] ?? source;
-  })();
 
   return (
     <FieldContext.Provider value={context}>
@@ -149,7 +165,7 @@ export function InlineTextEditor({
         <FieldPopover
           editor={editor}
           pos={fieldPos}
-          label={fieldLabel}
+          fields={fields}
           onClose={() => {
             setFieldPos(null);
             editor.commands.focus();
