@@ -324,14 +324,13 @@ function TextElementView({
   renderEditing,
 }: ElementViewProps & { element: TextElement }) {
   const ref = useRef<HTMLDivElement>(null);
-  const fit = useAutoFit(ref, element.props.autoFit && !editing, element.props.lineHeight, [
-    element.props,
-    element.w,
-    element.h,
-    data,
-    unfilled,
-    fields,
-  ]);
+  const fit = useAutoFit(
+    ref,
+    element.props.autoFit,
+    element.props.lineHeight,
+    [element.props, element.w, element.h, data, unfilled, fields],
+    Boolean(editing),
+  );
 
   return (
     <div

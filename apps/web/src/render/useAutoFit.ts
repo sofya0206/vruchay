@@ -23,6 +23,7 @@ export function useAutoFit(
   enabled: boolean,
   lineHeight: number,
   deps: unknown[],
+  frozen = false,
 ): FitStep {
   const [index, setIndex] = useState(0);
   const [fontsReady, setFontsReady] = useState(false);
@@ -42,13 +43,17 @@ export function useAutoFit(
     };
   }, []);
 
-  // Содержимое или оформление поменялось — подбираем с начала.
-  useLayoutEffect(() => setIndex(0), deps);
+  // Содержимое или оформление поменялось — подбираем с начала. Под правкой
+  // сброса нет: ступень держится, а по выходу из правки подбор начнётся
+  // заново, потому что `frozen` сам входит в зависимости.
+  useLayoutEffect(() => {
+    if (!frozen) setIndex(0);
+  }, [...deps, frozen]);
 
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    if (!enabled || !fontsReady) {
+    if (!enabled || !fontsReady || frozen) {
       el.removeAttribute('data-fitting');
       return;
     }
