@@ -5,11 +5,13 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   Check,
   ChevronLeft,
+  Circle,
   ChevronRight,
   ChevronsRight,
   CopyPlus,
   Dot,
   Grid3x3,
+  ImagePlus,
   ImageUp,
   Layers,
   LoaderCircle,
@@ -18,15 +20,18 @@ import {
   Lock,
   LockOpen,
   Magnet,
+  Minus,
   Paintbrush,
   Printer,
   Proportions,
   Redo2,
   SlidersHorizontal,
+  Square,
   SquareDashed,
   Table2,
   Trash2,
   TriangleAlert,
+  Type,
   Undo2,
   Variable,
   Wand2,
@@ -53,6 +58,7 @@ import { SheetTabs } from '../editor/SheetTabs';
 import type { MenuEntry } from '../editor/DocumentChrome';
 import { StatusChip } from '../ui/Field';
 import { IconButton } from '../ui/IconButton';
+import { Menu, MenuItem } from '../ui/Menu';
 import { Select } from '../ui/Select';
 import { api } from '../api/client';
 import { useOrgProfile } from '../api/org';
@@ -1009,7 +1015,10 @@ export function EditorPage() {
       what.type === 'text'
         ? what.field
           ? { doc: docWithField(what.field.source, what.field.fieldId) }
-          : { text: 'Награждается %name' }
+          : // Пустой, а не «Награждается %name»: человек просил текст, а не
+            // имя. Пустой блок сразу открывается на ввод (ниже), иначе его
+            // не видно.
+            { text: '' }
         : what.type === 'link'
           ? { url: 'https://vruchay.ru' }
           : what.type === 'shape'
@@ -1033,6 +1042,9 @@ export function EditorPage() {
 
     history.setLayout((prev) => [...prev, el]);
     setSelected(new Set([el.id]));
+    // Пустой текст — сразу с кареткой, как в Miro и Figma: без неё на листе
+    // ничего не появляется, и кажется, что нажатие не сработало.
+    if (what.type === 'text' && !what.field) setEditingId(el.id);
     // Блок, вставленный из панели полей, не уводит из неё к свойствам.
     if (!fieldsOpen) setOtherPanel('props');
     return el;
@@ -1217,11 +1229,6 @@ export function EditorPage() {
         iconOnly
         onInsert={addElement}
         fields={fields}
-        onBackground={pickBackground}
-        backgroundLoading={uploadBackground.isPending}
-        hasBackground={hasBackground}
-        onImage={pickImage}
-        imageLoading={uploadImage.isPending}
       />
       <ToolButton
         title={hasBackground ? 'Заменить бланк' : 'Загрузить бланк'}
@@ -1230,6 +1237,33 @@ export function EditorPage() {
       >
         <ImageUp size={16} />
       </ToolButton>
+      <ToolButton title="Картинка: логотип, подпись, печать" onClick={pickImage} disabled={uploadImage.isPending}>
+        <ImagePlus size={16} />
+      </ToolButton>
+      {/* Текст и фигура — то, что кладут на лист чаще всего, поэтому
+          в один клик, как «T» и «□» у Figma и Canva. Текст с подстановкой
+          поля остаётся в «+»: там выбирают, какое именно. */}
+      <ToolButton title="Текст" onClick={() => addElement({ type: 'text' })}>
+        <Type size={16} />
+      </ToolButton>
+      <Menu
+        align="left"
+        trigger={({ open, toggle }) => (
+          <IconButton size="sm" label="Фигура" active={open} aria-expanded={open} onClick={toggle}>
+            <Square size={16} />
+          </IconButton>
+        )}
+      >
+        <MenuItem icon={<Minus size={16} />} onClick={() => addElement({ type: 'shape', kind: 'line' })}>
+          Линия
+        </MenuItem>
+        <MenuItem icon={<Square size={16} />} onClick={() => addElement({ type: 'shape', kind: 'rect' })}>
+          Прямоугольник
+        </MenuItem>
+        <MenuItem icon={<Circle size={16} />} onClick={() => addElement({ type: 'shape', kind: 'ellipse' })}>
+          Овал
+        </MenuItem>
+      </Menu>
 
       <ToolDivider />
 
@@ -1482,8 +1516,7 @@ export function EditorPage() {
               // как в Miro и Excalidraw. По блокам событие не доходит.
               onDoubleClick={(e) => {
                 if (dataMode) return;
-                const el = addElement({ type: 'text' }, pointOnSheet(e));
-                if (el?.type === 'text') setEditingId(el.id);
+                addElement({ type: 'text' }, pointOnSheet(e));
               }}
               onContextMenu={(e) => {
                 if (dataMode) return;
