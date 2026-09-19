@@ -11,6 +11,7 @@ import {
   CopyPlus,
   Dot,
   Grid3x3,
+  ImagePlus,
   ImageUp,
   Layers,
   LoaderCircle,
@@ -1014,7 +1015,10 @@ export function EditorPage() {
       what.type === 'text'
         ? what.field
           ? { doc: docWithField(what.field.source, what.field.fieldId) }
-          : { text: 'Награждается %name' }
+          : // Пустой, а не «Награждается %name»: человек просил текст, а не
+            // имя. Пустой блок сразу открывается на ввод (ниже), иначе его
+            // не видно.
+            { text: '' }
         : what.type === 'link'
           ? { url: 'https://vruchay.ru' }
           : what.type === 'shape'
@@ -1038,6 +1042,9 @@ export function EditorPage() {
 
     history.setLayout((prev) => [...prev, el]);
     setSelected(new Set([el.id]));
+    // Пустой текст — сразу с кареткой, как в Miro и Figma: без неё на листе
+    // ничего не появляется, и кажется, что нажатие не сработало.
+    if (what.type === 'text' && !what.field) setEditingId(el.id);
     // Блок, вставленный из панели полей, не уводит из неё к свойствам.
     if (!fieldsOpen) setOtherPanel('props');
     return el;
@@ -1222,8 +1229,6 @@ export function EditorPage() {
         iconOnly
         onInsert={addElement}
         fields={fields}
-        onImage={pickImage}
-        imageLoading={uploadImage.isPending}
       />
       <ToolButton
         title={hasBackground ? 'Заменить бланк' : 'Загрузить бланк'}
@@ -1231,6 +1236,9 @@ export function EditorPage() {
         disabled={uploadBackground.isPending}
       >
         <ImageUp size={16} />
+      </ToolButton>
+      <ToolButton title="Картинка: логотип, подпись, печать" onClick={pickImage} disabled={uploadImage.isPending}>
+        <ImagePlus size={16} />
       </ToolButton>
       {/* Текст и фигура — то, что кладут на лист чаще всего, поэтому
           в один клик, как «T» и «□» у Figma и Canva. Текст с подстановкой
@@ -1508,8 +1516,7 @@ export function EditorPage() {
               // как в Miro и Excalidraw. По блокам событие не доходит.
               onDoubleClick={(e) => {
                 if (dataMode) return;
-                const el = addElement({ type: 'text' }, pointOnSheet(e));
-                if (el?.type === 'text') setEditingId(el.id);
+                addElement({ type: 'text' }, pointOnSheet(e));
               }}
               onContextMenu={(e) => {
                 if (dataMode) return;
