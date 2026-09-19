@@ -34,6 +34,7 @@ import { DpaPage } from './pages/DpaPage';
 import { KnowledgeBasePage } from './docs/KnowledgeBasePage';
 import { BillingPage } from './billing/BillingPage';
 import { IssuerPage } from './public/IssuerPage';
+import { RecipientPage } from './public/RecipientPage';
 import { LandingPage } from './pages/LandingPage';
 import { DiscussTermsPage } from './pages/DiscussTermsPage';
 import { InvitePage } from './pages/InvitePage';
@@ -107,6 +108,8 @@ export function App() {
         <Route path="/verify/:publicId" element={<VerifyDocumentPage />} />
         {/* Короткий адрес из QR: /c/K7M2-9QXR-4TVB. Та же страница. */}
         <Route path="/c/:publicId" element={<VerifyDocumentPage />} />
+        {/* Страница получателя — по подписанной ссылке из письма, без входа. */}
+        <Route path="/d/:token" element={<RecipientPage />} />
         {/* Публичная страница организации — реестр эмитента для проверяющих. */}
         <Route path="/org/:slug" element={<IssuerPage />} />
         {publicRoutes()}
@@ -201,6 +204,7 @@ export function App() {
       <Route path="/invite" element={<Navigate to="/" replace />} />
       <Route path="/verify/:publicId" element={<VerifyDocumentPage />} />
       <Route path="/c/:publicId" element={<VerifyDocumentPage />} />
+      <Route path="/d/:token" element={<RecipientPage />} />
       <Route path="/org/:slug" element={<IssuerPage />} />
       {publicRoutes()}
       <Route path="*" element={<NotFoundPage />} />

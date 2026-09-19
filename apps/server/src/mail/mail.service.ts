@@ -20,6 +20,7 @@ import { sharedDomainRefusal } from './shared-domain-limit';
 import { platformSender, type ResolvedSender } from './platform-sender';
 import { withOpenPixel } from './open-tracking';
 import { renderLetterBody, unsubscribeUrl } from '../mailing/letter-kind';
+import { signRecipientToken } from '../recipient/recipient-token';
 import { deliveryProblem } from '../mailing/bounce-reason';
 import { redact } from '../common/redact';
 
@@ -573,7 +574,7 @@ export class MailService {
         replyTo: sender.replyTo,
         to: email.toEmail,
         subject: email.subject,
-        html: this.trackOpens(this.letterBody(email, data, sender.signature), email.id),
+        html: this.trackOpens(this.letterBody(email, data, sender.signature, email.file ? this.documentLink(email.file.id) : ''), email.id),
         attachments,
         reference: email.id,
         // Отписка ещё и заголовком: почтовые службы показывают по нему
@@ -660,6 +661,21 @@ export class MailService {
    * письму его взять неоткуда: у соответствующего типа попросту нет полей
    * рекламодателя и ссылки отписки (см. mailing/letter-kind.ts).
    */
+  /**
+   * Кнопка «Открыть документ» под текстом письма.
+   *
+   * Вложение остаётся: на телефоне PDF из письма открывается в просмотрщике,
+   * а сохранить, переслать и проверить проще со страницы сервиса. Ссылка
+   * подписана и действует месяц; в базе ничего не хранит.
+   */
+  private documentLink(fileId: string): string {
+    const url = `${this.publicUrl}/d/${signRecipientToken(this.config.get('SESSION_SECRET', { infer: true }), fileId)}`;
+    return (
+      mailButton(url, 'Открыть документ') +
+      '<p style="margin:-12px 0 24px;font-size:13px;color:#36394a">Открыть, сохранить на телефон, проверить подлинность.</p>'
+    );
+  }
+
   private letterBody(
     email: {
       kind: EmailKind;
@@ -669,12 +685,14 @@ export class MailService {
     },
     data: Record<string, string>,
     signature = '',
+    /** Что добавить после текста оператора — кнопка на страницу документа. */
+    extra = '',
   ): string {
     // Готовый текст сервиса (уведомление о сроке) — как есть: он собран
     // нами с экранированием, переменных в нём нет.
     const bodyHtml =
-      email.bodyHtml ??
-      (email.template ? renderHtmlTemplate(email.template.bodyHtml, data) : DEFAULT_BODY_HTML);
+      (email.bodyHtml ??
+        (email.template ? renderHtmlTemplate(email.template.bodyHtml, data) : DEFAULT_BODY_HTML)) + extra;
 
     if (email.kind !== 'marketing') {
       return renderLetterBody({ kind: 'transactional', bodyHtml, signature });

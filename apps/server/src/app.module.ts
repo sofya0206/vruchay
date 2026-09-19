@@ -26,6 +26,7 @@ import { TeamModule } from './team/team.module';
 import { AuditModule } from './audit/audit.module';
 import { ReferralModule } from './referral/referral.module';
 import { PushModule } from './push/push.module';
+import { RecipientModule } from './recipient/recipient.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { SupportModule } from './support/support.module';
 import { OrgModule } from './org/org.module';
@@ -65,6 +66,7 @@ import { PlansModule } from './plans/plans.module';
     AuditModule,
     ReferralModule,
     PushModule,
+    RecipientModule,
     ReviewsModule,
     SupportModule,
     OrgModule,
