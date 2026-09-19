@@ -1487,6 +1487,10 @@ export function EditorPage() {
               }}
               onContextMenu={(e) => {
                 if (dataMode) return;
+                // Блок под правкой лежит на листе без слоя жестов, и правый
+                // щелчок из него всплывает сюда: по фишке открылось бы сразу
+                // два окна, по тексту — меню вставки вместо «копировать».
+                if ((e.target as Element).closest('[data-element-id]')) return;
                 e.preventDefault();
                 const mm = pointOnSheet(e);
                 if (mm) setCanvasMenu({ x: e.clientX, y: e.clientY, mm });
