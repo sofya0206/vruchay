@@ -20,7 +20,6 @@ enum OrgPlan {
 
 /**
  * Как показывать получателя на публичной странице проверки.
- *
  * Настройка эмитента, а не материала: страница открыта без входа, и
  * решение «сколько персональных данных отдавать любому, кто знает код»
  * принимает организация как оператор ПД один раз на всё выданное.
@@ -85,10 +84,10 @@ model Plan {
 }
 
 model Organization {
-  id        String      @id @default(uuid()) @db.Uuid
+  id        String   @id @default(uuid()) @db.Uuid
   name      String
-  plan      OrgPlan     @default(free)
-  createdAt DateTime    @default(now()) @map("created_at")
+  plan      OrgPlan  @default(free)
+  createdAt DateTime @default(now()) @map("created_at")
 
   // ─── Публичное лицо эмитента ─────────────────────────────────────────
   //
@@ -97,19 +96,18 @@ model Organization {
   // сама решает, показываться ли ей наружу, и включает это явно.
 
   /// Адрес публичной страницы: /org/<slug>. Пусто — страницы нет.
-  slug        String? @unique
-  description String  @default("")
-  inn         String  @default("")
-  website     String  @default("")
+  slug         String? @unique
+  description  String  @default("")
+  inn          String  @default("")
+  website      String  @default("")
   /// Куда писать проверяющему: «сообщить о проблеме» на странице проверки.
-  contactEmail String @default("") @map("contact_email")
-  contactPhone String @default("") @map("contact_phone")
+  contactEmail String  @default("") @map("contact_email")
+  contactPhone String  @default("") @map("contact_phone")
   logoFileId   String? @map("logo_file_id") @db.Uuid
   logo         File?   @relation("OrgLogo", fields: [logoFileId], references: [id], onDelete: SetNull)
 
   /**
    * Значок «Верифицированный эмитент».
-   *
    * Проставляется владельцем сервиса руками после проверки домена и ИНН
    * (см. PlatformController), а не самой организацией: значок — наше
    * ручательство, и выдавать его себе никто не должен. Автоматическая
@@ -119,34 +117,33 @@ model Organization {
   verifiedAt     DateTime? @map("verified_at")
 
   /// Показывать ли публичную страницу организации вообще.
-  publicPageEnabled Boolean @default(false) @map("public_page_enabled")
+  publicPageEnabled  Boolean        @default(false) @map("public_page_enabled")
   /**
    * Поиск по ФИО в публичном реестре.
-   *
    * Выключен по умолчанию и включается только явно: поиск по фамилии
    * без согласия субъекта — распространение персональных данных
    * (ст. 10.1 152-ФЗ, «ПД, разрешённые для распространения»). Согласие
    * собирает эмитент как оператор; мы даём инструмент и галочку.
    */
-  publicSearchByName Boolean @default(false) @map("public_search_by_name")
+  publicSearchByName Boolean        @default(false) @map("public_search_by_name")
   /**
    * Пускать ли поисковики на страницу организации и страницы проверки
    * её документов. Выключено — везде стоит noindex.
    */
-  publicIndexable Boolean @default(false) @map("public_indexable")
-  verifyNameMode  VerifyNameMode @default(full) @map("verify_name_mode")
+  publicIndexable    Boolean        @default(false) @map("public_indexable")
+  verifyNameMode     VerifyNameMode @default(full) @map("verify_name_mode")
 
   /// Код приглашения. Заводится при первом открытии раздела «Пригласить
   /// друга», а не при регистрации: у большинства организаций его никогда
   /// не спросят, а раздавать коды всем — значит занимать словарь коротких
   /// сочетаний ради тех, кто им не воспользуется.
-  referralCode    String?  @unique @map("referral_code")
+  referralCode    String?        @unique @map("referral_code")
   /// Кто пригласил. Начисленные бонусы нигде не хранятся: они выводятся из
   /// этой связи и из числа выпущенных приглашёнными документов (см.
   /// ReferralService). Отдельный счётчик пришлось бы держать в согласии
   /// с реальностью при каждом удалении и ошибке, а связь ничему
   /// противоречить не может.
-  referredByOrgId String?  @map("referred_by_org_id") @db.Uuid
+  referredByOrgId String?        @map("referred_by_org_id") @db.Uuid
   referredBy      Organization?  @relation("OrgReferrals", fields: [referredByOrgId], references: [id], onDelete: SetNull)
   referrals       Organization[] @relation("OrgReferrals")
 
@@ -172,32 +169,33 @@ model Organization {
   // ещё не заполнены; тогда кабинет подставляет их из последнего счёта
   // (Invoice хранит копию реквизитов покупателя).
   billingKind    BillingKind? @map("billing_kind")
-  billingName    String @default("") @map("billing_name")
-  billingInn     String @default("") @map("billing_inn")
-  billingKpp     String @default("") @map("billing_kpp")
-  billingOgrn    String @default("") @map("billing_ogrn")
-  billingAddress String @default("") @map("billing_address")
-  billingEmail   String @default("") @map("billing_email")
+  billingName    String       @default("") @map("billing_name")
+  billingInn     String       @default("") @map("billing_inn")
+  billingKpp     String       @default("") @map("billing_kpp")
+  billingOgrn    String       @default("") @map("billing_ogrn")
+  billingAddress String       @default("") @map("billing_address")
+  billingEmail   String       @default("") @map("billing_email")
 
-  members     OrgMember[]
-  documents   Document[]
-  folders     DocumentFolder[]
-  files       File[]
-  jobs        GenerationJob[]
-  mailDomains MailDomain[]
-  senders     Sender[]
-  templates   EmailTemplate[]
-  emails      Email[]
-  integrations TildaIntegration[]
-  tildaRequests TildaRequest[]
-  consents    Consent[]
-  reviews     Review[]
-  auditEvents AuditEvent[]
-  apiTokens   ApiToken[]
-  awardRuleSets AwardRuleSet[]
-  supportTickets SupportTicket[]
-  roadmapVotes   RoadmapVote[]
-  plans         Plan[]
+  members           OrgMember[]
+  documents         Document[]
+  folders           DocumentFolder[]
+  files             File[]
+  verifyDays        VerifyDaily[]
+  jobs              GenerationJob[]
+  mailDomains       MailDomain[]
+  senders           Sender[]
+  templates         EmailTemplate[]
+  emails            Email[]
+  integrations      TildaIntegration[]
+  tildaRequests     TildaRequest[]
+  consents          Consent[]
+  reviews           Review[]
+  auditEvents       AuditEvent[]
+  apiTokens         ApiToken[]
+  awardRuleSets     AwardRuleSet[]
+  supportTickets    SupportTicket[]
+  roadmapVotes      RoadmapVote[]
+  plans             Plan[]
   pushSubscriptions PushSubscription[]
 
   @@map("organizations")
@@ -211,15 +209,15 @@ enum BillingKind {
 }
 
 model User {
-  id           String      @id @default(uuid()) @db.Uuid
-  email        String      @unique
-  passwordHash String      @map("password_hash")
-  name         String      @default("")
+  id              String    @id @default(uuid()) @db.Uuid
+  email           String    @unique
+  passwordHash    String    @map("password_hash")
+  name            String    @default("")
   /// Пока не заполнено — адрес не подтверждён и войти нельзя. Учётные записи,
   /// заведённые оператором из консоли, помечаются подтверждёнными сразу:
   /// адрес там вводит сам оператор, проверять нечего.
   emailVerifiedAt DateTime? @map("email_verified_at")
-  createdAt    DateTime    @default(now()) @map("created_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
 
   // ─── Второй фактор входа ─────────────────────────────────────────────
   //
@@ -236,13 +234,13 @@ model User {
   dateFormat DateFormat @default(numeric) @map("date_format")
   density    UiDensity  @default(comfortable)
 
-  memberships  OrgMember[]
-  reviews      Review[]
-  backupCodes  TotpBackupCode[]
-  sessions     UserSession[]
-  loginEvents  LoginEvent[]
-  supportTickets   SupportTicket[]
-  supportMessages  SupportMessage[]
+  memberships       OrgMember[]
+  reviews           Review[]
+  backupCodes       TotpBackupCode[]
+  sessions          UserSession[]
+  loginEvents       LoginEvent[]
+  supportTickets    SupportTicket[]
+  supportMessages   SupportMessage[]
   pushSubscriptions PushSubscription[]
   generationJobs    GenerationJob[]
 
@@ -266,7 +264,6 @@ enum DateFormat {
  * Плотность интерфейса. `compact` поджимает вертикальные отступы в списках
  * и таблицах: у федерации в реестре тысячи строк, и лишние восемь пикселей
  * на строке — это экран, который приходится прокручивать.
- *
  * Языка рядом нет намеренно: переключатель языка без перевода интерфейса
  * обещал бы то, чего сервис не умеет.
  */
@@ -277,18 +274,17 @@ enum UiDensity {
 
 /**
  * Резервные коды второго фактора.
- *
  * Хранятся HMAC-SHA256 от кода с серверным ключом, а не argon2: кодов
  * десять, и при входе сверять пришлось бы каждый — десять argon2 подряд
  * на каждый вход это секунды. У кода 50 бит энтропии, а ключ HMAC —
  * серверный секрет, так что без него база ничего не выдаёт.
  */
 model TotpBackupCode {
-  id       String    @id @default(uuid()) @db.Uuid
-  userId   String    @map("user_id") @db.Uuid
-  codeHash String    @unique @map("code_hash")
-  usedAt   DateTime? @map("used_at")
-  createdAt DateTime @default(now()) @map("created_at")
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  codeHash  String    @unique @map("code_hash")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -298,7 +294,6 @@ model TotpBackupCode {
 
 /**
  * Активные сессии.
- *
  * Cookie сессии шифрованная и сама по себе не отзывается: раньше выйти
  * «на всех устройствах» было нельзя вовсе. Теперь cookie несёт случайный
  * идентификатор, а его хеш проверяется здесь на каждом запросе — так
@@ -306,15 +301,15 @@ model TotpBackupCode {
  * идентификатор: по строке из базы cookie собрать нельзя.
  */
 model UserSession {
-  id        String    @id @default(uuid()) @db.Uuid
-  userId    String    @map("user_id") @db.Uuid
-  orgId     String    @map("org_id") @db.Uuid
-  tokenHash String    @unique @map("token_hash")
-  ip        String?   @db.Inet
-  userAgent String    @default("") @map("user_agent")
-  createdAt DateTime  @default(now()) @map("created_at")
-  lastSeenAt DateTime @default(now()) @map("last_seen_at")
-  revokedAt DateTime? @map("revoked_at")
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  orgId      String    @map("org_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash")
+  ip         String?   @db.Inet
+  userAgent  String    @default("") @map("user_agent")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  lastSeenAt DateTime  @default(now()) @map("last_seen_at")
+  revokedAt  DateTime? @map("revoked_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -331,7 +326,6 @@ enum LoginOutcome {
 
 /**
  * Журнал авторизаций: удачные и неудачные входы.
- *
  * Пишется только для существующих учётных записей — попытка входа
  * на несуществующий адрес никому не принадлежит, и хранить чужие адреса
  * ради неё нельзя. Показывается человеку только его собственный.
@@ -371,47 +365,47 @@ model OrgMember {
 // ─── Документы (Фаза 1) ───────────────────────────────────────────────────
 
 model Document {
-  id             String   @id @default(uuid()) @db.Uuid
-  orgId          String   @map("org_id") @db.Uuid
-  title          String
-  /** размер листа в миллиметрах: A4 альбомный = 297×210 */
-  pageWidthMm    Float    @default(297) @map("page_width_mm")
-  pageHeightMm   Float    @default(210) @map("page_height_mm")
-  /** показывать ли страницу проверки подлинности и какие поля на ней раскрывать */
-  verifyEnabled  Boolean  @default(true) @map("verify_enabled")
-  verifyFields   Json     @default("[]") @map("verify_fields")
+  id            String  @id @default(uuid()) @db.Uuid
+  orgId         String  @map("org_id") @db.Uuid
+  title         String
+  /**
+   * размер листа в миллиметрах: A4 альбомный = 297×210
+   */
+  pageWidthMm   Float   @default(297) @map("page_width_mm")
+  pageHeightMm  Float   @default(210) @map("page_height_mm")
+  /**
+   * показывать ли страницу проверки подлинности и какие поля на ней раскрывать
+   */
+  verifyEnabled Boolean @default(true) @map("verify_enabled")
+  verifyFields  Json    @default("[]") @map("verify_fields")
 
-  /*
+  /**
    * Мероприятие, за которое выдаются документы.
-   *
    * Хранится у документа, а не в макете, потому что меняется чаще макета:
    * бланк федерации один на сезон, а соревнований за сезон десятки. Пока
    * этих полей не было, название и дата вписывались прямо в текст на листе,
    * и на каждое соревнование приходилось делать копию шаблона.
-   *
    * Дата строкой, а не датой: на грамотах пишут и «17 июня 2026 года»,
    * и «17–19 июня 2026», и «сезон 2025/26». Календарное поле заставило бы
    * выбирать одно из них и упростило бы задачу до неверной.
    */
-  eventName   String @default("") @map("event_name")
-  eventDate   String @default("") @map("event_date")
-  eventPlace  String @default("") @map("event_place")
-  eventHours  String @default("") @map("event_hours")
+  eventName  String    @default("") @map("event_name")
+  eventDate  String    @default("") @map("event_date")
+  eventPlace String    @default("") @map("event_place")
+  eventHours String    @default("") @map("event_hours")
   /**
    * Дата выдачи, если она не совпадает с днём выпуска: грамоты за прошедшее
    * мероприятие печатают позже, а на них должна стоять дата награждения.
    * null — дата выпуска, как и раньше.
    */
-  issueDate   DateTime? @map("issue_date") @db.Date
+  issueDate  DateTime? @map("issue_date") @db.Date
 
   /**
    * Срок действия выпускаемых документов — правило, а не факт.
-   *
    * Два способа, и нужны оба (см. verify/expiry.ts): длительность от
    * выдачи в записи ISO 8601 (`P1Y` — сертификаты о квалификации, у
    * которых срок свой у каждого) и фиксированная дата (сезонный допуск,
    * один срок на всех). Пусто и там и там — документы бессрочные.
-   *
    * Правило применяется в момент выпуска и записывается в файл: менять
    * его потом можно, выданные документы от этого не меняются — их срок
    * напечатан на бумаге.
@@ -421,7 +415,6 @@ model Document {
 
   /**
    * Папка библиотеки. null — материал лежит в корне «Моих документов».
-   *
    * SetNull, а не Cascade: удаление папки не удаляет то, что в ней лежало, —
    * материалы возвращаются в корень. Папку заводят на глаз и удаляют так же
    * легко, и цена ошибки не должна равняться потере сезона работы.
@@ -431,12 +424,10 @@ model Document {
 
   /**
    * Материал, с которого сняли копию под новое мероприятие.
-   *
    * Ссылка на себя, а не отдельная модель шаблона: полное разделение
    * «бланк отдельно, мероприятие отдельно» задело бы ядро выпуска,
    * и делается отдельной задачей. Пока это видимая связь «сделан
    * на основе того», по которой человек находит исходный бланк.
-   *
    * SetNull, а не Cascade: исходник могли удалить насовсем, и копии
    * от этого пропадать не должны — они самостоятельные материалы.
    */
@@ -446,22 +437,20 @@ model Document {
 
   /**
    * Шаблон: макет, который организация берёт за основу новых документов.
-   *
    * Флаг, а не отдельная модель: шаблону нужны ровно те же листы, фон,
    * колонки и редактор, что и документу, — отдельная таблица заставила бы
    * держать вторую копию макета и второй редактор. Документ из шаблона —
    * копия макета и колонок, без получателей и без мероприятия (см.
    * `DocumentsService.copyFrom`), поэтому шаблон никогда не держит чужих
    * персональных данных и не выпускается сам.
-   *
    * Шаблоны живут отдельным списком: в «Моих документах», рассылке,
    * Тильде и сводке их нет.
    */
   isTemplate Boolean @default(false) @map("is_template")
 
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
-  deletedAt      DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
 
   /**
    * Набор правил награждения, по которому раскладывается протокол.
@@ -472,14 +461,14 @@ model Document {
   ruleSetId String?       @map("rule_set_id") @db.Uuid
   ruleSet   AwardRuleSet? @relation("DocumentRuleSet", fields: [ruleSetId], references: [id], onDelete: SetNull)
 
-  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  sheets  Sheet[]
-  files   File[]
-  columns   RecipientColumn[]
-  rows      RecipientRow[]
-  jobs      GenerationJob[]
-  templates EmailTemplate[]
-  emails    Email[]
+  org           Organization      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  sheets        Sheet[]
+  files         File[]
+  columns       RecipientColumn[]
+  rows          RecipientRow[]
+  jobs          GenerationJob[]
+  templates     EmailTemplate[]
+  emails        Email[]
   tildaRequests TildaRequest[]
 
   @@index([orgId, deletedAt])
@@ -491,12 +480,10 @@ model Document {
 
 /**
  * Папка библиотеки — список материалов, который организация заводит себе сама.
- *
  * Плоский список без вложенности: папки здесь как ярлыки на полке, а не как
  * дерево каталогов. Дерево требует переносов, хлебных крошек и ответа на
  * вопрос «куда делся материал из удалённой ветки», а награждений за сезон
  * десятки — их раскладывают в один уровень и этим обходятся.
- *
  * Названия свои: раньше набор разделов был зашит в код («Спортивные
  * соревнования», «Олимпиады и конкурсы»), и организация, которая проводит
  * семинары, читала их как чужой шаблон.
@@ -505,7 +492,9 @@ model DocumentFolder {
   id        String   @id @default(uuid()) @db.Uuid
   orgId     String   @map("org_id") @db.Uuid
   name      String
-  /** Порядок в колонке: человек ставит папки как ему удобно, а не по алфавиту. */
+  /**
+   * Порядок в колонке: человек ставит папки как ему удобно, а не по алфавиту.
+   */
   position  Int      @default(0)
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -513,7 +502,9 @@ model DocumentFolder {
   org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   documents Document[]
 
-  /** Две папки с одним именем в одной организации различить нечем. */
+  /**
+   * Две папки с одним именем в одной организации различить нечем.
+   */
   @@unique([orgId, name])
   @@index([orgId, position])
   @@map("document_folders")
@@ -548,55 +539,52 @@ enum FileKind {
 }
 
 model File {
-  id           String   @id @default(uuid()) @db.Uuid
-  orgId        String   @map("org_id") @db.Uuid
-  documentId   String?  @map("document_id") @db.Uuid
-  kind         FileKind
-  s3Key        String   @map("s3_key")
-  sizeBytes    Int      @map("size_bytes")
-  mime         String
-  originalName String   @default("") @map("original_name")
+  id            String    @id @default(uuid()) @db.Uuid
+  orgId         String    @map("org_id") @db.Uuid
+  documentId    String?   @map("document_id") @db.Uuid
+  kind          FileKind
+  s3Key         String    @map("s3_key")
+  sizeBytes     Int       @map("size_bytes")
+  mime          String
+  originalName  String    @default("") @map("original_name")
   /**
    * Публичный идентификатор для проверки подлинности: попадает в QR-код
    * и в ссылку /verify/<publicId>. Генерируется у всех файлов сразу,
    * даже до включения модуля верификации, — иначе выданные раньше
    * сертификаты нельзя будет проверить задним числом.
    */
-  publicId      String   @unique @default(uuid()) @map("public_id") @db.Uuid
+  publicId      String    @unique @default(uuid()) @map("public_id") @db.Uuid
   /**
    * Короткий публичный код: `K7M2-9QXR-4TVB`, алфавит Крокфорда, хвост
    * HMAC (см. verify/public-code.ts). Печатается на бумаге, кодируется
    * в QR, диктуется по телефону — UUID для всего этого слишком длинный.
-   *
    * Считается в приложении, а не базой: базе неоткуда взять секрет
    * для хвоста. Null у документов, выпущенных до появления кода: их QR
    * уже напечатан со ссылкой на publicId, и она продолжает работать.
    * Задним числом код им не назначается — на их бумаге его всё равно нет.
    */
-  publicCode    String?  @unique @map("public_code")
+  publicCode    String?   @unique @map("public_code")
   /**
    * Регистрационный номер «по-бухгалтерски»: «142/2026», сквозной
    * у организации за год. Выделяется при выпуске экземпляра, до печати,
    * из счётчика IssueCounter — и печатается на документе полем reg_number.
-   *
    * Не то же самое, что публичный код: номер ведёт организация для своей
    * отчётности, код — для проверки посторонним. Первый может повторяться
    * между организациями, второй уникален на весь сервис.
    */
-  regNumber     String?  @map("reg_number")
-  verifyRevoked Boolean  @default(false) @map("verify_revoked")
-  createdAt     DateTime @default(now()) @map("created_at")
+  regNumber     String?   @map("reg_number")
+  verifyRevoked Boolean   @default(false) @map("verify_revoked")
+  createdAt     DateTime  @default(now()) @map("created_at")
   deletedAt     DateTime? @map("deleted_at")
 
   /**
    * Когда документ перестаёт действовать. Null — бессрочный.
-   *
    * Факт, а не правило: посчитан при выпуске из настроек материала
    * (Document.expiresIn / expiresAt) и больше не меняется. Состояние
    * «истёк» отдельно не хранится — оно выводится из этой даты и часов,
    * как и остальные состояния (см. registry/file-state.ts).
    */
-  expiresAt DateTime? @map("expires_at")
+  expiresAt      DateTime? @map("expires_at")
   /**
    * Когда участнику ушло письмо о скором истечении срока. Ночная задача
    * шлёт его один раз — по этой отметке, а не по журналу писем.
@@ -605,7 +593,6 @@ model File {
 
   /**
    * SHA-256 выпущенного файла — тех самых байтов, что ушли участнику.
-   *
    * По нему человек сверяет файл на руках со страницей проверки прямо
    * в браузере, не отправляя файл никуда. Null у документов, выпущенных
    * до появления отпечатка: пересчитать его потом можно только скачав
@@ -615,7 +602,6 @@ model File {
 
   /**
    * Снимок данных получателя на момент выпуска — то, что напечатано.
-   *
    * Страница проверки читает его, а не живую строку таблицы: строку
    * потом правят (опечатка в фамилии перед перевыпуском), и страница
    * не должна показывать имя, которого нет на бумаге. Правка названия
@@ -637,7 +623,6 @@ model File {
 
   /**
    * Порядковый номер для списка состояний (Bitstring Status List).
-   *
    * Задел: сам список — офлайн-проверка отзыва по подписанному QR —
    * делается позже, но номер должен быть у документа с момента выпуска,
    * иначе выданному раньше его будет неоткуда взять. Растёт монотонно
@@ -651,12 +636,10 @@ model File {
   jobId String? @map("job_id") @db.Uuid
   /**
    * Строка получателя, ради которой файл выпущен.
-   *
    * Вместе с jobId образует ключ идемпотентности: пара (job_id, row_id)
    * уникальна, поэтому повторная обработка строки не создаст второй файл
    * даже если воркер запустится дважды. Это не удобство, а деньги: квота
    * считается по числу файлов, и дубликат списал бы документ повторно.
-   *
    * При удалении строки обнуляется, а файл остаётся: выпущенный документ
    * мог уже уйти участнику и быть проверен по QR-коду.
    */
@@ -664,12 +647,10 @@ model File {
 
   /**
    * Перевыпуск: задание, которое должно заменить этот файл.
-   *
    * Ставится в момент, когда человек нажал «Перевыпустить», — то есть до
    * того, как новый документ существует. Пока файла-замены нет, старый
    * остаётся действительным: выпуск может упасть или быть отменён, и
    * гасить настоящий сертификат под обещание нового нельзя.
-   *
    * Замену находим по паре (job_id, row_id) — тому же ключу идемпотентности,
    * которым пользуется очередь. Найденную запоминаем в replacedById, чтобы
    * связь пережила удаление строки из таблицы получателей.
@@ -679,7 +660,6 @@ model File {
 
   /**
    * Сколько раз документ проверяли по QR-коду и когда в последний раз.
-   *
    * Обезличенный счётчик: ни адреса, ни устройства, ни отпечатка браузера
    * проверяющего мы не храним. Организации нужен ответ «сертификат проверили
    * 47 раз», а не досье на того, кто проверял, — и по 152-ФЗ второе
@@ -688,7 +668,9 @@ model File {
   verifyCount  Int       @default(0) @map("verify_count")
   verifyLastAt DateTime? @map("verify_last_at")
 
-  /** Сколько раз файл скачивали из кабинета — тоже только счётчиком. */
+  /**
+   * Сколько раз файл скачивали из кабинета — тоже только счётчиком.
+   */
   downloadCount Int @default(0) @map("download_count")
 
   org             Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
@@ -701,6 +683,7 @@ model File {
   orgLogos        Organization[] @relation("OrgLogo")
   rows            RecipientRow[] @relation("RowFile")
   emails          Email[]        @relation("EmailFile")
+  verifyDays      VerifyDaily[]
   tildaRequests   TildaRequest[]
 
   @@unique([jobId, rowId])
@@ -713,23 +696,47 @@ model File {
   @@map("files")
 }
 
+/**
+ * Проверки по QR по дням — обезличенный агрегат.
+ * Одна строка на документ в день: сколько раз страницу проверки открыли
+ * и сколько из этих открытий были первыми за сутки (повтор отсеивается
+ * хешем с суточной солью, который живёт в Redis и на диск не попадает).
+ * Ни адреса, ни устройства, ни времени отдельной проверки здесь нет —
+ * это и позволяет строить график «проверок по дням», не становясь
+ * оператором персональных данных проверяющих.
+ */
+model VerifyDaily {
+  fileId  String   @map("file_id") @db.Uuid
+  orgId   String   @map("org_id") @db.Uuid
+  day     DateTime @db.Date
+  checks  Int      @default(0)
+  uniques Int      @default(0)
+
+  file File         @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@id([fileId, day])
+  @@index([orgId, day])
+  @@map("verify_daily")
+}
+
 // ─── Получатели и генерация (Фаза 2) ──────────────────────────────────────
 
 model RecipientColumn {
-  id         String @id @default(uuid()) @db.Uuid
-  documentId String @map("document_id") @db.Uuid
+  id         String  @id @default(uuid()) @db.Uuid
+  documentId String  @map("document_id") @db.Uuid
   position   Int
-  /** Имя переменной без знака процента: name, email, course. */
+  /**
+   * Имя переменной без знака процента: name, email, course.
+   */
   name       String
   /**
    * Заголовок этой колонки в загруженном файле: «Год рождения», «Команда».
-   *
    * Имя переменной для макета и заголовок для человека — разные вещи.
    * `birth_year` пишут в `%birth_year` на листе, но в шапке таблицы
    * получателей человек ждёт увидеть ту же надпись, что была в его файле.
    * Пока заголовка не было, таблица показывала служебные имена, и колонки
    * приходилось опознавать по значениям.
-   *
    * null — колонка заведена руками или до появления заголовков; тогда
    * в шапке остаётся имя переменной, как и раньше.
    */
@@ -746,19 +753,25 @@ model RecipientRow {
   id         String  @id @default(uuid()) @db.Uuid
   documentId String  @map("document_id") @db.Uuid
   position   Int
-  /** Значения по именам колонок: {"name":"Иванов Иван","email":"..."} */
+  /**
+   * Значения по именам колонок: {"name":"Иванов Иван","email":"..."}
+   */
   data       Json    @default("{}")
-  /** Отмеченные строки попадают в генерацию. */
+  /**
+   * Отмеченные строки попадают в генерацию.
+   */
   checked    Boolean @default(true)
   lastFileId String? @map("last_file_id") @db.Uuid
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  lastFile File?    @relation("RowFile", fields: [lastFileId], references: [id], onDelete: SetNull)
-  /** Все файлы, когда-либо выпущенные по этой строке, — по одному на задание. */
-  generated File[]  @relation("RowGenerated")
+  document  Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  lastFile  File?    @relation("RowFile", fields: [lastFileId], references: [id], onDelete: SetNull)
+  /**
+   * Все файлы, когда-либо выпущенные по этой строке, — по одному на задание.
+   */
+  generated File[]   @relation("RowGenerated")
   emails    Email[]
 
   @@unique([documentId, position])
@@ -787,37 +800,35 @@ model GenerationJob {
 
   /**
    * На сколько частей пакет разрезан в очереди.
-   *
    * Пакет — это не одна задача, а несколько по полсотни строк: иначе
    * запущенный выпуск на десять тысяч держал бы воркер часами, и пакет
    * на пять грамот, поставленный следом, ждал бы его целиком.
    * Число нужно, чтобы снять с очереди все части разом при отмене.
    */
-  chunks     Int       @default(0)
+  chunks  Int @default(0)
   /**
    * Номер попытки. Растёт, когда упавший выпуск продолжают.
-   *
    * Входит в идентификаторы частей в очереди: BullMQ молча отказывается
    * добавлять задачу с уже существующим идентификатором, а часть прошлой
    * попытки может ещё лежать в Redis.
    */
-  attempt    Int       @default(1)
+  attempt Int @default(1)
 
   /**
    * Кто запустил выпуск — ему и уходит push «готово» (ADR-0004).
    * Пусто у заданий, запущенных до появления поля, у выпусков по форме
    * на сайте и у тех, чей автор удалён из системы.
    */
-  createdById String?  @map("created_by_id") @db.Uuid
+  createdById String? @map("created_by_id") @db.Uuid
 
   createdAt  DateTime  @default(now()) @map("created_at")
   startedAt  DateTime? @map("started_at")
   finishedAt DateTime? @map("finished_at")
 
-  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  document  Document     @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  createdBy User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  files    File[]       @relation("JobFiles")
+  org         Organization           @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  document    Document               @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  createdBy   User?                  @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  files       File[]                 @relation("JobFiles")
   rowFailures GenerationRowFailure[]
 
   @@index([orgId, status])
@@ -826,24 +837,23 @@ model GenerationJob {
 
 /**
  * Строка, которую выпустить не удалось.
- *
  * Хранится фактом, а не счётчиком, — по той же причине, по какой квота
  * считается по файлам. Счётчик нельзя сложить из нескольких частей пакета,
  * идущих вразнобой: часть, вернувшаяся из очереди после перезапуска
  * воркера, прибавила бы свои ошибки второй раз.
- *
  * А главное — из этих записей и файлов складывается ответ на вопрос
  * «пакет доработал?». Строка либо стала файлом, либо попала сюда; пока
  * сумма меньше обещанного, какая-то часть ещё в пути, и объявлять выпуск
  * законченным нельзя — иначе участникам уйдёт половина писем.
- *
  * Ссылки на recipient_rows нет намеренно: одна из причин попасть сюда —
  * что строку удалили, пока шёл выпуск.
  */
 model GenerationRowFailure {
   jobId     String   @map("job_id") @db.Uuid
   rowId     String   @map("row_id") @db.Uuid
-  /** Причина по-русски: её видит владелец в отчёте о выпуске. */
+  /**
+   * Причина по-русски: её видит владелец в отчёте о выпуске.
+   */
   message   String
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -862,22 +872,26 @@ enum MailDomainStatus {
 }
 
 model MailDomain {
-  id       String           @id @default(uuid()) @db.Uuid
-  orgId    String           @map("org_id") @db.Uuid
-  domain   String
-  provider String           @default("smtp")
-  status   MailDomainStatus @default(pending)
-  /** DNS-записи, которые владелец домена должен прописать: [{type,host,value}] */
-  dnsRecords Json           @default("[]") @map("dns_records")
-  /** Идентификатор домена на стороне почтового провайдера, если тот его выдаёт. */
-  providerRef String?       @map("provider_ref")
+  id                String           @id @default(uuid()) @db.Uuid
+  orgId             String           @map("org_id") @db.Uuid
+  domain            String
+  provider          String           @default("smtp")
+  status            MailDomainStatus @default(pending)
+  /**
+   * DNS-записи, которые владелец домена должен прописать: [{type,host,value}]
+   */
+  dnsRecords        Json             @default("[]") @map("dns_records")
+  /**
+   * Идентификатор домена на стороне почтового провайдера, если тот его выдаёт.
+   */
+  providerRef       String?          @map("provider_ref")
   /**
    * Секрет подтверждения владения доменом. Уникален для каждой заявки:
    * прописать его в DNS может только тот, у кого есть доступ к зоне.
    * Без этого любая организация «подтвердила» бы чужой домен, просто
    * повторив общие для всех записи SPF.
    */
-  verificationToken String @default(uuid()) @map("verification_token")
+  verificationToken String           @default(uuid()) @map("verification_token")
 
   verifiedAt    DateTime? @map("verified_at")
   lastCheckedAt DateTime? @map("last_checked_at")
@@ -903,10 +917,9 @@ model Sender {
    * отправителя. Нужен, когда письма уходят с noreply, а отвечать
    * человек должен в приёмную комиссию.
    */
-  replyTo String @default("") @map("reply_to")
+  replyTo   String @default("") @map("reply_to")
   /**
    * Подпись, которая дописывается к письму о выдаче документа.
-   *
    * Только к транзакционному: рекламный низ добавляет отдельный код
    * и только рекламной ветке (см. mailing/letter-kind.ts). Подпись
    * с рекламой внутри письма о выдаче сделала бы рекламным всё письмо.
@@ -925,11 +938,9 @@ model Sender {
 
 /**
  * Поток отправки. Разделение не про удобство, а про деньги.
- *
  * Выдача документа, ссылка на него и уведомление об истечении срока —
  * переписка по существу отношений, согласия по ст. 18 ФЗ «О рекламе»
  * она не требует. Реклама требует согласия, отписки и журнала согласий.
- *
  * Ловушка в том, что рекламный кусок внутри транзакционного письма делает
  * рекламным всё письмо целиком, а штраф по ст. 14.3 КоАП для юрлица — от
  * 300 тысяч до миллиона рублей за каждый факт. Поэтому поток — это поле
@@ -953,25 +964,26 @@ model EmailTemplate {
    * отправка ищет шаблон с фильтром по этому полю и рекламный
    * не найдёт даже случайно.
    */
-  kind EmailKind @default(transactional)
+  kind           EmailKind @default(transactional)
   /**
    * Рекламодатель: ст. 18 требует, чтобы получатель видел, чья это реклама.
    * Заполнен только у рекламных шаблонов — транзакционному письму
    * рекламодателя не полагается по определению.
    */
-  advertiserName String? @map("advertiser_name")
+  advertiserName String?   @map("advertiser_name")
 
   /**
    * Название рассылки без документа — приглашения, объявления, напоминания.
-   *
    * Заполнено только у шаблонов без материала: у шаблона материала
    * название и так есть, это название материала. По нему рассылка
    * узнаётся в журнале писем и в сводке.
    */
-  name     String?
-  subject  String
-  bodyHtml String  @map("body_html")
-  /** Прикладывать ли к письму сгенерированный для этой строки файл. */
+  name                String?
+  subject             String
+  bodyHtml            String  @map("body_html")
+  /**
+   * Прикладывать ли к письму сгенерированный для этой строки файл.
+   */
   attachGeneratedFile Boolean @default(true) @map("attach_generated_file")
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -995,8 +1007,8 @@ enum EmailStatus {
 }
 
 model Email {
-  id         String @id @default(uuid()) @db.Uuid
-  orgId      String @map("org_id") @db.Uuid
+  id         String  @id @default(uuid()) @db.Uuid
+  orgId      String  @map("org_id") @db.Uuid
   documentId String? @map("document_id") @db.Uuid
   rowId      String? @map("row_id") @db.Uuid
   templateId String? @map("template_id") @db.Uuid
@@ -1004,26 +1016,24 @@ model Email {
 
   /**
    * Поток копией с шаблона на момент постановки в очередь.
-   *
    * Именно копией: шаблон можно потом переделать из рекламного
    * в транзакционный, а по журналу за прошлый год отвечать перед
    * проверкой придётся тем, чем письмо было в день отправки.
    */
   kind EmailKind @default(transactional)
 
-  toEmail  String @map("to_email")
-  subject  String
-  provider String @default("smtp")
+  toEmail           String  @map("to_email")
+  subject           String
+  provider          String  @default("smtp")
   providerMessageId String? @map("provider_message_id")
 
   /**
    * Готовый текст письма, если он не из шаблона организации.
-   *
    * Служебные письма о самом документе — уведомление о скором истечении
    * срока — пишет сервис, а не организация, и шаблона у них нет. Пусто —
    * тело собирается из шаблона при отправке, как и раньше.
    */
-  bodyHtml String? @map("body_html")
+  bodyHtml   String? @map("body_html")
   /**
    * Прикладывать ли файл. У письма о выдаче — да, у уведомления о сроке —
    * нет: документ у человека уже есть, второй раз слать его незачем.
@@ -1037,26 +1047,25 @@ model Email {
   sentAt          DateTime? @map("sent_at")
   statusUpdatedAt DateTime  @default(now()) @map("status_updated_at")
 
-  org      Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  org           Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
   /**
    * Материал, по которому ушло письмо.
-   *
    * Cascade, в отличие от файлов: файл мог уже уйти участнику и проверяться
    * по QR-коду, а запись о письме нужна только рядом со своим материалом.
    * Пока связи не было, удаление материала оставляло в базе адреса
    * участников навсегда — вопреки сроку хранения, который остальным
    * таблицам считает ночная задача.
    */
-  document Document?      @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  document      Document?      @relation(fields: [documentId], references: [id], onDelete: Cascade)
   /**
    * Строка получателя. SetNull, а не Cascade: список получателей переливают
    * заново при каждом повторном импорте, а журнал отправки за прошлое
    * награждение от этого пропадать не должен.
    */
-  row      RecipientRow?  @relation(fields: [rowId], references: [id], onDelete: SetNull)
-  template EmailTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
-  file     File?          @relation("EmailFile", fields: [fileId], references: [id], onDelete: SetNull)
-  events   EmailEvent[]
+  row           RecipientRow?  @relation(fields: [rowId], references: [id], onDelete: SetNull)
+  template      EmailTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  file          File?          @relation("EmailFile", fields: [fileId], references: [id], onDelete: SetNull)
+  events        EmailEvent[]
   tildaRequests TildaRequest[]
 
   @@index([orgId, status])
@@ -1073,11 +1082,11 @@ model Email {
 }
 
 model EmailEvent {
-  id        BigInt   @id @default(autoincrement())
-  emailId   String   @map("email_id") @db.Uuid
-  type      String
-  source    String
-  payload   Json     @default("{}")
+  id         BigInt   @id @default(autoincrement())
+  emailId    String   @map("email_id") @db.Uuid
+  type       String
+  source     String
+  payload    Json     @default("{}")
   occurredAt DateTime @default(now()) @map("occurred_at")
 
   email Email @relation(fields: [emailId], references: [id], onDelete: Cascade)
@@ -1098,18 +1107,26 @@ model TildaIntegration {
   orgId String @map("org_id") @db.Uuid
   name  String
 
-  /** Попадает в адрес скрипта на странице клиента, поэтому виден всем. */
+  /**
+   * Попадает в адрес скрипта на странице клиента, поэтому виден всем.
+   */
   token String @unique @default(uuid()) @db.Uuid
 
-  /** Домены страниц, с которых принимаются заявки. Пустой список = не принимать. */
+  /**
+   * Домены страниц, с которых принимаются заявки. Пустой список = не принимать.
+   */
   allowedDomains String[] @map("allowed_domains")
-  /** Какие документы разрешено запрашивать через эту интеграцию. */
+  /**
+   * Какие документы разрешено запрашивать через эту интеграцию.
+   */
   documentIds    String[] @map("document_ids") @db.Uuid
 
-  authMode TildaAuthMode @default(email_code) @map("auth_mode")
-  /** Один файл на пару «документ + адрес»: повторный запрос отдаёт готовый. */
-  singleFilePerEmail Boolean @default(true) @map("single_file_per_email")
-  dailyLimit         Int     @default(500) @map("daily_limit")
+  authMode           TildaAuthMode @default(email_code) @map("auth_mode")
+  /**
+   * Один файл на пару «документ + адрес»: повторный запрос отдаёт готовый.
+   */
+  singleFilePerEmail Boolean       @default(true) @map("single_file_per_email")
+  dailyLimit         Int           @default(500) @map("daily_limit")
 
   successMessage String  @default("Спасибо! Документ отправлен на вашу почту") @map("success_message")
   showDownload   Boolean @default(true) @map("show_download")
@@ -1119,40 +1136,42 @@ model TildaIntegration {
 
   /**
    * Подставлять имя и почту из личного кабинета площадки.
-   *
    * У Тильды внутри личного кабинета к формам добавляются `ma_name`
    * и `ma_email` — имя и адрес вошедшего участника. Если они есть,
    * человеку остаётся только подтвердить их, а не набирать заново.
-   *
    * Данные приходят из браузера, поэтому сами по себе доказательством
    * личности не служат: подтверждение по коду (`authMode`) остаётся
    * отдельной настройкой и решает, доверяем мы подставленному адресу
    * или проверяем его.
    */
   prefillFromAccount Boolean @default(true) @map("prefill_from_account")
-  /** Можно ли править подставленные данные. Выключено — только подтвердить. */
+  /**
+   * Можно ли править подставленные данные. Выключено — только подтвердить.
+   */
   allowEdit          Boolean @default(true) @map("allow_edit")
-  /** Кнопки «поделиться» на окне успеха. */
+  /**
+   * Кнопки «поделиться» на окне успеха.
+   */
   showShare          Boolean @default(true) @map("show_share")
-  /** Ссылка на страницу проверки подлинности в окне успеха. */
+  /**
+   * Ссылка на страницу проверки подлинности в окне успеха.
+   */
   showVerifyLink     Boolean @default(false) @map("show_verify_link")
 
   /**
    * Выдавать только тем, кто есть в реестре получателей документа.
-   *
    * Проверка идёт до подтверждения адреса: посылать код тому, кому документ
    * всё равно не положен, — значит слать письмо в никуда и подсказывать
    * постороннему, что адрес обрабатывается.
    */
-  checkList          Boolean @default(false) @map("check_list")
+  checkList      Boolean @default(false) @map("check_list")
   /**
    * Принимать заявку, только если площадка сообщила адрес учётной записи.
-   *
    * Означает «форма стоит внутри личного кабинета, и человек в него вошёл».
    * Сам по себе доказательством не служит — данные приходят из браузера, —
    * но отсекает заявки со страниц, куда форму скопировали.
    */
-  requireAccount     Boolean @default(false) @map("require_account")
+  requireAccount Boolean @default(false) @map("require_account")
 
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -1177,24 +1196,26 @@ model TildaRequest {
   orgId         String @map("org_id") @db.Uuid
   documentId    String @map("document_id") @db.Uuid
 
-  email  String
+  email        String
   /**
    * Адрес учётной записи на площадке, откуда пришла заявка (`ma_email`
    * у Тильды). Отличается от `email` тем, что человек его не набирал:
    * он подставлен личным кабинетом, в который человек вошёл.
-   *
    * Нужен, чтобы «один сертификат в руки» держалось даже когда адрес
    * доставки разрешено менять. Иначе достаточно вписать другой адрес —
    * и выдача пойдёт заново, сколько угодно раз. Здесь мы разделяем два
    * разных вопроса: «куда прислать» и «кто это».
-   *
    * Пусто, если подстановка выключена или площадка ничего не сообщила.
    */
   accountEmail String? @map("account_email")
-  /** Остальные поля формы: становятся переменными документа. */
-  fields Json   @default("{}")
+  /**
+   * Остальные поля формы: становятся переменными документа.
+   */
+  fields       Json    @default("{}")
 
-  /** Нужны для разбора злоупотреблений; хранятся ограниченный срок. */
+  /**
+   * Нужны для разбора злоупотреблений; хранятся ограниченный срок.
+   */
   ip        String? @db.Inet
   userAgent String? @map("user_agent")
 
@@ -1237,7 +1258,9 @@ enum ConsentPurpose {
   certificate
   marketing
   verification
-  /** Согласие клиента на публикацию его отзыва с именем и организацией. */
+  /**
+   * Согласие клиента на публикацию его отзыва с именем и организацией.
+   */
   review_publication
 }
 
@@ -1249,7 +1272,6 @@ enum ReviewStatus {
 
 /**
  * Журнал согласий.
- *
  * Доказывать наличие согласия при споре обязан оператор, и «пользователь же
  * нажал галочку» без записи не работает. Договор-поручение отдельно обязывает
  * нас предоставлять эти сведения заказчику по запросу.
@@ -1287,7 +1309,6 @@ model Consent {
 
 /**
  * Отзыв клиента о сервисе.
- *
  * Оставить его может только вошедший пользователь: отзыв от анонимного
  * посетителя ничего не доказывает и открывает форму для спама. Публикуется
  * не сразу — сначала проверка. До публикации требуется отдельное согласие
@@ -1299,17 +1320,23 @@ model Review {
   orgId  String @map("org_id") @db.Uuid
   userId String @map("user_id") @db.Uuid
 
-  /** Как подписать отзыв. Заполняется автором, а не берётся из профиля. */
-  authorName String  @map("author_name")
-  authorRole String  @map("author_role")
-  orgName    String  @map("org_name")
+  /**
+   * Как подписать отзыв. Заполняется автором, а не берётся из профиля.
+   */
+  authorName String @map("author_name")
+  authorRole String @map("author_role")
+  orgName    String @map("org_name")
   text       String
-  /** Необязательная оценка от 1 до 5. */
+  /**
+   * Необязательная оценка от 1 до 5.
+   */
   rating     Int?
 
-  status      ReviewStatus @default(pending)
-  /** Почему отклонён — видно автору, чтобы он мог поправить. */
-  moderatorNote String?    @map("moderator_note")
+  status        ReviewStatus @default(pending)
+  /**
+   * Почему отклонён — видно автору, чтобы он мог поправить.
+   */
+  moderatorNote String?      @map("moderator_note")
 
   createdAt   DateTime  @default(now()) @map("created_at")
   publishedAt DateTime? @map("published_at")
@@ -1331,12 +1358,10 @@ enum LeadStatus {
 
 /**
  * Заявка на счёт с посадочной страницы.
- *
  * Организация не покупает нажатием кнопки: сначала ей нужны договор, счёт
  * и ответы юристу. Пока эта заявка уходила письмом на общий ящик, она жила
  * ровно до первого завала входящих — а это единственный вход для крупных
  * клиентов, ради которых сервис и делается.
- *
  * Организация к заявке не привязана: её ещё нет в системе, человек только
  * присматривается.
  */
@@ -1347,37 +1372,54 @@ model Lead {
   contact String
   email   String
   phone   String?
-  /** ИНН покупателя: без него счёт бесполезен для его бухгалтерии. */
+  /**
+   * ИНН покупателя: без него счёт бесполезен для его бухгалтерии.
+   */
   inn     String?
-  /** Выбранный тариф — по нему выставляется счёт без переписки. */
+  /**
+   * Выбранный тариф — по нему выставляется счёт без переписки.
+   */
   tariff  String?
-  /** Сколько документов в год, если тариф не выбран. */
+  /**
+   * Сколько документов в год, если тариф не выбран.
+   */
   volume  String?
   comment String?
 
-  /*
+  /**
    * Поля заявки «Обсудить условия» (ветка 10-B).
-   *
    * Заведены здесь, потому что миграции блока делает только эта ветка.
    * До них тип мероприятий и удобное время звонка складывались в comment
    * одним текстом — искать по такому нельзя, а «позвонить утром» надо
    * не читать глазами, а сортировать.
    */
-  /** Какие мероприятия проводит: соревнования, конференции, курсы. */
-  eventKinds String[] @map("event_kinds")
-  /** Когда удобно звонить. */
-  callTime   String?  @map("call_time")
-  /** Редакция текста согласия, на которую человек нажал. */
-  consentTextVersion String? @map("consent_text_version")
+  /**
+   * /** Какие мероприятия проводит: соревнования, конференции, курсы.
+   */
+  eventKinds         String[] @map("event_kinds")
+  /**
+   * Когда удобно звонить.
+   */
+  callTime           String?  @map("call_time")
+  /**
+   * Редакция текста согласия, на которую человек нажал.
+   */
+  consentTextVersion String?  @map("consent_text_version")
 
   status LeadStatus @default(new)
-  /** Что с заявкой сделали: кому передали, о чём договорились. */
+  /**
+   * Что с заявкой сделали: кому передали, о чём договорились.
+   */
   note   String?
 
-  /** Нужны для разбора злоупотреблений; стираются вместе с остальными следами. */
+  /**
+   * Нужны для разбора злоупотреблений; стираются вместе с остальными следами.
+   */
   ip        String? @db.Inet
   userAgent String? @map("user_agent")
-  /** Откуда пришёл: адрес страницы, с которой отправлена форма. */
+  /**
+   * Откуда пришёл: адрес страницы, с которой отправлена форма.
+   */
   source    String?
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -1390,11 +1432,9 @@ model Lead {
 
 /**
  * Счёт на оплату.
- *
  * Нумерация сквозная в пределах года и обеспечивается уникальным индексом:
  * два счёта с одним номером — это разбирательство с бухгалтерией клиента,
  * а не мелкая опечатка.
- *
  * Реквизиты продавца в счёт не копируются: они одни на всё и берутся
  * из окружения при отрисовке. Копия покупателя, наоборот, сохраняется —
  * счёт должен остаться таким, каким его получили, даже если клиент
@@ -1407,20 +1447,24 @@ model Invoice {
   number Int
   year   Int
 
-  buyerName String  @map("buyer_name")
-  buyerInn  String  @map("buyer_inn")
+  buyerName String @map("buyer_name")
+  buyerInn  String @map("buyer_inn")
   email     String
 
-  tariff      String
-  description String
-  /** Сумма в копейках: в рублях с плавающей точкой деньги считать нельзя. */
-  amountKopecks Int  @map("amount_kopecks")
+  tariff        String
+  description   String
+  /**
+   * Сумма в копейках: в рублях с плавающей точкой деньги считать нельзя.
+   */
+  amountKopecks Int    @map("amount_kopecks")
 
   paidAt    DateTime? @map("paid_at")
-  /** Идентификатор платежа у платёжного сервиса, когда он появится. */
+  /**
+   * Идентификатор платежа у платёжного сервиса, когда он появится.
+   */
   paymentId String?   @map("payment_id")
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @default(now()) @map("created_at")
   sentAt    DateTime? @map("sent_at")
 
   /**
@@ -1437,38 +1481,45 @@ model Invoice {
 
 /**
  * Журнал действий.
- *
  * Отвечает на вопрос «кто и когда это сделал» — он возникает в первом же
  * спорном случае: участник уверяет, что грамоту ему не присылали, а
  * федерация не может ни подтвердить, ни опровергнуть. Без журнала
  * единственный источник правды — память сотрудника.
- *
  * Пишем действия, у которых есть последствия снаружи: выпуск и рассылка
  * документов, отзыв проверки, удаление, изменения в составе сотрудников.
  * Открытие страниц и правку макета не пишем — это шум, в котором тонет
  * то немногое, ради чего журнал заведён.
- *
  * Имя и адрес автора храним копией на момент события: сотрудник может
  * уволиться и быть удалён, а запись обязана остаться читаемой.
  */
 model AuditEvent {
-  id     BigInt @id @default(autoincrement())
-  orgId  String @map("org_id") @db.Uuid
+  id    BigInt @id @default(autoincrement())
+  orgId String @map("org_id") @db.Uuid
 
-  /** Кто. null — действие системы, например ночная очистка по срокам. */
+  /**
+   * Кто. null — действие системы, например ночная очистка по срокам.
+   */
   userId     String? @map("user_id") @db.Uuid
   actorName  String  @default("") @map("actor_name")
   actorEmail String  @default("") @map("actor_email")
 
-  /** Что: documents.purge, generation.start, mail.send и т.п. */
-  action String
-  /** Над чем: тип и идентификатор, чтобы можно было найти предмет спора. */
+  /**
+   * Что: documents.purge, generation.start, mail.send и т.п.
+   */
+  action     String
+  /**
+   * Над чем: тип и идентификатор, чтобы можно было найти предмет спора.
+   */
   targetType String? @map("target_type")
   targetId   String? @map("target_id")
-  /** Человекочитаемое описание — его и показываем в кабинете. */
-  summary String @default("")
+  /**
+   * Человекочитаемое описание — его и показываем в кабинете.
+   */
+  summary    String  @default("")
 
-  /** Подробности события. Персональных данных сюда не кладём. */
+  /**
+   * Подробности события. Персональных данных сюда не кладём.
+   */
   meta Json @default("{}")
 
   ip        String?  @db.Inet
@@ -1484,7 +1535,6 @@ model AuditEvent {
 /**
  * Токен для доступа к API без входа человеком: чужая система, скрипт
  * федерации, помощник на основе ИИ.
- *
  * Храним хеш, а не сам токен. Токен показывается один раз при выдаче
  * и больше нигде: список токенов в кабинете — первое, что прочтёт тот,
  * кто получил доступ к чужой открытой вкладке, и там не должно быть
@@ -1494,14 +1544,16 @@ model ApiToken {
   id    String @id @default(uuid()) @db.Uuid
   orgId String @map("org_id") @db.Uuid
 
-  /** Понятное человеку название: «выгрузка из СпортОрг», «бот федерации». */
+  /**
+   * Понятное человеку название: «выгрузка из СпортОрг», «бот федерации».
+   */
   name String
 
   /// sha256 от токена. Не argon2: токен — это 32 случайных байта, перебирать
   /// его нечем, а проверка идёт на каждом запросе и обязана быть дешёвой.
   tokenHash String @unique @map("token_hash")
   /// Начало токена — чтобы владелец узнал свой среди нескольких.
-  prefix String
+  prefix    String
 
   /// Права те же, что у сотрудника: обычный работает с материалами,
   /// полный вдобавок удаляет. Управлять людьми токен не может никогда —
@@ -1511,8 +1563,8 @@ model ApiToken {
   createdByUserId String?   @map("created_by_user_id") @db.Uuid
   createdAt       DateTime  @default(now()) @map("created_at")
   /// Когда пользовались в последний раз — чтобы видеть забытые токены.
-  lastUsedAt DateTime? @map("last_used_at")
-  revokedAt  DateTime? @map("revoked_at")
+  lastUsedAt      DateTime? @map("last_used_at")
+  revokedAt       DateTime? @map("revoked_at")
 
   org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
@@ -1525,7 +1577,6 @@ model ApiToken {
 /**
  * Набор правил награждения: «первое место — диплом победителя, снятым
  * ничего, остальным грамота участника».
- *
  * Принадлежит организации, а не документу. Федерация настраивает
  * награждение один раз на сезон, а соревнований за сезон десятки:
  * если бы правила жили у документа, «переиспользовать на следующем
@@ -1539,7 +1590,6 @@ model AwardRuleSet {
   /**
    * Колонка таблицы получателей, по которой строки делятся на группы.
    * Пусто — весь протокол одна группа.
-   *
    * Группа задаёт область дедупликации получателя, подпись строки в отчёте
    * и — только для условий с признаком `withinGroup` — круг строк, среди
    * которых пересчитывается место. Сама по себе она место не пересчитывает:
@@ -1548,7 +1598,9 @@ model AwardRuleSet {
    * в @gramota/shared).
    */
   groupColumn  String @default("") @map("group_column")
-  /** Колонка со статусом (DSQ/DNS/«снят»). Пусто — статусов в протоколе нет. */
+  /**
+   * Колонка со статусом (DSQ/DNS/«снят»). Пусто — статусов в протоколе нет.
+   */
   statusColumn String @default("") @map("status_column")
 
   /**
@@ -1559,7 +1611,9 @@ model AwardRuleSet {
    */
   schemaVersion Int @default(1) @map("schema_version")
 
-  /** Предлагать по умолчанию для нового соревнования. */
+  /**
+   * Предлагать по умолчанию для нового соревнования.
+   */
   isDefault Boolean @default(false) @map("is_default")
 
   createdAt DateTime  @default(now()) @map("created_at")
@@ -1574,13 +1628,17 @@ model AwardRuleSet {
   @@map("award_rule_sets")
 }
 
-/** issue — выдать перечисленные документы; skip — не выдавать ничего. */
+/**
+ * issue — выдать перечисленные документы; skip — не выдавать ничего.
+ */
 enum AwardRuleAction {
   issue
   skip
 }
 
-/** Как соединять условия правила. */
+/**
+ * Как соединять условия правила.
+ */
 enum AwardConditionMatch {
   all
   any
@@ -1588,7 +1646,6 @@ enum AwardConditionMatch {
 
 /**
  * Одно правило набора.
- *
  * Выигрывает первое совпавшее правило, поэтому порядок задаётся явно
  * через position, а не временем создания: «2–3 место» обязано проверяться
  * раньше, чем «все остальные», иначе призёр получит грамоту участника.
@@ -1599,13 +1656,14 @@ model AwardRule {
   position  Int
 
   enabled Boolean @default(true)
-  /** То, что человек видит в превью: «Победители», «Призёры». */
+  /**
+   * То, что человек видит в превью: «Победители», «Призёры».
+   */
   label   String  @default("")
 
   /**
    * Плоский список условий вида {field, op, value}. Валидируется Zod-схемой
    * awardCondition из @gramota/shared.
-   *
    * Отдельной таблицы условий нет по той же причине, что у Sheet.layout:
    * SQL-запросов по условиям не бывает, а конструктор сохраняет набор целиком
    * одним PATCH. Пустой список — правило «иначе».
@@ -1618,11 +1676,9 @@ model AwardRule {
   /**
    * Что выдаём: список выходов {templateDocumentId, subjectColumn,
    * dedupeScope, label}, схема awardOutput из @gramota/shared.
-   *
    * Список, а не один шаблон: за первое место участнику полагается диплом,
    * а его тренеру — благодарность, и это одно решение судейской коллегии.
    * Разнести их по двум правилам нельзя: выигрывает первое совпавшее.
-   *
    * Внешнего ключа на documents здесь нет — принадлежность шаблона
    * организации проверяет сервис при сохранении. Ключ этого всё равно
    * не гарантирует: он ручается за существование строки, а не за её
@@ -1639,7 +1695,6 @@ model AwardRule {
 
 /**
  * Счётчик регистрационных номеров организации за год.
- *
  * Отдельная таблица, а не `MAX(reg_number) + 1`: воркеры выпускают
  * документы параллельно, и два из них взяли бы один номер. Атомарный
  * `INSERT … ON CONFLICT DO UPDATE … RETURNING` выдаёт номера без гонок.
@@ -1663,10 +1718,10 @@ enum SupportTicketStatus {
 }
 
 model SupportTicket {
-  id      String @id @default(uuid()) @db.Uuid
-  orgId   String @map("org_id") @db.Uuid
+  id      String              @id @default(uuid()) @db.Uuid
+  orgId   String              @map("org_id") @db.Uuid
   /// Кто написал. SetNull: обращение переживает уход сотрудника.
-  userId  String? @map("user_id") @db.Uuid
+  userId  String?             @map("user_id") @db.Uuid
   subject String
   status  SupportTicketStatus @default(open)
 
@@ -1683,13 +1738,13 @@ model SupportTicket {
 }
 
 model SupportMessage {
-  id       String @id @default(uuid()) @db.Uuid
-  ticketId String @map("ticket_id") @db.Uuid
+  id          String   @id @default(uuid()) @db.Uuid
+  ticketId    String   @map("ticket_id") @db.Uuid
   /// Пусто — ответ поддержки, а не сотрудника организации.
-  userId   String? @map("user_id") @db.Uuid
-  fromSupport Boolean @default(false) @map("from_support")
-  text     String
-  createdAt DateTime @default(now()) @map("created_at")
+  userId      String?  @map("user_id") @db.Uuid
+  fromSupport Boolean  @default(false) @map("from_support")
+  text        String
+  createdAt   DateTime @default(now()) @map("created_at")
 
   ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   user   User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -1734,12 +1789,10 @@ model RoadmapVote {
 
 /**
  * Подписка браузера на push-уведомления (ADR-0004).
- *
  * Принадлежит человеку в организации: сотрудник двух организаций получает
  * уведомления о выпусках той, в которой их запускал. Адрес подписки выдаёт
  * push-сервис браузера (FCM, APNs, Mozilla) — он же и ключ: один браузер,
  * одна подписка, сколько бы раз человек ни нажимал «Включить».
- *
  * Персональных данных здесь нет, и в сами уведомления они не кладутся:
  * тело push уходит через сторонний сервис доставки за пределы контура.
  */

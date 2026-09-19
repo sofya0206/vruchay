@@ -81,10 +81,7 @@ function controllerWith(): {
         rows: [{ data: { name: 'Иванова Анна', email: 'anna@example.test' } }],
       }),
       count: async () => 100,
-      update: async () => {
-        asked.counted++;
-        return { id: 'file-1' };
-      },
+      update: async () => ({ id: 'file-1' }),
     },
   };
 
@@ -97,6 +94,12 @@ function controllerWith(): {
     prisma as never,
     { settleOne: async () => null } as never,
     testConfig() as never,
+    {
+      count: async () => {
+        asked.counted++;
+        return { counted: true, unique: true };
+      },
+    } as never,
   );
   return { controller, asked, plans };
 }

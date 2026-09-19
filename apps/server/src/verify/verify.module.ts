@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { RegistryModule } from '../registry/registry.module';
 import { VerifyController } from './verify.controller';
+import { VerifyCounter } from './verify-counter';
 
 /**
  * Проверка подлинности документа — единственная часть кабинета, открытая
@@ -11,5 +12,5 @@ import { VerifyController } from './verify.controller';
  * Считать её здесь заново значило бы завести второе мнение о том,
  * какой документ действителен.
  */
-@Module({ imports: [RegistryModule], controllers: [VerifyController] })
+@Module({ imports: [RegistryModule], controllers: [VerifyController], providers: [VerifyCounter] })
 export class VerifyModule {}

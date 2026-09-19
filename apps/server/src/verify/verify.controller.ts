@@ -1,6 +1,6 @@
-import { Controller, Get, Logger, NotFoundException, Param, Res, UseGuards } from '@nestjs/common';
+import { Controller, Get, NotFoundException, Param, Req, Res, UseGuards } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { FastifyReply } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { PrismaService } from '../prisma/prisma.service';
@@ -12,6 +12,7 @@ import { publicCodeSecret, type Env } from '../config/env';
 import { hasValidTail, normalizePublicCode } from './public-code';
 import { maskVerifyFields } from './name-mask';
 import { verifyPath } from './verify-url';
+import { VerifyCounter } from './verify-counter';
 
 /**
  * Идентификатор в адресе: UUID старых выпусков или короткий код новых.
@@ -61,12 +62,11 @@ const VALID_CACHE_SECONDS = 60;
 @Controller('v1/verify')
 @UseGuards(ThrottleGuard)
 export class VerifyController {
-  private readonly logger = new Logger(VerifyController.name);
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly replacement: ReplacementService,
     private readonly config: ConfigService<Env, true>,
+    private readonly counter: VerifyCounter,
   ) {}
 
   /*
@@ -85,7 +85,11 @@ export class VerifyController {
    */
   @Get(':id')
   @Throttle({ max: 30, timeWindow: '1 minute' })
-  async check(@Param('id', idParam) id: string, @Res({ passthrough: true }) reply?: FastifyReply) {
+  async check(
+    @Param('id', idParam) id: string,
+    @Res({ passthrough: true }) reply?: FastifyReply,
+    @Req() req?: FastifyRequest,
+  ) {
     const lookup = this.lookupFor(id);
     if (!lookup.where) throw this.notFound(lookup.reason);
 
@@ -170,7 +174,17 @@ export class VerifyController {
         : null;
 
     this.cacheHeaders(reply, state);
-    await this.countCheck(file.id);
+    // Считаем «в отрыв», как пиксель писем: ответ не ждёт счётчика.
+    // Кто проверял, счётчик не запоминает (см. verify-counter.ts).
+    void this.counter.count(
+      { id: file.id, orgId: file.orgId },
+      {
+        sessionOrgId: sessionOrgId(req),
+        ip: req?.ip,
+        userAgent: req?.headers['user-agent'],
+        method: req?.method,
+      },
+    );
 
     /*
      * Снимок на момент выпуска, если он есть, иначе живая строка.
@@ -304,30 +318,11 @@ export class VerifyController {
       issuedAt: next.createdAt,
     };
   }
+}
 
-  /**
-   * Обезличенный счётчик проверок.
-   *
-   * Растёт число на документе — и всё: ни адреса, ни устройства, ни
-   * времени каждой отдельной проверки. Организации нужен ответ «сертификат
-   * проверили 47 раз», и он же — её главный довод, что выданный документ
-   * чего-то стоит. Собирать при этом сведения о проверяющих нельзя:
-   * мы обработчик по поручению, а слежка в собственных интересах перевела бы
-   * нас в операторы персональных данных со всей полнотой ответственности.
-   *
-   * Неудача счётчика не ломает проверку: подлинность документа не зависит
-   * от того, удалось ли нам её сосчитать.
-   */
-  private async countCheck(fileId: string): Promise<void> {
-    try {
-      await this.prisma.file.update({
-        where: { id: fileId },
-        data: { verifyCount: { increment: 1 }, verifyLastAt: new Date() },
-      });
-    } catch (err) {
-      this.logger.warn(
-        `Не удалось учесть проверку документа: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    }
-  }
+/** Организация из сессии кабинета, если она есть; публичная страница её не требует. */
+function sessionOrgId(req: FastifyRequest | undefined): string | null {
+  const session = (req as { session?: { get(key: string): unknown } } | undefined)?.session;
+  const orgId = session?.get('orgId');
+  return typeof orgId === 'string' ? orgId : null;
 }

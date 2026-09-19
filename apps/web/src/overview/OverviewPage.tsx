@@ -1,5 +1,6 @@
 import { Plus } from 'lucide-react';
 import { useOverview } from '../api/overview';
+import { useAnalyticsSummary } from '../api/analytics';
 import { useMe } from '../auth/useAuth';
 import { Button } from '../ui/Button';
 import { Loading } from '../ui/Loading';
@@ -36,6 +37,7 @@ import { useCreateMaterial } from './useCreateMaterial';
 export function OverviewPage() {
   const me = useMe();
   const overview = useOverview();
+  const summary = useAnalyticsSummary('30d');
   const create = useCreateMaterial();
   // Ждём и того, кто вошёл: без почты не сказать, видел ли этот человек
   // обучение, а показать его на миг и убрать — хуже, чем секунда загрузки.
@@ -99,7 +101,7 @@ export function OverviewPage() {
             организатор на мероприятии смотрит сводку одним взглядом,
             без прокрутки через четыре карточки. */}
         <div className="grid grid-cols-2 items-start gap-3 sm:gap-4 lg:grid-cols-4">
-          <Metrics data={data} />
+          <Metrics data={data} summary={summary.data} />
           <div className="col-span-2 min-w-0 lg:col-span-3">
             <RegistryBlock />
           </div>

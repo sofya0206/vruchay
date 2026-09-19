@@ -27,8 +27,9 @@ import { ApiError } from '../api/client';
 import { RegistryFilters } from './RegistryFilters';
 import { RegistryTable } from './RegistryTable';
 import { DocumentHistory } from './DocumentHistory';
-import { AnalyticsPanel } from './AnalyticsPanel';
 import { AnalyticsPage } from '../analytics/AnalyticsPage';
+import { SummaryScreen } from '../analytics/SummaryScreen';
+import { isPeriod, type Period } from '../api/analytics';
 import { plural } from './registry-format';
 import { Tooltip } from '../ui/Tooltip';
 
@@ -67,6 +68,17 @@ export function RegistryPage() {
         const q = new URLSearchParams(prev);
         if (next === 'analytics') q.set('tab', 'analytics');
         else q.delete('tab');
+        return q;
+      },
+      { replace: true },
+    );
+  // Период сводки — в адресе: с главной сюда приходят по ссылке «за 30 дней».
+  const period: Period = isPeriod(search.get('period')) ? (search.get('period') as Period) : '30d';
+  const setPeriod = (next: Period) =>
+    setSearch(
+      (prev) => {
+        const q = new URLSearchParams(prev);
+        q.set('period', next);
         return q;
       },
       { replace: true },
@@ -157,12 +169,14 @@ export function RegistryPage() {
         />
       }
     >
-      <RegistryFilters
-        value={filters}
-        facets={facets.data}
-        onChange={setFilters}
-        onReset={() => setFilters(emptyFilters)}
-      />
+      {tab === 'registry' && (
+        <RegistryFilters
+          value={filters}
+          facets={facets.data}
+          onChange={setFilters}
+          onReset={() => setFilters(emptyFilters)}
+        />
+      )}
 
       {notice && (
         <div className="mt-4 rounded-xl bg-[var(--surface-sunken)] p-4 text-sm">
@@ -181,10 +195,15 @@ export function RegistryPage() {
       )}
 
       {tab === 'analytics' ? (
-        <div className="mt-6 space-y-10">
-          {/* Сначала по текущему отбору — за этим сюда и приходят из
-              материала; ниже — по организации целиком. */}
-          <AnalyticsPanel filters={filters} active={tab === 'analytics'} />
+        <div className="space-y-10">
+          {/* Материал сводки — тот же, что в отборе реестра: из материала
+              сюда приходят уже суженными. Ниже — качество и активация. */}
+          <SummaryScreen
+            period={period}
+            documentId={filters.documentId}
+            onPeriod={setPeriod}
+            onDocument={(documentId) => setFilters({ ...filters, documentId })}
+          />
           <AnalyticsPage />
         </div>
       ) : (

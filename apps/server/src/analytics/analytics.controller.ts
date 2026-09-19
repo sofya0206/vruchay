@@ -1,4 +1,6 @@
-import { Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { z } from 'zod';
+import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { AuthGuard } from '../auth/auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
 import { PlatformOnlyGuard } from '../auth/platform-only.guard';
@@ -9,6 +11,13 @@ import type { SessionUser } from '../auth/auth.service';
 import { MetricsService } from './metrics.service';
 import { FunnelService } from './funnel.service';
 import { DigestService } from './digest.service';
+import { PERIODS, SummaryService } from './summary.service';
+
+const summaryQuery = z.object({
+  period: z.enum(PERIODS).default('30d'),
+  documentId: z.string().uuid('Некорректный идентификатор материала').optional(),
+});
+type SummaryQuery = z.infer<typeof summaryQuery>;
 
 /**
  * Раздел «Аналитика».
@@ -27,11 +36,22 @@ export class AnalyticsController {
     private readonly metrics: MetricsService,
     private readonly funnel: FunnelService,
     private readonly digest: DigestService,
+    private readonly periods: SummaryService,
   ) {}
 
   @Get()
   summary(@CurrentUser() user: SessionUser) {
     return this.metrics.forOrg(user.orgId);
+  }
+
+  /**
+   * Сводка за период: плитки, графики по дням и разбивка по материалам.
+   * Из входящего — только период и материал; материал всё равно
+   * отбирается внутри своей организации.
+   */
+  @Get('summary')
+  periodSummary(@CurrentUser() user: SessionUser, @Query(new ZodValidationPipe(summaryQuery)) q: SummaryQuery) {
+    return this.periods.forOrg(user.orgId, q.period, q.documentId);
   }
 
   @Get('funnel')

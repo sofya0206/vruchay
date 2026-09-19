@@ -10,6 +10,7 @@ import {
   LoaderCircle,
   MoreHorizontal,
   Scale,
+  TriangleAlert,
   type LucideIcon,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -18,6 +19,8 @@ import { MATERIAL_TABS, materialTabPath, workspacePath, type MaterialTab } from 
 import { IconButton } from '../ui/IconButton';
 import { Menu, MenuDivider, MenuItem } from '../ui/Menu';
 import { useTooltip } from '../ui/Tooltip';
+import { cn } from '../ui/cn';
+import { useUsage } from '../api/org';
 import { DocumentTitle } from './DocumentTitle';
 
 /** Пункт меню «…» либо разделитель между смысловыми группами. */
@@ -209,15 +212,32 @@ export function ReleaseButton({
   disabled: boolean;
   onClick: () => void;
 }) {
+  /*
+   * Предупреждаем в момент действия, а не после отказа сервера:
+   * отмечено больше, чем осталось по плану, — счётчик становится
+   * предупреждающим, а подсказка говорит, сколько именно.
+   */
+  const { data: usage } = useUsage();
+  const short = usage?.left !== null && usage?.left !== undefined && count > usage.left;
+  const { triggerProps, tooltip } = useTooltip(
+    short && usage ? `Отмечено ${count}, осталось ${usage.left}. Выпустятся первые ${usage.left}` : undefined,
+  );
   return (
-    <button type="button" className={releaseClass} disabled={disabled} onClick={onClick}>
+    <button type="button" className={releaseClass} disabled={disabled} onClick={onClick} {...triggerProps}>
       {running && <LoaderCircle size={15} className="animate-spin" />}
       {running ? 'Выпускаем' : 'Выпуск'}
       {!running && count > 0 && (
-        <span className="tabular -mr-1 grid h-5 min-w-5 place-items-center rounded-md bg-[var(--accent-contrast)]/20 px-1.5 text-xs leading-none">
+        <span
+          className={cn(
+            'tabular -mr-1 grid h-5 min-w-5 place-items-center rounded-md px-1.5 text-xs leading-none',
+            short ? 'bg-[var(--warn)] text-white' : 'bg-[var(--accent-contrast)]/20',
+          )}
+        >
+          {short && <TriangleAlert size={11} className="mr-1" aria-hidden />}
           {count}
         </span>
       )}
+      {tooltip}
     </button>
   );
 }
