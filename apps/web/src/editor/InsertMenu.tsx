@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ChevronDown,
   ChevronRight,
-  ImagePlus,
   Link2,
   Plus,
   QrCode,
@@ -27,17 +26,11 @@ export type InsertKind =
 export function InsertMenu({
   onInsert,
   fields = [],
-  onImage,
-  imageLoading = false,
   iconOnly = false,
 }: {
   onInsert: (what: InsertKind) => void;
   /** Что можно подставить: колонки таблицы и то, что подставляет сервис. */
   fields?: FieldInfo[];
-  /** Выбор картинки для отдельного блока — тоже системным окном. */
-  onImage: () => void;
-  /** Загружается ли картинка прямо сейчас. */
-  imageLoading?: boolean;
   /**
    * Значком без подписи — для панели под меню.
    *
@@ -159,17 +152,8 @@ export function InsertMenu({
             )}
           </div>
 
-          <Item
-            icon={<ImagePlus size={15} />}
-            label={imageLoading ? 'Загружаем картинку…' : 'Картинка'}
-            hint="Логотип, подпись, печать — PNG или JPEG"
-            disabled={imageLoading}
-            onClick={() => {
-              setOpen(false);
-              setSubmenu(null);
-              onImage();
-            }}
-          />
+          {/* Картинки и бланка здесь нет: оба — файлы, их значки стоят
+              в панели рядом с «+». Меню — про то, что рисуется на листе. */}
           <Item
             icon={<QrCode size={15} />}
             label="QR-код"
