@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bold, Check, Italic, Paperclip } from 'lucide-react';
-import { api } from '../api/client';
+import { api, errorText } from '../api/client';
 import { Button } from '../ui/Button';
 import { Input, Label } from '../ui/Field';
 import { DEFAULT_LETTER } from './letter-defaults';
@@ -234,7 +234,7 @@ export function EmailTemplateEditor({
         )}
         {save.isError && (
           <span className="text-sm text-[var(--danger)]">
-            {(save.error as Error).message}
+            {errorText(save.error)}
           </span>
         )}
       </div>

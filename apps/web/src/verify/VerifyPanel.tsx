@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CalendarClock, Check, ShieldCheck } from 'lucide-react';
-import { api } from '../api/client';
+import { api, errorText } from '../api/client';
 import type { DocumentDetail } from '../api/types';
 import { Button } from '../ui/Button';
 import { Radio } from '../ui/Checkbox';
@@ -178,7 +178,7 @@ export function VerifyPanel({ doc }: { doc: DocumentDetail }) {
           </div>
           {save.isError && (
             <p role="alert" className="text-sm text-[var(--danger)]">
-              {(save.error as Error).message}
+              {errorText(save.error)}
             </p>
           )}
         </div>

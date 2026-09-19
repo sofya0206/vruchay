@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Copy, Plus, Save, Wand2 } from 'lucide-react';
 import type { AwardRule, AwardRuleSet } from '@gramota/shared';
 import { AWARD_RULES_SCHEMA_VERSION } from '@gramota/shared';
-import { ApiError } from '../api/client';
+import { ApiError, errorText } from '../api/client';
 import { useRecipients } from '../api/recipients';
 import {
   useAwardPreview,
@@ -111,6 +111,19 @@ export function RulesTab({ documentId, ruleSetId }: Props) {
     }
   };
 
+  /**
+   * Взять готовый набор, собрать по колонкам, снять копию. Отказ сервера
+   * здесь пропадал вовсе: обещание падало мимо всех, а экран стоял как был.
+   */
+  const attempt = async (action: () => Promise<void>) => {
+    setSaveError(null);
+    try {
+      await action();
+    } catch (err) {
+      setSaveError(errorText(err));
+    }
+  };
+
   if (sets.isLoading || recipients.isLoading) return <Loading />;
 
   if (!draft) {
@@ -118,10 +131,20 @@ export function RulesTab({ documentId, ruleSetId }: Props) {
       <StartScreen
         sets={sets.data ?? []}
         hasColumns={columns.length > 0}
-        onPick={(id) => void mutations.attach.mutateAsync(id)}
-        onSuggest={async () => setDraft(asNew(await mutations.suggest.mutateAsync()))}
-        onBlank={() => setDraft(blankRuleSet())}
+        onPick={(id) =>
+          void attempt(async () => {
+            await mutations.attach.mutateAsync(id);
+          })
+        }
+        onSuggest={() =>
+          void attempt(async () => setDraft(asNew(await mutations.suggest.mutateAsync())))
+        }
+        onBlank={() => {
+          setSaveError(null);
+          setDraft(blankRuleSet());
+        }}
         suggesting={mutations.suggest.isPending}
+        error={saveError}
       />
     );
   }
@@ -193,7 +216,11 @@ export function RulesTab({ documentId, ruleSetId }: Props) {
                 <Button
                   icon={<Copy size={15} />}
                   title="Копия набора — чтобы поправить под другое соревнование"
-                  onClick={async () => setDraft(await mutations.duplicate.mutateAsync(draft.id))}
+                  onClick={() =>
+                    void attempt(async () =>
+                      setDraft(await mutations.duplicate.mutateAsync(draft.id)),
+                    )
+                  }
                 >
                   Копия
                 </Button>
@@ -257,6 +284,7 @@ function StartScreen({
   onSuggest,
   onBlank,
   suggesting,
+  error,
 }: {
   sets: { id: string; name: string; ruleCount: number; documentCount: number }[];
   hasColumns: boolean;
@@ -264,6 +292,7 @@ function StartScreen({
   onSuggest: () => void;
   onBlank: () => void;
   suggesting: boolean;
+  error: string | null;
 }) {
   return (
     <div className="mx-auto max-w-2xl space-y-5 p-8">
@@ -319,6 +348,12 @@ function StartScreen({
           или начать с нуля
         </button>
       </div>
+
+      {error && (
+        <p role="alert" className="rounded-lg bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]">
+          {error}
+        </p>
+      )}
 
       {!hasColumns && (
         <p className="text-sm text-[var(--text-muted)]">

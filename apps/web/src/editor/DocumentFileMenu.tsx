@@ -11,7 +11,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { TRASH_DAYS } from '@gramota/shared';
-import { api } from '../api/client';
+import { api, errorText } from '../api/client';
 import { useFolders } from '../api/folders';
 import type { DocumentDetail } from '../api/types';
 import { Button } from '../ui/Button';
@@ -184,7 +184,7 @@ export function useDocumentFileMenu(doc: DocumentDetail | undefined): {
           />
           {move.isError && (
             <p role="alert" className="mt-2 text-sm text-[var(--danger)]">
-              {(move.error as Error).message}
+              {errorText(move.error)}
             </p>
           )}
         </Dialog>
@@ -213,7 +213,7 @@ export function useDocumentFileMenu(doc: DocumentDetail | undefined): {
           </p>
           {remove.isError && (
             <p role="alert" className="mt-2 text-sm text-[var(--danger)]">
-              {(remove.error as Error).message}
+              {errorText(remove.error)}
             </p>
           )}
         </Dialog>

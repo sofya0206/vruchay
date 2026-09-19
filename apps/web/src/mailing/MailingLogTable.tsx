@@ -3,6 +3,7 @@ import { Button } from '../ui/Button';
 import { useResendFailed, type LogItem } from './api';
 import { STATUS_LABELS, statusTone } from './letter-preview';
 import { formatLetterTime, letterList, type MailList } from './mail-lists';
+import { errorText } from '../api/client';
 
 /**
  * Список писем открытой папки.
@@ -76,7 +77,7 @@ export function MailingLogTable({
       )}
 
       {resend.isError && (
-        <p className="text-sm text-[var(--danger)]">{(resend.error as Error).message}</p>
+        <p className="text-sm text-[var(--danger)]">{errorText(resend.error)}</p>
       )}
 
       {items.length === 0 ? (

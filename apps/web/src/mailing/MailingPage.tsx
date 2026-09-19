@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { CalendarRange, ChevronRight, RefreshCw, Search, Send } from 'lucide-react';
-import { api } from '../api/client';
+import { api, errorText } from '../api/client';
 import type { DocumentList, DocumentSummary } from '../api/types';
 import { Button } from '../ui/Button';
 import { Input, Textarea } from '../ui/Field';
@@ -407,7 +407,7 @@ export function MailingPage() {
                   )}
                   {send.isError && (
                     <span className="text-sm text-[var(--danger)]">
-                      {(send.error as Error).message}
+                      {errorText(send.error)}
                     </span>
                   )}
                 </div>

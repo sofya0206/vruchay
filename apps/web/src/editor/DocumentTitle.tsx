@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../api/client';
+import { api, errorText } from '../api/client';
 import type { DocumentDetail } from '../api/types';
 import { cn } from '../ui/cn';
 import { useTooltip } from '../ui/Tooltip';
@@ -68,7 +68,7 @@ export function DocumentTitle({ documentId, title }: { documentId: string; title
   }
 
   const failed = rename.isError && draft.trim() !== title;
-  const failure = failed ? `Не сохранилось: ${(rename.error as Error).message}` : undefined;
+  const failure = failed ? `Не сохранилось: ${errorText(rename.error)}` : undefined;
 
   // Полное название — когда оно не влезло в шапку; причина — когда
   // не сохранилось. Пока человек печатает, плашка над полем только мешает.

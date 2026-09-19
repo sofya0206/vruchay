@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Check, Copy, KeyRound, Plus, TriangleAlert, X } from 'lucide-react';
+import { ApiError, errorText } from '../api/client';
 import { useTokens, useTokenMutations, type ApiTokenInfo, type TokenRole } from '../api/tokens';
 import { Button } from '../ui/Button';
 import { Input, Label } from '../ui/Field';
@@ -106,7 +107,7 @@ function NewToken() {
 
       {create.isError && (
         <p role="alert" className="w-full text-sm text-[var(--danger)]">
-          {(create.error as Error).message}
+          {errorText(create.error)}
         </p>
       )}
     </form>
@@ -162,50 +163,73 @@ function IssuedToken({ token, onClose }: { token: string; onClose: () => void })
 function TokenList({ tokens }: { tokens: ApiTokenInfo[] }) {
   const { revoke } = useTokenMutations();
   const [asking, setAsking] = useState<string | null>(null);
+  /**
+   * Токен отзывают, когда он утёк, — молчаливый отказ оставил бы доступ
+   * открытым у человека, уверенного в обратном. 404 — токен уже отозван.
+   */
+  const [error, setError] = useState<string | null>(null);
 
   if (tokens.length === 0) {
     return <p className="mt-3 text-sm text-[var(--text-muted)]">Действующих токенов нет.</p>;
   }
 
   return (
-    <ul className="mt-3 divide-y divide-[var(--line)] rounded-2xl bg-[var(--surface)] ring-1 ring-[var(--line)]">
-      {tokens.map((t) => (
-        <li key={t.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
-          <div className="min-w-40 flex-1">
-            <div className="font-medium">{t.name}</div>
-            <div className="text-sm text-[var(--text-muted)]">
-              <code className="font-mono">{t.prefix}…</code> · {ROLE_TITLE[t.role]} ·{' '}
-              {t.lastUsedAt ? `работал ${when(t.lastUsedAt)}` : 'ни разу не использован'}
+    <>
+      <ul className="mt-3 divide-y divide-[var(--line)] rounded-2xl bg-[var(--surface)] ring-1 ring-[var(--line)]">
+        {tokens.map((t) => (
+          <li key={t.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+            <div className="min-w-40 flex-1">
+              <div className="font-medium">{t.name}</div>
+              <div className="text-sm text-[var(--text-muted)]">
+                <code className="font-mono">{t.prefix}…</code> · {ROLE_TITLE[t.role]} ·{' '}
+                {t.lastUsedAt ? `работал ${when(t.lastUsedAt)}` : 'ни разу не использован'}
+              </div>
             </div>
-          </div>
 
-          {asking === t.id ? (
-            <div className="flex items-center gap-2">
-              <span className="text-sm">Программа, которая им пользуется, перестанет работать.</span>
-              <Button
-                size="sm"
-                variant="danger"
-                disabled={revoke.isPending}
-                onClick={() => {
-                  revoke.mutate(t.id);
-                  setAsking(null);
-                }}
+            {asking === t.id ? (
+              <div className="flex items-center gap-2">
+                <span className="text-sm">
+                  Программа, которая им пользуется, перестанет работать.
+                </span>
+                <Button
+                  size="sm"
+                  variant="danger"
+                  disabled={revoke.isPending}
+                  onClick={() => {
+                    setError(null);
+                    revoke.mutateAsync(t.id).catch((err: unknown) => {
+                      if (!(err instanceof ApiError && err.status === 404))
+                        setError(errorText(err));
+                    });
+                    setAsking(null);
+                  }}
+                >
+                  Отозвать
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon={<X size={14} />}
+                  onClick={() => setAsking(null)}
+                />
+              </div>
+            ) : (
+              <button
+                onClick={() => setAsking(t.id)}
+                className="text-sm text-[var(--text-muted)] underline underline-offset-2 hover:text-[var(--text)]"
               >
                 Отозвать
-              </Button>
-              <Button size="sm" variant="ghost" icon={<X size={14} />} onClick={() => setAsking(null)} />
-            </div>
-          ) : (
-            <button
-              onClick={() => setAsking(t.id)}
-              className="text-sm text-[var(--text-muted)] underline underline-offset-2 hover:text-[var(--text)]"
-            >
-              Отозвать
-            </button>
-          )}
-        </li>
-      ))}
-    </ul>
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+      {error && (
+        <p role="alert" className="mt-2 text-sm text-[var(--danger)]">
+          {error}
+        </p>
+      )}
+    </>
   );
 }
 

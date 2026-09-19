@@ -23,6 +23,7 @@ import {
   Plus,
   Trash2,
 } from 'lucide-react';
+import { errorText } from '../api/client';
 import {
   useCreateFolder,
   useDeleteFolder,
@@ -300,7 +301,7 @@ export function LibraryNav({ archiveCount }: { archiveCount?: number | null }) {
                   <FolderNameForm
                     initial={folder.name}
                     busy={rename.isPending}
-                    error={rename.error?.message}
+                    error={rename.error ? errorText(rename.error) : undefined}
                     onCancel={() => setRenamingId(null)}
                     onSubmit={(name) =>
                       rename.mutate(
@@ -330,7 +331,7 @@ export function LibraryNav({ archiveCount }: { archiveCount?: number | null }) {
             <li>
               <FolderNameForm
                 busy={create.isPending}
-                error={create.error?.message}
+                error={create.error ? errorText(create.error) : undefined}
                 onCancel={() => setCreating(false)}
                 onSubmit={(name) => create.mutate(name, { onSuccess: () => setCreating(false) })}
               />
@@ -375,25 +376,33 @@ export function LibraryNav({ archiveCount }: { archiveCount?: number | null }) {
         />
       )}
 
-      {deleting && (
-        <ConfirmDialog
-          title={`Удалить папку «${deleting.name}»?`}
-          confirmLabel="Удалить папку"
-          danger
-          pending={remove.isPending}
-          onClose={() => setDeleting(null)}
-          onConfirm={() =>
-            remove.mutate(deleting.id, {
-              onSuccess: () => {
-                setDeleting(null);
-                if (openFolderId === deleting.id) navigate('/documents');
-              },
-            })
-          }
-        >
-          Материалы останутся — вернутся в «Мои документы».
-        </ConfirmDialog>
-      )}
+      {/* В body: колонка липкая, а липкий блок — свой слой, и карточки
+          списка ложились поверх окна вместе с его строкой ошибки. */}
+      {deleting &&
+        createPortal(
+          <ConfirmDialog
+            title={`Удалить папку «${deleting.name}»?`}
+            confirmLabel="Удалить папку"
+            danger
+            pending={remove.isPending}
+            error={remove.error ? errorText(remove.error) : null}
+            onClose={() => {
+              setDeleting(null);
+              remove.reset();
+            }}
+            onConfirm={() =>
+              remove.mutate(deleting.id, {
+                onSuccess: () => {
+                  setDeleting(null);
+                  if (openFolderId === deleting.id) navigate('/documents');
+                },
+              })
+            }
+          >
+            Материалы останутся — вернутся в «Мои документы».
+          </ConfirmDialog>,
+          document.body,
+        )}
     </nav>
   );
 }

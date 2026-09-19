@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Check, Timer } from 'lucide-react';
+import { errorText } from '../api/client';
 import { usePublicProfile, useUpdatePublicProfile } from '../api/org';
 import { Button } from '../ui/Button';
 import { Input, Label } from '../ui/Field';
@@ -84,6 +85,13 @@ export function RetentionPolicy() {
             </span>
           )}
         </div>
+        {/* Срок меняет владелец или управляющий: сотруднику сервер
+            отказывает, и без этой строки кнопка просто «не работала». */}
+        {update.isError && (
+          <p role="alert" className="text-sm text-[var(--danger)]">
+            {errorText(update.error)}
+          </p>
+        )}
       </div>
 
       <dl className="mt-4 max-w-2xl space-y-2 text-sm">

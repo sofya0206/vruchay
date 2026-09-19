@@ -13,6 +13,15 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Текст отказа для человека. Ответ сервера уже написан по-русски и по делу;
+ * всё остальное — обрыв сети, и браузер описывает его «Failed to fetch»
+ * или «Load failed», что человеку ничего не говорит.
+ */
+export function errorText(err: unknown): string {
+  return err instanceof ApiError ? err.message : 'Сервер не ответил — попробуйте ещё раз';
+}
+
 interface ErrorBody {
   message?: string;
   errors?: { field: string; message: string }[];

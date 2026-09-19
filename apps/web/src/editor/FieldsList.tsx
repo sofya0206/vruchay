@@ -31,6 +31,7 @@ import {
   type FieldGroup,
   type FieldIcon,
 } from './field-meta';
+import { errorText } from '../api/client';
 
 /** Формат перетаскивания поля на холст — свой, чтобы не путать с текстом. */
 export const FIELD_DRAG_TYPE = 'application/x-vruchay-field';
@@ -388,7 +389,7 @@ function CreateFromQuery({ title, onCreate }: { title: string; onCreate: (title:
           try {
             await onCreate(title);
           } catch (err) {
-            setError(err instanceof Error ? err.message : 'Не получилось добавить поле');
+            setError(errorText(err));
           } finally {
             setPending(false);
           }
@@ -430,7 +431,7 @@ function CreateField({ onCreate }: { onCreate: (title: string) => Promise<void> 
       await onCreate(value);
       close();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Не получилось добавить поле');
+      setError(errorText(err));
     } finally {
       setPending(false);
     }

@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { LogOut, MonitorSmartphone } from 'lucide-react';
+import { ApiError, errorText } from '../api/client';
 import {
   useLoginHistory,
   useSessionMutations,
@@ -28,6 +30,18 @@ const OUTCOME: Record<LoginOutcome, string> = {
 export function Sessions() {
   const sessions = useSessions();
   const { revoke, revokeOthers } = useSessionMutations();
+  /**
+   * Молчать здесь нельзя: человек закрывает забытый вход на чужом
+   * компьютере и уходит, уверенный, что вход закрыт. 404 — не отказ:
+   * вход уже закрыт, и строка уйдёт с обновлением списка.
+   */
+  const [error, setError] = useState<string | null>(null);
+  const report = (action: Promise<unknown>) => {
+    setError(null);
+    action.catch((err: unknown) => {
+      if (!(err instanceof ApiError && err.status === 404)) setError(errorText(err));
+    });
+  };
   const prefs = usePreferences();
   const format = prefs.data?.dateFormat;
 
@@ -65,7 +79,7 @@ export function Sessions() {
                 size="sm"
                 variant="danger"
                 icon={<LogOut size={14} />}
-                onClick={() => revoke.mutate(s.id)}
+                onClick={() => report(revoke.mutateAsync(s.id))}
                 disabled={revoke.isPending}
               >
                 Завершить
@@ -79,11 +93,17 @@ export function Sessions() {
         <Button
           className="mt-3"
           variant="danger"
-          onClick={() => revokeOthers.mutate()}
+          onClick={() => report(revokeOthers.mutateAsync())}
           disabled={revokeOthers.isPending}
         >
           Завершить остальные ({others})
         </Button>
+      )}
+
+      {error && (
+        <p role="alert" className="mt-2 max-w-2xl text-sm text-[var(--danger)]">
+          {error}
+        </p>
       )}
 
       <LoginHistory />

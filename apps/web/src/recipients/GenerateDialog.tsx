@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, Download, Mail, Paperclip, Pencil, TriangleAlert, X } from 'lucide-react';
-import { api } from '../api/client';
+import { api, errorText } from '../api/client';
 import { useMailTemplate } from '../api/recipients';
 import type { RecipientRow } from '../api/recipients';
 import { toHtml, toText } from '../mail/email-body';
@@ -81,7 +81,7 @@ export function GenerateDialog({
       if (!saved) await saveDefault.mutateAsync();
       onConfirm('files-and-send');
     } catch (err) {
-      setError((err as Error).message);
+      setError(errorText(err));
     }
   }
 

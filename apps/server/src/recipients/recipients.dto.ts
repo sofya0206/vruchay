@@ -15,8 +15,13 @@ export const columnName = z
     'Латинские буквы, цифры и подчёркивание; первым символом — буква',
   );
 
-/** Значения ячеек — только строки: в макет они попадают как текст. */
-export const rowData = z.record(columnName, z.string().max(1000));
+/**
+ * Значения ячеек — только строки: в макет они попадают как текст.
+ * Отказ читает человек в таблице, поэтому сообщение своё, а не Zod
+ * по-английски.
+ */
+const cellValue = z.string().max(1000, 'В ячейке не больше 1000 знаков');
+export const rowData = z.record(columnName, cellValue);
 
 /**
  * Как читать первую строку разбираемого файла — параметр запроса.
@@ -86,7 +91,7 @@ export const importSchema = z.object({
    * не присылают, и это нормально — в шапке останется имя переменной.
    */
   titles: z.array(z.string().max(200)).max(30).optional(),
-  rows: z.array(z.array(z.string().max(1000)).max(30)).max(10000),
+  rows: z.array(z.array(cellValue).max(30)).max(10000),
   /** Дописать к существующим строкам или заменить таблицу целиком. */
   mode: z.enum(['append', 'replace']).default('append'),
 }).refine(

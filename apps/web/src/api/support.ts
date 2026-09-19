@@ -70,6 +70,13 @@ export function useRoadmap() {
   return useQuery({ queryKey: ['roadmap'], queryFn: supportApi.roadmap });
 }
 
+/*
+ * Отказ не показываем намеренно. Предсказуемо голос не падает: роль
+ * не проверяется, повторный голос и снятие несуществующего сервер
+ * принимает молча, а 404 бывает, только если пункт убрали, пока страница
+ * открыта. Остаются сеть и пятисотая — и тогда счётчик не сдвигается:
+ * голос не рисуется заранее, поэтому экран не врёт.
+ */
 export function useRoadmapVote() {
   const qc = useQueryClient();
   return useMutation({

@@ -19,6 +19,7 @@ import {
   type TextMailing,
   type TextSendResult,
 } from './api';
+import { errorText } from '../api/client';
 
 /**
  * Рассылка текстом: письмо списку адресов без документа.
@@ -279,7 +280,7 @@ export function TextMailingForm() {
           Себе
         </Button>
         {test.isSuccess && <span className="text-sm text-[var(--accent)]">→ {test.data.to}</span>}
-        {error && <span className="text-sm text-[var(--danger)]">{error.message}</span>}
+        {error && <span className="text-sm text-[var(--danger)]">{errorText(error)}</span>}
       </div>
 
       {audience && !confirm && <AudienceLine audience={audience} />}

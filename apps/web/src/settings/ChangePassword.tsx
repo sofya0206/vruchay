@@ -3,6 +3,7 @@ import { Check, KeyRound } from 'lucide-react';
 import { useTeamMutations } from '../api/team';
 import { Button } from '../ui/Button';
 import { Field, Input } from '../ui/Field';
+import { errorText } from '../api/client';
 
 /**
  * Смена собственного пароля.
@@ -77,7 +78,7 @@ export function ChangePassword() {
 
         {changePassword.isError && (
           <p role="alert" className="text-sm text-[var(--danger)]">
-            {(changePassword.error as Error).message}
+            {errorText(changePassword.error)}
           </p>
         )}
 

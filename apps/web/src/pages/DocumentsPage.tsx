@@ -5,7 +5,7 @@ import { Archive, FileText, LayoutTemplate, Plus, Search } from 'lucide-react';
 import { UsageBar } from '../documents/UsageBar';
 import { LibraryLayout } from '../documents/LibraryNav';
 import { TRASH_DAYS } from '@gramota/shared';
-import { api } from '../api/client';
+import { api, errorText } from '../api/client';
 import type { DocumentDetail, DocumentList, DocumentSummary } from '../api/types';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Field';
@@ -341,7 +341,7 @@ export function DocumentsPage({
         <RenameDialog
           initial={renaming.title}
           pending={rename.isPending}
-          error={rename.error?.message}
+          error={rename.error ? errorText(rename.error) : undefined}
           onSubmit={(title) => rename.mutate({ id: renaming.id, title })}
           onClose={() => setRenaming(null)}
         />

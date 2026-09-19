@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Check, Globe, ImagePlus, ShieldCheck } from 'lucide-react';
-import { api } from '../api/client';
+import { api, errorText } from '../api/client';
 import {
   usePublicProfile,
   useUpdatePublicProfile,
@@ -211,7 +211,7 @@ export function PublicProfile() {
                   <p className="mt-1 text-xs text-[var(--text-muted)]">PNG или JPEG до 2 МБ.</p>
                   {uploadLogo.isError && (
                     <p role="alert" className="mt-1 text-xs text-[var(--danger)]">
-                      {(uploadLogo.error as Error).message}
+                      {errorText(uploadLogo.error)}
                     </p>
                   )}
                 </div>
@@ -310,7 +310,7 @@ export function PublicProfile() {
         </div>
         {update.isError && (
           <p role="alert" className="text-sm text-[var(--danger)]">
-            {(update.error as Error).message}
+            {errorText(update.error)}
           </p>
         )}
       </div>
