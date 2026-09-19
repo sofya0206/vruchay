@@ -1,13 +1,12 @@
-import { Check, Mail, RefreshCw, Timer } from 'lucide-react';
+import { Check, Mail, RefreshCw } from 'lucide-react';
 import { useMe } from '../auth/useAuth';
 import { Loading } from '../ui/Loading';
 import {
   useOrgAnalytics,
-  type ActivationStep,
   type OrgAnalytics,
 } from '../api/analytics';
 import { plural } from '../registry/registry-format';
-import { formatCount, formatDuration, formatShare, withinTarget } from './analytics-format';
+import { formatCount, formatShare } from './analytics-format';
 import { PlatformFunnel } from './PlatformFunnel';
 import { TourDropOff } from '../onboarding/TourDropOff';
 
@@ -41,15 +40,7 @@ export function AnalyticsPage() {
 
   return (
     <section className="space-y-8 border-t border-[var(--line)] pt-8">
-      <header>
-        <h2 className="text-lg font-medium">Качество и активация</h2>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Не врём ли клиенту: перевыпуски, пакеты с ошибками и путь до первого документа
-        </p>
-      </header>
-
       <Quality data={data} />
-      <Activation steps={data.activation.steps} timeToFirst={data.timeToFirst} />
 
       {me.data?.isPlatform && <PlatformFunnel />}
       {me.data?.isPlatform && <TourDropOff />}
@@ -92,66 +83,6 @@ function Quality({ data }: { data: OrgAnalytics }) {
           hint="Ушедшие участникам, включая вернувшиеся"
         />
       </div>
-    </section>
-  );
-}
-
-/** Путь организации от регистрации до второго мероприятия. */
-function Activation({
-  steps,
-  timeToFirst,
-}: {
-  steps: ActivationStep[];
-  timeToFirst: OrgAnalytics['timeToFirst'];
-}) {
-  const inTime = withinTarget(timeToFirst.minutes, timeToFirst.targetMinutes);
-
-  return (
-    <section>
-      <h2 className="mb-3 text-lg font-medium">Ваш путь</h2>
-
-      <div className="card p-5">
-        <p className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
-          <Timer size={16} strokeWidth={1.5} />
-          От регистрации до первого выпущенного документа
-        </p>
-        <p
-          className={`mt-1 text-2xl tabular-nums ${
-            timeToFirst.minutes === null
-              ? 'text-[var(--text-muted)]'
-              : inTime
-                ? 'text-[var(--accent)]'
-                : 'text-[var(--text)]'
-          }`}
-        >
-          {formatDuration(timeToFirst.minutes)}
-        </p>
-        <p className="mt-1 text-xs text-[var(--text-muted)]">
-          {timeToFirst.minutes === null
-            ? 'Первый документ ещё не выпущен'
-            : `Ориентир — меньше ${timeToFirst.targetMinutes} минут`}
-        </p>
-      </div>
-
-      <ol className="mt-4 space-y-2">
-        {steps.map((step) => (
-          <li
-            key={step.key}
-            className="flex items-center gap-3 hairline rounded-xl px-4 py-3"
-          >
-            <span
-              className={`flex size-6 shrink-0 items-center justify-center rounded-full ${
-                step.done
-                  ? 'bg-[var(--accent-button)] text-[var(--accent-contrast)]'
-                  : 'bg-[var(--surface-sunken)] text-[var(--text-muted)]'
-              }`}
-            >
-              {step.done ? <Check size={14} strokeWidth={2.5} /> : null}
-            </span>
-            <span className={step.done ? '' : 'text-[var(--text-muted)]'}>{step.label}</span>
-          </li>
-        ))}
-      </ol>
     </section>
   );
 }
