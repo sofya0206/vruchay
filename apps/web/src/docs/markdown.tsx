@@ -279,10 +279,10 @@ export function CodeBlock({ lang, code, label }: { lang?: string; code: string; 
     }
   };
   return (
-    <div data-code className="my-4 overflow-hidden rounded-xl bg-[#0b0f1d] text-[#e6eaf5] ring-1 ring-white/10">
+    <div data-code className="my-4 overflow-hidden rounded-xl bg-code-bg text-code-fg ring-1 ring-code-line">
       {(label || lang) && (
-        <div className="flex items-center gap-2 border-b border-white/10 px-3 py-1.5 text-xs text-[#9aa4c2]">
-          <span className="font-medium text-[#e6eaf5]">{label}</span>
+        <div className="flex items-center gap-2 border-b border-code-line px-3 py-1.5 text-xs text-code-muted">
+          <span className="font-medium text-code-fg">{label}</span>
           <span className="ml-auto font-mono">{lang}</span>
           <CopyBtn copied={copied} onClick={copy} />
         </div>
@@ -307,7 +307,7 @@ function CopyBtn({ copied, onClick }: { copied: boolean; onClick: () => void }) 
       type="button"
       onClick={onClick}
       aria-label={copied ? 'Скопировано' : 'Скопировать'}
-      className="grid size-7 place-items-center rounded-md text-[#9aa4c2] transition-colors hover:bg-white/10 hover:text-[#e6eaf5]"
+      className="grid size-7 place-items-center rounded-md text-code-muted transition-colors hover:bg-code-line hover:text-code-fg"
     >
       {copied ? <Check size={14} /> : <Copy size={14} />}
     </button>

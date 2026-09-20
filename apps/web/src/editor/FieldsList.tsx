@@ -58,9 +58,9 @@ const ICONS: Record<FieldIcon, LucideIcon> = {
  * в кабинете значат «готово», «внимание» и «сломано».
  */
 const GROUP_STYLE: Record<FieldGroup, { color: string; icon: LucideIcon }> = {
-  recipient: { color: '#127ee3', icon: UsersRound },
-  event: { color: '#7a5af8', icon: Flag },
-  document: { color: '#5b6b86', icon: FileText },
+  recipient: { color: 'var(--field-recipient)', icon: UsersRound },
+  event: { color: 'var(--field-event)', icon: Flag },
+  document: { color: 'var(--field-document)', icon: FileText },
 };
 
 /** Что делает клик по полю на этой вкладке. */

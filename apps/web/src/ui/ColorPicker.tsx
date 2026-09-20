@@ -18,11 +18,11 @@ const SWATCHES = [
   '#b1bbcd',
   '#e1e9f0',
   '#ffffff',
-  '#127ee3',
+  '#0f6ac1',
   '#0f77ff',
-  '#d92d3f',
-  '#1f5d3f',
-  '#8a6d2f',
+  '#c9273a',
+  '#14764a',
+  '#9e5a0c',
 ];
 
 /**

@@ -17,15 +17,70 @@ function isTheme(value: unknown): value is UiTheme {
 
 export function applyTheme(theme: UiTheme): void {
   const root = document.documentElement;
-  // Системную тему рисует сама CSS по prefers-color-scheme — атрибут
-  // тогда надо убрать, иначе он навсегда перебьёт настройку системы.
+  // `data-theme` — выбор человека; «как в системе» атрибут снимает,
+  // иначе он навсегда перебил бы настройку системы.
   if (theme === 'system') root.removeAttribute('data-theme');
   else root.setAttribute('data-theme', theme);
+  resolveScheme(theme);
 
   try {
     localStorage.setItem(THEME_KEY, theme);
   } catch {
     // Приватный режим запрещает хранилище — тема просто не переживёт перезагрузку.
+  }
+}
+
+const DARK_QUERY = '(prefers-color-scheme: dark)';
+let systemWatch: MediaQueryList | null = null;
+
+/*
+ * `data-scheme` — что нарисовано на самом деле: light или dark. Его читает
+ * CSS (styles/tokens.css) вместо медиазапроса, чтобы тёмная тема была
+ * объявлена один раз. «Как в системе» разрешается через matchMedia
+ * и следит за сменой системной темы, пока выбор не станет явным.
+ */
+function setScheme(dark: boolean): void {
+  const root = document.documentElement;
+  const next = dark ? 'dark' : 'light';
+  if (root.getAttribute('data-scheme') === next) return;
+  /*
+   * На время смены темы переходы цвета выключены (styles/base.css):
+   * иначе каждый элемент тянется к новому цвету со своей задержкой,
+   * а у некоторых переход застревает на старом — плитка остаётся белой
+   * в тёмном кабинете. Два кадра: первый пересчитывает стили уже с
+   * новыми цветами, второй снимает запрет.
+   */
+  root.setAttribute('data-theme-switching', '');
+  root.setAttribute('data-scheme', next);
+  // В скрытой вкладке кадры не идут — таймер снимает запрет и там.
+  const release = () => root.removeAttribute('data-theme-switching');
+  const timer = setTimeout(release, 120);
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        clearTimeout(timer);
+        release();
+      });
+    });
+  }
+}
+
+function onSystemChange(event: MediaQueryListEvent): void {
+  setScheme(event.matches);
+}
+
+function resolveScheme(theme: UiTheme): void {
+  if (theme !== 'system') {
+    systemWatch?.removeEventListener('change', onSystemChange);
+    systemWatch = null;
+    setScheme(theme === 'dark');
+    return;
+  }
+  const query = typeof window.matchMedia === 'function' ? window.matchMedia(DARK_QUERY) : null;
+  setScheme(query?.matches ?? false);
+  if (query && !systemWatch) {
+    systemWatch = query;
+    query.addEventListener('change', onSystemChange);
   }
 }
 

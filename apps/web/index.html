@@ -57,7 +57,7 @@
         /* Тот же цвет, что у знака в шапке и у иконки приложения:
            заставка — первое, что человек видит, и знак на ней должен быть
            тем же самым, а не родственным. */
-        background: #4a3fce;
+        background: #0f6ac1;
         display: grid;
         place-items: center;
         animation: splash-beat 1.8s ease-in-out infinite;
@@ -91,21 +91,14 @@
       }
       /*
         Цвета заставки — те же, что у подложки и приглушённого текста
-        кабинета в каждой теме (index.css). Атрибут data-theme ставит
-        скрипт ниже, до первой отрисовки.
+        кабинета в каждой теме (styles/tokens.css). Атрибут data-scheme
+        ставит скрипт ниже, до первой отрисовки, — тот же атрибут, по
+        которому красится и сам кабинет.
       */
-      @media (prefers-color-scheme: dark) {
-        html:not([data-theme='light']) #splash {
-          background: #0b0f1d;
-        }
-        html:not([data-theme='light']) #splash .word {
-          color: #9aa4c2;
-        }
-      }
-      html[data-theme='dark'] #splash {
+      html[data-scheme='dark'] #splash {
         background: #0b0f1d;
       }
-      html[data-theme='dark'] #splash .word {
+      html[data-scheme='dark'] #splash .word {
         color: #9aa4c2;
       }
       /* Тем, кто просил систему не двигать картинки, показываем неподвижно. */
@@ -159,14 +152,23 @@
     -->
     <script>
       (function () {
+        var theme = null;
         try {
-          var theme = localStorage.getItem('vruchay:theme');
-          if (theme === 'dark' || theme === 'light') {
-            document.documentElement.setAttribute('data-theme', theme);
-          }
+          theme = localStorage.getItem('vruchay:theme');
         } catch (e) {
           // Хранилище недоступно — остаётся системная тема.
         }
+        var root = document.documentElement;
+        if (theme === 'dark' || theme === 'light') root.setAttribute('data-theme', theme);
+        // Что нарисовать: явный выбор, а без него — тема системы. Тот же
+        // расчёт повторяет приложение (settings/preferences.ts), здесь он
+        // нужен раньше первой отрисовки, чтобы не мигнуть светлым.
+        var dark =
+          theme === 'dark' ||
+          (theme !== 'light' &&
+            typeof window.matchMedia === 'function' &&
+            window.matchMedia('(prefers-color-scheme: dark)').matches);
+        root.setAttribute('data-scheme', dark ? 'dark' : 'light');
       })();
     </script>
     <script>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { BadgeCheck, Check, Download, ExternalLink, Share2, ShieldX } from 'lucide-react';
 import { Meta } from '../seo/Meta';
+import { Brand } from '../shell/Brand';
 
 interface RecipientInfo {
   title: string;
@@ -85,12 +86,7 @@ export function RecipientPage() {
       <Meta title={data ? `${data.title} — Вручай` : 'Ваш документ — Вручай'} description="Документ, выданный через Вручай." path="/d" noindex />
       <div className="flex min-h-full flex-col bg-[var(--surface-sunken)]">
         <div className="flex h-13 items-center gap-2 px-4">
-          <span className="grid size-7 place-items-center rounded-md bg-[#4a3fce]">
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="#fff" aria-hidden>
-              <path d="M7.5,6.19 H13.5 A2.77,2.77 0 0 1 13.5,11.72 H7.5 Z" />
-              <path d="M7.5,11.72 H13.69 A2.95,2.95 0 0 1 13.69,17.63 H7.5 Z" />
-            </svg>
-          </span>
+          <Brand size={28} />
           <span className="font-semibold">Вручай</span>
         </div>
 

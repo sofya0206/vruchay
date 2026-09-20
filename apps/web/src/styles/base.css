@@ -1,0 +1,240 @@
+/* Базовый слой: документ, фокус, нативные контролы, общие анимации. */
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--ground);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Гарнитура у заголовков та же, что у текста, — отличают их кегль и вес. */
+h1,
+h2 {
+  text-wrap: balance;
+}
+
+/* Цифры в таблицах и счётчиках должны стоять в колонку. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * В базовом слое, а не вне слоёв: иначе правило перебивало `outline-none`
+ * у любого поля — стили вне слоёв сильнее утилит Tailwind при любой
+ * специфичности.
+ */
+@layer base {
+  :where(a, button, input, select, textarea, [role='button'], [tabindex]):focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+}
+
+/*
+ * Смена темы — мгновенная. Атрибут ставит settings/preferences.ts на два
+ * кадра: без него элементы с transition-colors тянулись бы к новым цветам
+ * каждый со своей задержкой, а у части переход застревал на старом цвете.
+ */
+:root[data-theme-switching] *,
+:root[data-theme-switching] *::before,
+:root[data-theme-switching] *::after {
+  transition: none !important;
+}
+
+/* Строки панели полей лежат в обрезанной карточке: рамку фокуса утапливаем внутрь. */
+.field-row:focus-visible {
+  outline-offset: -2px;
+}
+
+/*
+ * Маска пароля. Гарнитура сайта рисует «•» крошечной точкой, и введённый
+ * пароль выглядит как пыль. Точки набираются системным шрифтом с разрядкой.
+ */
+input[type='password']:not(:placeholder-shown) {
+  font-family: Verdana, system-ui, sans-serif;
+  letter-spacing: 0.12em;
+}
+
+/*
+ * Ползунок. Единственный контрол, который остаётся нативным: перетаскивание,
+ * шаг стрелками и Home/End браузер даёт сам. Красим дорожку и бегунок.
+ * Псевдоэлементы Chromium и Firefox в один селектор не соберёшь.
+ */
+input[type='range'] {
+  appearance: none;
+  background: transparent;
+  height: 16px;
+}
+input[type='range']::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--line-strong);
+}
+input[type='range']::-moz-range-track {
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--line-strong);
+}
+input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border-radius: 9999px;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  box-shadow: 0 1px 2px 0 rgba(12, 43, 100, 0.32);
+}
+input[type='range']::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  box-shadow: 0 1px 2px 0 rgba(12, 43, 100, 0.32);
+}
+input[type='range']:disabled::-webkit-slider-thumb {
+  background: var(--line-strong);
+}
+
+/* Уголок-хват у текстовых полей: тянуть можно, системный глиф убран. */
+textarea {
+  resize: vertical;
+}
+textarea::-webkit-resizer {
+  display: none;
+}
+
+/*
+ * Поле ввода мельче 16px Safari на iOS при нажатии увеличивает вместе со
+ * страницей. На сенсорном экране поднимаем кегль полей до 16px.
+ * Правило намеренно вне слоёв: утилиты Tailwind лежат в @layer.
+ * Редактируемый текст на холсте сюда не входит — там кегль задаёт макет.
+ */
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='file']),
+  textarea,
+  select {
+    font-size: max(16px, 1em);
+  }
+}
+
+/* Лента, которая прокручивается вбок, — без полосы прокрутки. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/*
+ * Высота «почти весь экран» для нижнего листа и высота редактора.
+ * Сначала vh, поверх — dvh под @supports: браузеры без dvh берут первое.
+ */
+.sheet-max-h {
+  max-height: 85vh;
+}
+.editor-height {
+  height: calc(100vh - var(--app-header));
+}
+@supports (height: 100dvh) {
+  .sheet-max-h {
+    max-height: 85dvh;
+  }
+  .editor-height {
+    height: calc(100dvh - var(--app-header));
+  }
+}
+
+/*
+ * Поджатый вид таблиц по атрибуту плотности. Интерфейса у настройки нет,
+ * атрибут ещё ставится из хранилища — правило уйдёт вместе с ним.
+ */
+:root[data-density='compact'] table :is(th, td) {
+  padding-top: 0.375rem;
+  padding-bottom: 0.375rem;
+}
+
+/* ── Общие анимации ─────────────────────────────────────────── */
+
+@keyframes vru-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Появление снизу и из прозрачности: сдвиг мал, чтобы не читаться рывком. */
+@keyframes vru-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* Ничто не появляется из нуля: старт с 0.96, а не с scale(0). */
+@keyframes vru-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+/* Медленное «дыхание» вместо вертящегося колеса: на наградной странице
+   крутящийся индикатор читается тревожно, а тут ничего не случилось. */
+@keyframes vru-beat {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.07);
+  }
+}
+
+/*
+ * Загрузка. Тот же образ, что на заставке в index.html. Появление отложено
+ * на треть секунды — почти всегда данные приходят быстрее.
+ */
+.vru-loading {
+  animation: vru-fade 400ms var(--ease-out) 350ms both;
+}
+.vru-beat {
+  animation: vru-beat 1.8s var(--ease-in-out) infinite;
+}
+
+/* Скелетон: мягкое мерцание слева направо. */
+@keyframes vru-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+.vru-skeleton {
+  background: linear-gradient(90deg, var(--surface-sunken) 25%, var(--line) 50%, var(--surface-sunken) 75%);
+  background-size: 200% 100%;
+  animation: vru-shimmer 1.6s linear infinite;
+}
+
+/*
+ * Тем, кто просил систему не двигать картинки: движение убираем, но
+ * не через нулевую длительность у всего подряд — так пропадали и смены
+ * цвета. Перемещения гасятся точечно у каждой анимации, здесь — общий
+ * предохранитель для transition transform.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+  .vru-loading,
+  .vru-beat {
+    animation: none;
+  }
+}
