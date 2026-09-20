@@ -14,7 +14,7 @@ import { Link } from 'react-router-dom';
 const LINKS: { to: string; label: string; external?: boolean }[] = [
   { to: '/docs', label: 'База знаний' },
   { to: '/docs/README', label: 'Документация API' },
-  { to: '/settings/support', label: 'Поддержка' },
+  { to: '/support', label: 'Поддержка' },
   { to: '/oferta', label: 'Оферта' },
   { to: '/dpa', label: 'Обработка данных' },
   { to: '/privacy', label: 'Политика' },

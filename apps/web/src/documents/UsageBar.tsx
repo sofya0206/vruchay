@@ -69,7 +69,7 @@ export function UsageBar() {
             <>
               Проба закончилась. Напишите нам —{' '}
               <DiscussTermsLink>обсудим условия и добавим документов</DiscussTermsLink>. Или{' '}
-              <Link to="/settings/referral" className="underline underline-offset-2">
+              <Link to="/referral" className="underline underline-offset-2">
                 пригласите коллегу
               </Link>
               : за каждого, кто начнёт работать, добавим документов.
@@ -88,7 +88,7 @@ export function UsageBar() {
             {trial ? ' или ' : '.'}
             {trial && (
               <>
-                <Link to="/settings/referral" className="underline underline-offset-2">
+                <Link to="/referral" className="underline underline-offset-2">
                   пригласите коллегу
                 </Link>
                 .

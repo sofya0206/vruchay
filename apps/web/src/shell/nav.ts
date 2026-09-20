@@ -1,13 +1,4 @@
-import {
-  CreditCard,
-  FileText,
-  Mail,
-  Plug,
-  ShieldCheck,
-  type LucideIcon,
-} from 'lucide-react';
-import { LETTER_LISTS } from '../mailing/mail-lists';
-import { INTEGRATION_SECTIONS } from '../integrations/sections';
+import { FileText, Mail, ShieldCheck, type LucideIcon } from 'lucide-react';
 
 export interface NavChild {
   to: string;
@@ -15,23 +6,23 @@ export interface NavChild {
 }
 
 export interface NavItem {
-  key: 'documents' | 'mail' | 'registry' | 'integrations' | 'billing';
+  key: 'documents' | 'mail' | 'registry';
   label: string;
   /** Куда ведёт сам пункт, без раскрытия. */
   to: string;
   icon: LucideIcon;
-  /** Подстраницы в выпадающем. Папки документов добавляются на месте. */
+  /** Подстраницы в бургере на телефоне. */
   children: NavChild[];
 }
 
 /*
- * Пять пунктов колонки разделов — пять работ, ради которых сюда приходят.
+ * Три пункта колонки разделов — три работы, ради которых сюда приходят:
+ * собрать документ, разослать письма, найти выданное.
  *
- * Не карта разделов: настройки и справка стоят в колонке отдельно, внизу,
- * аналитика и счета — в меню учётной записи.
- * Подстраницы берутся из тех же списков, что рисуют колонки внутри разделов
- * (папки писем, площадки интеграций), — иначе меню разошлось бы с разделом
- * при первой же правке.
+ * Не карта разделов: настройки и помощь стоят в колонке отдельно, внизу;
+ * оплата и интеграции — настройки организации, а не работа, и живут
+ * в настройках. Раньше «Оплата» стояла в меню и в настройках сразу,
+ * а из пяти «Интеграций» работала одна.
  */
 export const NAV_ITEMS: NavItem[] = [
   {
@@ -51,11 +42,8 @@ export const NAV_ITEMS: NavItem[] = [
     to: '/mailing',
     icon: Mail,
     children: [
-      ...LETTER_LISTS.map((l) => ({
-        to: l.id === 'all' ? '/mailing' : `/mailing?list=${l.id}`,
-        label: l.label,
-      })),
-      { to: '/mailing?list=stats', label: 'Сводка' },
+      { to: '/mailing', label: 'Все письма' },
+      { to: '/mailing/stats', label: 'Сводка' },
     ],
   },
   {
@@ -68,37 +56,18 @@ export const NAV_ITEMS: NavItem[] = [
       { to: '/registry?tab=analytics', label: 'Аналитика' },
     ],
   },
-  {
-    key: 'integrations',
-    label: 'Интеграции',
-    to: '/integrations',
-    icon: Plug,
-    children: INTEGRATION_SECTIONS.map((s) => ({
-      to: `/integrations/${s.path}`,
-      label: s.title,
-    })),
-  },
-  {
-    key: 'billing',
-    label: 'Оплата',
-    to: '/billing',
-    icon: CreditCard,
-    children: [],
-  },
 ];
 
 /**
  * Какой пункт колонки подсвечен.
  *
- * Редактор материала и рабочее место письма — подстраницы «Документов»:
- * материал открывают из документов и туда же возвращаются. Аналитика
- * живёт под «Реестром»: она про выданное.
+ * Все шаги документа — «Документы»: документ один, где бы человек внутри
+ * него ни стоял. Журнал писем и сводка — «Письма». Аналитика — под
+ * «Реестром»: она про выданное.
  */
 export function activeNav(pathname: string): NavItem['key'] | null {
-  if (pathname.startsWith('/documents') || pathname.startsWith('/mailing/')) return 'documents';
+  if (pathname.startsWith('/documents')) return 'documents';
   if (pathname.startsWith('/mailing')) return 'mail';
   if (pathname.startsWith('/registry') || pathname.startsWith('/analytics')) return 'registry';
-  if (pathname.startsWith('/integrations')) return 'integrations';
-  if (pathname.startsWith('/billing')) return 'billing';
   return null;
 }

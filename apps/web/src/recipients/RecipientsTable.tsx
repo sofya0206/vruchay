@@ -273,7 +273,7 @@ export function RecipientsTable({
           title={doc.title}
           isTemplate={doc.isTemplate}
           actions={fileMenu.entries}
-          tab="table"
+          view="recipients"
           toolbar={<span aria-hidden className="size-8" />}
         />
         {table.isPending ? (
@@ -580,7 +580,7 @@ export function RecipientsTable({
         title={doc.title}
         isTemplate={doc.isTemplate}
         actions={actions}
-        tab="table"
+        view="recipients"
         toolbar={toolbar}
         action={
           <ReleaseButton

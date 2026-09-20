@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Hotspot } from '../onboarding/Hotspot';
 import { onboarding } from '../onboarding/store';
 import { AlertTriangle, Wand2, X } from 'lucide-react';
 import type { ImportSuggestion, ParsedSheet } from '../api/recipients';
@@ -246,7 +245,7 @@ export function ImportDialog({
           <div>
             <div className="flex items-baseline justify-between gap-3">
               <Label>
-                Колонки файла и имена переменных <Hotspot id="import" />
+                Колонки файла и имена переменных
               </Label>
               <span
                 className={`text-sm ${

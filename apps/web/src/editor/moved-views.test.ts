@@ -9,14 +9,14 @@ const ID = '8f0e6a0e-0f5b-4a1a-9c3a-2f2b1d4e5c6a';
  * поэтому перевод старого адреса в новый проверяем поимённо.
  */
 describe('старые вкладки редактора', () => {
-  it('получатели ведут в рабочее место материала', () => {
-    expect(movedViewTarget('table', ID)).toBe(`/mailing/${ID}`);
+  it('получатели ведут на шаг получателей того же документа', () => {
+    expect(movedViewTarget('table', ID)).toBe(`/documents/${ID}/recipients`);
   });
 
-  it('правила, проверка и письмо — на свои вкладки там же', () => {
-    expect(movedViewTarget('rules', ID)).toBe(`/mailing/${ID}?tab=rules`);
-    expect(movedViewTarget('check', ID)).toBe(`/mailing/${ID}?tab=check`);
-    expect(movedViewTarget('mail', ID)).toBe(`/mailing/${ID}?tab=mail`);
+  it('правила, проверка и письмо — на свои шаги там же', () => {
+    expect(movedViewTarget('rules', ID)).toBe(`/documents/${ID}/rules`);
+    expect(movedViewTarget('check', ID)).toBe(`/documents/${ID}/check`);
+    expect(movedViewTarget('mail', ID)).toBe(`/documents/${ID}/letter`);
   });
 
   it('выданное — в общий реестр, сразу отобранный по материалу', () => {

@@ -225,7 +225,7 @@ export function SummaryScreen({
               </span>
             )
           }
-          to="/billing"
+          to="/settings/billing"
         >
           {!unlimited && (
             <div

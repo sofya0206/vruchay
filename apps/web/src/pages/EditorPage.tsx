@@ -72,7 +72,6 @@ import { useDocumentFileMenu } from '../editor/DocumentFileMenu';
 import { SheetTabs } from '../editor/SheetTabs';
 import type { MenuEntry } from '../editor/DocumentChrome';
 import { StatusChip } from '../ui/Field';
-import { Hotspot } from '../onboarding/Hotspot';
 import { onboarding } from '../onboarding/store';
 import { track } from '../onboarding/track';
 import { IconButton } from '../ui/IconButton';
@@ -1819,7 +1818,7 @@ export function EditorPage() {
         title={page.title}
         isTemplate={page.isTemplate}
         actions={actions}
-        tab="sheet"
+        view="sheet"
         toolbar={phone ? undefined : toolbar}
         titleActions={phone ? phoneToolbar : undefined}
       />
@@ -2296,7 +2295,7 @@ export function EditorPage() {
               </Tab>
               <Tab active={panel === 'fields'} onClick={() => setPanel('fields')} icon={<Variable size={14} />} badge={matches.length || undefined}>
                 Данные
-                <Hotspot id="fields" />
+                
               </Tab>
               <Tab active={panel === 'layers'} onClick={() => setPanel('layers')} icon={<Layers size={14} />}>
                 Слои

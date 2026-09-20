@@ -1,31 +1,31 @@
-import { workspacePath, type WorkspaceTab } from '../mailing/workspace-tabs';
+import { materialPath } from '../documents/material-steps';
 
 /**
  * Куда уехали прежние вкладки редактора.
  *
- * Редактор больше не занимается ни списками, ни письмами, ни выданным:
- * получатели, правила, проверка и письмо живут на «Рассылке», выданное —
- * в «Реестре». Но адреса вида `/documents/:id?view=table` разошлись
- * по закладкам, письмам и истории браузера: человек нажимал на такую
- * ссылку, чтобы попасть к списку, и молча показать ему макет — значит
- * потерять его на ровном месте.
- *
- * Поэтому старый адрес не игнорируется, а переводится в новый.
+ * Адреса вида `/documents/:id?view=table` разошлись по закладкам,
+ * письмам и истории браузера: человек нажимал на такую ссылку, чтобы
+ * попасть к списку, и молча показать ему макет — значит потерять его
+ * на ровном месте. Поэтому старый адрес не игнорируется, а переводится
+ * в шаг документа.
  */
-const MOVED: Record<string, WorkspaceTab> = {
-  table: 'table',
-  rules: 'rules',
-  check: 'check',
-  mail: 'mail',
-};
-
 export function movedViewTarget(view: string | null, documentId: string): string | null {
   if (!view || view === 'editor') return null;
 
-  // Выданное по материалу теперь ищется в общем реестре — отбором
-  // по материалу, а не отдельной таблицей внутри материала.
+  // Выданное по документу теперь ищется в общем реестре — отбором
+  // по документу, а не отдельной таблицей внутри него.
   if (view === 'registry') return `/registry?documentId=${encodeURIComponent(documentId)}`;
 
-  const tab = MOVED[view];
-  return tab ? workspacePath(documentId, tab) : null;
+  switch (view) {
+    case 'table':
+      return materialPath(documentId, 'recipients');
+    case 'rules':
+      return materialPath(documentId, 'rules');
+    case 'check':
+      return materialPath(documentId, 'check');
+    case 'mail':
+      return materialPath(documentId, 'letter');
+    default:
+      return null;
+  }
 }
