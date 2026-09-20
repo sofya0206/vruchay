@@ -10,6 +10,7 @@ import { SheetRenderer } from '../render/SheetRenderer';
 import { parseBody, type Run } from '../mail/email-body';
 import { Button } from '../ui/Button';
 import { Dialog } from '../ui/Dialog';
+import { Segmented } from '../ui/Tabs';
 import { fillVariables, previewValues } from './letter-preview';
 import type { LetterKind } from './api';
 
@@ -98,7 +99,7 @@ export function TriplePreview({
               aria-label="Следующий получатель"
             />
           </div>
-          <p className="text-sm text-[var(--text-muted)]">
+          <p className="text-sm text-muted">
             {rows.length === 0
               ? 'В таблице получателей пока никого'
               : `${row?.data.name || 'Без имени'} — ${index + 1} из ${rows.length}`}
@@ -106,23 +107,13 @@ export function TriplePreview({
         </>
       }
     >
-      <div className="mb-4 flex gap-1">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setTab(t.id)}
-            aria-current={tab === t.id}
-            className={`rounded-lg px-3 py-1.5 text-sm ${
-              tab === t.id
-                ? 'bg-[var(--accent-soft)] text-[var(--accent)]'
-                : 'text-[var(--text-muted)] hover:bg-[var(--surface-sunken)]'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <Segmented
+        label="Что показать"
+        value={tab}
+        onChange={setTab}
+        items={TABS.map((t) => ({ id: t.id, label: t.label }))}
+        className="mb-4"
+      />
 
       {/*
         Высота у трёх вкладок разная — лист, короткое письмо и карточка
@@ -166,7 +157,7 @@ function DocumentPreview({
   position: number;
   orgName?: string;
 }) {
-  if (!doc) return <p className="text-center text-[var(--text-muted)]">Загрузка…</p>;
+  if (!doc) return <p className="text-center text-muted">Загрузка…</p>;
 
   const merged = mergeVariables(data, {
     issuedAt: new Date(),
@@ -183,7 +174,7 @@ function DocumentPreview({
   });
 
   return (
-    <div className="space-y-6 rounded-xl bg-[var(--surface-sunken)] p-4">
+    <div className="space-y-6 rounded-card bg-sunken p-4">
       {doc.sheets.map((sheet) => (
         <Scaled key={sheet.id} widthMm={doc.pageWidthMm} heightMm={doc.pageHeightMm}>
           <SheetPage
@@ -295,13 +286,13 @@ function LetterPreview({
   const paragraphs = parseBody(body);
 
   return (
-    <div className="rounded-xl bg-[var(--surface-sunken)] p-4">
-      <p className="text-xs text-[var(--text-muted)]">Тема</p>
+    <div className="rounded-card bg-sunken p-4">
+      <p className="text-xs text-muted">Тема</p>
       <p className="mt-1 font-medium">{subject || '(без темы)'}</p>
 
       {/* Белый фон и тёмный текст независимо от темы кабинета: письмо
           человек откроет в почте, а не здесь. */}
-      <div className="mt-3 rounded-lg bg-[var(--sheet-paper)] px-4 py-3 text-[15px] leading-relaxed text-[var(--sheet-ink)]">
+      <div className="mt-3 rounded-control bg-[var(--sheet-paper)] px-4 py-3 text-[15px] leading-relaxed text-[var(--sheet-ink)]">
         {paragraphs.length === 0 ? (
           <p className="text-sm text-[var(--sheet-ink-muted)]">Письмо пустое</p>
         ) : (
@@ -358,11 +349,11 @@ function VerifyPreview({
   doc: DocumentDetail | undefined;
   data: Record<string, string>;
 }) {
-  if (!doc) return <p className="text-center text-[var(--text-muted)]">Загрузка…</p>;
+  if (!doc) return <p className="text-center text-muted">Загрузка…</p>;
 
   if (!doc.verifyEnabled) {
     return (
-      <div className="rounded-xl bg-[var(--surface-sunken)] p-6 text-center text-sm text-[var(--text-muted)]">
+      <div className="rounded-card bg-sunken p-6 text-center text-sm text-muted">
         Проверка подлинности для этого материала выключена — страницы по QR-коду не будет.
       </div>
     );
@@ -371,26 +362,26 @@ function VerifyPreview({
   const fields = doc.verifyFields.filter((key) => data[key]);
 
   return (
-    <div className="rounded-xl bg-[var(--surface-sunken)] p-6">
-      <div className="mx-auto max-w-md rounded-2xl bg-[var(--surface)] p-8 text-center ring-1 ring-[var(--line)]">
-        <BadgeCheck size={40} className="mx-auto text-[var(--accent)]" strokeWidth={1.5} />
+    <div className="rounded-card bg-sunken p-6">
+      <div className="mx-auto max-w-md rounded-sheet bg-surface p-8 text-center ring-1 ring-line">
+        <BadgeCheck size={40} className="mx-auto text-accent" strokeWidth={1.5} />
         <p className="mt-4 font-serif text-2xl">Документ подлинный</p>
-        <p className="mt-1 text-[var(--text-muted)]">{doc.title}</p>
+        <p className="mt-1 text-muted">{doc.title}</p>
 
-        <dl className="mt-6 space-y-2 border-t border-[var(--line)] pt-6 text-left text-sm">
+        <dl className="mt-6 space-y-2 border-t border-line pt-6 text-left text-sm">
           {fields.length === 0 && (
-            <p className="text-center text-[var(--text-muted)]">
+            <p className="text-center text-muted">
               Поля не выбраны — страница подтвердит только подлинность
             </p>
           )}
           {fields.map((key) => (
             <div key={key} className="flex justify-between gap-4">
-              <dt className="text-[var(--text-muted)]">{key}</dt>
+              <dt className="text-muted">{key}</dt>
               <dd className="text-right font-medium">{data[key]}</dd>
             </div>
           ))}
           <div className="flex justify-between gap-4">
-            <dt className="text-[var(--text-muted)]">Выдан</dt>
+            <dt className="text-muted">Выдан</dt>
             <dd className="tabular text-right font-medium">
               {new Date().toLocaleDateString('ru-RU', {
                 day: '2-digit',

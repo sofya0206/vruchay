@@ -94,9 +94,34 @@ export function mailList(param: string | null): MailList {
   return known.find((id) => id === param) ?? 'all';
 }
 
-/** Адрес папки — одно место, где он собирается. */
+/** Состояния писем — то, по чему журнал отбирают чипами. */
+export const MAIL_STATUS_FILTERS = LETTER_LISTS;
+
+/**
+ * Адрес папки — одно место, где он собирается.
+ *
+ * Состояния писем — параметр `?status=` журнала; сводка и новая рассылка —
+ * свои экраны; списки получателей — это шаг «Получатели» документа,
+ * и в раздел писем они больше не заходят.
+ */
 export function mailListPath(id: MailList): string {
-  return id === 'all' ? '/mailing' : `/mailing?list=${id}`;
+  switch (id) {
+    case 'all':
+      return '/mailing';
+    case 'stats':
+      return '/mailing/stats';
+    case 'new':
+      return '/mailing/new';
+    case 'lists':
+      return '/documents';
+    default:
+      return `/mailing?status=${id}`;
+  }
+}
+
+/** Какое состояние отобрано по адресу `?status=`; незнакомое — все письма. */
+export function mailStatus(param: string | null): MailList {
+  return LETTER_LISTS.find((item) => item.id === param)?.id ?? 'all';
 }
 
 /**

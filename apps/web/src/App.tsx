@@ -132,10 +132,10 @@ export function App() {
           <Route path="/documents/:id" element={<EditorPage />} />
           <Route path="/documents/:id/:segment" element={<MaterialPage />} />
 
-          <Route path="/mailing" element={<MailingPage />} />
-          {/* Сводка и новая рассылка получат свои экраны; пока — те же папки. */}
-          <Route path="/mailing/stats" element={<Navigate to="/mailing?list=stats" replace />} />
-          <Route path="/mailing/new" element={<Navigate to="/mailing?list=new" replace />} />
+          {/* Письма: журнал, сводка и новая рассылка — три экрана под одной шапкой. */}
+          <Route path="/mailing" element={<MailingPage view="log" />} />
+          <Route path="/mailing/stats" element={<MailingPage view="stats" />} />
+          <Route path="/mailing/new" element={<MailingPage view="new" />} />
           {/* Прежнее рабочее место материала — теперь шаги документа. */}
           <Route path="/mailing/:id" element={<LegacyRedirect fallback="/documents" />} />
 
