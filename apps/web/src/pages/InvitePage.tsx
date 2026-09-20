@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { Award } from 'lucide-react';
 import { useAcceptInvite } from '../api/team';
+import { AuthCard, AuthLayout } from '../auth/AuthLayout';
 import { Button } from '../ui/Button';
-import { Input, Label } from '../ui/Field';
+import { ErrorBar } from '../ui/ErrorState';
+import { Field, Input } from '../ui/Field';
 import { errorText } from '../api/client';
 
 /**
@@ -20,89 +22,55 @@ export function InvitePage() {
 
   const mismatch = repeat.length > 0 && password !== repeat;
 
+  const icon = (
+    <span className="grid h-11 w-11 place-items-center rounded-control bg-accent-button text-on-accent">
+      <Award size={18} strokeWidth={1.75} />
+    </span>
+  );
+
   if (!token) {
     return (
-      <Frame>
-        <h1 className="font-serif text-2xl">Ссылка неполная</h1>
-        <p className="mt-2 text-[var(--text-muted)]">
-          Откройте приглашение из письма целиком — вместе с длинной частью после знака вопроса.
-          Проще всего нажать кнопку в письме, а не копировать адрес руками.
+      <AuthLayout icon={icon} title="Вручай">
+        <h2 className="text-xl font-medium">Ссылка неполная</h2>
+        <p className="mt-2 text-muted">
+          Откройте приглашение из письма целиком — вместе с длинной частью после знака вопроса. Проще всего
+          нажать кнопку в письме, а не копировать адрес руками.
         </p>
-      </Frame>
+      </AuthLayout>
     );
   }
 
   return (
-    <Frame>
-      <h1 className="font-serif text-2xl">Придумайте пароль</h1>
-      <p className="mt-2 text-[var(--text-muted)]">
-        Вас пригласили работать в сервисе «Вручай». Осталось придумать пароль — и можно
-        начинать. Больше ничего заполнять не нужно.
+    <AuthLayout icon={icon} title="Вручай" wide>
+      <h2 className="text-xl font-medium">Придумайте пароль</h2>
+      <p className="mt-2 text-muted">
+        Вас пригласили работать в сервисе «Вручай». Осталось придумать пароль — и можно начинать. Больше ничего
+        заполнять не нужно.
       </p>
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          accept.mutate({ token, password });
-        }}
-        className="mt-6 space-y-4"
-      >
-        <div>
-          <Label>Пароль</Label>
-          <Input
-            type="password"
-            autoComplete="new-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoFocus
-          />
-          <p className="mt-1.5 text-sm text-[var(--text-muted)]">
-            Не короче 10 знаков, хотя бы одна буква и одна цифра.
-          </p>
-        </div>
-
-        <div>
-          <Label>Пароль ещё раз</Label>
-          <Input
-            type="password"
-            autoComplete="new-password"
-            value={repeat}
-            onChange={(e) => setRepeat(e.target.value)}
-          />
-          {mismatch && <p className="mt-1.5 text-sm text-[var(--danger)]">Пароли не совпадают</p>}
-        </div>
-
-        {accept.isError && (
-          <p role="alert" className="text-sm text-[var(--danger)]">
-            {errorText(accept.error)}
-          </p>
-        )}
-
-        <Button
-          type="submit"
-          variant="primary"
-          className="w-full"
-          disabled={!password || mismatch || accept.isPending}
+      <AuthCard className="mt-6">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            accept.mutate({ token, password });
+          }}
+          className="space-y-4"
         >
-          {accept.isPending ? 'Входим…' : 'Начать работу'}
-        </Button>
-      </form>
-    </Frame>
-  );
-}
+          <Field label="Пароль" help="Не короче 10 знаков, хотя бы одна буква и одна цифра.">
+            <Input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} autoFocus />
+          </Field>
 
-function Frame({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="grid min-h-full place-items-center px-6 py-12">
-      <div className="w-full max-w-md">
-        <div className="mb-6 flex items-center gap-2">
-          <span className="grid h-9 w-9 place-items-center rounded-lg bg-[var(--accent)] text-[var(--accent-contrast)]">
-            <Award size={18} strokeWidth={1.75} />
-          </span>
-          <span className="font-serif text-lg">Вручай</span>
-        </div>
-        {children}
-      </div>
-    </div>
+          <Field label="Пароль ещё раз" error={mismatch ? 'Пароли не совпадают' : undefined}>
+            <Input type="password" autoComplete="new-password" value={repeat} onChange={(e) => setRepeat(e.target.value)} />
+          </Field>
+
+          {accept.isError && <ErrorBar>{errorText(accept.error)}</ErrorBar>}
+
+          <Button type="submit" variant="primary" size="lg" disabled={!password || mismatch} loading={accept.isPending} className="w-full">
+            Начать работу
+          </Button>
+        </form>
+      </AuthCard>
+    </AuthLayout>
   );
 }
