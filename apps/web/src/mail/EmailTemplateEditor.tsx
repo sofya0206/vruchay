@@ -1,13 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bold, Check, Italic, Paperclip } from 'lucide-react';
+import { Bold, ChevronDown, Italic, Paperclip } from 'lucide-react';
 import { api, errorText } from '../api/client';
 import { Button } from '../ui/Button';
-import { Input, Label } from '../ui/Field';
+import { Card } from '../ui/Card';
+import { Checkbox } from '../ui/Checkbox';
+import { Collapse } from '../ui/Collapse';
+import { ErrorBar } from '../ui/ErrorState';
+import { Field, Input, Textarea } from '../ui/Field';
+import { IconButton } from '../ui/IconButton';
+import { toast } from '../ui/Toast';
+import { cn } from '../ui/cn';
 import { DEFAULT_LETTER } from './letter-defaults';
 import { insertToken, parseBody, toHtml, toText, wrapSelection, type Run } from './email-body';
-import { Checkbox } from '../ui/Checkbox';
-import { useTooltip } from '../ui/Tooltip';
 import type { FieldTarget } from '../editor/FieldsSidebar';
 import { FieldsToggle } from '../editor/FieldsToggle';
 
@@ -21,41 +26,33 @@ interface EmailTemplate {
 /**
  * Письмо, которое получит участник вместе с документом.
  *
- * До этого экрана участнику уходило безличное «Ваш документ во вложении»,
- * и поменять это было нельзя — хотя сервер умел с самого начала.
- *
  * Человек печатает обычный текст, как в почте: пустая строка — новый абзац,
  * кнопки для полужирного и курсива, адрес сам становится ссылкой. Разметку
- * собирает сервис. Раньше в поле лежало «<p>Здравствуйте</p>» — теги в лицо
- * тому, кто просто хочет поздравить участника.
- *
- * Набор возможностей узкий намеренно: почтовые клиенты понимают ограниченный
- * набор тегов, и произвольная вёрстка разъехалась бы в Outlook незаметно
- * для отправителя.
+ * собирает сервис. Набор возможностей узкий намеренно: почтовые клиенты
+ * понимают ограниченный набор тегов, и произвольная вёрстка разъехалась бы
+ * в Outlook незаметно для отправителя.
  */
 export function EmailTemplateEditor({
   documentId,
   onFieldTarget,
 }: {
   documentId: string;
-  /** Отдать рамке материала вставку поля — для панели «Данные». */
+  /** Отдать рамке документа вставку поля — для панели «Данные». */
   onFieldTarget?: (target: FieldTarget | null) => void;
 }) {
   const qc = useQueryClient();
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [attach, setAttach] = useState(true);
-  const [saved, setSaved] = useState(false);
+  const [more, setMore] = useState(false);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   /** Где стоял курсор последним — в теме или в тексте. */
   const lastField = useRef<'subject' | 'body'>('body');
   const subjectRef = useRef<HTMLInputElement | null>(null);
 
   /**
-   * Начертание для выделенного куска.
-   *
-   * Курсор возвращаем на место сами: без этого он прыгал бы в конец
-   * после каждой кнопки, и продолжать набор было бы невозможно.
+   * Начертание для выделенного куска. Курсор возвращаем на место сами:
+   * без этого он прыгал бы в конец после каждой кнопки.
    */
   function applyFormat(marker: '*' | '_') {
     const field = bodyRef.current;
@@ -93,8 +90,7 @@ export function EmailTemplateEditor({
         attachGeneratedFile: attach,
       }),
     onSuccess: () => {
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+      toast({ title: 'Письмо сохранено', tone: 'ok' });
       void qc.invalidateQueries({ queryKey: ['email-template', documentId] });
     },
   });
@@ -123,13 +119,7 @@ export function EmailTemplateEditor({
     });
   }, []);
 
-  const target = useMemo<FieldTarget>(
-    () => ({
-      insert: (field) => insert(field.source),
-      columnsOnly: true,
-    }),
-    [insert],
-  );
+  const target = useMemo<FieldTarget>(() => ({ insert: (field) => insert(field.source), columnsOnly: true }), [insert]);
 
   useEffect(() => {
     if (!onFieldTarget) return;
@@ -138,23 +128,19 @@ export function EmailTemplateEditor({
   }, [onFieldTarget, target]);
 
   return (
-    /* По левому краю и без потолка на весь блок: у соседних вкладок
-       материала содержимое стоит слева, и центрированная колонка при
-       переходе к письму уезжала в сторону, а с открытой панелью полей —
-       ещё раз. Узкая колонка нужна только тексту: длинную строку темы
-       и абзац письма неудобно читать шире 3xl, остальное живёт на своей
-       ширине. */
-    <div className="space-y-5 p-6">
-      <header className="max-w-3xl">
+    /* По левому краю: у соседних шагов документа содержимое стоит слева,
+       и центрированная колонка при переходе к письму уезжала в сторону.
+       Узкая колонка нужна только тексту. */
+    <div className="w-full max-w-3xl space-y-5 p-4 sm:p-6">
+      <header>
         <h2 className="text-lg font-medium">Письмо участнику</h2>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Так выглядит письмо, которое придёт вместе с документом. Отправителем участник увидит
-          название вашей организации.
+        <p className="mt-1 text-sm text-muted">
+          Так выглядит письмо, которое придёт вместе с документом. Отправителем участник увидит название
+          вашей организации.
         </p>
       </header>
 
-      <div className="max-w-3xl">
-        <Label>Тема письма</Label>
+      <Field label="Тема письма">
         <Input
           value={subject}
           onChange={(e) => setSubject(e.target.value)}
@@ -164,74 +150,74 @@ export function EmailTemplateEditor({
           }}
           placeholder={DEFAULT_LETTER.subject}
         />
-      </div>
+      </Field>
 
-      <div className="max-w-3xl">
-        <Label>Текст письма</Label>
-
-        {/* Кнопки, а не разметка руками: человек выделяет кусок и нажимает,
-            как в любом мессенджере. Знаки при этом видны в тексте —
-            это честнее скрытого форматирования, где непонятно, где
-            начертание начинается и где кончается. */}
-        <div className="mb-2 flex items-center gap-1">
-          <FormatButton onClick={() => applyFormat('*')} title="Полужирный">
-            <Bold size={15} />
-          </FormatButton>
-          <FormatButton onClick={() => applyFormat('_')} title="Курсив">
-            <Italic size={15} />
-          </FormatButton>
-          {/* Поля — общей панелью справа, как на листе: вставка идёт
-              туда, где стоял курсор, в тему или в текст. */}
-          <FieldsToggle />
-          <span className="ml-2 text-xs text-[var(--text-muted)]">
-            Пустая строка — новый абзац. Адрес сайта сам станет ссылкой.
-          </span>
+      <div>
+        <div className="mb-1.5 flex items-center gap-1">
+          <span className="text-sm font-medium text-muted">Текст письма</span>
+          {/* Кнопки, а не разметка руками: человек выделяет кусок и нажимает,
+              как в любом мессенджере. Знаки при этом видны в тексте. */}
+          <div className="ml-auto flex items-center gap-1">
+            <IconButton size="sm" label="Полужирный" onClick={() => applyFormat('*')}>
+              <Bold size={16} />
+            </IconButton>
+            <IconButton size="sm" label="Курсив" onClick={() => applyFormat('_')}>
+              <Italic size={16} />
+            </IconButton>
+            {/* Поля — общей панелью справа, как на листе: вставка идёт
+                туда, где стоял курсор, в тему или в текст. */}
+            <FieldsToggle />
+          </div>
         </div>
-
-        <textarea
+        <Textarea
           ref={bodyRef}
           onFocus={() => (lastField.current = 'body')}
           value={body}
           onChange={(e) => setBody(e.target.value)}
           rows={10}
           spellCheck
-          className="w-full rounded-xl bg-[var(--surface)] px-3 py-2 text-sm ring-1 ring-[var(--line)] focus:ring-2 focus:ring-[var(--accent)] focus:outline-none"
+          aria-label="Текст письма"
         />
+        <p className="mt-1.5 text-xs text-muted">Пустая строка — новый абзац. Адрес сайта сам станет ссылкой.</p>
       </div>
 
-      {/* Убрано под спойлер: нужно редко — когда документ вручают на бумаге,
-          а письмо служит уведомлением. На виду эта галочка только пугала:
-          непонятно, зачем снимать то, ради чего всё и затевалось. */}
-      <details className="max-w-3xl rounded-xl bg-[var(--surface-sunken)] px-4 py-3">
-        <summary className="cursor-pointer text-sm text-[var(--text-muted)]">Дополнительно</summary>
-        <label className="mt-3 flex items-start gap-3 text-sm">
-          <Checkbox checked={attach} onChange={setAttach} className="mt-0.5" />
-          <span>
-            <span className="flex items-center gap-1.5 font-medium">
-              <Paperclip size={14} /> Прикладывать документ к письму
-            </span>
-            <span className="mt-0.5 block text-[var(--text-muted)]">
-              Обычно нужно: участник получает грамоту прямо в письме. Снимайте, только если вручаете
-              документ на бумаге, а письмо — просто уведомление.
-            </span>
-          </span>
-        </label>
-      </details>
+      {/* Убрано под раскрывашку: нужно редко — когда документ вручают
+          на бумаге, а письмо служит уведомлением. На виду эта галочка
+          только пугала. */}
+      <Card padding="none">
+        <button
+          type="button"
+          onClick={() => setMore((v) => !v)}
+          aria-expanded={more}
+          className="pressable flex w-full items-center gap-3 rounded-card px-4 py-3 text-left text-sm hover:bg-row-hover"
+        >
+          <span className="flex-1 font-medium">Дополнительно</span>
+          <ChevronDown size={16} className={cn('text-muted transition-transform', more && 'rotate-180')} aria-hidden />
+        </button>
+        <Collapse open={more}>
+          <div className="border-t border-line px-4 py-3">
+            <Checkbox
+              checked={attach}
+              onChange={setAttach}
+              label={
+                <span className="flex items-center gap-1.5 font-medium">
+                  <Paperclip size={16} aria-hidden /> Прикладывать документ к письму
+                </span>
+              }
+              hint="Обычно нужно: участник получает грамоту прямо в письме. Снимайте, только если вручаете документ на бумаге, а письмо — просто уведомление."
+            />
+          </div>
+        </Collapse>
+      </Card>
 
       <Preview subject={subject} body={body} variables={variables} />
 
+      {save.isError && <ErrorBar>{errorText(save.error)}</ErrorBar>}
+
       <div className="flex items-center gap-3">
-        <Button variant="primary" onClick={() => save.mutate()} disabled={save.isPending}>
-          Сохранить
+        <Button variant="primary" onClick={() => save.mutate()} loading={save.isPending}>
+          Сохранить письмо
         </Button>
-        {saved && (
-          <span className="flex items-center gap-1.5 text-sm text-[var(--accent)]">
-            <Check size={15} /> Сохранено
-          </span>
-        )}
-        {save.isError && (
-          <span className="text-sm text-[var(--danger)]">{errorText(save.error)}</span>
-        )}
       </div>
     </div>
   );
@@ -242,51 +228,28 @@ export function EmailTemplateEditor({
  *
  * Переменные подставляем примерами, а не оставляем «%name»: смысл
  * предпросмотра в том, чтобы увидеть готовое письмо, а не разметку.
+ * Письмо собираем из того же разбора, что уходит на сервер, но рисуем
+ * своими элементами, а не вставкой разметки: текст письма набирает
+ * сотрудник, а смотрит владелец, и вставка означала бы выполнение
+ * чужого скрипта в чужой сессии.
  */
-function Preview({
-  subject,
-  body,
-  variables,
-}: {
-  subject: string;
-  body: string;
-  variables: string[];
-}) {
+function Preview({ subject, body, variables }: { subject: string; body: string; variables: string[] }) {
   const examples: Record<string, string> = {
     name: 'Иванов Пётр Ильич',
     email: 'participant@example.com',
   };
   for (const v of variables) examples[v] ??= `значение ${v}`;
 
-  const fill = (text: string) =>
-    text.replace(/%([a-zA-Z][a-zA-Z0-9_]*)/g, (whole, n: string) => examples[n] ?? whole);
-
-  /*
-   * Письмо собираем из того же разбора, что уходит на сервер, но рисуем
-   * своими элементами, а не вставкой разметки.
-   *
-   * Разметку в страницу кабинета вставлять нельзя: текст письма набирает
-   * сотрудник организации, а смотрит его владелец, и вставка означала бы
-   * выполнение чужого скрипта в чужой сессии. Раньше здесь стояло вложенное
-   * окно с песочницей — задачу оно решало, но пустело при перерисовке
-   * страницы, и вместо письма человек видел белый прямоугольник.
-   *
-   * Своя отрисовка снимает обе проблемы разом: подставить сюда разметку
-   * попросту нечем, а рисуется предпросмотр как обычная часть страницы.
-   * Расхождения с письмом при этом не возникает — разбор общий.
-   */
+  const fill = (text: string) => text.replace(/%([a-zA-Z][a-zA-Z0-9_]*)/g, (whole, n: string) => examples[n] ?? whole);
   const paragraphs = parseBody(fill(body));
 
   return (
-    <div className="max-w-3xl rounded-xl bg-[var(--surface-sunken)] p-4">
-      <p className="text-xs text-[var(--text-muted)]">Как увидит участник</p>
-      <p className="mt-2 font-medium">{fill(subject)}</p>
-
-      {/* В цветах кабинета, как и всё вокруг: белая плашка в тёмной теме
-          била по глазам, а само письмо человек и так откроет в почте. */}
-      <div className="mt-2 rounded-lg bg-[var(--surface)] px-4 py-3 text-[15px] leading-relaxed text-[var(--text)] shadow-[var(--ring-line)]">
+    <Card title="Как увидит участник" padding="sm">
+      <p className="font-medium">{fill(subject)}</p>
+      {/* В цветах кабинета, как и всё вокруг: белая плашка в тёмной теме била по глазам. */}
+      <div className="mt-2 rounded-control bg-sunken px-4 py-3 text-base leading-relaxed text-ink">
         {paragraphs.length === 0 ? (
-          <p className="text-sm text-[var(--text-muted)]">Письмо пустое</p>
+          <p className="text-sm text-muted">Письмо пустое</p>
         ) : (
           paragraphs.map((runs, i) => (
             <p key={i} className={i > 0 ? 'mt-3' : undefined}>
@@ -297,7 +260,7 @@ function Preview({
           ))
         )}
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -311,36 +274,9 @@ function RunView({ run }: { run: Run }) {
     case 'italic':
       return <i>{run.text}</i>;
     case 'link':
-      // Рабочей ссылку не делаем: нажимать её здесь незачем, а уводить
-      // человека со страницы настройки письма — тем более.
-      return <span className="text-[var(--accent)] underline">{run.text}</span>;
+      // Рабочей ссылку не делаем: нажимать её здесь незачем.
+      return <span className="text-accent underline">{run.text}</span>;
     default:
       return <>{run.text}</>;
   }
-}
-
-/** Кнопка начертания над полем ввода. */
-function FormatButton({
-  onClick,
-  title,
-  children,
-}: {
-  onClick: () => void;
-  title: string;
-  children: React.ReactNode;
-}) {
-  const { triggerProps, tooltip } = useTooltip(title);
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      {...triggerProps}
-      aria-label={title}
-      className="grid h-8 w-8 place-items-center rounded-lg text-[var(--text-muted)] ring-1 ring-[var(--line)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
-    >
-      {children}
-      {tooltip}
-    </button>
-  );
 }

@@ -2,10 +2,9 @@ import {
   cloneElement,
   isValidElement,
   useId,
-  type InputHTMLAttributes,
+  type ComponentProps,
   type ReactElement,
   type ReactNode,
-  type TextareaHTMLAttributes,
 } from 'react';
 import { Badge, type BadgeTone } from './Badge';
 import { cn } from './cn';
@@ -125,15 +124,13 @@ export function Field({
   );
 }
 
-export function Input({
-  className = '',
-  compact,
-  ...rest
-}: InputHTMLAttributes<HTMLInputElement> & { compact?: boolean }) {
+/* `ComponentProps`, а не `InputHTMLAttributes`: с ним поле принимает `ref`
+   как обычный проп — так устроен React 19, и обёртка ref не глотает. */
+export function Input({ className = '', compact, ...rest }: ComponentProps<'input'> & { compact?: boolean }) {
   return <input className={cn(control, compact && controlCompact, className)} {...rest} />;
 }
 
-export function Textarea({ className = '', ...rest }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+export function Textarea({ className = '', ...rest }: ComponentProps<'textarea'>) {
   return <textarea className={cn(control, 'h-auto min-h-24 py-2', className)} {...rest} />;
 }
 

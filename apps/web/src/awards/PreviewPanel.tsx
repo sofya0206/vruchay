@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { AlertTriangle, CircleAlert, Layers, Users } from 'lucide-react';
 import type { AwardIssueCode, AwardPlan, AwardPlanIssue } from '@gramota/shared';
 import { Button } from '../ui/Button';
+import { Card } from '../ui/Card';
+import { ErrorBar } from '../ui/ErrorState';
 
 interface Props {
   plan: AwardPlan | null;
@@ -23,9 +25,9 @@ export function PreviewPanel({ plan, problems, loading, error, onRefresh }: Prop
 
   return (
     <aside className="w-full shrink-0 space-y-3 lg:w-96">
-      <div className="rounded-xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]">
+      <Card padding="sm">
         <div className="mb-3 flex items-center gap-2">
-          <Layers size={16} className="text-[var(--text-muted)]" />
+          <Layers size={16} className="text-muted" />
           <h3 className="font-medium">Что выйдет</h3>
           <Button
             variant="ghost"
@@ -38,14 +40,10 @@ export function PreviewPanel({ plan, problems, loading, error, onRefresh }: Prop
           </Button>
         </div>
 
-        {error && (
-          <p className="rounded-lg bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]">
-            {error}
-          </p>
-        )}
+        {error && <ErrorBar>{error}</ErrorBar>}
 
         {!plan && !error && (
-          <p className="text-sm text-[var(--text-muted)]">
+          <p className="text-sm text-muted">
             Соберите правила и нажмите «Пересчитать» — покажем, сколько каких документов
             получится, ещё до выпуска.
           </p>
@@ -54,7 +52,7 @@ export function PreviewPanel({ plan, problems, loading, error, onRefresh }: Prop
         {plan && (
           <>
             {plan.summary.length === 0 ? (
-              <p className="text-sm text-[var(--text-muted)]">
+              <p className="text-sm text-muted">
                 Пока ни одного документа: у правил не выбраны шаблоны или ни одна строка
                 под них не подошла.
               </p>
@@ -65,14 +63,14 @@ export function PreviewPanel({ plan, problems, loading, error, onRefresh }: Prop
                     <span className="truncate" title={row.templateTitle}>
                       {row.templateTitle}
                     </span>
-                    <span className="min-w-4 flex-1 border-b border-dotted border-[var(--line-strong)]" />
+                    <span className="min-w-4 flex-1 border-b border-dotted border-line-strong" />
                     <span className="tabular font-medium">{row.count}</span>
                   </li>
                 ))}
               </ul>
             )}
 
-            <dl className="mt-3 space-y-1 border-t border-[var(--line)] pt-3 text-sm text-[var(--text-muted)]">
+            <dl className="mt-3 space-y-1 border-t border-line pt-3 text-sm text-muted">
               <Stat label="Строк в протоколе" value={plan.totals.rows} />
               <Stat label="Документов всего" value={plan.totals.documents} />
               {plan.totals.deduplicated > 0 && (
@@ -99,13 +97,13 @@ export function PreviewPanel({ plan, problems, loading, error, onRefresh }: Prop
             </dl>
           </>
         )}
-      </div>
+      </Card>
 
       {problems.length > 0 && (
-        <ul className="space-y-1.5 rounded-xl bg-[var(--award-soft)] px-4 py-3 text-sm text-[var(--award)]">
+        <ul className="space-y-1.5 rounded-card bg-warn-soft px-4 py-3 text-sm text-warn">
           {problems.map((p) => (
             <li key={p} className="flex gap-2">
-              <AlertTriangle size={15} className="mt-0.5 shrink-0" />
+              <AlertTriangle size={16} className="mt-0.5 shrink-0" />
               {p}
             </li>
           ))}
@@ -113,21 +111,22 @@ export function PreviewPanel({ plan, problems, loading, error, onRefresh }: Prop
       )}
 
       {plan && plan.issues.length > 0 && (
-        <div className="rounded-xl bg-[var(--surface)] ring-1 ring-[var(--line)]">
+        <Card padding="none">
           <button
+            type="button"
             onClick={() => setOpenReport((v) => !v)}
-            className="flex w-full items-center gap-2 px-4 py-3 text-left"
+            className="pressable flex w-full items-center gap-2 rounded-card px-4 py-3 text-left hover:bg-row-hover"
             aria-expanded={openReport}
           >
-            <Users size={16} className="text-[var(--text-muted)]" />
+            <Users size={16} className="text-muted" />
             <span className="font-medium">Строки, о которых надо знать</span>
-            <span className="tabular ml-auto text-sm text-[var(--text-muted)]">
+            <span className="tabular ml-auto text-sm text-muted">
               {plan.issues.length}
             </span>
           </button>
 
           {openReport && <IssueReport issues={plan.issues} />}
-        </div>
+        </Card>
       )}
     </aside>
   );
@@ -145,40 +144,40 @@ function IssueReport({ issues }: { issues: AwardPlanIssue[] }) {
   const groups = groupByCode(issues);
 
   return (
-    <div className="max-h-96 space-y-3 overflow-y-auto border-t border-[var(--line)] px-4 py-3">
+    <div className="max-h-96 space-y-3 overflow-y-auto border-t border-line px-4 py-3">
       {groups.map(([code, list]) => (
         <section key={code}>
           <h4 className="mb-1 flex items-center gap-1.5 text-xs font-medium tracking-wide uppercase">
             {list[0].severity === 'error' ? (
-              <CircleAlert size={13} className="text-[var(--danger)]" />
+              <CircleAlert size={13} className="text-danger" />
             ) : (
-              <AlertTriangle size={13} className="text-[var(--award)]" />
+              <AlertTriangle size={13} className="text-info" />
             )}
             <span
               className={
-                list[0].severity === 'error' ? 'text-[var(--danger)]' : 'text-[var(--award)]'
+                list[0].severity === 'error' ? 'text-danger' : 'text-info'
               }
             >
               {ISSUE_TITLES[code]}
             </span>
-            <span className="tabular text-[var(--text-muted)]">{list.length}</span>
+            <span className="tabular text-muted">{list.length}</span>
           </h4>
           <ul className="space-y-0.5 text-sm">
             {list.slice(0, 50).map((issue, i) => (
               <li key={`${issue.rowId}-${i}`} className="flex gap-2">
-                <span className="tabular w-8 shrink-0 text-right text-[var(--text-muted)]">
+                <span className="tabular w-8 shrink-0 text-right text-muted">
                   {issue.rowNumber}
                 </span>
                 <span className="truncate" title={issue.message}>
                   {issue.subject || '— без имени —'}
                   {issue.group && (
-                    <span className="text-[var(--text-muted)]"> · {issue.group}</span>
+                    <span className="text-muted"> · {issue.group}</span>
                   )}
                 </span>
               </li>
             ))}
             {list.length > 50 && (
-              <li className="text-[var(--text-muted)]">…и ещё {list.length - 50}</li>
+              <li className="text-muted">…и ещё {list.length - 50}</li>
             )}
           </ul>
         </section>
@@ -227,7 +226,7 @@ function Stat({
     <div className="flex justify-between gap-2" title={hint}>
       <dt>{label}</dt>
       <dd
-        className={`tabular font-medium ${tone === 'danger' ? 'text-[var(--danger)]' : 'text-[var(--text)]'}`}
+        className={`tabular font-medium ${tone === 'danger' ? 'text-danger' : 'text-ink'}`}
       >
         {value}
       </dd>
