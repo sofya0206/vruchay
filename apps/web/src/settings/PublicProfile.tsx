@@ -109,7 +109,7 @@ export function PublicProfile() {
     <section>
       <SectionHead title="Страница проверки и публичный реестр" about={<>Страницу проверки открывает любой, кто знает код с документа. Что на ней показывать о человеке — решаете вы как оператор персональных данных.</>} />
 
-      <div className="mt-4 max-w-2xl space-y-6 rounded-2xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]">
+      <div className="mt-4 max-w-2xl space-y-6 rounded-sheet bg-surface p-4 ring-1 ring-line">
         <div>
           <Label>Кого показывать на странице проверки</Label>
           <div className="space-y-2">
@@ -124,13 +124,13 @@ export function PublicProfile() {
               />
             ))}
           </div>
-          <p className="mt-2 text-xs text-[var(--text-muted)]">
+          <p className="mt-2 text-xs text-muted">
             Адрес почты, телефон и дата рождения не показываются никогда, что бы ни было отмечено в
             материале.
           </p>
         </div>
 
-        <hr className="border-[var(--line)]" />
+        <hr className="border-line" />
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
@@ -141,7 +141,7 @@ export function PublicProfile() {
               onChange={(e) => set('contactEmail', e.target.value)}
               placeholder="docs@federation.ru"
             />
-            <p className="mt-1.5 text-xs text-[var(--text-muted)]">
+            <p className="mt-1.5 text-xs text-muted">
               Туда уходит «сообщить о проблеме» со страницы проверки.
             </p>
           </div>
@@ -155,7 +155,7 @@ export function PublicProfile() {
           </div>
         </div>
 
-        <hr className="border-[var(--line)]" />
+        <hr className="border-line" />
 
         <div className="space-y-3">
           <Checkbox
@@ -172,10 +172,10 @@ export function PublicProfile() {
                   <img
                     src={data.logoUrl}
                     alt=""
-                    className="h-16 w-16 rounded-xl bg-[var(--surface-sunken)] object-contain p-1"
+                    className="h-16 w-16 rounded-card bg-sunken object-contain p-1"
                   />
                 ) : (
-                  <div className="grid h-16 w-16 place-items-center rounded-xl bg-[var(--surface-sunken)] text-[var(--text-muted)]">
+                  <div className="grid h-16 w-16 place-items-center rounded-card bg-sunken text-muted">
                     <ImagePlus size={20} />
                   </div>
                 )}
@@ -202,9 +202,9 @@ export function PublicProfile() {
                         ? 'Заменить логотип'
                         : 'Загрузить логотип'}
                   </Button>
-                  <p className="mt-1 text-xs text-[var(--text-muted)]">PNG или JPEG до 2 МБ.</p>
+                  <p className="mt-1 text-xs text-muted">PNG или JPEG до 2 МБ.</p>
                   {uploadLogo.isError && (
-                    <p role="alert" className="mt-1 text-xs text-[var(--danger)]">
+                    <p role="alert" className="mt-1 text-xs text-danger">
                       {errorText(uploadLogo.error)}
                     </p>
                   )}
@@ -213,7 +213,7 @@ export function PublicProfile() {
               <div>
                 <Label>Адрес страницы</Label>
                 <div className="flex items-center gap-1">
-                  <span className="text-sm text-[var(--text-muted)]">vruchay.ru/org/</span>
+                  <span className="text-sm text-muted">vruchay.ru/org/</span>
                   <Input
                     value={form.slug ?? ''}
                     onChange={(e) => set('slug', e.target.value)}
@@ -221,7 +221,7 @@ export function PublicProfile() {
                     maxLength={50}
                   />
                 </div>
-                <p className="mt-1.5 text-xs text-[var(--text-muted)]">
+                <p className="mt-1.5 text-xs text-muted">
                   Латиница, цифры и дефис. Без адреса страница не откроется.
                 </p>
               </div>
@@ -278,13 +278,13 @@ export function PublicProfile() {
                   checked={consent}
                   onChange={setConsent}
                   label={CONSENT_DRAFT}
-                  className="ml-6 rounded-xl bg-[var(--award-soft)] p-3"
+                  className="ml-6 rounded-card bg-info-soft p-3"
                 />
               )}
             </div>
           )}
 
-          <p className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+          <p className="flex items-center gap-1.5 text-xs text-muted">
             <ShieldCheck size={13} />
             {form.verifiedIssuer
               ? 'Значок «Верифицированный эмитент» получен.'
@@ -297,13 +297,13 @@ export function PublicProfile() {
             {update.isPending ? 'Сохраняем…' : 'Сохранить'}
           </Button>
           {saved && (
-            <span className="flex items-center gap-1.5 text-sm text-[var(--accent)]">
+            <span className="flex items-center gap-1.5 text-sm text-accent">
               <Check size={15} /> Сохранено
             </span>
           )}
         </div>
         {update.isError && (
-          <p role="alert" className="text-sm text-[var(--danger)]">
+          <p role="alert" className="text-sm text-danger">
             {errorText(update.error)}
           </p>
         )}

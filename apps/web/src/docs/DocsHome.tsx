@@ -44,12 +44,12 @@ export function DocsHome({
   return (
     <div>
       <h1 className="text-2xl font-medium">API «Вручай»</h1>
-      <p className="mt-2 max-w-2xl text-[var(--text-muted)]">{leadOf(body)}</p>
+      <p className="mt-2 max-w-2xl text-muted">{leadOf(body)}</p>
 
       <ol className="mt-6 grid gap-3 lg:grid-cols-3">
         <Step n="1" title="Токен">
-          <p className="text-sm text-[var(--text-muted)]">
-            <Link to="/settings/tokens" className="text-[var(--accent)] hover:underline">
+          <p className="text-sm text-muted">
+            <Link to="/settings/tokens" className="text-accent hover:underline">
               Настройки → Токены API
             </Link>
             . Показывается один раз.
@@ -57,15 +57,15 @@ export function DocsHome({
           <CodeBlock code={'export VRUCHAY_TOKEN=vru_…'} />
         </Step>
         <Step n="2" title="Первый запрос">
-          <p className="text-sm text-[var(--text-muted)]">Проверьте, что токен живой.</p>
+          <p className="text-sm text-muted">Проверьте, что токен живой.</p>
           <CodeBlock
             code={`curl -H "Authorization: Bearer $VRUCHAY_TOKEN" \\\n  ${SITE}/api/auth/me`}
           />
         </Step>
         <Step n="3" title="Выпуск">
-          <p className="text-sm text-[var(--text-muted)]">
+          <p className="text-sm text-muted">
             Документ → получатели → задание → архив. По шагам в{' '}
-            <Link to={`${basePath}/AGENTS`} className="text-[var(--accent)] hover:underline">
+            <Link to={`${basePath}/AGENTS`} className="text-accent hover:underline">
               AGENTS.md
             </Link>
             .
@@ -74,13 +74,13 @@ export function DocsHome({
         </Step>
       </ol>
 
-      <div className="mt-6 flex flex-wrap items-center gap-4 rounded-xl bg-[var(--accent-soft)] p-4">
-        <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-[var(--accent)] text-[var(--accent-contrast)]">
+      <div className="mt-6 flex flex-wrap items-center gap-4 rounded-card bg-accent-soft p-4">
+        <span className="grid size-10 shrink-0 place-items-center rounded-control bg-accent text-on-accent">
           <Bot size={20} />
         </span>
         <div className="min-w-0 flex-1">
           <p className="font-medium">Отдайте документацию своему ИИ</p>
-          <p className="text-sm text-[var(--text-muted)]">
+          <p className="text-sm text-muted">
             Промпт с адресом llms-full.txt и порядком шагов. Вставьте токен и приложите таблицу.
           </p>
         </div>
@@ -90,14 +90,14 @@ export function DocsHome({
           </Button>
           <a
             href={`${SITE}/llms.txt`}
-            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm text-[var(--text-muted)] hover:bg-[var(--surface)] hover:text-[var(--text)]"
+            className="inline-flex items-center gap-1.5 rounded-control px-2.5 py-2 text-sm text-muted hover:bg-surface hover:text-ink"
           >
             <FileText size={15} />
             llms.txt
           </a>
           <a
             href={`${SITE}/llms-full.txt`}
-            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm text-[var(--text-muted)] hover:bg-[var(--surface)] hover:text-[var(--text)]"
+            className="inline-flex items-center gap-1.5 rounded-control px-2.5 py-2 text-sm text-muted hover:bg-surface hover:text-ink"
           >
             <FileText size={15} />
             llms-full.txt
@@ -105,7 +105,7 @@ export function DocsHome({
         </div>
       </div>
 
-      <h2 className="mt-10 mb-3 text-xs font-medium tracking-wide text-[var(--text-muted)] uppercase">
+      <h2 className="mt-10 mb-3 text-xs font-medium tracking-wide text-muted uppercase">
         Справочник
       </h2>
       <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -113,18 +113,18 @@ export function DocsHome({
           <li key={g.key}>
             <Link
               to={`${basePath}/${g.pages[0].slug}`}
-              className="group flex h-full flex-col gap-2 rounded-xl p-4 ring-1 ring-[var(--line)] transition-colors hover:bg-[var(--row-hover)]"
+              className="group flex h-full flex-col gap-2 rounded-card p-4 ring-1 ring-line transition-colors hover:bg-row-hover"
             >
               <span className="flex items-center justify-between gap-2">
                 <span className="font-medium">{g.title}</span>
-                <span className="tabular text-xs text-[var(--text-muted)]">{g.pages.length}</span>
+                <span className="tabular text-xs text-muted">{g.pages.length}</span>
               </span>
               <span className="flex flex-wrap gap-1">
                 {methods(g).map((m) => (
                   <MethodPill key={m} method={m} />
                 ))}
               </span>
-              <span className="mt-auto flex items-center gap-1 text-sm text-[var(--accent)] opacity-0 transition-opacity group-hover:opacity-100">
+              <span className="mt-auto flex items-center gap-1 text-sm text-accent opacity-0 transition-opacity group-hover:opacity-100">
                 Открыть <ArrowRight size={14} />
               </span>
             </Link>
@@ -137,7 +137,7 @@ export function DocsHome({
           <section key={title}>
             <h2
               id={title}
-              className="mt-10 mb-3 text-xs font-medium tracking-wide text-[var(--text-muted)] uppercase"
+              className="mt-10 mb-3 text-xs font-medium tracking-wide text-muted uppercase"
             >
               {title}
             </h2>
@@ -151,8 +151,8 @@ export function DocsHome({
 
 function Step({ n, title, children }: { n: string; title: string; children: React.ReactNode }) {
   return (
-    <li className="flex min-w-0 flex-col rounded-xl p-4 ring-1 ring-[var(--line)] [&_[data-code]]:my-0 [&_[data-code]]:mt-auto [&_pre]:p-3 [&_pre]:text-xs">
-      <span className="text-xs font-medium tracking-wide text-[var(--text-muted)] uppercase">
+    <li className="flex min-w-0 flex-col rounded-card p-4 ring-1 ring-line [&_[data-code]]:my-0 [&_[data-code]]:mt-auto [&_pre]:p-3 [&_pre]:text-xs">
+      <span className="text-xs font-medium tracking-wide text-muted uppercase">
         {n} · {title}
       </span>
       <div className="mt-1 mb-3 space-y-2">{children}</div>

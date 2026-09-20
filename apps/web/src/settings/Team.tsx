@@ -4,6 +4,7 @@ import { errorText } from '../api/client';
 import { useTeam, useTeamMutations, type TeamMember, type TeamRole } from '../api/team';
 import { useMe } from '../auth/useAuth';
 import { Button } from '../ui/Button';
+import { IconButton } from '../ui/IconButton';
 import { SectionHead } from '../ui/Settings';
 import { Input, Label } from '../ui/Field';
 import { ConfirmDialog } from '../ui/Dialog';
@@ -54,7 +55,7 @@ export function Team() {
     <section>
       <SectionHead title="Кто работает в организации" about={<>Добавьте коллег, чтобы каждый входил под своим именем и паролем. Так видно, кто какие грамоты выпустил, и не приходится передавать один пароль на всех.</>} />
 
-      {team.isPending && <p className="mt-4 text-sm text-[var(--text-muted)]">Загрузка…</p>}
+      {team.isPending && <p className="mt-4 text-sm text-muted">Загрузка…</p>}
 
       <ul className="mt-4 space-y-2">
         {members.map((member) => (
@@ -71,7 +72,7 @@ export function Team() {
       </ul>
 
       {actionError && (
-        <p role="alert" className="mt-2 text-sm text-[var(--danger)]">
+        <p role="alert" className="mt-2 text-sm text-danger">
           {actionError}
         </p>
       )}
@@ -98,7 +99,7 @@ export function Team() {
         ))}
 
       {!canManage && members.length > 0 && (
-        <p className="mt-4 text-sm text-[var(--text-muted)]">
+        <p className="mt-4 text-sm text-muted">
           Добавлять сотрудников может владелец или управляющий.
         </p>
       )}
@@ -141,12 +142,12 @@ function MemberRow({
   resent: boolean;
 }) {
   return (
-    <li className="flex flex-wrap items-center gap-3 rounded-xl bg-[var(--surface)] px-4 py-3 ring-1 ring-[var(--line)]">
+    <li className="flex flex-wrap items-center gap-3 rounded-card bg-surface px-4 py-3 ring-1 ring-line">
       <div className="min-w-0 flex-1">
         <p className="truncate font-medium">
           {member.name || member.email}
           {member.pending && (
-            <span className="ml-2 rounded-md bg-[var(--surface-sunken)] px-1.5 py-0.5 text-xs font-normal text-[var(--text-muted)]">
+            <span className="ml-2 rounded-md bg-sunken px-1.5 py-0.5 text-xs font-normal text-muted">
               приглашение отправлено
             </span>
           )}
@@ -154,7 +155,7 @@ function MemberRow({
         {/* Адрес второй строкой — только если сверху имя. Иначе он
             повторялся бы сам под собой, и строка выглядела бы ошибкой. */}
         {member.name && (
-          <p className="truncate text-sm text-[var(--text-muted)]">{member.email}</p>
+          <p className="truncate text-sm text-muted">{member.email}</p>
         )}
       </div>
 
@@ -173,31 +174,21 @@ function MemberRow({
           aria-label={`Права: ${member.name || member.email}`}
         />
       ) : (
-        <span className="text-sm text-[var(--text-muted)]">{ROLE_TITLE[member.role]}</span>
+        <span className="text-sm text-muted">{ROLE_TITLE[member.role]}</span>
       )}
 
       {/* Письма теряются в спаме — кнопка выслать заново нужна всегда,
           иначе единственный выход это завести человека заново. */}
       {member.pending && canManage && (
-        <button
-          type="button"
-          onClick={onResend}
-          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm ring-1 ring-[var(--line-strong)] hover:bg-[var(--surface-sunken)]"
-        >
-          {resent ? <Check size={14} /> : <Mail size={14} />}
+        <Button size="sm" onClick={onResend} icon={resent ? <Check size={16} /> : <Mail size={16} />}>
           {resent ? 'Отправлено' : 'Выслать снова'}
-        </button>
+        </Button>
       )}
 
       {canManage && (
-        <button
-          type="button"
-          onClick={onRemove}
-          aria-label={`Убрать ${member.name || member.email}`}
-          className="text-[var(--text-muted)] hover:text-[var(--danger)]"
-        >
+        <IconButton size="sm" label={`Убрать ${member.name || member.email}`} className="hover:text-danger" onClick={onRemove}>
           <Trash2 size={16} />
-        </button>
+        </IconButton>
       )}
     </li>
   );
@@ -224,9 +215,9 @@ function InviteForm({
         e.preventDefault();
         if (email.trim() && name.trim()) onSubmit({ email: email.trim(), name: name.trim(), role });
       }}
-      className="mt-4 space-y-4 rounded-2xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]"
+      className="mt-4 space-y-4 rounded-sheet bg-surface p-4 ring-1 ring-line"
     >
-      <p className="text-sm text-[var(--text-muted)]">
+      <p className="text-sm text-muted">
         Человеку придёт письмо со ссылкой. Пароль он придумает сам — вам его знать не нужно.
       </p>
 
@@ -261,11 +252,11 @@ function InviteForm({
             { value: 'admin' as const, label: ROLE_TITLE.admin },
           ]}
         />
-        <p className="mt-1.5 text-sm text-[var(--text-muted)]">{ROLE_HINT[role]}</p>
+        <p className="mt-1.5 text-sm text-muted">{ROLE_HINT[role]}</p>
       </div>
 
       {error && (
-        <p role="alert" className="text-sm text-[var(--danger)]">
+        <p role="alert" className="text-sm text-danger">
           {error}
         </p>
       )}

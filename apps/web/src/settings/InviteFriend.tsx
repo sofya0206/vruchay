@@ -20,7 +20,7 @@ export function InviteFriend() {
     <section>
       <SectionHead title="Пригласить друга" about={<>Если сервис вам пригодился, расскажите о нём знакомому организатору. Вы оба получите бесплатные документы: он — на старте, вы — когда он начнёт работать.</>} />
 
-      {isLoading && <p className="mt-4 text-sm text-[var(--text-muted)]">Загружаем…</p>}
+      {isLoading && <p className="mt-4 text-sm text-muted">Загружаем…</p>}
       {data && <InviteBody data={data} />}
     </section>
   );
@@ -45,19 +45,19 @@ function HowItWorks({ data }: { data: ReferralSummary }) {
   ];
 
   return (
-    <ol className="space-y-2.5 rounded-2xl bg-[var(--surface-sunken)] p-4 text-sm">
+    <ol className="space-y-2.5 rounded-card bg-sunken p-4 text-sm">
       {steps.map((text, i) => (
         <li key={i} className="flex gap-3">
           <span
             className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full
-                       bg-[var(--accent)] text-xs font-medium text-[var(--accent-contrast)]"
+                       bg-accent text-xs font-medium text-on-accent"
           >
             {i + 1}
           </span>
           <span>{text}</span>
         </li>
       ))}
-      <li className="pt-1 text-[var(--text-muted)]">
+      <li className="pt-1 text-muted">
         Мы ждём первых {data.qualifyDocuments} документов, чтобы бонусы нельзя было получать за
         пустые регистрации. Больше чем за {data.maxRewarded} приглашённых начисления не идут.
       </li>
@@ -71,13 +71,13 @@ function ShareBox({ data }: { data: ReferralSummary }) {
   const whatsapp = `https://wa.me/?text=${encodeURIComponent(data.message)}`;
 
   return (
-    <div className="rounded-2xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]">
+    <div className="card p-4">
       <p className="text-sm font-medium">Готовое сообщение</p>
-      <p className="mt-1 text-sm text-[var(--text-muted)]">
+      <p className="mt-1 text-sm text-muted">
         Можно отправить как есть или переписать своими словами — ссылка внутри уже ваша.
       </p>
 
-      <pre className="mt-3 whitespace-pre-wrap rounded-xl bg-[var(--surface-sunken)] p-3 font-sans text-sm">
+      <pre className="mt-3 whitespace-pre-wrap rounded-card bg-sunken p-3 font-sans text-sm">
         {data.message}
       </pre>
 
@@ -98,10 +98,10 @@ function ShareBox({ data }: { data: ReferralSummary }) {
         </a>
       </div>
 
-      <div className="mt-4 border-t border-[var(--line)] pt-3">
-        <p className="text-sm text-[var(--text-muted)]">Только ссылка, без текста:</p>
+      <div className="mt-4 border-t border-line pt-3">
+        <p className="text-sm text-muted">Только ссылка, без текста:</p>
         <div className="mt-1.5 flex flex-wrap items-center gap-2">
-          <code className="rounded-lg bg-[var(--surface-sunken)] px-2.5 py-1.5 text-sm">
+          <code className="rounded-control bg-sunken px-2.5 py-1.5 text-sm">
             {data.link}
           </code>
           <CopyButton value={data.link} idle="Скопировать ссылку" done="Скопировано" />
@@ -114,25 +114,25 @@ function ShareBox({ data }: { data: ReferralSummary }) {
 function Progress({ data }: { data: ReferralSummary }) {
   if (data.invitedTotal === 0) {
     return (
-      <p className="text-sm text-[var(--text-muted)]">
+      <p className="text-sm text-muted">
         Пока никто не пришёл по вашей ссылке. Как только придёт — появится здесь.
       </p>
     );
   }
 
   return (
-    <div className="rounded-2xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]">
+    <div className="card p-4">
       <div className="flex flex-wrap gap-6">
         <Stat value={data.invitedTotal} label="пришли по ссылке" />
         <Stat value={data.invitedWorking} label="уже работают" />
         <Stat value={data.bonusEarned} label="документов вам начислено" accent />
       </div>
 
-      <ul className="mt-4 space-y-1.5 border-t border-[var(--line)] pt-3 text-sm">
+      <ul className="mt-4 space-y-1.5 border-t border-line pt-3 text-sm">
         {data.invited.map((org, i) => (
           <li key={i} className="flex items-center justify-between gap-3">
             <span>{org.name}</span>
-            <span className={org.working ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]'}>
+            <span className={org.working ? 'text-accent' : 'text-muted'}>
               {org.working
                 ? `начислено ${data.rewardPerFriend}`
                 : `ещё не выпустил ${data.qualifyDocuments} документов`}
@@ -147,8 +147,8 @@ function Progress({ data }: { data: ReferralSummary }) {
 function Stat({ value, label, accent }: { value: number; label: string; accent?: boolean }) {
   return (
     <div>
-      <div className={`text-xl font-medium ${accent ? 'text-[var(--accent)]' : ''}`}>{value}</div>
-      <div className="text-sm text-[var(--text-muted)]">{label}</div>
+      <div className={`text-xl font-medium ${accent ? 'text-accent' : ''}`}>{value}</div>
+      <div className="text-sm text-muted">{label}</div>
     </div>
   );
 }

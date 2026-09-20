@@ -30,7 +30,7 @@ function useSavedFlag() {
 
 function Saved() {
   return (
-    <span className="flex items-center gap-1.5 text-sm text-[var(--ok)]">
+    <span className="flex items-center gap-1.5 text-sm text-ok">
       <Check size={15} /> Сохранено
     </span>
   );
@@ -68,7 +68,7 @@ function NameRow({
   return (
     <SettingRow
       title={title}
-      about={error ? <span className="text-[var(--danger)]">{errorText(error)}</span> : about}
+      about={error ? <span className="text-danger">{errorText(error)}</span> : about}
     >
       {saved && <Saved />}
       <form

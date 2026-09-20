@@ -25,7 +25,7 @@ export function Review() {
     <section>
       <SectionHead title="Отзыв о сервисе" about={<>Если «Вручай» вам пригодился — расскажите об этом. Отзыв появится на главной странице сервиса вместе с названием вашей организации.</>} />
 
-      {isLoading && <p className="mt-4 text-sm text-[var(--text-muted)]">Загружаем…</p>}
+      {isLoading && <p className="mt-4 text-sm text-muted">Загружаем…</p>}
       {!isLoading && <ReviewForm existing={data ?? null} />}
     </section>
   );
@@ -75,7 +75,7 @@ function ReviewForm({ existing }: { existing: MyReview | null }) {
             },
           );
         }}
-        className="space-y-4 rounded-2xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]"
+        className="space-y-4 rounded-sheet bg-surface p-4 ring-1 ring-line"
       >
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
@@ -106,7 +106,7 @@ function ReviewForm({ existing }: { existing: MyReview | null }) {
             maxLength={200}
             placeholder="Учебный центр «Развитие»"
           />
-          <p className="mt-1.5 text-sm text-[var(--text-muted)]">
+          <p className="mt-1.5 text-sm text-muted">
             Так она будет подписана на главной странице.
           </p>
         </div>
@@ -122,7 +122,7 @@ function ReviewForm({ existing }: { existing: MyReview | null }) {
             placeholder="Что делали раньше, что изменилось, сколько времени стало занимать награждение."
             className="text-sm"
           />
-          <p className="mt-1.5 text-sm text-[var(--text-muted)]">
+          <p className="mt-1.5 text-sm text-muted">
             {tooShort
               ? 'Пока коротковато — напишите хотя бы пару предложений.'
               : 'Полезнее всего конкретика: сколько человек награждали и сколько это заняло.'}
@@ -133,26 +133,23 @@ function ReviewForm({ existing }: { existing: MyReview | null }) {
           <Label>Оценка (необязательно)</Label>
           <div className="mt-1 flex gap-1.5">
             {[1, 2, 3, 4, 5].map((n) => (
-              <button
+              <Button
                 key={n}
-                type="button"
-                onClick={() => setRating(rating === n ? undefined : n)}
+                size="sm"
+                variant={rating && n <= rating ? 'primary' : 'secondary'}
                 aria-label={`${n} из 5`}
                 aria-pressed={rating === n}
-                className={`h-9 w-9 rounded-lg text-sm ring-1 transition-colors ${
-                  rating && n <= rating
-                    ? 'bg-[var(--accent)] text-[var(--accent-contrast)] ring-[var(--accent)]'
-                    : 'ring-[var(--line-strong)] hover:bg-[var(--surface-sunken)]'
-                }`}
+                onClick={() => setRating(rating === n ? undefined : n)}
+                className="w-9 px-0"
               >
                 {n}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
 
         {submit.isError && (
-          <p role="alert" className="text-sm text-[var(--danger)]">
+          <p role="alert" className="text-sm text-danger">
             {errorText(submit.error)}
           </p>
         )}
@@ -167,30 +164,32 @@ function ReviewForm({ existing }: { existing: MyReview | null }) {
           </Button>
 
           {saved && (
-            <span className="flex items-center gap-1.5 text-sm text-[var(--accent)]">
+            <span className="flex items-center gap-1.5 text-sm text-accent">
               <Check size={15} /> Отправлено на проверку
             </span>
           )}
 
           {existing && (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="sm"
+              className="ml-auto hover:text-danger"
+              icon={<Trash2 size={16} />}
+              loading={remove.isPending}
               onClick={() => remove.mutate(existing.id)}
-              disabled={remove.isPending}
-              className="ml-auto flex items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--danger)]"
             >
-              <Trash2 size={15} /> Убрать отзыв
-            </button>
+              Убрать отзыв
+            </Button>
           )}
         </div>
 
         {remove.isError && (
-          <p role="alert" className="text-sm text-[var(--danger)]">
+          <p role="alert" className="text-sm text-danger">
             {errorText(remove.error)}
           </p>
         )}
 
-        <p className="text-sm text-[var(--text-muted)]">
+        <p className="text-sm text-muted">
           Перед публикацией мы читаем отзыв глазами — обычно в течение пары дней.
           Так на главной не окажется того, чего вы не хотели там видеть.
         </p>
@@ -203,7 +202,7 @@ function ReviewForm({ existing }: { existing: MyReview | null }) {
 function StatusNotice({ review }: { review: MyReview }) {
   if (review.status === 'published') {
     return (
-      <p className="rounded-2xl bg-[var(--accent-soft)] px-4 py-3 text-sm">
+      <p className="rounded-sheet bg-accent-soft px-4 py-3 text-sm">
         Отзыв опубликован на главной странице. Учтите: если поправить текст, отзыв
         снимется с главной и вернётся туда после проверки — на непроверенный текст
         мы ссылаться не можем.
@@ -213,10 +212,10 @@ function StatusNotice({ review }: { review: MyReview }) {
 
   if (review.status === 'rejected') {
     return (
-      <div className="rounded-2xl bg-[var(--danger-soft)] px-4 py-3 text-sm">
-        <p className="font-medium text-[var(--danger)]">Отзыв пока не опубликован</p>
+      <div className="rounded-sheet bg-danger-soft px-4 py-3 text-sm">
+        <p className="font-medium text-danger">Отзыв пока не опубликован</p>
         {review.moderatorNote && <p className="mt-1">{review.moderatorNote}</p>}
-        <p className="mt-1 text-[var(--text-muted)]">
+        <p className="mt-1 text-muted">
           Поправьте текст ниже и отправьте снова.
         </p>
       </div>
@@ -224,7 +223,7 @@ function StatusNotice({ review }: { review: MyReview }) {
   }
 
   return (
-    <p className="rounded-2xl bg-[var(--surface-sunken)] px-4 py-3 text-sm">
+    <p className="rounded-sheet bg-sunken px-4 py-3 text-sm">
       Отзыв отправлен и ждёт проверки. Обычно это пара дней.
     </p>
   );

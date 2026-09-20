@@ -30,7 +30,7 @@ export function AuditLog() {
         data &&
         data.total > PAGE && (
           <div className="flex items-center gap-2">
-            <span className="tabular text-sm text-[var(--text-muted)]">
+            <span className="tabular text-sm text-muted">
               {offset + 1}–{Math.min(offset + PAGE, data.total)} из {data.total}
             </span>
             <Button size="sm" disabled={offset === 0} onClick={() => setOffset(offset - PAGE)}>
@@ -47,23 +47,23 @@ export function AuditLog() {
         )
       }
     >
-      {isLoading && <p className="text-sm text-[var(--text-muted)]">Загружаем…</p>}
+      {isLoading && <p className="text-sm text-muted">Загружаем…</p>}
 
       {isError && (
-        <p className="text-sm text-[var(--text-muted)]">
+        <p className="text-sm text-muted">
           Журнал доступен владельцу и управляющему.
         </p>
       )}
 
       {data && data.total === 0 && (
-        <p className="text-sm text-[var(--text-muted)]">
+        <p className="text-sm text-muted">
           Пока пусто. Записи появятся, как только кто-нибудь выпустит документы или разошлёт
           письма.
         </p>
       )}
 
       {data && data.total > 0 && (
-        <ul className="divide-y divide-[var(--line)]">
+        <ul className="divide-y divide-line">
           {data.items.map((event) => (
             <Row key={event.id} event={event} />
           ))}
@@ -76,9 +76,9 @@ export function AuditLog() {
 function Row({ event }: { event: AuditEvent }) {
   return (
     <li className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-2.5 text-sm">
-      <span className="tabular shrink-0 text-[var(--text-muted)]">{when(event.createdAt)}</span>
+      <span className="tabular shrink-0 text-muted">{when(event.createdAt)}</span>
       <span>{event.summary}</span>
-      <span className="ml-auto text-[var(--text-muted)]">
+      <span className="ml-auto text-muted">
         {event.actorName || event.actorEmail || 'сервис'}
       </span>
     </li>

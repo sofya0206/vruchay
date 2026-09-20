@@ -81,7 +81,7 @@ export function Billing() {
       <SectionHead title="Реквизиты" about={<>По ним выставляется счёт и оформляются закрывающие документы. Бухгалтерия проверит их до копейки, поэтому лучше заполнить один раз и точно.</>} />
 
       {data && !data.kind && data.suggested.name && (
-        <p className="mt-3 max-w-2xl rounded-xl bg-[var(--surface-sunken)] p-3 text-sm text-[var(--text-muted)]">
+        <p className="mt-3 max-w-2xl rounded-card bg-sunken p-3 text-sm text-muted">
           {data.suggested.from === 'invoice' ? (
             <>
               Подставили из счёта{data.suggested.at ? ` от ${formatDate(data.suggested.at)}` : ''} —
@@ -95,7 +95,7 @@ export function Billing() {
 
       <form
         onSubmit={submit}
-        className="mt-4 max-w-xl space-y-4 rounded-2xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]"
+        className="mt-4 max-w-xl space-y-4 rounded-sheet bg-surface p-4 ring-1 ring-line"
       >
         <div>
           <Label>Кто платит</Label>
@@ -179,13 +179,13 @@ export function Billing() {
             {save.isPending ? 'Сохраняем…' : 'Сохранить реквизиты'}
           </Button>
           {saved && (
-            <span className="flex items-center gap-1.5 text-sm text-[var(--accent)]">
+            <span className="flex items-center gap-1.5 text-sm text-accent">
               <Check size={15} /> Сохранено
             </span>
           )}
         </div>
         {error && (
-          <p role="alert" className="text-sm text-[var(--danger)]">
+          <p role="alert" className="text-sm text-danger">
             {error}
           </p>
         )}

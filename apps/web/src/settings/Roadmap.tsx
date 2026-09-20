@@ -1,4 +1,5 @@
 import { ThumbsUp } from 'lucide-react';
+import { Button } from '../ui/Button';
 import { useRoadmap, useRoadmapVote, type RoadmapStatus } from '../api/support';
 import { SectionHead } from '../ui/Settings';
 
@@ -24,7 +25,7 @@ export function Roadmap() {
       <SectionHead title="Что дальше" about={<>Что мы собираемся делать. Голос — один от организации; он не назначает срок, а показывает нам, с чего начать.</>} />
 
       {data?.length === 0 && (
-        <p className="mt-3 text-sm text-[var(--text-muted)]">
+        <p className="mt-3 text-sm text-muted">
           Список пока пуст — напишите в поддержку, чего вам не хватает.
         </p>
       )}
@@ -33,29 +34,24 @@ export function Roadmap() {
         {data?.map((item) => (
           <li
             key={item.id}
-            className="flex flex-wrap items-start gap-3 rounded-xl bg-[var(--surface)] p-3 ring-1 ring-[var(--line)]"
+            className="flex flex-wrap items-start gap-3 rounded-card bg-surface p-3 ring-1 ring-line"
           >
             <div className="min-w-48 flex-1">
               <p className="font-medium">{item.title}</p>
               {item.description && (
-                <p className="mt-1 text-sm text-[var(--text-muted)]">{item.description}</p>
+                <p className="mt-1 text-sm text-muted">{item.description}</p>
               )}
-              <p className="mt-1 text-xs text-[var(--text-muted)]">{STATUS_TITLE[item.status]}</p>
+              <p className="mt-1 text-xs text-muted">{STATUS_TITLE[item.status]}</p>
             </div>
-            <button
-              type="button"
-              onClick={() => vote.mutate({ id: item.id, voted: item.voted })}
+            <Button
+              size="sm"
+              active={item.voted}
               disabled={item.status === 'done' || vote.isPending}
-              aria-pressed={item.voted}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm ring-1 transition disabled:opacity-50 ${
-                item.voted
-                  ? 'bg-[var(--accent-soft)] text-[var(--accent)] ring-[var(--accent)]'
-                  : 'bg-[var(--surface-sunken)] ring-[var(--line)] hover:ring-[var(--line-strong)]'
-              }`}
+              onClick={() => vote.mutate({ id: item.id, voted: item.voted })}
+              icon={<ThumbsUp size={16} />}
             >
-              <ThumbsUp size={14} />
               {item.votes}
-            </button>
+            </Button>
           </li>
         ))}
       </ul>

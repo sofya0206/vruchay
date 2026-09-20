@@ -40,7 +40,7 @@ export function RetentionPolicy() {
     <section>
       <SectionHead title="Сроки хранения" about={<>Закон запрещает держать данные дольше, чем требует цель. Оператор этих данных — вы, поэтому срок корзины выбираете тоже вы.</>} />
 
-      <div className="mt-4 max-w-md space-y-3 rounded-2xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]">
+      <div className="mt-4 max-w-md space-y-3 rounded-sheet bg-surface p-4 ring-1 ring-line">
         <div>
           <Label>Материал лежит в корзине, дней</Label>
           <Input
@@ -49,7 +49,7 @@ export function RetentionPolicy() {
             inputMode="numeric"
             placeholder="7"
           />
-          <p className="mt-1 text-xs text-[var(--text-muted)]">
+          <p className="mt-1 text-xs text-muted">
             От суток до 90 дней. По истечении срока материал и выданные по нему файлы удаляются
             безвозвратно, а ссылки проверки перестают отвечать — это уже не корзина, а удаление.
           </p>
@@ -74,7 +74,7 @@ export function RetentionPolicy() {
             {update.isPending ? 'Сохраняем…' : 'Сохранить'}
           </Button>
           {saved && (
-            <span className="flex items-center gap-1.5 text-sm text-[var(--accent)]">
+            <span className="flex items-center gap-1.5 text-sm text-accent">
               <Check size={15} /> Сохранено
             </span>
           )}
@@ -82,7 +82,7 @@ export function RetentionPolicy() {
         {/* Срок меняет владелец или управляющий: сотруднику сервер
             отказывает, и без этой строки кнопка просто «не работала». */}
         {update.isError && (
-          <p role="alert" className="text-sm text-[var(--danger)]">
+          <p role="alert" className="text-sm text-danger">
             {errorText(update.error)}
           </p>
         )}
@@ -90,13 +90,13 @@ export function RetentionPolicy() {
 
       <dl className="mt-4 max-w-2xl space-y-2 text-sm">
         {FIXED.map(([what, when]) => (
-          <div key={what} className="flex flex-wrap justify-between gap-2 border-b border-[var(--line)] pb-2">
-            <dt className="text-[var(--text-muted)]">{what}</dt>
+          <div key={what} className="flex flex-wrap justify-between gap-2 border-b border-line pb-2">
+            <dt className="text-muted">{what}</dt>
             <dd>{when}</dd>
           </div>
         ))}
       </dl>
-      <p className="mt-2 max-w-2xl text-xs text-[var(--text-muted)]">
+      <p className="mt-2 max-w-2xl text-xs text-muted">
         Эти сроки выведены из закона и одинаковы для всех — растянуть их значило бы нарушить его.
       </p>
     </section>

@@ -9,7 +9,7 @@ import {
 import { usePreferences } from '../api/org';
 import { formatDateTime } from './preferences';
 import { Button } from '../ui/Button';
-import { StatusChip } from '../ui/Field';
+import { Badge } from '../ui/Badge';
 import { SettingRow, SettingRows, SettingsSection, SettingsStack } from '../ui/Settings';
 
 /** Почему вход не удался — по-русски, а не кодом из базы. */
@@ -72,7 +72,7 @@ export function Sessions() {
               title={
                 <span className="flex items-center gap-2">
                   {s.device}
-                  {s.current && <StatusChip tone="done">это устройство</StatusChip>}
+                  {s.current && <Badge tone="ok">это устройство</Badge>}
                 </span>
               }
               about={`${s.ip ?? 'адрес неизвестен'} · вход ${formatDateTime(s.createdAt, format)} · был здесь ${formatDateTime(s.lastSeenAt, format)}`}
@@ -92,7 +92,7 @@ export function Sessions() {
         </SettingRows>
 
         {error && (
-          <p role="alert" className="mt-2 text-sm text-[var(--danger)]">
+          <p role="alert" className="mt-2 text-sm text-danger">
             {error}
           </p>
         )}
@@ -111,17 +111,17 @@ function LoginHistory() {
   return (
     <SettingsSection title="Журнал входов" about="Последние попытки войти, удачные и нет">
       {events.data?.length === 0 && (
-        <p className="text-sm text-[var(--text-muted)]">Пока ни одной записи.</p>
+        <p className="text-sm text-muted">Пока ни одной записи.</p>
       )}
 
       <SettingRows>
         {events.data?.map((e) => (
           <div key={e.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-2.5 text-sm">
-            <span className={e.outcome === 'success' ? '' : 'text-[var(--danger)]'}>
+            <span className={e.outcome === 'success' ? '' : 'text-danger'}>
               {OUTCOME[e.outcome]}
             </span>
-            <span className="text-[var(--text-muted)]">{e.device}</span>
-            <span className="tabular ml-auto text-xs text-[var(--text-muted)]">
+            <span className="text-muted">{e.device}</span>
+            <span className="tabular ml-auto text-xs text-muted">
               {e.ip ?? '—'} · {formatDateTime(e.createdAt, format)}
             </span>
           </div>

@@ -55,7 +55,7 @@ function inline(text: string, key: string, options: Options): ReactNode[] {
       parts.push(
         <code
           key={`${key}-c${i}`}
-          className="rounded bg-[var(--surface-sunken)] px-1.5 py-0.5 font-mono text-[0.85em] text-[var(--text)]"
+          className="rounded bg-sunken px-1.5 py-0.5 font-mono text-[0.85em] text-ink"
         >
           {match[1]}
         </code>,
@@ -66,7 +66,7 @@ function inline(text: string, key: string, options: Options): ReactNode[] {
       const label = match[3];
       const href = match[4];
       const internal = resolveLink(href, options.slug, options.basePath);
-      const className = 'text-[var(--accent)] underline underline-offset-2';
+      const className = 'text-accent underline underline-offset-2';
 
       parts.push(
         internal ? (
@@ -134,7 +134,7 @@ export function renderDoc(source: string, options: Options): ReactNode[] {
         level === 1
           ? 'mt-2 mb-4 text-2xl font-medium'
           : level === 2
-            ? 'mt-10 mb-3 scroll-mt-28 text-xs font-medium tracking-wide text-[var(--text-muted)] uppercase'
+            ? 'mt-10 mb-3 scroll-mt-28 text-xs font-medium tracking-wide text-muted uppercase'
             : 'mt-6 mb-2 font-medium';
       const Tag = (level === 1 ? 'h1' : level === 2 ? 'h2' : 'h3') as 'h1' | 'h2' | 'h3';
       out.push(
@@ -155,7 +155,7 @@ export function renderDoc(source: string, options: Options): ReactNode[] {
       out.push(
         <blockquote
           key={key++}
-          className="my-4 border-l-2 border-[var(--accent)] pl-4 text-[var(--text-muted)]"
+          className="my-4 border-l-2 border-accent pl-4 text-muted"
         >
           {inline(quote.join(' '), `q${key}`, options)}
         </blockquote>,
@@ -170,7 +170,7 @@ export function renderDoc(source: string, options: Options): ReactNode[] {
         i++;
       }
       out.push(
-        <ul key={key++} className="my-3 list-disc space-y-1.5 pl-5 marker:text-[var(--text-muted)]">
+        <ul key={key++} className="my-3 list-disc space-y-1.5 pl-5 marker:text-muted">
           {items.map((item, n) => (
             <li key={n}>{inline(item, `l${key}-${n}`, options)}</li>
           ))}
@@ -186,7 +186,7 @@ export function renderDoc(source: string, options: Options): ReactNode[] {
         i++;
       }
       out.push(
-        <ol key={key++} className="my-3 list-decimal space-y-1.5 pl-5 marker:text-[var(--text-muted)]">
+        <ol key={key++} className="my-3 list-decimal space-y-1.5 pl-5 marker:text-muted">
           {items.map((item, n) => (
             <li key={n}>{inline(item, `o${key}-${n}`, options)}</li>
           ))}
@@ -207,7 +207,7 @@ export function renderDoc(source: string, options: Options): ReactNode[] {
       out.push(
         <div key={key++} className="my-4 overflow-x-auto">
           <table className="w-full text-left text-sm [&_code]:text-[0.8rem]">
-            <thead className="text-[11px] tracking-wide text-[var(--text-muted)] uppercase">
+            <thead className="text-[11px] tracking-wide text-muted uppercase">
               <tr>
                 {head.map((h, n) => (
                   <th key={n} className="pb-2 pr-4 font-medium">
@@ -218,7 +218,7 @@ export function renderDoc(source: string, options: Options): ReactNode[] {
             </thead>
             <tbody>
               {rows.map((row, n) => (
-                <tr key={n} className="border-t border-[var(--line)]">
+                <tr key={n} className="border-t border-line">
                   {row.map((c, m) => (
                     <td key={m} className="py-2 pr-4 align-top">
                       {inline(c, `td${n}-${m}`, options)}
@@ -279,7 +279,7 @@ export function CodeBlock({ lang, code, label }: { lang?: string; code: string; 
     }
   };
   return (
-    <div data-code className="my-4 overflow-hidden rounded-xl bg-code-bg text-code-fg ring-1 ring-code-line">
+    <div data-code className="my-4 overflow-hidden rounded-card bg-code-bg text-code-fg ring-1 ring-code-line">
       {(label || lang) && (
         <div className="flex items-center gap-2 border-b border-code-line px-3 py-1.5 text-xs text-code-muted">
           <span className="font-medium text-code-fg">{label}</span>

@@ -56,10 +56,10 @@ export function MailDomains() {
           Добавить
         </Button>
       </form>
-      {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
 
       {domains.data?.length === 0 && (
-        <div className="rounded-xl bg-[var(--surface-sunken)] p-4 text-sm text-[var(--text-muted)]">
+        <div className="rounded-card bg-sunken p-4 text-sm text-muted">
           <p>
             Своего домена нет — и это рабочее состояние. Письма уходят с адреса{' '}
             <code className="font-mono">noreply@vruchay.ru</code>, а отправителем участник
@@ -89,7 +89,7 @@ function DomainCard({ domain, onChanged }: { domain: MailDomain; onChanged: () =
   const verified = domain.status === 'verified';
 
   return (
-    <article className="rounded-xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]">
+    <article className="rounded-card bg-surface p-4 ring-1 ring-line">
       <div className="flex flex-wrap items-center gap-3">
         <span className="font-medium">{domain.domain}</span>
         {verified ? (
@@ -126,7 +126,7 @@ function DomainCard({ domain, onChanged }: { domain: MailDomain; onChanged: () =
 
       {!verified && (
         <div className="mt-4 space-y-2">
-          <p className="text-sm text-[var(--text-muted)]">
+          <p className="text-sm text-muted">
             Добавьте эти записи в панели управления доменом:
           </p>
           {domain.dnsRecords.map((r) => (
@@ -136,11 +136,11 @@ function DomainCard({ domain, onChanged }: { domain: MailDomain; onChanged: () =
       )}
 
       {verified && (
-        <p className="mt-3 text-sm text-[var(--text-muted)]">
+        <p className="mt-3 text-sm text-muted">
           {domain.senders.length > 0
             ? `Адресов на этом домене: ${domain.senders.length}. `
             : 'Адресов отправки на нём пока нет. '}
-          <Link to="/settings/senders" className="text-[var(--accent)] underline">
+          <Link to="/settings/senders" className="text-accent underline">
             Адреса рассылки
           </Link>
         </p>
@@ -160,9 +160,9 @@ function DnsRow({ type, host, value, purpose }: { type: string; host: string; va
   }
 
   return (
-    <div className="rounded-lg bg-[var(--surface-sunken)] p-3">
+    <div className="rounded-control bg-sunken p-3">
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="rounded bg-[var(--surface)] px-1.5 py-0.5 font-mono text-xs ring-1 ring-[var(--line)]">
+        <span className="rounded bg-surface px-1.5 py-0.5 font-mono text-xs ring-1 ring-line">
           {type}
         </span>
         <span className="font-mono text-xs">{host}</span>
@@ -177,8 +177,8 @@ function DnsRow({ type, host, value, purpose }: { type: string; host: string; va
         </Button>
       </div>
       {/* Значение переносим по символам: длинная строка DKIM иначе растянет страницу. */}
-      <p className="mt-1.5 font-mono text-xs break-all text-[var(--text)]">{value}</p>
-      <p className="mt-1 text-xs text-[var(--text-muted)]">{purpose}</p>
+      <p className="mt-1.5 font-mono text-xs break-all text-ink">{value}</p>
+      <p className="mt-1 text-xs text-muted">{purpose}</p>
     </div>
   );
 }
