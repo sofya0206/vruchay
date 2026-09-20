@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  badgeTone,
   formatDate,
   mailLabel,
   mailTone,
@@ -28,9 +29,21 @@ describe('состояние документа', () => {
     expect(stateLabel({ state: 'revoked', reissuePending: true })).toBe('Отозван');
   });
 
-  it('истёкший срок — жёлтое предупреждение, а не красный отказ', () => {
+  it('истёкший срок — серое прошлое, а не красный отказ и не жёлтая замена', () => {
     expect(stateLabel({ state: 'expired', reissuePending: false })).toBe('Срок истёк');
-    expect(stateTone({ state: 'expired', reissuePending: false })).toBe('warn');
+    expect(stateTone({ state: 'expired', reissuePending: false })).toBe('neutral');
+  });
+
+  it('обещанный перевыпуск подсвечен как идущий процесс', () => {
+    expect(stateTone({ state: 'valid', reissuePending: true })).toBe('progress');
+    expect(stateTone({ state: 'valid', reissuePending: false })).toBe('done');
+  });
+
+  it('в метке реестра: действителен — зелёный, отозван — красный, заменён — жёлтый, истёк — серый', () => {
+    expect(badgeTone(stateTone({ state: 'valid', reissuePending: false }))).toBe('ok');
+    expect(badgeTone(stateTone({ state: 'revoked', reissuePending: false }))).toBe('danger');
+    expect(badgeTone(stateTone({ state: 'replaced', reissuePending: false }))).toBe('warn');
+    expect(badgeTone(stateTone({ state: 'expired', reissuePending: false }))).toBe('neutral');
   });
 });
 

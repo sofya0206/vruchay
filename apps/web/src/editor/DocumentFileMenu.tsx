@@ -17,7 +17,7 @@ import type { DocumentDetail } from '../api/types';
 import { Button } from '../ui/Button';
 import { Label } from '../ui/Field';
 import { Select } from '../ui/Select';
-import { Dialog } from '../ui/Dialog';
+import { ConfirmDialog, Dialog } from '../ui/Dialog';
 import type { MenuEntry } from './DocumentChrome';
 import { DOCUMENT_TITLE_ID } from './DocumentTitle';
 
@@ -157,18 +157,19 @@ export function useDocumentFileMenu(doc: DocumentDetail | undefined): {
       {moving && (
         <Dialog
           title="Переместить материал"
+          size="sm"
           onClose={() => setMoving(false)}
           footer={
             <>
-              <Button
-                variant="primary"
-                disabled={move.isPending}
-                onClick={() => move.mutate(folderId === '' ? null : folderId)}
-              >
-                {move.isPending ? 'Переносим…' : 'Переместить'}
-              </Button>
               <Button variant="ghost" onClick={() => setMoving(false)}>
                 Отмена
+              </Button>
+              <Button
+                variant="primary"
+                loading={move.isPending}
+                onClick={() => move.mutate(folderId === '' ? null : folderId)}
+              >
+                Переместить
               </Button>
             </>
           }
@@ -183,7 +184,7 @@ export function useDocumentFileMenu(doc: DocumentDetail | undefined): {
             ]}
           />
           {move.isError && (
-            <p role="alert" className="mt-2 text-sm text-[var(--danger)]">
+            <p role="alert" className="mt-2 text-sm text-danger">
               {errorText(move.error)}
             </p>
           )}
@@ -191,32 +192,20 @@ export function useDocumentFileMenu(doc: DocumentDetail | undefined): {
       )}
 
       {deleting && (
-        <Dialog
+        <ConfirmDialog
           title="Удалить материал"
+          confirmLabel="Удалить"
+          danger
+          pending={remove.isPending}
+          error={remove.isError ? errorText(remove.error) : null}
+          onConfirm={() => remove.mutate()}
           onClose={() => setDeleting(false)}
-          footer={
-            <>
-              <Button variant="danger" disabled={remove.isPending} onClick={() => remove.mutate()}>
-                {remove.isPending ? 'Удаляем…' : 'Удалить'}
-              </Button>
-              <Button variant="ghost" onClick={() => setDeleting(false)}>
-                Отмена
-              </Button>
-            </>
-          }
         >
           {/* Про архив говорим прямо: без этой строчки удаление читается
               как безвозвратное, и его боятся нажимать даже там, где надо. */}
-          <p className="text-sm">
-            «{doc?.title}» уедет в архив. Оттуда его можно вернуть в течение {TRASH_DAYS} дней,
-            потом он исчезнет насовсем.
-          </p>
-          {remove.isError && (
-            <p role="alert" className="mt-2 text-sm text-[var(--danger)]">
-              {errorText(remove.error)}
-            </p>
-          )}
-        </Dialog>
+          «{doc?.title}» уедет в архив. Оттуда его можно вернуть в течение {TRASH_DAYS} дней, потом он
+          исчезнет насовсем.
+        </ConfirmDialog>
       )}
     </>
   );

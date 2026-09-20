@@ -115,7 +115,7 @@ export function DocumentChrome({
             aria-label={isTemplate ? 'Все шаблоны' : 'Все документы'}
             className="-ml-2 grid size-11 shrink-0 place-items-center rounded-control text-muted active:bg-sunken md:hidden"
           >
-            <ChevronLeft size={22} />
+            <ChevronLeft size={24} />
           </Link>
           <span className="max-md:hidden">
             <LibraryLink isTemplate={isTemplate} />
@@ -154,7 +154,7 @@ export function DocumentChrome({
           <Menu
             trigger={({ open, toggle }) => (
               <IconButton label="Ещё действия" aria-expanded={open} onClick={toggle}>
-                <MoreHorizontal size={18} />
+                <MoreHorizontal size={20} />
               </IconButton>
             )}
           >

@@ -40,7 +40,7 @@ export function PageSizeDialog({
       }
     >
       <div className="space-y-4">
-        <p className="text-sm text-[var(--text-muted)]">Сейчас: {describeSize(current)}</p>
+        <p className="text-sm text-muted">Сейчас: {describeSize(current)}</p>
         <PageSizePicker value={draft} onChange={setDraft} />
       </div>
     </Dialog>

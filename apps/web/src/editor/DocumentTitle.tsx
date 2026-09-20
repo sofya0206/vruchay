@@ -128,10 +128,10 @@ export function DocumentTitle({ documentId, title }: { documentId: string; title
           }
         }}
         className={cn(
-          'col-start-1 row-start-1 h-7 w-full min-w-0 truncate rounded-md bg-transparent px-1.5',
-          'text-sm font-medium text-[var(--text)] outline-none transition-shadow',
-          'hover:ring-1 hover:ring-[var(--line)] focus:ring-2 focus:ring-[var(--focus)]',
-          failed && 'ring-1 ring-[var(--danger)] hover:ring-[var(--danger)] focus:ring-[var(--danger)]',
+          'col-start-1 row-start-1 h-7 w-full min-w-0 truncate rounded-control bg-transparent px-1.5',
+          'text-sm font-medium text-ink outline-none transition-shadow',
+          'hover:ring-1 hover:ring-line focus:ring-2 focus:ring-focus',
+          failed && 'ring-1 ring-danger hover:ring-danger focus:ring-danger',
         )}
       />
       {failed && (

@@ -7,7 +7,6 @@ import {
   FileText,
   Flag,
   Hash,
-  LoaderCircle,
   MapPin,
   Medal,
   Plus,
@@ -20,6 +19,8 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { Input } from '../ui/Field';
+import { IconButton } from '../ui/IconButton';
 import { cn } from '../ui/cn';
 import type { FieldInfo } from './fields';
 import {
@@ -177,10 +178,11 @@ export function FieldsList({
         <label className="relative block">
           <span className="sr-only">Найти поле</span>
           <Search
-            size={15}
-            className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
+            size={16}
+            className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted"
           />
-          <input
+          <Input
+            compact
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -192,17 +194,17 @@ export function FieldsList({
               if (e.key === 'Enter' && visible[0]) void run(visible[0].variants[0].field);
             }}
             placeholder="Найти поле"
-            className="h-8 w-full rounded-lg bg-[var(--surface)] pl-8 pr-8 text-[13px] text-[var(--text)] outline-none ring-1 ring-[var(--line)] transition-shadow placeholder:text-[var(--text-muted)] focus:ring-2 focus:ring-[var(--focus)] [&::-webkit-search-cancel-button]:hidden"
+            className="pl-8 pr-8 [&::-webkit-search-cancel-button]:hidden"
           />
           {query && (
-            <button
-              type="button"
-              aria-label="Очистить поиск"
+            <IconButton
+              size="sm"
+              label="Очистить поиск"
               onClick={() => setQuery('')}
-              className="absolute right-1 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-md text-[var(--text-muted)] hover:bg-[var(--row-hover)] hover:text-[var(--text)]"
+              className="absolute right-0 top-1/2 -translate-y-1/2"
             >
-              <X size={14} />
-            </button>
+              <X size={16} />
+            </IconButton>
           )}
         </label>
       </div>
@@ -218,7 +220,7 @@ export function FieldsList({
             <section
               key={group}
               style={{ '--group': style.color } as CSSProperties}
-              className="overflow-hidden rounded-xl bg-[var(--surface)] ring-1 ring-[color-mix(in_srgb,var(--group)_22%,transparent)]"
+              className="overflow-hidden rounded-card bg-surface ring-1 ring-[color-mix(in_srgb,var(--group)_22%,transparent)]"
             >
               <button
                 type="button"
@@ -227,13 +229,13 @@ export function FieldsList({
                 onClick={() => toggle(setCollapsed, group)}
                 className="field-row flex h-10 w-full items-center gap-2.5 bg-[color-mix(in_srgb,var(--group)_8%,var(--surface))] px-3 text-left transition-colors hover:bg-[color-mix(in_srgb,var(--group)_12%,var(--surface))]"
               >
-                <span className="grid size-6 shrink-0 place-items-center rounded-md bg-[var(--group)] text-white">
-                  <GroupIcon size={14} strokeWidth={2} />
+                <span className="grid size-6 shrink-0 place-items-center rounded-control bg-[var(--group)] text-on-accent">
+                  <GroupIcon size={16} strokeWidth={2} />
                 </span>
-                <span className="shrink-0 text-[13px] font-semibold text-[var(--text)]">{GROUP_TITLES[group]}</span>
+                <span className="shrink-0 text-sm font-semibold text-ink">{GROUP_TITLES[group]}</span>
                 {/* Свёрнутая секция показывает, что в ней: иначе закрытые
                     карточки одинаковы, и искать приходится открывая все. */}
-                <span className="min-w-0 flex-1 truncate text-xs text-[var(--text-muted)]">
+                <span className="min-w-0 flex-1 truncate text-xs text-muted">
                   {open ? '' : items.map((e) => e.title).join(', ')}
                 </span>
                 <span className="shrink-0 text-xs tabular-nums text-[color-mix(in_srgb,var(--group)_80%,var(--text))]">
@@ -242,7 +244,7 @@ export function FieldsList({
                 <ChevronDown
                   size={16}
                   className={cn(
-                    'shrink-0 text-[var(--text-muted)] transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:transition-none',
+                    'shrink-0 text-muted transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:transition-none',
                     !open && '-rotate-90',
                   )}
                 />
@@ -268,7 +270,7 @@ export function FieldsList({
 
         {sections.length === 0 && (
           <div className="px-2 py-6 text-center">
-            <p className="text-[13px] text-[var(--text-muted)]">
+            <p className="text-sm text-muted">
               {searching ? `Нет полей «${query.trim()}»` : 'Полей пока нет'}
             </p>
             {searching && onCreate && <CreateFromQuery title={query.trim()} onCreate={create} />}
@@ -303,7 +305,7 @@ function Collapse({ open, children }: { open: boolean; children: ReactNode }) {
 // Рамку фокуса рисует общее правило кабинета; `field-row` только утапливает
 // её внутрь строки (index.css) — снаружи её обрезал бы край карточки.
 const rowClass =
-  'field-row group relative flex w-full items-center gap-2.5 rounded-lg px-2 text-left transition-colors ' +
+  'field-row group relative flex w-full items-center gap-2.5 rounded-control px-2 text-left transition-colors ' +
   'hover:bg-[color-mix(in_srgb,var(--group)_7%,transparent)] focus-visible:bg-[color-mix(in_srgb,var(--group)_7%,transparent)]';
 
 /** Синяя «Вставить» на месте образца — только под указателем. */
@@ -311,7 +313,7 @@ function ActionPill({ label }: { label: string }) {
   return (
     <span
       aria-hidden
-      className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded-md bg-[var(--accent)] px-2 text-xs font-medium leading-5 text-[var(--accent-contrast)] opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100"
+      className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded-control bg-accent px-2 text-xs font-medium leading-5 text-on-accent opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100"
     >
       {label}
     </span>
@@ -319,7 +321,7 @@ function ActionPill({ label }: { label: string }) {
 }
 
 const sampleClass =
-  'min-w-8 flex-1 truncate text-right text-xs leading-5 text-[color-mix(in_srgb,var(--text-muted)_70%,transparent)]';
+  'min-w-8 flex-1 truncate text-right text-xs leading-5 text-muted/70';
 
 function dragProps(draggable: boolean, field: FieldInfo) {
   return {
@@ -361,10 +363,10 @@ function EntryRow({
         type="button"
         {...dragProps(draggable, main)}
         onClick={() => onRun(main)}
-        className={cn(rowClass, 'h-9', fresh && 'bg-[var(--accent-soft)] hover:bg-[var(--accent-soft)]')}
+        className={cn(rowClass, 'h-9', fresh && 'bg-accent-soft hover:bg-accent-soft')}
       >
         <Icon size={16} strokeWidth={1.75} className="shrink-0 text-[var(--group)]" aria-hidden />
-        <span className="min-w-0 truncate text-[13px] leading-5 text-[var(--text)]">{entry.title}</span>
+        <span className="min-w-0 truncate text-sm leading-5 text-ink">{entry.title}</span>
         <span className={cn(sampleClass, 'transition-opacity duration-150 group-hover:opacity-0 group-focus-visible:opacity-0')}>
           {sampleOf(main, samples)}
         </span>
@@ -380,9 +382,11 @@ function CreateFromQuery({ title, onCreate }: { title: string; onCreate: (title:
   const [error, setError] = useState<string | null>(null);
   return (
     <>
-      <button
-        type="button"
-        disabled={pending}
+      <Button
+        size="sm"
+        variant="ghost"
+        loading={pending}
+        icon={<Plus size={16} />}
         onClick={async () => {
           setPending(true);
           setError(null);
@@ -394,12 +398,11 @@ function CreateFromQuery({ title, onCreate }: { title: string; onCreate: (title:
             setPending(false);
           }
         }}
-        className="mx-auto mt-2 flex h-8 max-w-full items-center gap-1.5 rounded-md px-2.5 text-[13px] font-medium text-[var(--accent)] hover:bg-[var(--row-hover)] disabled:opacity-60"
+        className="mx-auto mt-2 max-w-full text-accent hover:text-accent"
       >
-        {pending ? <LoaderCircle size={15} className="animate-spin" /> : <Plus size={15} />}
         <span className="truncate">Создать поле «{title}»</span>
-      </button>
-      {error && <p className="mt-1 text-xs text-[var(--danger)]">{error}</p>}
+      </Button>
+      {error && <p className="mt-1 text-xs text-danger">{error}</p>}
     </>
   );
 }
@@ -439,22 +442,23 @@ function CreateField({ onCreate }: { onCreate: (title: string) => Promise<void> 
 
   if (!editing) {
     return (
-      <div className="shrink-0 border-t border-[var(--line)] p-1.5">
-        <button
-          type="button"
+      <div className="shrink-0 border-t border-line p-1.5">
+        <Button
+          size="sm"
+          variant="ghost"
+          icon={<Plus size={16} />}
           onClick={() => setEditing(true)}
-          className="flex h-8 w-full items-center gap-2.5 rounded-md px-2 text-[13px] font-medium text-[var(--accent)] transition-colors hover:bg-[var(--row-hover)]"
+          className="w-full justify-start px-2 text-accent hover:text-accent"
         >
-          <Plus size={15} className="shrink-0" />
           Новое поле
-        </button>
+        </Button>
       </div>
     );
   }
 
   return (
     <form
-      className="shrink-0 border-t border-[var(--line)] p-3"
+      className="shrink-0 border-t border-line p-3"
       onSubmit={(e) => {
         e.preventDefault();
         void submit();
@@ -463,7 +467,8 @@ function CreateField({ onCreate }: { onCreate: (title: string) => Promise<void> 
       <label htmlFor="new-field-title" className="sr-only">
         Название нового поля
       </label>
-      <input
+      <Input
+        compact
         id="new-field-title"
         autoFocus
         value={title}
@@ -479,11 +484,10 @@ function CreateField({ onCreate }: { onCreate: (title: string) => Promise<void> 
           }
         }}
         placeholder="Название, например «Команда»"
-        className="h-8 w-full rounded-lg bg-[var(--surface)] px-2.5 text-[13px] text-[var(--text)] outline-none ring-1 ring-[var(--line)] transition-shadow placeholder:text-[var(--text-muted)] focus:ring-2 focus:ring-[var(--focus)]"
       />
       <p
         role={error ? 'alert' : undefined}
-        className={cn('mt-1.5 text-xs leading-4', error ? 'text-[var(--danger)]' : 'text-[var(--text-muted)]')}
+        className={cn('mt-1.5 text-xs leading-4', error ? 'text-danger' : 'text-muted')}
       >
         {error ?? 'Появится колонкой в «Получателях».'}
       </p>

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   ChevronDown,
   ChevronUp,
@@ -15,7 +15,10 @@ import {
 } from 'lucide-react';
 import { richDocToPlainText, type SheetElement, type SheetLayout } from '@gramota/shared';
 import { layersTopDown, moveLayer, reorderLayers } from './selection';
+import { Input } from '../ui/Field';
+import { IconButton } from '../ui/IconButton';
 import { useTooltip } from '../ui/Tooltip';
+import { cn } from '../ui/cn';
 
 /**
  * Панель слоёв: все блоки листа сверху вниз, как они лежат друг на друге.
@@ -52,7 +55,7 @@ export function LayersPanel({
   };
 
   if (layers.length === 0) {
-    return <p className="px-1 text-sm text-[var(--text-muted)]">На листе пока нет блоков.</p>;
+    return <p className="px-1 text-sm text-muted">На листе пока нет блоков.</p>;
   }
 
   return (
@@ -84,16 +87,18 @@ export function LayersPanel({
             }}
             onClick={(e) => onSelect(el.id, e.shiftKey || e.metaKey || e.ctrlKey)}
             onDoubleClick={() => setRenaming(el.id)}
-            className={`group relative flex items-center gap-1.5 rounded-lg px-1.5 py-1 text-sm ${
-              active ? 'bg-[var(--accent-soft)]' : 'hover:bg-[var(--surface-sunken)]'
-            } ${dragging === el.id ? 'opacity-40' : el.hidden ? 'opacity-50' : ''}`}
+            className={cn(
+              'group relative flex items-center gap-1.5 rounded-control px-1.5 py-0.5 text-sm',
+              active ? 'bg-accent-soft' : 'hover:bg-sunken',
+              dragging === el.id ? 'opacity-40' : el.hidden && 'opacity-50',
+            )}
           >
             {/* Линия вставки над строкой — как в Figma: видно, куда ляжет слой. */}
             {over === el.id && dragging !== el.id && (
-              <span className="pointer-events-none absolute inset-x-1 -top-0.5 h-0.5 rounded bg-[var(--accent)]" />
+              <span className="pointer-events-none absolute inset-x-1 -top-0.5 h-0.5 rounded bg-accent" />
             )}
-            <GripVertical size={14} className="shrink-0 cursor-grab text-[var(--text-muted)]" />
-            <span className="shrink-0 text-[var(--text-muted)]">{icon(el)}</span>
+            <GripVertical size={16} className="shrink-0 cursor-grab text-muted" />
+            <span className="shrink-0 text-muted">{icon(el)}</span>
             {renaming === el.id ? (
               <RenameField
                 value={el.name ?? ''}
@@ -117,7 +122,7 @@ export function LayersPanel({
                   onChange(moveLayer(layout, el.id, 'up'));
                 }}
               >
-                <ChevronUp size={13} />
+                <ChevronUp size={16} />
               </Small>
               <Small
                 hover
@@ -127,7 +132,7 @@ export function LayersPanel({
                   onChange(moveLayer(layout, el.id, 'down'));
                 }}
               >
-                <ChevronDown size={13} />
+                <ChevronDown size={16} />
               </Small>
               <Small
                 title={el.locked ? 'Заперт — не двигается и не растягивается. Нажмите, чтобы отпереть' : 'Не заперт. Нажмите, чтобы запереть'}
@@ -137,7 +142,7 @@ export function LayersPanel({
                   patch(el.id, { locked: !el.locked });
                 }}
               >
-                {el.locked ? <Lock size={13} /> : <LockOpen size={13} />}
+                {el.locked ? <Lock size={16} /> : <LockOpen size={16} />}
               </Small>
               <Small
                 title={el.hidden ? 'Скрыт. Нажмите, чтобы показать' : 'Виден. Нажмите, чтобы скрыть'}
@@ -147,7 +152,7 @@ export function LayersPanel({
                   patch(el.id, { hidden: !el.hidden });
                 }}
               >
-                {el.hidden ? <EyeOff size={13} /> : <Eye size={13} />}
+                {el.hidden ? <EyeOff size={16} /> : <Eye size={16} />}
               </Small>
             </span>
           </li>
@@ -188,17 +193,16 @@ function RenameField({
   onDone: (name: string) => void;
 }) {
   const [draft, setDraft] = useState(value);
-  const input = useRef<HTMLInputElement>(null);
-  useEffect(() => input.current?.select(), []);
 
   return (
-    <input
-      ref={input}
+    <Input
+      compact
       autoFocus
       value={draft}
       placeholder={placeholder}
       maxLength={100}
       aria-label="Имя слоя"
+      onFocus={(e) => e.currentTarget.select()}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => onDone(draft.trim())}
       onKeyDown={(e) => {
@@ -207,11 +211,12 @@ function RenameField({
         e.stopPropagation();
       }}
       onClick={(e) => e.stopPropagation()}
-      className="min-w-0 flex-1 rounded bg-[var(--surface)] px-1.5 py-0.5 text-sm ring-1 ring-[var(--focus)] outline-none"
+      className="min-w-0 flex-1 ring-focus"
     />
   );
 }
 
+/** Значок в строке слоя: стрелки видны только под указателем, замок и глаз — пока включены. */
 function Small({
   title,
   pressed,
@@ -223,42 +228,37 @@ function Small({
   pressed?: boolean;
   /** Показывать только при наведении на строку (и с клавиатуры). */
   hover?: boolean;
-  onClick: (e: React.MouseEvent) => void;
+  onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
   children: React.ReactNode;
 }) {
-  const { triggerProps, tooltip } = useTooltip(title);
   const quiet = hover || !pressed;
 
   return (
-    <button
-      type="button"
-      {...triggerProps}
-      aria-label={title}
-      aria-pressed={pressed}
+    <IconButton
+      size="sm"
+      label={title}
+      active={pressed}
       onClick={onClick}
       // На сенсорном экране наведения нет: стрелки видны всегда и под палец.
-      className={`grid h-6 w-6 place-items-center rounded transition-opacity pointer-coarse:size-10 ${
-        pressed ? 'text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text)]'
-      } ${quiet ? 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100' : ''}`}
+      className={cn(quiet && 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100')}
     >
       {children}
-      {tooltip}
-    </button>
+    </IconButton>
   );
 }
 
 function icon(el: SheetElement) {
   switch (el.type) {
     case 'text':
-      return <Type size={14} />;
+      return <Type size={16} />;
     case 'image':
-      return <ImageIcon size={14} />;
+      return <ImageIcon size={16} />;
     case 'qr':
-      return <QrCode size={14} />;
+      return <QrCode size={16} />;
     case 'link':
-      return <Link2 size={14} />;
+      return <Link2 size={16} />;
     default:
-      return <Shapes size={14} />;
+      return <Shapes size={16} />;
   }
 }
 

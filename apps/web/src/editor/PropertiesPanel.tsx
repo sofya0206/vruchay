@@ -29,15 +29,15 @@ import { isSafeHrefTemplate, type SheetElement, type SheetLayout, type ShapeElem
 type QrElement = Extract<SheetElement, { type: 'qr' }>;
 type LinkElement = Extract<SheetElement, { type: 'link' }>;
 import type { DocumentDetail } from '../api/types';
-import { useTooltip } from '../ui/Tooltip';
 import { EventFields, type EventValues } from './EventFields';
 import { VerifySettings } from './VerifySettings';
-import { Tabs } from '../ui/Tabs';
+import { Segmented } from '../ui/Tabs';
 import { ColorField } from './ColorField';
 import { FONTS } from './fonts-list';
 import { MIXED, commonTextProps, commonValue, type AlignKind } from './selection';
 import type { Box } from './geometry';
 import { Button } from '../ui/Button';
+import { IconButton } from '../ui/IconButton';
 import { Input, Label } from '../ui/Field';
 import { NumberField } from '../ui/NumberField';
 import { Select } from '../ui/Select';
@@ -103,8 +103,8 @@ export function PropertiesPanel(props: Props) {
           />
         ) : (
           <>
-            <MousePointerSquareDashed size={22} className="mb-3 text-[var(--text-muted)]" strokeWidth={1.5} />
-            <p className="text-sm text-[var(--text-muted)]">
+            <MousePointerSquareDashed size={24} className="mb-3 text-muted" strokeWidth={1.75} />
+            <p className="text-sm text-muted">
               Выберите блок на листе, чтобы изменить его свойства.
             </p>
           </>
@@ -125,7 +125,7 @@ export function PropertiesPanel(props: Props) {
   return (
     <div className="space-y-5">
       {elements.length > 1 && (
-        <p className="text-sm text-[var(--text-muted)]">
+        <p className="text-sm text-muted">
           Выбрано блоков: {elements.length}. Изменения применяются ко всем.
         </p>
       )}
@@ -134,14 +134,14 @@ export function PropertiesPanel(props: Props) {
           не показываются никогда: макет хранится и печатается в мм. */}
       {single && (
         <div>
-          <Label>Положение и размер, мм</Label>
+          <Heading>Положение и размер, мм</Heading>
           {/* Четыре в ряд — на колонке в 320 точек. На телефоне панель во всю
               ширину, но у поля там стрелки под палец, и «225.5» в четверть
               строки не влезало: там по два в ряд. */}
           <div className="grid grid-cols-4 gap-1.5 max-md:grid-cols-2 max-md:gap-2">
             {(['x', 'y', 'w', 'h'] as const).map((key) => (
               <label key={key} className="block">
-                <span className="block text-center text-[10px] uppercase text-[var(--text-muted)]">{key}</span>
+                <span className="block text-center text-xs uppercase text-muted">{key}</span>
                 <NumberField
                   step={0.5}
                   value={round(single[key])}
@@ -185,7 +185,7 @@ export function PropertiesPanel(props: Props) {
 
       {/* Выравнивание: одного блока — по листу, нескольких — между собой. */}
       <div>
-        <Label>{elements.length > 1 ? 'Выровнять выделенные' : 'Выровнять по листу'}</Label>
+        <Heading>{elements.length > 1 ? 'Выровнять выделенные' : 'Выровнять по листу'}</Heading>
         <div className="flex gap-1">
           {(
             [
@@ -198,17 +198,17 @@ export function PropertiesPanel(props: Props) {
             ] as const
           ).map(([kind, Icon, title]) => (
             <IconToggle key={kind} active={false} title={title} onClick={() => props.onAlign(kind)}>
-              <Icon size={15} />
+              <Icon size={16} />
             </IconToggle>
           ))}
         </div>
         {elements.length > 2 && (
           <div className="mt-1.5 flex gap-1">
             <IconToggle active={false} title="Распределить по горизонтали" onClick={() => props.onDistribute('h')}>
-              <AlignHorizontalDistributeCenter size={15} />
+              <AlignHorizontalDistributeCenter size={16} />
             </IconToggle>
             <IconToggle active={false} title="Распределить по вертикали" onClick={() => props.onDistribute('v')}>
-              <AlignVerticalDistributeCenter size={15} />
+              <AlignVerticalDistributeCenter size={16} />
             </IconToggle>
           </div>
         )}
@@ -216,12 +216,12 @@ export function PropertiesPanel(props: Props) {
 
       <div className="flex flex-wrap gap-1.5">
         {elements.length > 1 && !grouped && (
-          <Button size="sm" variant="ghost" icon={<Group size={14} />} onClick={props.onGroup} title="Ctrl+G">
+          <Button size="sm" variant="ghost" icon={<Group size={16} />} onClick={props.onGroup} title="Ctrl+G">
             Сгруппировать
           </Button>
         )}
         {grouped && (
-          <Button size="sm" variant="ghost" icon={<Ungroup size={14} />} onClick={props.onUngroup} title="Ctrl+Shift+G">
+          <Button size="sm" variant="ghost" icon={<Ungroup size={16} />} onClick={props.onUngroup} title="Ctrl+Shift+G">
             Разгруппировать
           </Button>
         )}
@@ -255,7 +255,7 @@ export function PropertiesPanel(props: Props) {
       {single && single.type === 'link' && <LinkSection link={single} onChange={props.onLinkProps} />}
 
       {single && single.type === 'image' && (
-        <p className="text-sm text-[var(--text-muted)]">
+        <p className="text-sm text-muted">
           У картинки нет настроек, кроме положения, размера и прозрачности.
         </p>
       )}
@@ -263,7 +263,7 @@ export function PropertiesPanel(props: Props) {
       {/* Имя слоя — внизу: оно нужно редко, а наверху отвлекало от
           положения и оформления. Пусто — слой зовётся по содержимому. */}
       {single && (
-        <label className="block border-t border-[var(--line)] pt-4">
+        <label className="block border-t border-line pt-4">
           <Label>Имя слоя</Label>
           <Input
             value={single.name ?? ''}
@@ -275,7 +275,7 @@ export function PropertiesPanel(props: Props) {
         </label>
       )}
 
-      <Button variant="danger" icon={<Trash2 size={15} />} onClick={props.onDelete} className="w-full">
+      <Button variant="danger" icon={<Trash2 size={16} />} onClick={props.onDelete} className="w-full">
         {elements.length > 1 ? `Удалить (${elements.length})` : 'Удалить'}
       </Button>
     </div>
@@ -308,7 +308,7 @@ function DocumentSettings({
 
   return (
     <div className="space-y-5">
-      <Tabs
+      <Segmented
         items={[
           { id: 'event', label: 'Мероприятие' },
           { id: 'verify', label: 'Проверка' },
@@ -346,8 +346,8 @@ function TextSection({
   const ph = (key: keyof TextProps, fallback: string) => (p[key] === MIXED ? MIXED_PLACEHOLDER : fallback);
 
   return (
-    <div className="space-y-4 border-t border-[var(--line)] pt-4">
-      <p className="text-xs text-[var(--text-muted)]">
+    <div className="space-y-4 border-t border-line pt-4">
+      <p className="text-xs text-muted">
         Текст правится на листе: двойной клик по блоку. Здесь — оформление блока целиком;
         отдельные слова оформляются на листе, панелью над блоком.
       </p>
@@ -420,7 +420,7 @@ function TextSection({
       </div>
 
       <div>
-        <Label>Выравнивание</Label>
+        <Heading>Выравнивание</Heading>
         <div className="flex gap-1">
           {(
             [
@@ -451,7 +451,7 @@ function TextSection({
       </div>
 
       <div>
-        <Label>Начертание</Label>
+        <Heading>Начертание</Heading>
         <div className="flex gap-1">
           <IconToggle active={bool('bold')} onClick={() => onChange({ bold: !bool('bold') })} title="Полужирный (Ctrl+B)">
             <Bold size={16} />
@@ -480,7 +480,7 @@ function TextSection({
       {/* Обводка нужна там, где текст ложится на пёстрый фон и сливается
           с ним. Толщину даём в миллиметрах, как и всё остальное в макете. */}
       <div>
-        <Label>Контур текста</Label>
+        <Heading>Контур текста</Heading>
         <div className="flex items-center gap-2">
           <NumberField
             min={0}
@@ -491,7 +491,7 @@ function TextSection({
             onChange={(raw) => onChange({ strokeWidth: clampNumber(raw, 0, 2, 0) })}
             className="w-20"
           />
-          <span className="text-sm text-[var(--text-muted)]">мм</span>
+          <span className="text-sm text-muted">мм</span>
           <div className="min-w-0 flex-1">
             <ColorField
               value={(shown(p.strokeColor as string | typeof MIXED) as string) ?? '#ffffff'}
@@ -504,7 +504,7 @@ function TextSection({
       </div>
 
       <div>
-        <Label>Граница и заливка</Label>
+        <Heading>Граница и заливка</Heading>
         <div className="flex items-center gap-2">
           <NumberField
             min={0}
@@ -515,7 +515,7 @@ function TextSection({
             onChange={(raw) => onChange({ borderWidth: clampNumber(raw, 0, 5, 0) })}
             className="w-20"
           />
-          <span className="text-sm text-[var(--text-muted)]">мм</span>
+          <span className="text-sm text-muted">мм</span>
         </div>
         <div className="mt-2">
           <Label>Цвет обводки</Label>
@@ -526,7 +526,7 @@ function TextSection({
             label="Цвет обводки"
           />
           {p.borderWidth === 0 && (
-            <p className="mt-1 text-xs text-[var(--text-muted)]">Задайте толщину больше 0, чтобы выбрать цвет.</p>
+            <p className="mt-1 text-xs text-muted">Задайте толщину больше 0, чтобы выбрать цвет.</p>
           )}
         </div>
         <div className="mt-1.5 flex items-center gap-2">
@@ -544,10 +544,10 @@ function TextSection({
       {/* Стиль с блока на блок: пипетка снимает, кисть применяет. И «на все» —
           один шрифт и цвет на все текстовые блоки листа одной кнопкой. */}
       <div className="flex flex-wrap gap-1.5">
-        <Button size="sm" variant="ghost" icon={<Pipette size={14} />} onClick={onCopyStyle} title="Запомнить оформление этого блока">
+        <Button size="sm" variant="ghost" icon={<Pipette size={16} />} onClick={onCopyStyle} title="Запомнить оформление этого блока">
           Копировать стиль
         </Button>
-        <Button size="sm" variant="ghost" icon={<Paintbrush size={14} />} onClick={onPasteStyle} disabled={!hasStyleClipboard} title="Перенести скопированное оформление на выделенные блоки">
+        <Button size="sm" variant="ghost" icon={<Paintbrush size={16} />} onClick={onPasteStyle} disabled={!hasStyleClipboard} title="Перенести скопированное оформление на выделенные блоки">
           Вставить стиль
         </Button>
         <Button size="sm" variant="ghost" onClick={onApplyStyleToAll} title="Шрифт и цвет этого блока — на все текстовые блоки листа">
@@ -573,7 +573,7 @@ function ShapeSection({
   const dash = commonValue(shapes.map((s) => s.props.dash));
 
   return (
-    <div className="space-y-4 border-t border-[var(--line)] pt-4">
+    <div className="space-y-4 border-t border-line pt-4">
       <div className="grid grid-cols-2 gap-2">
         <label className="block">
           <Label>Контур, мм</Label>
@@ -654,9 +654,9 @@ function QrSection({
   const custom = template !== MIXED && template !== '';
 
   return (
-    <div className="space-y-4 border-t border-[var(--line)] pt-4">
+    <div className="space-y-4 border-t border-line pt-4">
       <div>
-        <Label>Содержимое QR</Label>
+        <Heading>Содержимое QR</Heading>
         <div className="flex gap-1">
           <Toggle active={!custom && template !== MIXED} onClick={() => onChange({ template: '' })}>
             Проверка подлинности
@@ -675,7 +675,7 @@ function QrSection({
             onChange={(e) => onChange({ template: e.target.value }, false)}
             onBlur={(e) => onChange({ template: e.target.value }, true)}
           />
-          <p className="mt-1 text-xs text-[var(--text-muted)]">Поля вида %name подставятся при печати.</p>
+          <p className="mt-1 text-xs text-muted">Поля вида %name подставятся при печати.</p>
         </label>
       )}
       <div>
@@ -685,7 +685,7 @@ function QrSection({
       {crooked.length > 0 && (
         <Button
           variant="secondary"
-          icon={<Square size={15} />}
+          icon={<Square size={16} />}
           className="w-full"
           onClick={() => {
             // Сторона — меньшая из двух, центр на месте: квадрат не вылезет за лист.
@@ -717,7 +717,7 @@ function LinkSection({
   const valid = isSafeHrefTemplate(draft);
 
   return (
-    <div className="space-y-2 border-t border-[var(--line)] pt-4">
+    <div className="space-y-2 border-t border-line pt-4">
       <label className="block">
         <Label>Адрес ссылки</Label>
         <Input
@@ -734,7 +734,7 @@ function LinkSection({
           }}
         />
       </label>
-      <p className={`text-xs ${valid ? 'text-[var(--text-muted)]' : 'text-[var(--danger)]'}`}>
+      <p className={`text-xs ${valid ? 'text-muted' : 'text-danger'}`}>
         {valid ? 'Область прозрачна на листе, в PDF кликается. Поля вида %code подставятся.' : 'Адрес должен начинаться с http:// или https://'}
       </p>
     </div>
@@ -751,23 +751,21 @@ function round(value: number): number {
   return Math.round(value * 10) / 10;
 }
 
+/** Подзаголовок группы настроек — над рядом кнопок или несколькими полями. */
+function Heading({ children }: { children: React.ReactNode }) {
+  return <p className="mb-1.5 text-xs font-medium tracking-wide text-muted uppercase">{children}</p>;
+}
+
+/** Переключатель словом: включённый залит мягким акцентом. */
 function Toggle({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs ring-1 transition-colors ${
-        active
-          ? 'bg-[var(--accent-soft)] text-[var(--accent)] ring-[var(--accent)]/40'
-          : 'text-[var(--text-muted)] ring-[var(--line-strong)] hover:bg-[var(--surface-sunken)]'
-      }`}
-    >
+    <Button size="sm" variant="secondary" active={active} onClick={onClick}>
       {children}
-    </button>
+    </Button>
   );
 }
 
+/** Переключатель значком в ряду равной ширины; подпись — подсказка. */
 function IconToggle({
   active,
   onClick,
@@ -779,23 +777,9 @@ function IconToggle({
   title: string;
   children: React.ReactNode;
 }) {
-  const { triggerProps, tooltip } = useTooltip(title);
-
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      {...triggerProps}
-      aria-label={title}
-      aria-pressed={active}
-      className={`grid h-9 flex-1 place-items-center rounded-lg ring-1 transition-colors ${
-        active
-          ? 'bg-[var(--accent-soft)] text-[var(--accent)] ring-[var(--accent)]/40'
-          : 'text-[var(--text-muted)] ring-[var(--line-strong)] hover:bg-[var(--surface-sunken)]'
-      }`}
-    >
+    <IconButton size="sm" variant="secondary" label={title} active={active} onClick={onClick} className="flex-1">
       {children}
-      {tooltip}
-    </button>
+    </IconButton>
   );
 }

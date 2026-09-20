@@ -1,4 +1,5 @@
 import type { RegistryRow } from '../api/registry';
+import type { BadgeTone } from '../ui/Badge';
 import type { ChipTone } from '../ui/Field';
 
 /**
@@ -20,13 +21,30 @@ export function stateLabel(row: Pick<RegistryRow, 'state' | 'reissuePending'>): 
   return row.reissuePending ? 'Перевыпускается' : 'Действителен';
 }
 
+/*
+ * Тона — прежние имена метки состояния (`StatusChip`): ими же пользуется
+ * рабочий стол. Для `Badge` их переводит `badgeTone`.
+ */
 export type Tone = ChipTone;
+
+const BADGE_TONES: Record<Tone, BadgeTone> = {
+  neutral: 'neutral',
+  progress: 'info',
+  done: 'ok',
+  warn: 'warn',
+  error: 'danger',
+};
+
+/** Тон состояния — в тон метки `Badge`. */
+export function badgeTone(tone: Tone): BadgeTone {
+  return BADGE_TONES[tone];
+}
 
 export function stateTone(row: Pick<RegistryRow, 'state' | 'reissuePending'>): Tone {
   if (row.state === 'revoked') return 'error';
   if (row.state === 'replaced') return 'warn';
-  // Истёкший — не беда, а прошлое: жёлтый, как у заменённого, не красный.
-  if (row.state === 'expired') return 'warn';
+  // Истёкший — не беда, а прошлое: серый, а не красный и не жёлтый.
+  if (row.state === 'expired') return 'neutral';
   return row.reissuePending ? 'progress' : 'done';
 }
 

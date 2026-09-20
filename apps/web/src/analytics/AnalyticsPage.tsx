@@ -1,10 +1,9 @@
 import { Check, Mail, RefreshCw } from 'lucide-react';
 import { useMe } from '../auth/useAuth';
+import { ErrorBar } from '../ui/ErrorState';
 import { Loading } from '../ui/Loading';
-import {
-  useOrgAnalytics,
-  type OrgAnalytics,
-} from '../api/analytics';
+import { Stat } from '../ui/Stat';
+import { useOrgAnalytics, type OrgAnalytics } from '../api/analytics';
 import { plural } from '../registry/registry-format';
 import { formatCount, formatShare } from './analytics-format';
 import { PlatformFunnel } from './PlatformFunnel';
@@ -29,9 +28,9 @@ export function AnalyticsPage() {
   if (analytics.isPending) return <Loading label="Считаем" />;
   if (analytics.isError || !analytics.data) {
     return (
-      <section className="space-y-8">
-        <h2 className="text-lg font-medium">По организации</h2>
-        <p className="mt-2 text-sm text-[var(--text-muted)]">Цифры сейчас не посчитать.</p>
+      <section className="space-y-3 border-t border-line pt-8">
+        <h2 className="text-lg font-medium">Качество выпуска</h2>
+        <ErrorBar onRetry={() => void analytics.refetch()}>Цифры не посчитались</ErrorBar>
       </section>
     );
   }
@@ -39,7 +38,7 @@ export function AnalyticsPage() {
   const data = analytics.data;
 
   return (
-    <section className="space-y-8 border-t border-[var(--line)] pt-8">
+    <section className="space-y-8 border-t border-line pt-8">
       <Quality data={data} />
 
       {me.data?.isPlatform && <PlatformFunnel />}
@@ -51,61 +50,39 @@ export function AnalyticsPage() {
 /** Не врём ли мы клиенту: пакеты без ошибок и перевыпуски. */
 function Quality({ data }: { data: OrgAnalytics }) {
   const { packages, reissues } = data;
+  const aside = 'text-muted';
 
   return (
     <section>
       <h2 className="mb-3 text-lg font-medium">Качество выпуска</h2>
       <div className="grid gap-3 sm:grid-cols-3">
-        <Tile
-          icon={<Check size={16} strokeWidth={1.5} />}
-          value={formatShare(packages.cleanShare)}
+        <Stat
           label="Пакетов без единой ошибки"
+          value={formatShare(packages.cleanShare)}
+          aside={<Check size={16} strokeWidth={1.75} aria-hidden className={aside} />}
           hint={
             packages.finished > 0
               ? `${formatCount(packages.clean)} из ${formatCount(packages.finished)} законченных`
               : 'Законченных пакетов ещё нет'
           }
         />
-        <Tile
-          icon={<RefreshCw size={16} strokeWidth={1.5} />}
-          value={formatShare(reissues.share)}
+        <Stat
           label="Документов пришлось перевыпустить"
+          value={formatShare(reissues.share)}
+          aside={<RefreshCw size={16} strokeWidth={1.75} aria-hidden className={aside} />}
           hint={
             reissues.count > 0
               ? `${formatCount(reissues.count)} ${plural(reissues.count, 'документ', 'документа', 'документов')} — растущая доля значит, что ошибка где-то у нас`
               : 'Ни одного перевыпуска'
           }
         />
-        <Tile
-          icon={<Mail size={16} strokeWidth={1.5} />}
-          value={formatCount(data.mailed)}
+        <Stat
           label="Разослано писем"
+          value={formatCount(data.mailed)}
+          aside={<Mail size={16} strokeWidth={1.75} aria-hidden className={aside} />}
           hint="Ушедшие участникам, включая вернувшиеся"
         />
       </div>
     </section>
-  );
-}
-
-function Tile({
-  icon,
-  value,
-  label,
-  hint,
-}: {
-  icon: React.ReactNode;
-  value: string;
-  label: string;
-  hint: string;
-}) {
-  return (
-    <div className="hairline rounded-xl p-4">
-      <p className="flex items-center gap-2 text-2xl tabular-nums">
-        <span className="text-[var(--text-muted)]">{icon}</span>
-        {value}
-      </p>
-      <p className="mt-1 text-xs">{label}</p>
-      <p className="mt-1 text-xs text-[var(--text-muted)]">{hint}</p>
-    </div>
   );
 }

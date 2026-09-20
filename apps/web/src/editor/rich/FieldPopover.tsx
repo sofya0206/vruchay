@@ -12,7 +12,7 @@ import type { FieldInfo } from '../fields';
 import { FieldContext } from './MergeFieldView';
 
 const WIDTH = 320;
-const small = 'mb-1 block text-xs font-medium text-[var(--text-muted)]';
+const small = 'mb-1 block text-xs font-medium text-muted';
 const GAP = 6;
 const EDGE = 8;
 
@@ -88,7 +88,7 @@ export function FieldPopover({
       data-rich-popover
       role="dialog"
       aria-label={`Настройки поля «${title}»`}
-      className="fixed z-50 space-y-3 overflow-y-auto overscroll-contain rounded-xl bg-[var(--surface)] p-3 shadow-lg ring-1 ring-[var(--line)]"
+      className="fixed z-50 space-y-3 overflow-y-auto overscroll-contain rounded-card bg-raised p-3 shadow-lg ring-1 ring-line"
       style={{ width: WIDTH, left: place?.left ?? -9999, top: place?.top ?? 0, maxHeight: place?.maxHeight }}
       onPointerDown={(e) => e.stopPropagation()}
       onContextMenu={(e) => e.preventDefault()}
@@ -110,18 +110,14 @@ export function FieldPopover({
                   aria-checked={active}
                   onClick={() => update({ source: variant.field.source, fieldId: variant.field.fieldId })}
                   className={cn(
-                    'flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left transition-colors',
-                    active ? 'bg-[var(--accent-soft)]' : 'hover:bg-[var(--row-hover)]',
+                    'pressable flex h-8 w-full items-center gap-2 rounded-control px-2 text-left transition-colors',
+                    active ? 'bg-accent-soft' : 'hover:bg-row-hover',
                   )}
                 >
-                  <Check
-                    size={14}
-                    strokeWidth={2.25}
-                    className={cn('shrink-0 text-[var(--accent)]', !active && 'invisible')}
-                  />
-                  <span className="min-w-0 flex-1 truncate text-[13px] text-[var(--text)]">{sample || variant.label}</span>
+                  <Check size={16} className={cn('shrink-0 text-accent', !active && 'invisible')} />
+                  <span className="min-w-0 flex-1 truncate text-sm text-ink">{sample || variant.label}</span>
                   {sample && (
-                    <span className="shrink-0 text-xs text-[color-mix(in_srgb,var(--text-muted)_70%,transparent)]">
+                    <span className="shrink-0 text-xs text-muted/70">
                       {variant.label}
                     </span>
                   )}
@@ -141,7 +137,7 @@ export function FieldPopover({
             value={attrs.format}
             onChange={(format) => update({ format })}
             aria-label="Регистр"
-            className="h-8 py-0 text-[13px]"
+            compact
             options={[
               { value: 'none' as MergeFieldFormat, label: 'как есть' },
               { value: 'upper' as MergeFieldFormat, label: 'ПРОПИСНЫМИ' },
@@ -157,7 +153,7 @@ export function FieldPopover({
             defaultValue={attrs.fallback ?? ''}
             placeholder="ничего"
             maxLength={200}
-            className="h-8 py-0 text-[13px]"
+            compact
             onBlur={(e) => update({ fallback: e.target.value.trim() || null })}
             onKeyDown={(e) => {
               if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
@@ -170,7 +166,7 @@ export function FieldPopover({
         <Button
           size="sm"
           variant="ghost"
-          icon={<Trash2 size={14} />}
+          icon={<Trash2 size={16} />}
           onClick={() => {
             editor.chain().setNodeSelection(pos).deleteSelection().focus().run();
             onClose();

@@ -16,7 +16,6 @@ import {
 import { Meta } from '../seo/Meta';
 import { Brand } from '../shell/Brand';
 import { Button } from '../ui/Button';
-import { IconButton } from '../ui/IconButton';
 import { sameDigest, sha256Hex } from '../verify/sha256';
 
 type State = 'valid' | 'revoked' | 'replaced' | 'expired';

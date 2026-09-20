@@ -1,6 +1,6 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, X } from 'lucide-react';
+import { FileCheck, Search, X } from 'lucide-react';
 import {
   emptyFilters,
   filtersToQuery,
@@ -15,9 +15,14 @@ import {
   stateLabel,
   stateTone,
 } from '../registry/registry-format';
-import { cn } from '../ui/cn';
+import { Card, CardHeader } from '../ui/Card';
 import { Input, StatusChip } from '../ui/Field';
-import { Card, Empty } from './Block';
+import { IconButton } from '../ui/IconButton';
+import { NextAction } from '../ui/NextAction';
+import { SkeletonRows } from '../ui/Skeleton';
+import { Segmented } from '../ui/Tabs';
+import { TBody, Td, Th, THead, Table, Tr } from '../ui/Table';
+import { cn } from '../ui/cn';
 import { plural } from './format';
 
 const LAST_SHOWN = 6;
@@ -45,7 +50,7 @@ const TABS: { id: Tab; label: string }[] = [
  * Поиск живой и никуда не уводит: совпадения встают под строкой с первой
  * буквы, Enter применяет набранное сразу, не дожидаясь паузы. «Найдите
  * грамоту Ивановой» — вопрос на десять секунд, и переход в раздел ради
- * него — лишний шаг. За всем найденным целиком — стрелка в заголовке,
+ * него — лишний шаг. За всем найденным целиком — ссылка в заголовке,
  * она несёт с собой и слово, и отбор.
  *
  * Счётчики считаются по тому же поиску, что и таблица, — иначе над
@@ -88,175 +93,163 @@ export function RegistryBlock() {
     replaced: t?.replaced,
   };
 
-  return (
-    <Card
-      title="Реестр выданного"
-      count={t ? `${t.issued}` : undefined}
-      to={registryPath(filters)}
-      linkLabel={search || tab ? 'Всё найденное в реестре' : 'Весь реестр'}
-    >
-      <div className="flex flex-wrap items-center gap-2 border-b border-[var(--line)] px-4 py-2.5">
-        <form onSubmit={onSubmit} role="search" className="flex min-w-60 flex-1 gap-2">
-          <div className="relative flex-1">
-            <Search
-              size={16}
-              className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-[var(--text-muted)]"
-            />
-            <Input
-              className="pl-9 pr-9 text-sm"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Фамилия, почта или код"
-              aria-label="Найти в реестре выданного"
-              autoComplete="off"
-            />
-            {(query || search) && (
-              <button
-                type="button"
-                onClick={clear}
-                aria-label="Очистить поиск"
-                className="absolute top-1/2 right-2 grid size-6 -translate-y-1/2 place-items-center rounded text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)] pointer-coarse:right-0.5 pointer-coarse:size-10"
-              >
-                <X size={14} />
-              </button>
-            )}
-          </div>
-        </form>
-        <div role="tablist" aria-label="Состояние" className="no-scrollbar flex gap-1 max-md:-mx-1 max-md:w-full max-md:overflow-x-auto max-md:px-1 max-md:py-0.5 md:flex-wrap">
-          {TABS.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              role="tab"
-              aria-selected={tab === item.id}
-              onClick={() => setTab(item.id)}
-              className={cn(
-                'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-sm transition-colors pointer-coarse:h-10',
-                tab === item.id
-                  ? 'bg-[var(--surface)] font-medium text-[var(--text)] ring-1 ring-[var(--line-strong)]'
-                  : 'text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]',
-              )}
-            >
-              {item.label}
-              {counts[item.id] !== undefined && (
-                <span
-                  className={cn(
-                    'tabular-nums',
-                    item.id === 'revoked' && counts.revoked ? 'text-[var(--danger)]' : 'text-[var(--text-muted)]',
-                  )}
-                >
-                  {counts[item.id]}
+  /* На телефоне — карточками. Таблица в 736 точек там прокручивалась
+     вбок, и «Состояние» с «Письмом» — то, ради чего организатор
+     и смотрит реестр на мероприятии, — оставались за краем. */
+  const cards = (
+    <ul className="divide-y divide-line">
+      {rows.map((row) => (
+        <li key={row.fileId}>
+          <Link to={searchPath(row.name)} className="flex flex-col gap-1.5 px-4 py-3 active:bg-sunken">
+            <span className="flex items-start justify-between gap-3">
+              <span className="min-w-0">
+                <span className="block truncate font-medium">{row.name}</span>
+                <span className="block truncate text-xs text-muted">
+                  {row.documentTitle}
+                  {row.eventName ? ` · ${row.eventName}` : ''}
                 </span>
-              )}
-            </button>
-          ))}
-        </div>
+              </span>
+              <StatusChip tone={stateTone(row)}>{stateLabel(row)}</StatusChip>
+            </span>
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+              <StatusChip tone={mailTone(row.mail?.status)}>{mailLabel(row.mail?.status)}</StatusChip>
+              <span className="tabular">{formatDate(row.issuedAt)}</span>
+              <span className="tabular">
+                {row.verifyCount} {plural(row.verifyCount, 'проверка', 'проверки', 'проверок')}
+              </span>
+            </span>
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+
+  return (
+    <Card padding="none" className="overflow-hidden">
+      <CardHeader
+        className="mb-0 px-4 pt-4 pb-3"
+        title="Реестр выданного"
+        count={t?.issued ?? null}
+        to={registryPath(filters)}
+        linkLabel={search || tab ? 'Всё найденное' : 'Весь реестр'}
+      />
+      <div className="flex flex-wrap items-center gap-2 border-y border-line px-4 py-2.5">
+        <form onSubmit={onSubmit} role="search" className="relative min-w-56 flex-1">
+          <Search
+            size={16}
+            aria-hidden
+            className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-muted"
+          />
+          <Input
+            compact
+            data-tour="registry-search"
+            className="pr-9 pl-8"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Фамилия, почта или код"
+            aria-label="Найти в реестре выданного"
+            autoComplete="off"
+          />
+          {(query || search) && (
+            <IconButton
+              size="sm"
+              label="Очистить поиск"
+              onClick={clear}
+              className="absolute top-1/2 right-0 -translate-y-1/2"
+            >
+              <X size={16} />
+            </IconButton>
+          )}
+        </form>
+        <Segmented
+          label="Состояние"
+          value={tab}
+          onChange={setTab}
+          items={TABS.map((item) => ({ id: item.id, label: item.label, count: counts[item.id] ?? null }))}
+          className="max-md:w-full"
+        />
       </div>
 
       {registry.isPending ? (
-        <Empty>Загружаем последние выданные…</Empty>
+        <SkeletonRows rows={4} label="Загружаем последние выданные" />
       ) : rows.length === 0 ? (
-        <Empty>
-          {search
-            ? `По запросу «${search}» ничего не нашлось${tab ? ' в этом состоянии' : ''}.`
-            : tab
-              ? 'В этом состоянии документов нет.'
-              : 'Выданных документов пока нет. Они появятся здесь сразу после первого выпуска — и останутся навсегда.'}
-        </Empty>
+        search ? (
+          <NextAction
+            compact
+            icon={Search}
+            title="Попробуйте другой запрос"
+            text={`По запросу «${search}» ничего не нашлось${tab ? ' в этом состоянии' : ''}`}
+            secondary={{ label: 'Сбросить поиск', onClick: clear }}
+          />
+        ) : tab ? (
+          <NextAction
+            compact
+            title="В этом состоянии документов нет"
+            secondary={{ label: 'Показать все', onClick: () => setTab('') }}
+          />
+        ) : (
+          <NextAction
+            compact
+            icon={FileCheck}
+            title="Выпустите первые документы"
+            text="Выданные появятся здесь сразу после первого выпуска — и останутся навсегда"
+            secondary={{ label: 'К документам', to: '/documents' }}
+          />
+        )
       ) : (
-        <div
-          className={cn('overflow-x-auto transition-opacity', stale && 'opacity-60')}
-          aria-busy={stale}
-        >
-          {/* На телефоне — карточками. Таблица в 736 точек там прокручивалась
-              вбок, и «Состояние» с «Письмом» — то, ради чего организатор
-              и смотрит реестр на мероприятии, — оставались за краем. */}
-          <ul className="divide-y divide-[var(--line)] md:hidden">
-            {rows.map((row) => (
-              <li key={row.fileId}>
-                <Link
-                  to={searchPath(row.name)}
-                  className="flex flex-col gap-1.5 px-4 py-3 active:bg-[var(--surface-sunken)]"
-                >
-                  <span className="flex items-start justify-between gap-3">
-                    <span className="min-w-0">
-                      <span className="block truncate font-medium">{row.name}</span>
-                      <span className="block truncate text-xs text-[var(--text-muted)]">
-                        {row.documentTitle}
-                        {row.eventName ? ` · ${row.eventName}` : ''}
-                      </span>
-                    </span>
-                    <StatusChip tone={stateTone(row)}>{stateLabel(row)}</StatusChip>
-                  </span>
-                  <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--text-muted)]">
-                    <StatusChip tone={mailTone(row.mail?.status)}>{mailLabel(row.mail?.status)}</StatusChip>
-                    <span className="tabular-nums">{formatDate(row.issuedAt)}</span>
-                    <span className="tabular-nums">
-                      {row.verifyCount} {plural(row.verifyCount, 'проверка', 'проверки', 'проверок')}
-                    </span>
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-          <table className="w-full min-w-[46rem] table-fixed border-collapse text-sm max-md:hidden">
+        <div className={cn('transition-opacity', stale && 'opacity-60')} aria-busy={stale}>
+          <Table dense stickyHeader={false} caption="Последние выданные документы" cards={cards}>
             {/* Ширины заданы, иначе длинная фамилия растягивает свою колонку,
                 и «Состояние» с «Проверок» уезжают за край карточки. */}
-            <colgroup>
-              <col className="w-[28%]" />
-              <col className="w-[20%]" />
-              <col className="w-[15%]" />
-              <col className="w-[14%]" />
-              <col className="w-[13%]" />
-              <col className="w-[10%]" />
-            </colgroup>
-            <thead>
-              <tr className="text-left text-xs tracking-wide text-[var(--text-muted)] uppercase">
-                <th className="px-4 py-2 font-medium">Получатель</th>
-                <th className="px-3 py-2 font-medium">Документ</th>
-                <th className="px-3 py-2 font-medium">Выдан</th>
-                <th className="px-3 py-2 font-medium">Письмо</th>
-                <th className="px-3 py-2 font-medium">Состояние</th>
-                <th className="px-4 py-2 text-right font-medium">Проверок</th>
+            <THead>
+              <tr>
+                <Th width="28%">Получатель</Th>
+                <Th width="20%">Документ</Th>
+                <Th width="15%">Выдан</Th>
+                <Th width="14%">Письмо</Th>
+                <Th width="13%">Состояние</Th>
+                <Th width="10%" align="right">
+                  Проверок
+                </Th>
               </tr>
-            </thead>
-            <tbody>
+            </THead>
+            <TBody>
               {rows.map((row) => (
-                <tr key={row.fileId} className="border-t border-[var(--line)] transition-colors hover:bg-[var(--surface-sunken)]">
-                  <td className="px-4 py-2.5">
+                <Tr key={row.fileId}>
+                  <Td className="max-w-0">
                     <Link to={searchPath(row.name)} className="block truncate font-medium">
                       {row.name}
                     </Link>
-                    <span className="block truncate text-xs text-[var(--text-muted)]">
-                      {row.email || 'без адреса'}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2.5 text-[var(--text-muted)]">
-                    <span className="block truncate text-[var(--text)]">{row.documentTitle}</span>
-                    {row.eventName && <span className="block truncate text-xs">{row.eventName}</span>}
-                  </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap">
-                    <span className="block tabular-nums">{formatDate(row.issuedAt)}</span>
+                    <span className="block truncate text-xs text-muted">{row.email || 'без адреса'}</span>
+                  </Td>
+                  <Td className="max-w-0">
+                    <span className="block truncate">{row.documentTitle}</span>
+                    {row.eventName && <span className="block truncate text-xs text-muted">{row.eventName}</span>}
+                  </Td>
+                  <Td className="max-w-0 whitespace-nowrap" numeric>
+                    <span className="block">{formatDate(row.issuedAt)}</span>
                     {/* Старые коды — UUID на 36 знаков; целиком он есть в реестре. */}
-                    <span className="block truncate font-mono text-xs text-[var(--text-muted)]" title={row.code}>
+                    <span className="block truncate font-mono text-xs text-muted" title={row.code}>
                       {row.code}
                     </span>
-                  </td>
-                  <td className="px-3 py-2.5">
+                  </Td>
+                  <Td>
                     <StatusChip tone={mailTone(row.mail?.status)}>{mailLabel(row.mail?.status)}</StatusChip>
-                  </td>
-                  <td className="px-3 py-2.5">
+                  </Td>
+                  <Td>
                     <StatusChip tone={stateTone(row)}>{stateLabel(row)}</StatusChip>
-                  </td>
-                  <td className="px-4 py-2.5 text-right tabular-nums">{row.verifyCount}</td>
-                </tr>
+                  </Td>
+                  <Td align="right" numeric>
+                    {row.verifyCount}
+                  </Td>
+                </Tr>
               ))}
-            </tbody>
-          </table>
+            </TBody>
+          </Table>
           {total > rows.length && (
-            <p className="border-t border-[var(--line)] px-4 py-2 text-xs text-[var(--text-muted)]">
+            <p className="border-t border-line px-4 py-2 text-xs text-muted">
               Показаны {rows.length} из {total} ·{' '}
-              <Link to={registryPath(filters)} className="text-[var(--accent)] underline-offset-4 hover:underline">
+              <Link to={registryPath(filters)} className="text-accent underline-offset-4 hover:underline">
                 открыть всё в реестре
               </Link>
             </p>

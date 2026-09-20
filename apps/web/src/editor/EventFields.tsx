@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Check } from 'lucide-react';
 import type { DocumentDetail } from '../api/types';
-import { Input, Label } from '../ui/Field';
+import { Badge } from '../ui/Badge';
 import { DateField } from '../ui/DateField';
+import { Field, Input, Label } from '../ui/Field';
 
 export interface EventValues {
   eventName: string;
@@ -96,13 +96,10 @@ export function EventFields({
   return (
     <div className="space-y-4">
       {/* Заголовок не нужен: его роль играет вкладка «Мероприятие» над панелью. */}
-      <p className="text-sm text-[var(--text-muted)]">
-        Заполните один раз — подставится во все документы материала.
-      </p>
+      <p className="text-sm text-muted">Заполните один раз — подставится во все документы материала.</p>
 
       {FIELDS.map((f) => (
-        <div key={f.key}>
-          <Label>{f.label}</Label>
+        <Field key={f.key} label={f.label} help={<code className="font-mono text-xs">{f.variable}</code>}>
           <Input
             value={values[f.key]}
             placeholder={f.placeholder}
@@ -110,10 +107,7 @@ export function EventFields({
             onBlur={() => commit(f.key)}
             onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
           />
-          <code className="mt-1 block font-mono text-xs text-[var(--text-muted)]">
-            {f.variable}
-          </code>
-        </div>
+        </Field>
       ))}
 
       {/* Дата выдачи — отдельно от дат мероприятия: это одно число для
@@ -131,16 +125,16 @@ export function EventFields({
           aria-label="Дата выдачи"
           placeholder="День выпуска"
         />
-        <span className="mt-1 block text-xs text-[var(--text-muted)]">
+        <p className="mt-1.5 text-xs text-muted">
           Пусто — день выпуска. Поля: <code className="font-mono">%date</code>,{' '}
           <code className="font-mono">%date_long</code>, <code className="font-mono">%year</code>
-        </span>
+        </p>
       </div>
 
       {saved && (
-        <p className="flex items-center gap-1.5 text-sm text-[var(--accent)]">
-          <Check size={14} /> Сохранено
-        </p>
+        <Badge tone="ok" dot>
+          Сохранено
+        </Badge>
       )}
     </div>
   );

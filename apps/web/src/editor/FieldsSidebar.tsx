@@ -56,12 +56,12 @@ export function FieldsSidebar({ documentId, target }: { documentId: string; targ
   return (
     <aside
       aria-label="Данные"
-      className="flex w-80 shrink-0 flex-col border-l border-[var(--line)] bg-[var(--surface)]"
+      className="flex w-80 shrink-0 flex-col border-l border-line bg-surface"
     >
-      <div className="flex h-10 shrink-0 items-center justify-between border-b border-[var(--line)] pl-4 pr-1">
+      <div className="flex h-10 shrink-0 items-center justify-between border-b border-line pl-4 pr-1">
         <h2 className="text-sm font-medium">Данные</h2>
         <IconButton size="sm" label="Закрыть панель" onClick={() => setFieldsPanelOpen(false)}>
-          <X size={15} />
+          <X size={16} />
         </IconButton>
       </div>
       <FieldsList

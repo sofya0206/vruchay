@@ -3,13 +3,11 @@ import { ErrorState } from '../ui/ErrorState';
 import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
-  Check,
   ChevronLeft,
   Circle,
   ChevronRight,
   ChevronsRight,
   CopyPlus,
-  Dot,
   Grid3x3,
   ImagePlus,
   FilePlus2,
@@ -71,10 +69,13 @@ import { DocumentChrome, ToolButton, ToolDivider } from '../editor/DocumentChrom
 import { useDocumentFileMenu } from '../editor/DocumentFileMenu';
 import { SheetTabs } from '../editor/SheetTabs';
 import type { MenuEntry } from '../editor/DocumentChrome';
-import { StatusChip } from '../ui/Field';
+import { Badge } from '../ui/Badge';
+import { OptionCard, OptionGroup } from '../ui/OptionCard';
+import { UnderlineTabs } from '../ui/Tabs';
 import { onboarding } from '../onboarding/store';
 import { track } from '../onboarding/track';
 import { IconButton } from '../ui/IconButton';
+import { Tooltip } from '../ui/Tooltip';
 import { Menu, MenuItem } from '../ui/Menu';
 import { Select } from '../ui/Select';
 import { api } from '../api/client';
@@ -96,7 +97,6 @@ import { InlineTextEditor } from '../editor/rich/InlineTextEditor';
 import { useLayoutHistory } from '../editor/useLayoutHistory';
 import { FitPageDialog } from '../editor/FitPageDialog';
 import { PageSizeDialog } from '../editor/PageSizeDialog';
-import { Tooltip } from '../ui/Tooltip';
 import { Button } from '../ui/Button';
 import { ResizeDialog } from '../editor/ResizeDialog';
 import { fitPageToImage, readImageSize, type PageFit } from '../editor/fit-page';
@@ -1185,7 +1185,7 @@ export function EditorPage() {
   // их порядок между отрисовками.
   if (moved) return <Navigate to={moved} replace />;
 
-  if (doc.isPending) return <div className="p-6 text-[var(--text-muted)]">Загрузка документа…</div>;
+  if (doc.isPending) return <div className="p-6 text-muted">Загрузка документа…</div>;
   if (doc.isError) {
     return (
       <ErrorState
@@ -1196,7 +1196,7 @@ export function EditorPage() {
       />
     );
   }
-  if (!doc.data || !sheet) return <div className="p-6 text-[var(--text-muted)]">Документ не найден</div>;
+  if (!doc.data || !sheet) return <div className="p-6 text-muted">Документ не найден</div>;
 
   const page = doc.data;
   const pageBox = { w: page.pageWidthMm, h: page.pageHeightMm };
@@ -1633,35 +1633,15 @@ export function EditorPage() {
       />
 
       <div className="ml-auto flex items-center gap-2">
-        <StatusChip
-          tone={
-            saved === 'saved'
-              ? 'done'
-              : saved === 'saving'
-                ? 'progress'
-                : saved === 'error'
-                  ? 'error'
-                  : 'neutral'
-          }
-        >
-          {saved === 'saved' ? (
-            <>
-              <Check size={13} /> Сохранено
-            </>
-          ) : saved === 'saving' ? (
-            <>
-              <LoaderCircle size={13} className="animate-spin" /> Сохраняем
-            </>
-          ) : saved === 'error' ? (
-            <>
-              <TriangleAlert size={13} /> Не удалось сохранить
-            </>
-          ) : (
-            <>
-              <Dot size={13} /> Есть правки
-            </>
-          )}
-        </StatusChip>
+        <Badge dot tone={saved === 'saved' ? 'ok' : saved === 'error' ? 'danger' : 'neutral'}>
+          {saved === 'saved'
+            ? 'Сохранено'
+            : saved === 'saving'
+              ? 'Сохраняем…'
+              : saved === 'error'
+                ? 'Не сохранилось'
+                : 'Есть правки'}
+        </Badge>
       </div>
     </>
   );
@@ -1688,7 +1668,7 @@ export function EditorPage() {
                 draggable
                 notice={
                   matches.length > 0 ? (
-                    <div className="rounded-lg bg-[var(--warn-soft)] p-2.5 text-[13px] leading-5">
+                    <div className="rounded-control bg-warn-soft p-2.5 text-sm leading-5">
                       <p>
                         {matches.length === 1 ? 'Поле макета не нашло колонку' : 'Поля макета не нашли колонки'}:{' '}
                         {matches.map((m) => `«${m.from}» → «${m.to.name}»`).join(', ')}.
@@ -1696,7 +1676,7 @@ export function EditorPage() {
                       <Button
                         size="sm"
                         variant="primary"
-                        icon={<Wand2 size={14} />}
+                        icon={<Wand2 size={16} />}
                         onClick={() => history.setLayout(applyMatches(layout, matches))}
                         className="mt-2"
                       >
@@ -1775,8 +1755,8 @@ export function EditorPage() {
       {/* Сохранение видно, только когда есть что сказать: крутится, пока
           пишет, и краснеет, если не вышло. Зелёная галочка на каждом шаге
           была лишним значком в тесной строке. */}
-      {saved === 'saving' && <LoaderCircle size={16} className="mx-1.5 animate-spin text-[var(--text-muted)]" aria-label="Сохраняем" />}
-      {saved === 'error' && <TriangleAlert size={18} className="mx-1.5 text-[var(--danger)]" aria-label="Не удалось сохранить" />}
+      {saved === 'saving' && <LoaderCircle size={16} className="mx-1.5 animate-spin text-muted" aria-label="Сохраняем" />}
+      {saved === 'error' && <TriangleAlert size={20} className="mx-1.5 text-danger" aria-label="Не сохранилось" />}
       <IconButton label="Отменить" onClick={history.undo} disabled={!history.canUndo}>
         <Undo2 size={20} />
       </IconButton>
@@ -1855,7 +1835,7 @@ export function EditorPage() {
       {(uploadBackground.error ?? uploadImage.error) && (
         <p
           role="alert"
-          className="shrink-0 border-b border-[var(--line)] bg-[var(--danger-soft)] px-4 py-2 text-sm text-[var(--danger)]"
+          className="shrink-0 border-b border-line bg-danger-soft px-4 py-2 text-sm text-danger"
         >
           {(uploadBackground.error ?? uploadImage.error)!.message}
         </p>
@@ -1863,12 +1843,12 @@ export function EditorPage() {
       {backgroundNote && (
         <p
           role="status"
-          className="shrink-0 border-b border-[var(--line)] bg-[var(--surface-sunken)] px-4 py-2 text-sm text-[var(--text-muted)]"
+          className="shrink-0 border-b border-line bg-sunken px-4 py-2 text-sm text-muted"
         >
           {backgroundNote}{' '}
-          <button type="button" onClick={() => setBackgroundNote(null)} className="underline">
+          <Button variant="link" size="sm" onClick={() => setBackgroundNote(null)}>
             понятно
-          </button>
+          </Button>
         </p>
       )}
 
@@ -1887,8 +1867,8 @@ export function EditorPage() {
           */
           className={
             phone
-              ? 'relative flex flex-1 overflow-auto bg-[var(--surface-sunken)] p-4'
-              : 'relative grid flex-1 place-items-center overflow-auto bg-[var(--surface-sunken)] p-6'
+              ? 'relative flex flex-1 overflow-auto bg-sunken p-4'
+              : 'relative grid flex-1 place-items-center overflow-auto bg-sunken p-6'
           }
           style={{ touchAction: 'none', ...(panning ? { cursor: pan.current ? 'grabbing' : 'grab' } : null) }}
           onPointerDown={(e) => {
@@ -1959,26 +1939,26 @@ export function EditorPage() {
               десятой доли, и плитки ужимались бы вместе с ним. Когда места
               на две в ряд нет, встают столбиком. */}
           {!sheet.backgroundFileId && layout.length === 0 && !buildHere.has(sheet.id) && (
-            <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center p-4 @container">
+            <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center p-4">
               <div
-                className="pointer-events-auto grid w-full max-w-sm grid-cols-1 gap-3 @[17rem]:grid-cols-2 max-md:grid-cols-2 max-md:gap-2"
+                className="pointer-events-auto w-full max-w-sm"
                 // На телефоне плитки не шире листа: иначе вылезали за его края.
                 style={phone ? { maxWidth: Math.max(220, px(page.pageWidthMm) - 24) } : undefined}
               >
-                <StartTile
-                  icon={<ImageUp size={22} />}
-                  label="Свой бланк"
-                  hint="PNG · JPG"
-                  disabled={uploadBackground.isPending}
-                  onClick={pickBackground}
-                  onFile={(file) => void onPickBackground(file)}
-                />
-                <StartTile
-                  icon={<FilePlus2 size={22} />}
-                  label="С нуля"
-                  hint="Чистый лист"
-                  onClick={() => setBuildHere((prev) => new Set(prev).add(sheet.id))}
-                />
+                <OptionGroup label="С чего начать лист" columns={2}>
+                  <BlankTile
+                    disabled={uploadBackground.isPending}
+                    onPick={pickBackground}
+                    onFile={(file) => void onPickBackground(file)}
+                  />
+                  <OptionCard
+                    icon={FilePlus2}
+                    title="С нуля"
+                    description="Чистый лист"
+                    tabIndex={0}
+                    onSelect={() => setBuildHere((prev) => new Set(prev).add(sheet.id))}
+                  />
+                </OptionGroup>
               </div>
             </div>
           )}
@@ -1991,7 +1971,7 @@ export function EditorPage() {
 
             <div
               ref={sheetRef}
-              className={`relative shadow-[var(--shadow-sheet)] ${fileOver ? 'ring-2 ring-[var(--accent)]' : ''}`}
+              className={`relative shadow-sheet ${fileOver ? 'ring-2 ring-accent' : ''}`}
               style={{ width: px(page.pageWidthMm), height: px(page.pageHeightMm) }}
               onPointerDown={startMarquee}
               // Двойной клик по пустому месту — новый текст прямо там,
@@ -2067,11 +2047,11 @@ export function EditorPage() {
               {showSafeArea && (
                 <>
                   <div
-                    className="pointer-events-none absolute border border-dashed border-[var(--danger)]/70"
+                    className="pointer-events-none absolute border border-dashed border-danger/70"
                     style={{ inset: px(BLEED_MM) }}
                   />
                   <div
-                    className="pointer-events-none absolute border border-dashed border-[var(--accent)]/70"
+                    className="pointer-events-none absolute border border-dashed border-accent/70"
                     style={{ inset: px(SAFE_MARGIN_MM) }}
                   />
                 </>
@@ -2081,7 +2061,7 @@ export function EditorPage() {
               {guides.map((g, i) => (
                 <div
                   key={i}
-                  className="pointer-events-none absolute bg-[var(--accent)]"
+                  className="pointer-events-none absolute bg-accent"
                   style={
                     g.axis === 'x'
                       ? { left: px(g.at), top: 0, width: 1, height: '100%' }
@@ -2147,7 +2127,7 @@ export function EditorPage() {
                         cursor: el.locked ? 'not-allowed' : 'move',
                         pointerEvents: editing ? 'none' : undefined,
                       }}
-                      className={isSelected && !frame ? (el.locked ? 'ring-2 ring-[var(--text-muted)]' : 'ring-2 ring-[var(--focus)]') : ''}
+                      className={isSelected && !frame ? (el.locked ? 'ring-2 ring-muted' : 'ring-2 ring-focus') : ''}
                     >
                       {single?.id === el.id && !el.locked && !editing && (
                         <>
@@ -2173,7 +2153,7 @@ export function EditorPage() {
                                 };
                               }}
                               style={handleStyle(handle, { x: px(el.w) < TIGHT_PX, y: px(el.h) < TIGHT_PX })}
-                              className="absolute h-2.5 w-2.5 rounded-full border border-[var(--surface)] bg-[var(--focus)]"
+                              className="absolute h-2.5 w-2.5 rounded-full border border-surface bg-focus"
                             >
                               <TouchZone />
                             </span>
@@ -2195,7 +2175,7 @@ export function EditorPage() {
                             }}
                             title="Повернуть (Shift — с шагом 15°)"
                             style={{ top: phone ? -34 : -22, left: 'calc(50% - 5px)', cursor: 'grab' }}
-                            className="absolute h-2.5 w-2.5 rounded-full border border-[var(--surface)] bg-[var(--accent)]"
+                            className="absolute h-2.5 w-2.5 rounded-full border border-surface bg-accent"
                           >
                             <TouchZone />
                           </span>
@@ -2208,7 +2188,7 @@ export function EditorPage() {
               {/* Общая рамка группы — с угловыми ручками масштаба. */}
               {frame && (
                 <div
-                  className="pointer-events-none absolute ring-2 ring-[var(--focus)]"
+                  className="pointer-events-none absolute ring-2 ring-focus"
                   style={{ left: px(frame.x), top: px(frame.y), width: px(frame.w), height: px(frame.h) }}
                 >
                   {CORNERS.map((handle) => (
@@ -2230,7 +2210,7 @@ export function EditorPage() {
                         };
                       }}
                       style={{ ...handleStyle(handle), pointerEvents: 'auto' }}
-                      className="absolute h-3 w-3 rounded-sm border border-[var(--surface)] bg-[var(--focus)]"
+                      className="absolute h-3 w-3 rounded-sm border border-surface bg-focus"
                     >
                       <TouchZone />
                     </span>
@@ -2250,7 +2230,7 @@ export function EditorPage() {
 
               {marquee && (
                 <div
-                  className="pointer-events-none absolute border border-[var(--focus)] bg-[var(--focus)]/10"
+                  className="pointer-events-none absolute border border-focus bg-focus/10"
                   style={{ left: px(marquee.x), top: px(marquee.y), width: px(marquee.w), height: px(marquee.h) }}
                 />
               )}
@@ -2264,16 +2244,14 @@ export function EditorPage() {
         {!phone && !panel && (
           <aside
             aria-label="Свёрнутая панель"
-            className="flex w-11 shrink-0 flex-col items-center gap-1 border-l border-[var(--line)] bg-[var(--surface)] py-2"
+            className="flex w-11 shrink-0 flex-col items-center gap-1 border-l border-line bg-surface py-2"
           >
             <IconButton size="sm" label="Свойства" onClick={() => setPanel('props')}>
               <SlidersHorizontal size={16} />
             </IconButton>
             <IconButton size="sm" label="Данные" onClick={() => setPanel('fields')} className="relative">
               <Variable size={16} />
-              {matches.length > 0 && (
-                <span className="absolute right-1 top-1 size-2 rounded-full bg-[var(--accent)]" />
-              )}
+              {matches.length > 0 && <span aria-hidden className="absolute top-1 right-1 size-2 rounded-full bg-accent" />}
             </IconButton>
             <IconButton size="sm" label="Слои" onClick={() => setPanel('layers')}>
               <Layers size={16} />
@@ -2285,24 +2263,40 @@ export function EditorPage() {
           // ширину: иначе лист ужимался до десятой доли и работать было не на чем.
           <aside
             className={
-              'absolute inset-y-0 right-0 z-30 flex w-80 max-w-[calc(100%-2.75rem)] flex-col border-l border-[var(--line)] ' +
-              'bg-[var(--surface)] shadow-xl md:static md:max-w-none md:shrink-0 md:shadow-none'
+              'absolute inset-y-0 right-0 z-30 flex w-80 max-w-[calc(100%-2.75rem)] flex-col border-l border-line ' +
+              'bg-surface shadow-xl md:static md:max-w-none md:shrink-0 md:shadow-none'
             }
           >
-            <div className="flex border-b border-[var(--line)]">
-              <Tab active={panel === 'props'} onClick={() => setPanel('props')} icon={<SlidersHorizontal size={14} />}>
-                Свойства
-              </Tab>
-              <Tab active={panel === 'fields'} onClick={() => setPanel('fields')} icon={<Variable size={14} />} badge={matches.length || undefined}>
-                Данные
-                
-              </Tab>
-              <Tab active={panel === 'layers'} onClick={() => setPanel('layers')} icon={<Layers size={14} />}>
-                Слои
-              </Tab>
-              <IconButton size="sm" label="Свернуть панель" onClick={() => setPanel(null)} className="m-1 shrink-0">
-                <ChevronsRight size={15} />
-              </IconButton>
+            <div className="flex items-stretch" data-tour="fields-panel">
+              <UnderlineTabs
+                stretch
+                className="min-w-0 flex-1"
+                label="Разделы панели"
+                value={panel}
+                onChange={setPanel}
+                items={[
+                  { id: 'props', label: 'Свойства' },
+                  {
+                    id: 'fields',
+                    label: (
+                      <>
+                        Данные
+                        {matches.length > 0 && (
+                          <Badge tone="accent" size="sm">
+                            {matches.length}
+                          </Badge>
+                        )}
+                      </>
+                    ),
+                  },
+                  { id: 'layers', label: 'Слои' },
+                ]}
+              />
+              <div className="flex items-center border-b border-line px-1">
+                <IconButton size="sm" label="Свернуть панель" onClick={() => setPanel(null)}>
+                  <ChevronsRight size={16} />
+                </IconButton>
+              </div>
             </div>
             {panelBody}
           </aside>
@@ -2322,11 +2316,16 @@ export function EditorPage() {
               onAdd={() => addSheet.mutate()}
             />
             {multi && (
-              <div className="pointer-events-auto absolute top-3 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-xl bg-[var(--text)] py-1 pr-1 pl-4 text-sm text-white shadow-[var(--shadow-lg)]">
+              <div className="pointer-events-auto absolute top-3 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-card bg-accent-button py-1 pr-1 pl-4 text-sm text-on-accent shadow-lg">
                 Выбрано {selected.size}
-                <button type="button" onClick={() => setMulti(false)} className="h-9 rounded-lg px-3 font-semibold text-[#8fc0ff]">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setMulti(false)}
+                  className="font-semibold text-on-accent/80 hover:bg-on-accent/10 hover:text-on-accent"
+                >
                   Готово
-                </button>
+                </Button>
               </div>
             )}
           </>
@@ -2514,7 +2513,7 @@ function Ruler({ axis, lengthMm, zoom }: { axis: 'x' | 'y'; lengthMm: number; zo
   return (
     <div
       aria-hidden
-      className="pointer-events-none absolute text-[9px] text-[var(--text-muted)]"
+      className="pointer-events-none absolute text-[9px] text-muted"
       style={
         axis === 'x'
           ? { left: 18, top: 0, width: px(lengthMm), height: 18 }
@@ -2527,7 +2526,7 @@ function Ruler({ axis, lengthMm, zoom }: { axis: 'x' | 'y'; lengthMm: number; zo
         return (
           <span
             key={mm}
-            className="absolute bg-[var(--line-strong)]"
+            className="absolute bg-line-strong"
             style={
               axis === 'x'
                 ? { left: px(mm), bottom: 0, width: 1, height: size }
@@ -2573,13 +2572,13 @@ function SheetView({
   const option = (active: boolean) =>
     `h-7 rounded-md px-2 text-[13px] transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
       active
-        ? 'bg-[var(--surface)] font-medium text-[var(--text)] shadow-[var(--shadow-sm,0_1px_2px_rgba(12,43,100,0.12))]'
-        : 'text-[var(--text-muted)] hover:text-[var(--text)]'
+        ? 'bg-surface font-medium text-ink shadow-[var(--shadow-sm,0_1px_2px_rgba(12,43,100,0.12))]'
+        : 'text-muted hover:text-ink'
     }`;
   return (
-    <div className="shrink-0 border-b border-[var(--line)] px-3 pb-3 pt-2.5">
-      <p className="mb-1.5 text-xs font-medium text-[var(--text-muted)]">На листе показывать</p>
-      <div role="radiogroup" aria-label="На листе показывать" className="grid grid-cols-2 gap-0.5 rounded-lg bg-[var(--surface-sunken)] p-0.5">
+    <div className="shrink-0 border-b border-line px-3 pb-3 pt-2.5">
+      <p className="mb-1.5 text-xs font-medium text-muted">На листе показывать</p>
+      <div role="radiogroup" aria-label="На листе показывать" className="grid grid-cols-2 gap-0.5 rounded-control bg-sunken p-0.5">
         <button type="button" role="radio" aria-checked={!dataMode} onClick={() => onMode('placeholders')} className={option(!dataMode)}>
           Названия полей
         </button>
@@ -2601,7 +2600,7 @@ function SheetView({
           <IconButton size="sm" label="Предыдущая строка" disabled={row === 0} onClick={() => onRow(Math.max(0, row - 1))}>
             <ChevronLeft size={16} />
           </IconButton>
-          <span className="tabular text-[13px] text-[var(--text-muted)]">
+          <span className="tabular text-[13px] text-muted">
             Строка {row + 1} из {rowCount}
           </span>
           <IconButton
@@ -2618,93 +2617,47 @@ function SheetView({
   );
 }
 
-function Tab({
-  active,
-  onClick,
-  icon,
-  badge,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon: React.ReactNode;
-  badge?: number;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-selected={active}
-      role="tab"
-      className={`flex flex-1 items-center justify-center gap-1.5 border-b-2 px-2 py-2 text-sm ${
-        active ? 'border-[var(--accent)] text-[var(--accent)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text)]'
-      }`}
-    >
-      {icon}
-      {children}
-      {badge ? (
-        <span className="rounded-full bg-[var(--accent)] px-1.5 text-[10px] font-medium text-[var(--accent-contrast)]">{badge}</span>
-      ) : null}
-    </button>
-  );
-}
 
 /**
- * Плитка выбора пути на пустом листе. Плитка бланка принимает и файл,
- * брошенный прямо на неё: так его ставят фоном, а не картинкой на лист.
+ * Плитка «Свой бланк» — как и другие варианты начать лист, но ещё
+ * принимает файл, брошенный прямо на неё: так бланк ставят фоном,
+ * а не картинкой поверх листа. Пунктирная рамка (`dropzone`) сплошнеет
+ * и заливается акцентом на время наведения файла — тем же приёмом,
+ * что и у выбранного варианта.
  */
-function StartTile({
-  icon,
-  label,
-  hint,
-  onClick,
+function BlankTile({
+  onPick,
   onFile,
   disabled,
 }: {
-  icon: React.ReactNode;
-  label: string;
-  hint: string;
-  onClick: () => void;
-  onFile?: (file: File) => void;
+  onPick: () => void;
+  onFile: (file: File) => void;
   disabled?: boolean;
 }) {
   const [over, setOver] = useState(false);
   return (
-    <button
-      type="button"
-      onClick={onClick}
+    <OptionCard
+      icon={ImageUp}
+      title="Свой бланк"
+      description="PNG · JPG"
+      dropzone
       disabled={disabled}
+      tabIndex={0}
+      selected={over}
+      onSelect={onPick}
       onDragOver={(e) => {
-        if (!onFile || !e.dataTransfer.types.includes('Files')) return;
+        if (!e.dataTransfer.types.includes('Files')) return;
         e.preventDefault();
-        e.stopPropagation();
         setOver(true);
       }}
       onDragLeave={() => setOver(false)}
       onDrop={(e) => {
         const file = e.dataTransfer.files[0];
-        if (!onFile || !file) return;
+        if (!file) return;
         e.preventDefault();
-        e.stopPropagation();
         setOver(false);
         onFile(file);
       }}
-      className={
-        'flex flex-col items-center gap-1.5 rounded-2xl border-2 bg-[var(--surface)] px-3 py-5 max-md:gap-1 max-md:rounded-xl max-md:border max-md:py-3 ' +
-        // Пунктир — только у плитки, на которую можно бросить файл.
-        (onFile ? 'border-dashed ' : '') +
-        'transition-colors disabled:opacity-60 ' +
-        (over
-          ? 'border-[var(--accent)] bg-[var(--accent-soft)]'
-          : 'border-[var(--line)] hover:border-[var(--accent)]')
-      }
-    >
-      <span className="grid size-11 place-items-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)] max-md:size-9 max-md:rounded-lg">
-        {icon}
-      </span>
-      <span className="text-sm font-medium whitespace-nowrap">{label}</span>
-      <span className="text-xs whitespace-nowrap text-[var(--text-muted)]">{hint}</span>
-    </button>
+    />
   );
 }

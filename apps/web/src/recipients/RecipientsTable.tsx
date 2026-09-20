@@ -1,71 +1,62 @@
 import { useEffect, useRef, useState } from 'react';
-import { GripVertical,
-  Ban,
-  CheckCheck,
+import {
   CheckCircle2,
   Columns3,
-  Download,
   Eye,
-  FileSpreadsheet,
-  FileUp,
+  GripVertical,
   ListChecks,
   ListX,
-  LoaderCircle,
-  Play,
   Plus,
   Rows3,
   Table2,
   Trash2,
   Upload,
+  Users,
+  Variable,
   X,
 } from 'lucide-react';
 import {
-  useGeneration,
-  useJobFailures,
   useRecipientMutations,
   useRecipients,
-  useSend,
   type HeaderChoice,
   type ParsedSheet,
   type RecipientColumn,
   type RecipientRow,
-  type SendResult,
 } from '../api/recipients';
 import { errorText } from '../api/client';
+import type { DocumentDetail } from '../api/types';
+import { materialPath } from '../documents/material-steps';
+import { DocumentChrome, ToolButton, ToolDivider, type MenuEntry } from '../editor/DocumentChrome';
+import { FieldsSidebar } from '../editor/FieldsSidebar';
+import { toggleFieldsPanel, useFieldsPanelOpen } from '../editor/fields-sidebar-store';
+import { useDocumentFileMenu } from '../editor/DocumentFileMenu';
+import type { WorkspaceTab } from '../mailing/workspace-tabs';
+import { Button } from '../ui/Button';
+import { Checkbox } from '../ui/Checkbox';
+import { DesktopFirst } from '../ui/DesktopFirst';
+import { Dialog } from '../ui/Dialog';
+import { ErrorBar, ErrorState } from '../ui/ErrorState';
+import { Field, Input } from '../ui/Field';
+import { IconButton } from '../ui/IconButton';
+import { Kbd } from '../ui/Kbd';
+import { NextAction } from '../ui/NextAction';
+import { SkeletonRows } from '../ui/Skeleton';
+import { toast } from '../ui/Toast';
+import { cn } from '../ui/cn';
+import { ICON, STROKE } from '../ui/icon';
+import { planPaste } from './clipboard';
+import { ImportDialog } from './ImportDialog';
 import { PreviewDialog } from './PreviewDialog';
 import { RowOutcomeChip } from './RowOutcomeChip';
-import { Button } from '../ui/Button';
-import { Field, Input, StatusChip } from '../ui/Field';
-import { cn } from '../ui/cn';
-import { ProgressBar } from '../ui/Progress';
-import { Outcome } from '../ui/Outcome';
-import { SkeletonRows } from '../ui/Skeleton';
-import { ImportDialog } from './ImportDialog';
-import { planPaste } from './clipboard';
-import { GenerateDialog, type GenerateMode } from './GenerateDialog';
-import { DownloadDialog } from './DownloadDialog';
-import { InviteNudge } from '../referral/InviteNudge';
-import { DocumentChrome, ReleaseButton, ToolButton, ToolDivider } from '../editor/DocumentChrome';
-import { FieldsSidebar } from '../editor/FieldsSidebar';
-import { FieldsToggle } from '../editor/FieldsToggle';
-import { useFieldsPanelOpen } from '../editor/fields-sidebar-store';
-import { useDocumentFileMenu } from '../editor/DocumentFileMenu';
-import type { MenuEntry } from '../editor/DocumentChrome';
-import { IconButton } from '../ui/IconButton';
-import { PushOffer } from '../push/PushOffer';
-import { BigListNote } from './BigListNote';
-import { Dialog } from '../ui/Dialog';
-import { Checkbox } from '../ui/Checkbox';
-import type { DocumentDetail } from '../api/types';
-import type { WorkspaceTab } from '../mailing/workspace-tabs';
 
 /**
- * Таблица получателей — вторая сторона материала.
+ * Таблица получателей — шаг «Получатели» документа.
  *
- * Рамку рисует сама: название, меню и переключатель «Редактор — Таблица»
- * должны стоять на том же месте, что и над листом, иначе переход между
- * ними читается как уход в другой раздел. Всё, что относится к списку —
- * загрузка файла, отметки, выпуск, — живёт в её меню и на её панели.
+ * Рамку рисует сама: название, лента шагов и меню должны стоять на том же
+ * месте, что и над листом, иначе переход между шагами читается как уход
+ * в другой раздел. Всё, что относится к списку — загрузка файла, отметки,
+ * проверка, — живёт на её панели и в меню; сам выпуск — на шаге «Выпуск»,
+ * куда ведёт главная кнопка рамки.
  */
 export function RecipientsTable({
   doc,
@@ -105,7 +96,9 @@ export function RecipientsTable({
     setDragCol(columnId);
     let target: string | null = null;
     const onMove = (ev: PointerEvent) => {
-      const th = document.elementFromPoint(ev.clientX, ev.clientY)?.closest<HTMLElement>('th[data-col]');
+      const th = document
+        .elementFromPoint(ev.clientX, ev.clientY)
+        ?.closest<HTMLElement>('th[data-col]');
       target = th?.dataset.col ?? null;
       setOverCol(target);
     };
@@ -124,9 +117,6 @@ export function RecipientsTable({
     handle.addEventListener('pointerup', onUp);
     handle.addEventListener('pointercancel', onUp);
   }
-  const [jobId, setJobId] = useState<string | null>(null);
-  const { job, start, cancel, resume } = useGeneration(documentId, jobId);
-  const send = useSend(documentId);
   const [parsed, setParsed] = useState<ParsedSheet | null>(null);
   const [parsedFrom, setParsedFrom] = useState<'file' | 'paste'>('file');
   /*
@@ -140,7 +130,6 @@ export function RecipientsTable({
    */
   const [manualNames, setManualNames] = useState<Record<string, string>>({});
   const [newColumn, setNewColumn] = useState('');
-  /** Открыто ли окно новой колонки: поле переехало из панели в меню «Вставка». */
   const [addingColumn, setAddingColumn] = useState(false);
   /** Отказ сервера на новую колонку — под полем окна, а не в общей полосе за ним. */
   const [columnError, setColumnError] = useState<string | null>(null);
@@ -153,49 +142,18 @@ export function RecipientsTable({
   const report = (action: Promise<unknown>) => {
     action.catch((err: unknown) => setError(errorText(err)));
   };
-  /**
-   * Ячейки, чья правка не дошла до сервера, — «строка:колонка». Состояние
-   * красит их, а ссылку читает выпуск: после ожидания записей состояние
-   * этого рендера уже устарело.
-   */
+  /** Ячейки, чья правка не дошла до сервера, — «строка:колонка»; они красные. */
   const [unsavedCells, setUnsavedCells] = useState<ReadonlySet<string>>(() => new Set());
-  const unsaved = useRef<ReadonlySet<string>>(unsavedCells);
-  const markCell = (key: string, failed: boolean) => {
-    if (unsaved.current.has(key) === failed) return;
-    const next = new Set(unsaved.current);
-    if (failed) next.add(key);
-    else next.delete(key);
-    unsaved.current = next;
-    setUnsavedCells(next);
-  };
+  const markCell = (key: string, failed: boolean) =>
+    setUnsavedCells((prev) => {
+      if (prev.has(key) === failed) return prev;
+      const next = new Set(prev);
+      if (failed) next.add(key);
+      else next.delete(key);
+      return next;
+    });
   const [preview, setPreview] = useState(false);
-  const [asking, setAsking] = useState(false);
-  const [sent, setSent] = useState<SendResult | null>(null);
-  const [downloading, setDownloading] = useState(false);
-  // Отчёт об ошибках спрашиваем только когда есть о чём: лишний запрос
-  // на каждый удачный выпуск не нужен никому.
-  const failures = useJobFailures(jobId, (job?.failed ?? 0) > 0);
 
-  /*
-   * Рассылка запускается сама, когда выпуск закончился.
-   *
-   * Держим намерение в ref, а не в состоянии: оно не влияет на то, что
-   * нарисовано, и лишняя перерисовка тут не нужна.
-   *
-   * `sentForJob` обязателен и защищает не от лишней перерисовки, а от
-   * повторной рассылки: задание опрашивается по таймеру, и без этой отметки
-   * каждый следующий ответ «готово» отправлял бы участникам письма заново.
-   */
-  const wantSend = useRef(false);
-  const sentForJob = useRef<string | null>(null);
-
-  /**
-   * Незаконченные записи ячеек.
-   *
-   * Копится цепочкой: правок может быть несколько, а дождаться нужно всех.
-   * Ошибку здесь глотаем: о ней сообщает сама запись — полосой и красной
-   * ячейкой, — а выпуск после ожидания сверяется с `unsaved`.
-   */
   /**
    * Файл, из которого разобран открытый диалог. Нужен, чтобы перечитать
    * его же, когда человек переключает понимание первой строки: вставку
@@ -204,15 +162,10 @@ export function RecipientsTable({
   const parseSource = useRef<File | null>(null);
 
   /*
-   * Выбор файла спрятан и живёт отдельно от меню: меню закрывается
-   * по нажатию, а системное окно выбора должно открыться уже после этого.
+   * Выбор файла спрятан и живёт отдельно от кнопок: системное окно выбора
+   * открывается уже после того, как закрылось меню или пустое состояние.
    */
   const xlsInput = useRef<HTMLInputElement>(null);
-
-  const pendingSaves = useRef<Promise<unknown>>(Promise.resolve());
-  const trackSave = (promise: Promise<unknown>) => {
-    pendingSaves.current = Promise.all([pendingSaves.current, promise.catch(() => {})]);
-  };
 
   /*
    * Вставка таблицы из Excel.
@@ -228,7 +181,7 @@ export function RecipientsTable({
   useEffect(() => {
     function onPaste(event: ClipboardEvent) {
       // Пока открыт диалог, вставка принадлежит ему.
-      if (parsed || preview || asking) return;
+      if (parsed || preview) return;
 
       const plan = planPaste(event);
       if (plan.kind === 'ignore') return;
@@ -243,24 +196,13 @@ export function RecipientsTable({
 
     document.addEventListener('paste', onPaste);
     return () => document.removeEventListener('paste', onPaste);
-  }, [parsed, preview, asking, parseInto]);
-
-  useEffect(() => {
-    if (!job || job.status !== 'done' || job.done === 0) return;
-    if (!wantSend.current || sentForJob.current === job.id) return;
-
-    sentForJob.current = job.id;
-    send.mutate(undefined, {
-      onSuccess: (result) => setSent(result),
-      onError: (err) => setError(errorText(err)),
-    });
-  }, [job?.id, job?.status, job?.done, send]);
+  }, [parsed, preview, parseInto]);
 
   // Имена помним в пределах одного материала: у другого материала и таблица
   // другая, а одинаковая шапка там может значить другое.
   useEffect(() => setManualNames({}), [documentId]);
 
-  /* Пока таблицы нет, шапка материала и лента вкладок уже стоят на месте:
+  /* Пока таблицы нет, шапка материала и лента шагов уже стоят на месте:
      иначе переход «Письмо → Получатели» на миг снимал шапку целиком,
      и она вставала обратно вместе с данными — рывок на весь экран.
      Панель значков ещё нечем наполнить, поэтому под ней пустая полоса
@@ -279,9 +221,12 @@ export function RecipientsTable({
         {table.isPending ? (
           <SkeletonRows rows={8} label="Загружаем таблицу" />
         ) : (
-          <div className="grid flex-1 place-items-center text-[var(--text-muted)]">
-            Таблица недоступна
-          </div>
+          <ErrorState
+            title="Таблица не открылась"
+            onRetry={() => void table.refetch()}
+            retrying={table.isFetching}
+            code={table.error ? errorText(table.error) : undefined}
+          />
         )}
         {fileMenu.dialogs}
       </div>
@@ -290,15 +235,6 @@ export function RecipientsTable({
   const { columns, rows, checkedCount } = table.data;
   const allChecked = rows.length > 0 && rows.every((r) => r.checked);
   const widths = Object.fromEntries(columns.map((col) => [col.name, fitChars(rows, col.name)]));
-  // Задание стоит «в очереди», но за ним никто не пришёл: пакет не доехал
-  // до очереди, и сам собой он не тронется. Сервис поднимет такое задание
-  // сторожем в течение нескольких минут, но человеку у экрана незачем
-  // ждать вслепую — он видит, что случилось, и может нажать «Продолжить».
-  const stuck = job?.status === 'queued' && job.stuck === true;
-  const running = !stuck && (job?.status === 'queued' || job?.status === 'running');
-  // Доделывать есть что, пока сделано меньше обещанного.
-  const canResume =
-    !!job && (job.status === 'failed' || job.status === 'canceled' || stuck) && job.done < job.total;
 
   /**
    * Разбор для диалога. Один путь и для файла, и для вставки: правила
@@ -311,71 +247,6 @@ export function RecipientsTable({
       const sheet = await m.parseFile.mutateAsync({ file, headers });
       setParsedFrom(from);
       setParsed(sheet);
-    } catch (err) {
-      setError(errorText(err));
-    }
-  }
-
-  async function onGenerate(mode: GenerateMode) {
-    setError(null);
-    setSent(null);
-    setAsking(false);
-    wantSend.current = mode === 'files-and-send';
-    try {
-      // Ждём, пока долетят правки ячеек.
-      //
-      // Ячейка сохраняется при уходе из неё, а самый обычный путь —
-      // дописать последнюю фамилию и сразу нажать «Создать документы».
-      // Нажатие уводит фокус, запись уходит на сервер, но выпуск читает
-      // строки уже на сервере — и в грамоте оказалась бы пустая фамилия.
-      // Секунды здесь никто не заметит, а испорченную партию заметят все.
-      await pendingSaves.current;
-
-      // Правка, которая не дошла, в грамоту не попадёт: выпуск напечатал бы
-      // прежнее значение, а с рассылкой ещё и отправил бы его человеку.
-      // Строки и колонки, удалённые с тех пор, не в счёт — править там нечего.
-      const lost = [...unsaved.current].some((key) => {
-        const [rowId, name] = key.split(':');
-        return rows.some((r) => r.id === rowId) && columns.some((c) => c.name === name);
-      });
-      if (lost) {
-        setError('Не все правки сохранились — исправьте ячейки, отмеченные красным');
-        return;
-      }
-
-      const created = await start.mutateAsync();
-      setJobId(created.id);
-    } catch (err) {
-      setError(errorText(err));
-    }
-  }
-
-  async function onCancel() {
-    if (!job) return;
-    setError(null);
-    // Рассылку отменённого пакета не запускаем: половина участников
-    // получила бы письма, а половина — нет, и разобраться, кто именно,
-    // было бы не по чему.
-    wantSend.current = false;
-    try {
-      await cancel.mutateAsync(job.id);
-    } catch (err) {
-      setError(errorText(err));
-    }
-  }
-
-  /**
-   * Доделать прерванный выпуск.
-   *
-   * Не то же самое, что «Создать документы»: там новое задание и новая
-   * оплата, а здесь доделывается то же самое, и за уже созданное второй раз
-   * не списывается.
-   */
-  async function onResume() {
-    if (!job) return;
-    setError(null);
-    try {
-      await resume.mutateAsync(job.id);
     } catch (err) {
       setError(errorText(err));
     }
@@ -408,81 +279,87 @@ export function RecipientsTable({
   }
 
   /*
-   * Строка меню таблицы.
-   *
-   * «Правка» и «Вид» из настольных редакторов здесь не заведены: отменять
-   * в таблице нечего — ячейка пишется на сервер по уходу из неё, а прятать
-   * колонки сервис не умеет. Пункт, за которым нет действия, хуже
-   * отсутствующего.
+   * Меню «…» рамки: действия над списком целиком. Отменять в таблице
+   * нечего — ячейка пишется на сервер по уходу из неё, — поэтому
+   * «Правки» здесь нет: пункт, за которым нет действия, хуже отсутствующего.
    */
   const actions: MenuEntry[] = [
     ...fileMenu.entries,
     { separator: true },
     {
-      icon: <FileSpreadsheet size={16} />,
-      label: m.parseFile.isPending ? 'Читаем файл…' : 'Загрузить файл XLS',
-      disabled: m.parseFile.isPending,
-      onSelect: () => xlsInput.current?.click(),
-    },
-    {
-      icon: <Rows3 size={16} />,
+      icon: <Rows3 size={ICON.sm} strokeWidth={STROKE} />,
       label: 'Добавить строку',
       disabled: m.addRow.isPending,
       onSelect: () => report(m.addRow.mutateAsync()),
     },
     {
-      icon: <Columns3 size={16} />,
+      icon: <Columns3 size={ICON.sm} strokeWidth={STROKE} />,
       label: 'Добавить колонку',
       onSelect: () => setAddingColumn(true),
     },
     { separator: true },
     {
-      icon: <CheckCircle2 size={16} />,
+      icon: <CheckCircle2 size={ICON.sm} strokeWidth={STROKE} />,
       label: 'Отметить все строки',
       disabled: rows.length === 0,
       onSelect: () => report(m.setChecked.mutateAsync({ checked: true })),
     },
     {
-      icon: <ListX size={16} />,
+      icon: <ListX size={ICON.sm} strokeWidth={STROKE} />,
       label: 'Снять отметку со всех строк',
       disabled: rows.length === 0,
       onSelect: () => report(m.setChecked.mutateAsync({ checked: false })),
     },
     { separator: true },
     {
-      icon: <Table2 size={16} />,
+      icon: <Table2 size={ICON.sm} strokeWidth={STROKE} />,
       label: 'Выданное по материалу',
       onSelect: onGoToRegistry,
     },
   ];
 
   /*
-   * Панель значков под меню: то, чем пользуются каждый раз, — файл, строка,
-   * колонка, взгляд на будущий документ. Остальное живёт в меню, а справа
-   * стоит состояние выпуска: сколько отмечено и что с пакетом.
+   * Панель под лентой шагов: словами — то, что делают на этом шаге каждый
+   * раз (загрузить список, проверить строки), значками — редкое. Залитая
+   * кнопка на экране одна, и она в рамке — «Выпуск».
    */
+  const openFile = () => xlsInput.current?.click();
+
   const toolbar = (
     <>
-      <ToolButton
-        title={m.parseFile.isPending ? 'Читаем файл…' : 'Загрузить список из файла'}
-        disabled={m.parseFile.isPending}
-        onClick={() => xlsInput.current?.click()}
+      <Button
+        variant="secondary"
+        size="sm"
+        icon={<Upload size={ICON.sm} strokeWidth={STROKE} />}
+        loading={m.parseFile.isPending}
+        onClick={openFile}
+        data-tour="import"
       >
-        {m.parseFile.isPending ? (
-          <LoaderCircle size={16} className="animate-spin" />
-        ) : (
-          <FileUp size={16} />
-        )}
-      </ToolButton>
+        Загрузить файл
+      </Button>
+      {/* «Посмотреть» показывает одну грамоту, а бед в списке на триста
+          человек глазами не увидеть: они прячутся в отдельных строках. */}
+      <Button
+        size="sm"
+        icon={<ListChecks size={ICON.sm} strokeWidth={STROKE} />}
+        disabled={checkedCount === 0}
+        onClick={() => onOpen('check')}
+        data-tour="check-rows"
+      >
+        Проверить строки
+      </Button>
+
+      <ToolDivider />
+
       <ToolButton
         title="Добавить строку"
         disabled={m.addRow.isPending}
         onClick={() => report(m.addRow.mutateAsync())}
       >
-        <Plus size={16} />
+        <Plus size={ICON.sm} strokeWidth={STROKE} />
       </ToolButton>
       <ToolButton title="Добавить колонку" onClick={() => setAddingColumn(true)}>
-        <Columns3 size={16} />
+        <Columns3 size={ICON.sm} strokeWidth={STROKE} />
       </ToolButton>
 
       <ToolDivider />
@@ -494,78 +371,18 @@ export function RecipientsTable({
         disabled={checkedCount === 0}
         onClick={() => setPreview(true)}
       >
-        <Eye size={16} />
-      </ToolButton>
-      {/* «Посмотреть» показывает одну грамоту, а бед в списке на триста
-          человек глазами не увидеть: они прячутся в отдельных строках. */}
-      <ToolButton
-        title="Проверить строки"
-        disabled={checkedCount === 0}
-        onClick={() => onOpen('check')}
-      >
-        <ListChecks size={16} />
+        <Eye size={ICON.sm} strokeWidth={STROKE} />
       </ToolButton>
 
       <div className="ml-auto flex items-center gap-2">
-        <FieldsToggle />
-        <span className="tabular text-sm text-[var(--text-muted)] max-md:hidden">
+        <span className="tabular text-sm text-muted max-md:hidden">
           отмечено {checkedCount} из {rows.length}
         </span>
-
-        {job && (
-          <StatusChip tone={running ? 'progress' : job.failed || stuck ? 'neutral' : 'done'}>
-            {running ? (
-              <>
-                <LoaderCircle size={13} className="animate-spin" />
-                {job.done} из {job.total}
-              </>
-            ) : stuck ? (
-              <>Выпуск не начался</>
-            ) : job.status === 'canceled' ? (
-              <>Остановлено на {job.done}</>
-            ) : (
-              <>
-                Готово {job.done}
-                {job.failed > 0 && `, ошибок ${job.failed}`}
-              </>
-            )}
-          </StatusChip>
-        )}
-
-        {/* Отменить можно, пока идёт. Пакет на тысячу строк печатается
-            больше часа, и увидеть опечатку в макете на второй минуте —
-            обычное дело: до сих пор оставалось только ждать. */}
-        {running && (
-          <Button
-            size="sm"
-            variant="danger"
-            icon={<Ban size={15} />}
-            disabled={cancel.isPending}
-            onClick={() => void onCancel()}
-          >
-            {cancel.isPending ? 'Останавливаем…' : 'Отменить'}
-          </Button>
-        )}
-
-        {/* Прерванный выпуск доделывается, а не начинается заново:
-            иначе за уже созданные документы пришлось бы платить второй раз. */}
-        {canResume && (
-          <Button
-            size="sm"
-            variant="primary"
-            icon={<Play size={15} />}
-            disabled={resume.isPending}
-            onClick={() => void onResume()}
-          >
-            {resume.isPending ? 'Продолжаем…' : 'Продолжить'}
-          </Button>
-        )}
-
-        {job && job.done > 0 && job.status !== 'queued' && job.status !== 'running' && (
-          <Button size="sm" icon={<Download size={15} />} onClick={() => setDownloading(true)}>
-            Скачать
-          </Button>
-        )}
+        {/* «Данные», а не «Поля»: поля есть и у листа (отступы печати),
+            а здесь — то, что подставится из таблицы получателей. */}
+        <ToolButton title="Данные" active={fieldsOpen} onClick={toggleFieldsPanel}>
+          <Variable size={ICON.sm} strokeWidth={STROKE} />
+        </ToolButton>
       </div>
     </>
   );
@@ -582,18 +399,7 @@ export function RecipientsTable({
         actions={actions}
         view="recipients"
         toolbar={toolbar}
-        action={
-          <ReleaseButton
-            count={checkedCount}
-            running={running}
-            disabled={running || checkedCount === 0}
-            onClick={() => setAsking(true)}
-          />
-        }
       />
-
-      {running && <PushOffer />}
-      <BigListNote />
 
       <input
         ref={xlsInput}
@@ -607,308 +413,176 @@ export function RecipientsTable({
         }}
       />
 
-      {/* Итог. Формулировка зависит от того, что человек выбрал: сказать
-          «созданы, никому не отправлены» тому, кто только что нажал
-          «создать и разослать», — значит напугать без причины. */}
-      {job?.status === 'done' && job.done > 0 && (
-        <div className="flex flex-wrap items-center gap-3 border-b border-[var(--line)] bg-[var(--accent-soft)] px-4 py-3 text-sm">
-          {send.isPending ? (
-            <span className="flex items-center gap-2">
-              <LoaderCircle size={14} className="animate-spin" />
-              Документы созданы: <span className="tabular font-medium">{job.done}</span>.
-              Отправляем письма…
-            </span>
-          ) : sent ? (
-            <>
-              <span>
-                Отправлено писем: <span className="tabular font-medium">{sent.queued}</span>
-                {sent.skipped.length > 0 && (
-                  <>
-                    , пропущено <span className="tabular font-medium">{sent.skipped.length}</span>
-                  </>
-                )}
-              </span>
-              <button
-                onClick={onGoToRegistry}
-                className="rounded-lg bg-[var(--surface)] px-2.5 py-1.5 ring-1 ring-[var(--line-strong)] hover:bg-[var(--surface-sunken)]"
-              >
-                Смотреть доставку
-              </button>
-            </>
-          ) : (
-            <>
-              <span>
-                Документы созданы: <span className="tabular font-medium">{job.done}</span>. Они
-                пока никому не отправлены.
-              </span>
-              <button
-                onClick={() => setDownloading(true)}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface)] px-2.5 py-1.5 ring-1 ring-[var(--line-strong)] hover:bg-[var(--surface-sunken)]"
-              >
-                <Download size={14} />
-                Скачать себе
-              </button>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Ход выпуска: полоса, число, оценка времени. Чип в панели
-          остаётся коротким сигналом, полоса — тем, на что смотрят. */}
-      {job && running && (
-        <div className="border-b border-[var(--line)] px-4 py-3">
-          <ProgressBar done={job.done} failed={job.failed} total={job.total} />
-        </div>
-      )}
-
-      {/* Итог: три цветных счётчика вместо фразы. */}
-      {job?.status === 'done' && (
-        <div className="border-b border-[var(--line)] px-4 py-3">
-          <Outcome done={job.done} failed={job.failed} doneLabel="выпущено" />
-        </div>
-      )}
-
-      {/* Зависшее задание. Без этой строчки человек видел вечный прогресс
-          и не знал ни что случилось, ни что делать: «Продолжить» такое
-          задание не принимало, а помогало только «Отменить». */}
-      {stuck && (
-        <div className="border-b border-[var(--line)] bg-[var(--surface-sunken)] px-4 py-3 text-sm">
-          Выпуск так и не начался: очередь заданий не приняла пакет. Ничего не списано —
-          нажмите «Продолжить», и документы создадутся с того же места.
-        </div>
-      )}
-
-      {/* Итог отмены. Главное здесь — что сделанное осталось и что
-          за ненапечатанное никто не заплатил: без этой строчки отмена
-          выглядит потерей всего пакета, и её боятся нажимать. */}
-      {job?.status === 'canceled' && (
-        <div className="flex flex-wrap items-center gap-3 border-b border-[var(--line)] bg-[var(--surface-sunken)] px-4 py-3 text-sm">
-          <span>
-            Выпуск остановлен. Успели создать:{' '}
-            <span className="tabular font-medium">{job.done}</span> из{' '}
-            <span className="tabular">{job.total}</span> — они сохранены.
-            {job.total - job.done - job.failed > 0 && (
-              <>
-                {' '}
-                За оставшиеся{' '}
-                <span className="tabular font-medium">{job.total - job.done - job.failed}</span>{' '}
-                документов ничего не списано — выпуск можно продолжить с того же места.
-              </>
-            )}
-          </span>
-          {job.done > 0 && (
-            <button
-              onClick={() => setDownloading(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface)] px-2.5 py-1.5 ring-1 ring-[var(--line-strong)] hover:bg-[var(--surface-sunken)]"
-            >
-              <Download size={14} />
-              Скачать созданные
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Просим рассказать о сервисе ровно здесь — сразу под сообщением
-          об удачном выпуске, пока человек видит результат. */}
-      {job?.status === 'done' && job.failed === 0 && <InviteNudge documentsMade={job.done} />}
-
-      {/* Кого не осилил сам выпуск — поимённо и по той же причине:
-          «ошибок 12» заставляет сверять список руками, а по числу не понять
-          даже, пропали это строки из таблицы или не отрисовались документы. */}
-      {(job?.failed ?? 0) > 0 && (failures.data?.length ?? 0) > 0 && (
-        <details className="border-b border-[var(--line)] px-4 py-2 text-sm">
-          <summary className="cursor-pointer text-[var(--text-muted)]">
-            Кому документ не создался: {job!.failed}
-          </summary>
-          <ul className="mt-2 space-y-1">
-            {failures.data!.map((f) => (
-              <li key={f.rowId}>
-                <span className="font-medium">{f.name}</span>
-                <span className="text-[var(--text-muted)]"> — {f.reason}</span>
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
-
-      {/* Кого рассылка обошла — поимённо. Число «пропущено 12» заставляет
-          сверять список руками, а причина у каждого своя. */}
-      {sent && sent.skipped.length > 0 && (
-        <details className="border-b border-[var(--line)] px-4 py-2 text-sm">
-          <summary className="cursor-pointer text-[var(--text-muted)]">
-            Кому письмо не ушло: {sent.skipped.length}
-          </summary>
-          <ul className="mt-2 space-y-1">
-            {sent.skipped.map((s, i) => (
-              <li key={i}>
-                <span className="font-medium">{s.name}</span>
-                <span className="text-[var(--text-muted)]"> — {s.reason}</span>
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
-
-      {(error || job?.error) && (
-        <p
-          role="alert"
-          className="flex items-center gap-2 bg-[var(--danger-soft)] px-4 py-2 text-sm text-[var(--danger)]"
-        >
-          {error ?? job?.error}
-          <button onClick={() => setError(null)} aria-label="Скрыть">
-            <X size={14} />
-          </button>
-        </p>
+      {error && (
+        <ErrorBar className="mx-3 mt-3">
+          {error}{' '}
+          <Button variant="link" onClick={() => setError(null)}>
+            Скрыть
+          </Button>
+        </ErrorBar>
       )}
 
       <div className="flex min-h-0 flex-1">
         <div className="min-h-0 min-w-0 flex-1 overflow-auto">
           {rows.length === 0 ? (
-            <div className="grid h-full place-items-center p-10 text-center">
-              <div>
-                <FileUp size={26} className="mx-auto mb-3 text-[var(--text-muted)]" strokeWidth={1.5} />
-                <p className="font-medium">Список получателей пуст</p>
-                <p className="mt-1 max-w-md text-sm text-[var(--text-muted)]">
-                  Загрузите файл Excel или CSV — подойдёт обычный список участников,
-                  шапку и лишние строки сервис распознает сам. Или скопируйте таблицу
-                  в Excel и вставьте сюда через Ctrl+V.
-                </p>
-                {/* Кнопка здесь обязательна: на панели значок без подписи,
-                    и на пустом экране по нему не догадаться. */}
-                <div className="mt-4 flex justify-center gap-2">
-                  <Button
-                    variant="primary"
-                    icon={<FileSpreadsheet size={15} />}
-                    disabled={m.parseFile.isPending}
-                    onClick={() => xlsInput.current?.click()}
-                  >
-                    {m.parseFile.isPending ? 'Читаем файл…' : 'Загрузить файл'}
-                  </Button>
-                  <Button icon={<Plus size={15} />} onClick={() => report(m.addRow.mutateAsync())}>
-                    Добавить строку
-                  </Button>
-                </div>
-              </div>
-            </div>
+            <NextAction
+              icon={Users}
+              title="Загрузите список получателей"
+              text="Excel или CSV; шапку и пустые строки уберём сами"
+              className="h-full justify-center"
+              primary={
+                <Button
+                  variant="primary"
+                  icon={<Upload size={ICON.sm} strokeWidth={STROKE} />}
+                  loading={m.parseFile.isPending}
+                  onClick={openFile}
+                >
+                  Загрузить файл
+                </Button>
+              }
+              secondary={{
+                label: 'Добавить строку',
+                icon: <Plus size={ICON.sm} strokeWidth={STROKE} />,
+                onClick: () => report(m.addRow.mutateAsync()),
+              }}
+            >
+              <p className="mt-1 text-sm text-muted">
+                Или скопируйте таблицу в Excel и вставьте сюда: <Kbd>Ctrl+V</Kbd>
+              </p>
+            </NextAction>
           ) : (
-            <table className="w-full border-collapse text-sm">
-              <thead className="sticky top-0 z-10 bg-[var(--surface-sunken)]">
-                <tr>
-                  <th className="w-10 border-r border-b border-[var(--line)] px-3 py-2">
-                    <Checkbox
-                      checked={allChecked}
-                      onChange={() => report(m.setChecked.mutateAsync({ checked: !allChecked }))}
-                      aria-label="Отметить все"
-                    />
-                  </th>
-                  {/* Номер строки — как в любой таблице: по нему называют место
-                      ошибки («в двенадцатой опечатка»), и без него сверять
-                      список с бумажным протоколом нечем. */}
-                  <th className="w-12 border-r border-b border-[var(--line)] px-2 py-2 text-right text-xs font-normal text-[var(--text-muted)]">
-                    №
-                  </th>
-                  {/* Итог сразу за номером: при широкой таблице колонки данных
-                      уезжают вбок, а судьба строки должна оставаться на виду. */}
-                  <th className="border-r border-b border-[var(--line)] px-3 py-2 text-left text-sm font-medium whitespace-nowrap">
-                    Итог
-                  </th>
-                  {/* Заголовок — по-человечески, переменная под ним мелким.
-                      Раньше колонки назывались «%name» и «%email»: для
-                      человека это не название столбца, а шифр.
-                      Переменную всё равно показываем — она нужна, когда
-                      человек вписывает её в макет. */}
-                  {columns.map((col) => (
+            /* Таблицу на телефоне видно и отметить строки можно; плашка честно
+               говорит, что править ячейки удобнее за столом, и не заслоняет список. */
+            <DesktopFirst
+              compact
+              title="Правку ячеек"
+              why="Таблицу на телефоне видно, отметить строки можно, а вот править ячейки удобнее за столом."
+            >
+              <table className="w-full border-collapse text-sm">
+                <thead className="sticky top-0 z-10 bg-sunken">
+                  <tr>
                     <th
-                      key={col.id}
-                      data-col={col.id}
-                      // Тянуть можно за весь заголовок, как в Airtable и Notion;
-                      // ручка слева лишь подсказывает, что это возможно.
-                      onPointerDown={(e) => {
-                        if ((e.target as HTMLElement).closest('button')) return;
-                        startColumnDrag(e, col.id);
-                      }}
-                      // В одну строку: в узкой колонке «E-mail» рвался по дефису,
-                      // а «Фамилия, имя, отчество» раздувал шапку на три строки.
-                      className={`group relative cursor-grab touch-none border-r border-b border-[var(--line)] px-3 py-2 text-left text-sm font-medium whitespace-nowrap select-none active:cursor-grabbing ${
-                        dragCol === col.id ? 'opacity-40' : ''
-                      }`}
+                      data-tour="check-all"
+                      className="w-10 border-r border-b border-line px-3 py-2"
                     >
-                      {/* Линия вставки у левого края целевой колонки. */}
-                      {dragCol && overCol === col.id && overCol !== dragCol && (
-                        <span className="pointer-events-none absolute inset-y-1 -left-px w-0.5 rounded bg-[var(--accent)]" />
-                      )}
-                      <span className="inline-flex items-center gap-1.5">
-                        {/* Ручка: колонки переставляются перетаскиванием, мышью
-                            и пальцем — указательные события работают и там, и там. */}
-                        <span
-                          aria-hidden
-                          className="-ml-1 text-[var(--text-muted)] opacity-0 transition-opacity group-hover:opacity-100"
-                        >
-                          <GripVertical size={13} />
-                        </span>
-                        {columnTitle(col)}
-                        <IconButton
-                          size="sm"
-                          label={`Удалить колонку ${columnTitle(col)}`}
-                          onClick={() => report(m.deleteColumn.mutateAsync(col.id))}
-                          className="size-6 opacity-0 group-hover:opacity-100 hover:text-[var(--danger)] pointer-coarse:size-10 pointer-coarse:opacity-100"
-                        >
-                          <X size={12} />
-                        </IconButton>
-                      </span>
-                      <span className="block font-mono text-xs font-normal text-[var(--text-muted)]">
-                        %{col.name}
-                      </span>
-                    </th>
-                  ))}
-                  <th className="w-10 border-b border-[var(--line)]" />
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row, index) => (
-                  <tr key={row.id} className="group hover:bg-[var(--surface-sunken)]/60">
-                    <td className="border-r border-b border-[var(--line)] px-3 py-1 text-center">
                       <Checkbox
-                        checked={row.checked}
-                        onChange={() =>
-                          report(m.updateRow.mutateAsync({ rowId: row.id, checked: !row.checked }))
-                        }
-                        aria-label="Включить в генерацию"
+                        checked={allChecked}
+                        onChange={() => report(m.setChecked.mutateAsync({ checked: !allChecked }))}
+                        aria-label="Отметить все"
                       />
-                    </td>
-                    <td className="tabular border-r border-b border-[var(--line)] px-2 py-1 text-right text-xs text-[var(--text-muted)]">
-                      {index + 1}
-                    </td>
-                    <td className="border-r border-b border-[var(--line)] px-3 py-1">
-                      <RowOutcomeChip row={row} />
-                    </td>
+                    </th>
+                    {/* Номер строки — как в любой таблице: по нему называют место
+                          ошибки («в двенадцатой опечатка»), и без него сверять
+                          список с бумажным протоколом нечем. */}
+                    <th className="w-12 border-r border-b border-line px-2 py-2 text-right text-xs font-normal text-muted">
+                      №
+                    </th>
+                    {/* Итог сразу за номером: при широкой таблице колонки данных
+                          уезжают вбок, а судьба строки должна оставаться на виду. */}
+                    <th className="border-r border-b border-line px-3 py-2 text-left text-sm font-medium whitespace-nowrap">
+                      Итог
+                    </th>
+                    {/* Заголовок — по-человечески, переменная под ним мелким.
+                          Раньше колонки назывались «%name» и «%email»: для
+                          человека это не название столбца, а шифр.
+                          Переменную всё равно показываем — она нужна, когда
+                          человек вписывает её в макет. */}
                     {columns.map((col) => (
-                      <td key={col.id} className="border-r border-b border-[var(--line)] p-0">
-                        <input
-                          defaultValue={row.data[col.name] ?? ''}
-                          size={widths[col.name]}
-                          // Нижний предел: когда шапки не влезают и таблица уезжает
-                          // вбок, колонка иначе сжималась до ширины заголовка
-                          // и почта превращалась в «a@exam…».
-                          style={{ minWidth: `calc(${Math.min(widths[col.name], 12)}ch + 1.5rem)` }}
-                          // Фамилии и названия организаций проверка орфографии
-                          // подчёркивает сплошь — красное в каждой строке ничего не значит.
-                          spellCheck={false}
-                          onBlur={(e) => {
-                            // Иначе ячейка так и остаётся прокрученной к концу
-                            // и показывает «ФУ, г. Екатеринбург» без начала.
-                            e.currentTarget.scrollLeft = 0;
-                            const value = e.target.value;
-                            const key = `${row.id}:${col.name}`;
-                            // Вернули прежнее значение — сохранять нечего,
-                            // и неудачная запись до этого больше не в счёт.
-                            if (value === (row.data[col.name] ?? '')) {
-                              markCell(key, false);
-                              return;
-                            }
-                            // Набранное остаётся в ячейке: его правят,
-                            // а не вспоминают и набирают заново.
-                            trackSave(
+                      <th
+                        key={col.id}
+                        data-col={col.id}
+                        // Тянуть можно за весь заголовок, как в Airtable и Notion;
+                        // ручка слева лишь подсказывает, что это возможно.
+                        onPointerDown={(e) => {
+                          if ((e.target as HTMLElement).closest('button')) return;
+                          startColumnDrag(e, col.id);
+                        }}
+                        // В одну строку: в узкой колонке «E-mail» рвался по дефису,
+                        // а «Фамилия, имя, отчество» раздувал шапку на три строки.
+                        className={cn(
+                          'group relative cursor-grab touch-none border-r border-b border-line px-3 py-2 text-left text-sm font-medium whitespace-nowrap select-none active:cursor-grabbing',
+                          dragCol === col.id && 'opacity-40',
+                        )}
+                      >
+                        {/* Линия вставки у левого края целевой колонки. */}
+                        {dragCol && overCol === col.id && overCol !== dragCol && (
+                          <span className="pointer-events-none absolute inset-y-1 -left-px w-0.5 rounded-full bg-accent" />
+                        )}
+                        <span className="inline-flex items-center gap-1.5">
+                          {/* Ручка: колонки переставляются перетаскиванием, мышью
+                                и пальцем — указательные события работают и там, и там. */}
+                          <span
+                            aria-hidden
+                            className="-ml-1 text-muted opacity-0 transition-opacity group-hover:opacity-100"
+                          >
+                            <GripVertical size={ICON.sm} strokeWidth={STROKE} />
+                          </span>
+                          {columnTitle(col)}
+                          <IconButton
+                            size="sm"
+                            label={`Удалить колонку ${columnTitle(col)}`}
+                            onClick={() => report(m.deleteColumn.mutateAsync(col.id))}
+                            className="size-6 opacity-0 group-hover:opacity-100 hover:text-danger pointer-coarse:size-10 pointer-coarse:opacity-100"
+                          >
+                            <X size={ICON.sm} strokeWidth={STROKE} />
+                          </IconButton>
+                        </span>
+                        <span className="block font-mono text-xs font-normal text-muted">
+                          %{col.name}
+                        </span>
+                      </th>
+                    ))}
+                    <th className="w-10 border-b border-line" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row, index) => (
+                    <tr key={row.id} className="group hover:bg-row-hover">
+                      <td className="border-r border-b border-line px-3 py-1 text-center">
+                        <Checkbox
+                          checked={row.checked}
+                          onChange={() =>
+                            report(
+                              m.updateRow.mutateAsync({ rowId: row.id, checked: !row.checked }),
+                            )
+                          }
+                          aria-label="Включить в выпуск"
+                        />
+                      </td>
+                      <td className="tabular border-r border-b border-line px-2 py-1 text-right text-xs text-muted">
+                        {index + 1}
+                      </td>
+                      <td className="border-r border-b border-line px-3 py-1">
+                        <RowOutcomeChip row={row} />
+                      </td>
+                      {columns.map((col) => (
+                        <td key={col.id} className="border-r border-b border-line p-0">
+                          <input
+                            defaultValue={row.data[col.name] ?? ''}
+                            size={widths[col.name]}
+                            // Нижний предел: когда шапки не влезают и таблица уезжает
+                            // вбок, колонка иначе сжималась до ширины заголовка
+                            // и почта превращалась в «a@exam…».
+                            style={{
+                              minWidth: `calc(${Math.min(widths[col.name], 12)}ch + 1.5rem)`,
+                            }}
+                            // Фамилии и названия организаций проверка орфографии
+                            // подчёркивает сплошь — красное в каждой строке ничего не значит.
+                            spellCheck={false}
+                            onBlur={(e) => {
+                              // Иначе ячейка так и остаётся прокрученной к концу
+                              // и показывает «ФУ, г. Екатеринбург» без начала.
+                              e.currentTarget.scrollLeft = 0;
+                              const value = e.target.value;
+                              const key = `${row.id}:${col.name}`;
+                              // Вернули прежнее значение — сохранять нечего,
+                              // и неудачная запись до этого больше не в счёт.
+                              if (value === (row.data[col.name] ?? '')) {
+                                markCell(key, false);
+                                return;
+                              }
+                              // Набранное остаётся в ячейке: его правят,
+                              // а не вспоминают и набирают заново.
                               m.updateRow
                                 .mutateAsync({ rowId: row.id, data: { [col.name]: value } })
                                 .then(
@@ -917,61 +591,50 @@ export function RecipientsTable({
                                     markCell(key, true);
                                     setError(`Строка ${index + 1}: ${errorText(err)}`);
                                   },
-                                ),
-                            );
-                          }}
-                          aria-invalid={unsavedCells.has(`${row.id}:${col.name}`) || undefined}
-                          // Рамка внутри ячейки: снаружи она легла бы на линии
-                          // соседних клеток, а верх ушёл бы под прилипшую шапку.
-                          className="w-full truncate bg-transparent px-3 py-1.5 outline-none focus:bg-[var(--surface)] focus:ring-2 focus:ring-[var(--focus)] focus:ring-inset aria-invalid:ring-2 aria-invalid:ring-[var(--danger)] aria-invalid:ring-inset"
-                        />
+                                );
+                            }}
+                            aria-invalid={unsavedCells.has(`${row.id}:${col.name}`) || undefined}
+                            // Рамка внутри ячейки: снаружи она легла бы на линии
+                            // соседних клеток, а верх ушёл бы под прилипшую шапку.
+                            className="w-full truncate bg-transparent px-3 py-1.5 outline-none focus:bg-surface focus:ring-2 focus:ring-focus focus:ring-inset aria-invalid:ring-2 aria-invalid:ring-danger aria-invalid:ring-inset"
+                          />
+                        </td>
+                      ))}
+                      <td className="border-b border-line px-2 text-center">
+                        <IconButton
+                          size="sm"
+                          label="Удалить строку"
+                          onClick={() => report(m.deleteRow.mutateAsync(row.id))}
+                          className="size-7 opacity-0 group-hover:opacity-100 hover:text-danger pointer-coarse:size-10 pointer-coarse:opacity-100"
+                        >
+                          <Trash2 size={ICON.sm} strokeWidth={STROKE} />
+                        </IconButton>
                       </td>
-                    ))}
-                    <td className="border-b border-[var(--line)] px-2 text-center">
-                      <IconButton
-                        size="sm"
-                        label="Удалить строку"
-                        onClick={() => report(m.deleteRow.mutateAsync(row.id))}
-                        className="size-7 opacity-0 group-hover:opacity-100 hover:text-[var(--danger)] pointer-coarse:size-10 pointer-coarse:opacity-100"
-                      >
-                        <Trash2 size={14} />
-                      </IconButton>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </DesktopFirst>
           )}
         </div>
         {fieldsOpen && <FieldsSidebar documentId={documentId} />}
       </div>
 
-      {/* На телефоне главное действие — внизу, под большим пальцем; в шапке
-          ему места нет и не достать. Загрузка списка — рядом значком. */}
+      {/* На телефоне главное действие — внизу, под большим пальцем: в шапке
+          рамки ему места нет и не достать. Число отмеченных — плашкой внутри,
+          а не хвостом слова: счётчик должен читаться счётчиком. */}
       <div
-        className="flex shrink-0 gap-2.5 border-t border-[var(--line)] bg-[var(--surface)] px-4 pt-3 md:hidden"
+        className="flex shrink-0 border-t border-line bg-surface px-4 pt-3 md:hidden"
         style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
       >
-        <button
-          type="button"
-          aria-label="Загрузить список"
-          onClick={() => xlsInput.current?.click()}
-          className="grid size-12 shrink-0 place-items-center rounded-xl border border-[var(--line-strong)] text-[var(--text)]"
-        >
-          <Upload size={20} />
-        </button>
-        <button
-          type="button"
-          disabled={running || checkedCount === 0}
-          onClick={() => setAsking(true)}
-          className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--accent-button)] text-base font-medium text-[var(--accent-contrast)] disabled:opacity-50"
-        >
-          {running ? <LoaderCircle size={18} className="animate-spin" /> : <CheckCheck size={18} />}
-          {running ? 'Выпускаем' : 'Выпуск'}
-          {!running && checkedCount > 0 && (
-            <span className="tabular grid h-6 min-w-6 place-items-center rounded-full bg-white/20 px-2 text-sm font-semibold">{checkedCount}</span>
+        <Button variant="primary" size="lg" to={materialPath(doc.id, 'issue')} className="flex-1">
+          Выпуск
+          {checkedCount > 0 && (
+            <span className="tabular grid h-6 min-w-6 place-items-center rounded-full bg-on-accent/20 px-2 text-sm font-semibold">
+              {checkedCount}
+            </span>
           )}
-        </button>
+        </Button>
       </div>
 
       {parsed && (
@@ -994,7 +657,13 @@ export function RecipientsTable({
           onConfirm={(cols, importRows, mode, titles) => {
             m.importRows.mutate(
               { columns: cols, rows: importRows, titles, mode },
-              { onSuccess: () => setParsed(null), onError: (e) => setError(errorText(e)) },
+              {
+                onSuccess: ({ imported }) => {
+                  setParsed(null);
+                  toast({ title: `Загружено строк: ${imported}`, tone: 'ok' });
+                },
+                onError: (e) => setError(errorText(e)),
+              },
             );
           }}
         />
@@ -1008,46 +677,26 @@ export function RecipientsTable({
         />
       )}
 
-      {downloading && job && (
-        <DownloadDialog
-          jobId={job.id}
-          count={job.done}
-          columns={columns.map((c) => c.name)}
-          onClose={() => setDownloading(false)}
-        />
-      )}
-
-      {asking && (
-        <GenerateDialog
-          documentId={documentId}
-          rows={rows.filter((r) => r.checked)}
-          onCancel={() => setAsking(false)}
-          onConfirm={(mode) => void onGenerate(mode)}
-          onGoToMail={() => {
-            setAsking(false);
-            onOpen('mail');
-          }}
-        />
-      )}
-
-      {/* Новая колонка — окном, а не полем на панели: панель под меню
-          рассчитана на значки одного размера, и поле ввода в ней ломало
-          строку каждый раз, когда название было длиннее слова. */}
+      {/* Новая колонка — окном, а не полем на панели: панель рассчитана
+          на контролы одной высоты, и поле ввода в ней ломало строку каждый
+          раз, когда название было длиннее слова. */}
       {addingColumn && (
         <Dialog
           title="Добавить колонку"
+          size="sm"
           onClose={closeAddColumn}
           footer={
             <>
-              <Button
-                variant="primary"
-                disabled={!newColumn.trim() || m.addColumn.isPending}
-                onClick={submitColumn}
-              >
-                {m.addColumn.isPending ? 'Добавляем…' : 'Добавить'}
-              </Button>
               <Button variant="ghost" onClick={closeAddColumn}>
                 Отмена
+              </Button>
+              <Button
+                variant="primary"
+                disabled={!newColumn.trim()}
+                loading={m.addColumn.isPending}
+                onClick={submitColumn}
+              >
+                Добавить
               </Button>
             </>
           }
@@ -1070,7 +719,7 @@ export function RecipientsTable({
                 setColumnError(null);
               }}
               placeholder="team"
-              className={cn('font-mono', columnError && 'ring-[var(--danger)] focus:ring-[var(--danger)]')}
+              className="font-mono"
               onKeyDown={(e) => e.key === 'Enter' && submitColumn()}
             />
           </Field>
@@ -1082,13 +731,6 @@ export function RecipientsTable({
   );
 }
 
-/**
- * Название колонки по-человечески.
- *
- * Служебные имена придумали мы, и в макет их вписывать удобно, но в шапке
- * таблицы «%name» — не название столбца, а шифр. Своим колонкам организация
- * даёт имена сама, и их показываем как есть.
- */
 /**
  * Что писать в шапке колонки.
  *

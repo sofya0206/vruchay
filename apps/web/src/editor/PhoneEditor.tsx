@@ -41,7 +41,12 @@ import type { FieldInfo } from './fields';
 import type { AlignKind } from './selection';
 import { FONTS } from './fonts-list';
 import { BottomSheet } from '../ui/BottomSheet';
+import { Button } from '../ui/Button';
+import { Input } from '../ui/Field';
+import { IconButton } from '../ui/IconButton';
+import { MenuDivider, MenuItem } from '../ui/Menu';
 import { Select } from '../ui/Select';
+import { Segmented } from '../ui/Tabs';
 import { cn } from '../ui/cn';
 
 /*
@@ -98,34 +103,34 @@ function BarButton({
   fixed?: boolean;
 }) {
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
+      size="lg"
       onClick={onClick}
       disabled={disabled}
-      aria-pressed={active || undefined}
+      active={active || undefined}
       className={cn(
-        'relative flex h-14 flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 text-[11px] leading-none font-medium transition-colors disabled:opacity-40',
+        'relative h-14 flex-col gap-0.5 px-0.5 text-[11px] leading-none',
         fixed ? 'w-[68px] shrink-0' : 'min-w-0 flex-1',
-        active ? 'bg-[var(--accent-soft)] text-[var(--accent)]' : 'text-[var(--text-muted)] active:bg-[var(--surface-sunken)]',
-        danger && !active && 'text-[var(--danger)]',
+        danger && !active && 'text-danger hover:text-danger',
       )}
     >
       {/* Значок — в гнезде одной высоты у всех кнопок: иначе круглая «Вставить»
           сдвигала свою подпись ниже соседних. */}
       <span className="grid h-8 place-items-center">
         {primary ? (
-          <span className="grid size-8 place-items-center rounded-full bg-[var(--accent-button)] text-[var(--accent-contrast)]">{icon}</span>
+          <span className="grid size-8 place-items-center rounded-full bg-accent-button text-on-accent">{icon}</span>
         ) : (
           icon
         )}
       </span>
       <span className="max-w-full truncate">{label}</span>
       {badge ? (
-        <span className="absolute top-1.5 right-[calc(50%-22px)] grid h-4 min-w-4 place-items-center rounded-full bg-[var(--accent)] px-1 text-[10px] font-semibold leading-none text-white">
+        <span className="absolute top-1.5 right-[calc(50%-22px)] grid h-4 min-w-4 place-items-center rounded-full bg-accent px-1 text-[10px] font-semibold leading-none text-on-accent">
           {badge}
         </span>
       ) : null}
-    </button>
+    </Button>
   );
 }
 
@@ -171,7 +176,7 @@ export function PhoneToolbar({
     <div
       role="toolbar"
       aria-label={selectedCount ? 'Действия с блоком' : 'Инструменты листа'}
-      className="flex shrink-0 gap-0.5 border-t border-[var(--line)] bg-[var(--surface)] px-1 pt-1 pb-[max(4px,env(safe-area-inset-bottom))]"
+      className="flex shrink-0 gap-0.5 border-t border-line bg-surface px-1 pt-1 pb-[max(4px,env(safe-area-inset-bottom))]"
     >
       {selectedCount > 0 ? (
         // Лента прокручивается: пунктов больше, чем влезает в ширину.
@@ -215,40 +220,37 @@ export function ViewPill({
   onMode: (mode: 'placeholders' | 'data') => void;
   onRow: (row: number) => void;
 }) {
-  const seg = (label: string, active: boolean, onClick: () => void, disabled = false) => (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={active}
-      disabled={disabled}
-      onClick={onClick}
-      className={cn(
-        'h-8 rounded-lg px-3 text-[13px] whitespace-nowrap transition-colors disabled:opacity-50',
-        active ? 'bg-[var(--accent-soft)] font-medium text-[var(--accent)]' : 'text-[var(--text-muted)]',
-      )}
-    >
-      {label}
-    </button>
-  );
   return (
-    <div
-      role="radiogroup"
-      aria-label="На листе показывать"
-      className="pointer-events-auto absolute top-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-0.5 rounded-xl bg-[var(--surface)] p-1 shadow-[var(--shadow-sm)] ring-1 ring-[var(--line)]"
-    >
-      {seg('Заготовка', !dataMode, () => onMode('placeholders'))}
-      {seg('Данные', dataMode, () => onMode('data'), rowCount === 0)}
+    <div className="pointer-events-auto absolute top-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-control bg-surface p-0.5 shadow-sm ring-1 ring-line">
+      <Segmented
+        label="На листе показывать"
+        items={[
+          { id: 'placeholders', label: 'Заготовка' },
+          { id: 'data', label: 'Данные' },
+        ]}
+        value={dataMode ? 'data' : 'placeholders'}
+        // Пустой список — данных показывать нечем: переключатель остаётся на заготовке.
+        onChange={(mode) => {
+          if (mode === 'data' && rowCount === 0) return;
+          onMode(mode);
+        }}
+      />
       {dataMode && rowCount > 0 && (
-        <span className="flex items-center border-l border-[var(--line)] pl-0.5 text-[13px] text-[var(--text-muted)]">
-          <button type="button" aria-label="Предыдущая строка" disabled={row === 0} onClick={() => onRow(Math.max(0, row - 1))} className="grid size-8 place-items-center disabled:opacity-30">
+        <span className="flex items-center border-l border-line pl-0.5 text-sm text-muted">
+          <IconButton size="sm" label="Предыдущая строка" disabled={row === 0} onClick={() => onRow(Math.max(0, row - 1))}>
             <ChevronLeft size={16} />
-          </button>
-          <span className="min-w-9 text-center whitespace-nowrap tabular-nums">
+          </IconButton>
+          <span className="tabular min-w-9 text-center whitespace-nowrap">
             {row + 1}/{rowCount}
           </span>
-          <button type="button" aria-label="Следующая строка" disabled={row >= rowCount - 1} onClick={() => onRow(Math.min(rowCount - 1, row + 1))} className="grid size-8 place-items-center disabled:opacity-30">
+          <IconButton
+            size="sm"
+            label="Следующая строка"
+            disabled={row >= rowCount - 1}
+            onClick={() => onRow(Math.min(rowCount - 1, row + 1))}
+          >
             <ChevronRight size={16} />
-          </button>
+          </IconButton>
         </span>
       )}
     </div>
@@ -270,30 +272,32 @@ export function PagePill({
   onSelect: (index: number) => void;
   onAdd: () => void;
 }) {
-  const btn = (label: string, icon: ReactNode, onClick: () => void, disabled = false) => (
-    <button type="button" aria-label={label} disabled={disabled} onClick={onClick} className="grid size-9 place-items-center rounded-full text-[var(--text-muted)] disabled:opacity-30">
-      {icon}
-    </button>
-  );
   const shell =
-    'pointer-events-auto absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center rounded-full bg-[var(--surface)] p-0.5 shadow-[var(--shadow-sm)] ring-1 ring-[var(--line)]';
+    'pointer-events-auto absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center rounded-full bg-surface p-0.5 shadow-sm ring-1 ring-line';
   if (count <= 1) {
     return (
-      <button type="button" onClick={onAdd} className={`${shell} h-10 gap-1.5 pr-4 pl-3 text-[13px] font-medium text-[var(--text-muted)]`}>
-        <Plus size={16} />
-        Лист
-      </button>
+      <div className={shell}>
+        <Button variant="ghost" icon={<Plus size={16} />} onClick={onAdd}>
+          Лист
+        </Button>
+      </div>
     );
   }
   return (
     <div className={shell}>
-      {btn('Предыдущий лист', <ChevronLeft size={18} />, () => onSelect(index - 1), index === 0)}
-      <span className="min-w-10 text-center text-[13px] font-medium whitespace-nowrap tabular-nums">
+      <IconButton label="Предыдущий лист" disabled={index === 0} onClick={() => onSelect(index - 1)}>
+        <ChevronLeft size={20} />
+      </IconButton>
+      <span className="tabular min-w-10 text-center text-sm font-medium whitespace-nowrap">
         {index + 1}/{count}
       </span>
-      {btn('Следующий лист', <ChevronRight size={18} />, () => onSelect(index + 1), index >= count - 1)}
-      <span aria-hidden className="mx-0.5 h-4 w-px bg-[var(--line)]" />
-      {btn('Добавить лист', <Plus size={18} />, onAdd)}
+      <IconButton label="Следующий лист" disabled={index >= count - 1} onClick={() => onSelect(index + 1)}>
+        <ChevronRight size={20} />
+      </IconButton>
+      <span aria-hidden className="mx-0.5 h-4 w-px bg-line" />
+      <IconButton label="Добавить лист" onClick={onAdd}>
+        <Plus size={20} />
+      </IconButton>
     </div>
   );
 }
@@ -313,19 +317,18 @@ export function MiniBar({
   onMore: () => void;
 }) {
   const b = (label: string, icon: ReactNode, onClick: () => void, danger = false) => (
-    <button
-      type="button"
-      aria-label={label}
+    <IconButton
+      label={label}
       onPointerDown={(e) => e.stopPropagation()}
       onClick={onClick}
-      className={cn('grid size-10 place-items-center rounded-lg', danger ? 'text-[var(--danger)]' : 'text-[var(--text)]')}
+      className={danger ? 'text-danger hover:text-danger' : 'text-ink'}
     >
       {icon}
-    </button>
+    </IconButton>
   );
   return (
     <div
-      className="absolute z-20 flex gap-0.5 rounded-xl bg-[var(--surface-raised)] p-0.5 shadow-[var(--shadow-lg)] ring-1 ring-[var(--line)]"
+      className="absolute z-20 flex gap-0.5 rounded-card bg-raised p-0.5 shadow-lg ring-1 ring-line"
       style={{ left, top, transform: 'translate(-50%, -100%)' }}
     >
       {b('Дублировать', <Copy size={20} />, onDuplicate)}
@@ -364,32 +367,27 @@ export function ContextSheet({
   onDelete: () => void;
 }) {
   const row = (icon: ReactNode, label: string, onClick: () => void, opts: { danger?: boolean; disabled?: boolean } = {}) => (
-    <button
-      type="button"
-      role="menuitem"
+    <MenuItem
+      icon={<span className="text-muted">{icon}</span>}
+      danger={opts.danger}
       disabled={opts.disabled}
       onClick={() => {
         onClose();
         onClick();
       }}
-      className={cn(
-        'flex h-12 w-full items-center gap-3 rounded-xl px-3 text-left text-base active:bg-[var(--surface-sunken)] disabled:opacity-40',
-        opts.danger ? 'text-[var(--danger)]' : 'text-[var(--text)]',
-      )}
     >
-      <span className="text-[var(--text-muted)]">{icon}</span>
       {label}
-    </button>
+    </MenuItem>
   );
   return (
     <BottomSheet open={open} onClose={onClose} title="Блок">
       <div role="menu">
-        {row(<Copy size={18} />, 'Дублировать', onDuplicate)}
-        {row(<ListChecks size={18} />, 'Выделить несколько', onMulti)}
-        {row(<Layers size={18} />, 'Выбрать под', onSelectBehind, { disabled: !canSelectBehind })}
-        {row(locked ? <LockOpen size={18} /> : <Lock size={18} />, locked ? 'Отпереть' : 'Запереть', onLock)}
-        <div className="my-1 h-px bg-[var(--line)]" />
-        {row(<Trash2 size={18} />, 'Удалить', onDelete, { danger: true })}
+        {row(<Copy size={20} />, 'Дублировать', onDuplicate)}
+        {row(<ListChecks size={20} />, 'Выделить несколько', onMulti)}
+        {row(<Layers size={20} />, 'Выбрать под', onSelectBehind, { disabled: !canSelectBehind })}
+        {row(locked ? <LockOpen size={20} /> : <Lock size={20} />, locked ? 'Отпереть' : 'Запереть', onLock)}
+        <MenuDivider />
+        {row(<Trash2 size={20} />, 'Удалить', onDelete, { danger: true })}
       </div>
     </BottomSheet>
   );
@@ -423,12 +421,12 @@ export function PositionSheet({
 }) {
   const [step, setStep] = useState<NudgeStep>(1);
   const label = (text: string) => (
-    <p className="px-1 pt-3 pb-2 text-[12px] font-medium tracking-wider text-[var(--text-muted)] uppercase">{text}</p>
+    <p className="px-1 pt-3 pb-2 text-xs font-medium tracking-wide text-muted uppercase">{text}</p>
   );
   const sq = (title: string, icon: ReactNode, onClick: () => void) => (
-    <button type="button" aria-label={title} onClick={onClick} className="grid h-12 flex-1 place-items-center rounded-xl bg-[var(--surface-sunken)] text-[var(--text)] active:bg-[var(--accent-soft)] active:text-[var(--accent)]">
+    <Button variant="secondary" size="lg" aria-label={title} onClick={onClick} className="flex-1 px-0">
       {icon}
-    </button>
+    </Button>
   );
   // Глифы выравнивания: линия и два бруска, как в Keynote.
   const glyph = (kind: AlignKind) => {
@@ -441,14 +439,14 @@ export function PositionSheet({
       bottom: '<line x1="3" x2="21" y1="20" y2="20"/><rect x="6" y="7" width="4" height="10" rx="1"/><rect x="14" y="3" width="4" height="14" rx="1"/>',
     };
     return (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden dangerouslySetInnerHTML={{ __html: g[kind] }} />
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden dangerouslySetInnerHTML={{ __html: g[kind] }} />
     );
   };
   const num = (key: 'x' | 'y' | 'w' | 'h', title: string) =>
     box && (
       <label className="flex flex-1 flex-col items-stretch gap-1">
-        <span className="text-center text-[11px] tracking-wider text-[var(--text-muted)] uppercase">{title}</span>
-        <input
+        <span className="text-center text-xs tracking-wide text-muted uppercase">{title}</span>
+        <Input
           type="number"
           inputMode="decimal"
           step={0.5}
@@ -457,7 +455,7 @@ export function PositionSheet({
             const value = Number(e.target.value);
             if (Number.isFinite(value)) onBox({ ...box, [key]: value });
           }}
-          className="tabular h-11 w-full rounded-lg border border-[var(--line-strong)] bg-[var(--surface)] text-center text-base"
+          className="tabular h-11 px-1 text-center text-base"
         />
       </label>
     );
@@ -476,35 +474,36 @@ export function PositionSheet({
         </div>
         {label('Порядок слоёв')}
         <div className="flex gap-2">
-          {sq('В самый верх', <ChevronsUp size={22} />, () => onLayer('front'))}
-          {sq('Выше', <ChevronUp size={22} />, () => onLayer('up'))}
-          {sq('Ниже', <ChevronDown size={22} />, () => onLayer('down'))}
-          {sq('В самый низ', <ChevronsDown size={22} />, () => onLayer('back'))}
+          {sq('В самый верх', <ChevronsUp size={24} />, () => onLayer('front'))}
+          {sq('Выше', <ChevronUp size={24} />, () => onLayer('up'))}
+          {sq('Ниже', <ChevronDown size={24} />, () => onLayer('down'))}
+          {sq('В самый низ', <ChevronsDown size={24} />, () => onLayer('back'))}
         </div>
         {label('Сдвинуть точно')}
         <div className="flex items-center gap-1.5">
-          <div className="flex flex-1 gap-1.5 rounded-2xl bg-[var(--surface-sunken)] p-1">
+          <div className="flex flex-1 gap-1.5 rounded-sheet bg-sunken p-1">
             {(
               [
-                ['Влево', <ArrowLeft size={20} strokeWidth={2} />, -1, 0],
-                ['Вверх', <ArrowUp size={20} strokeWidth={2} />, 0, -1],
-                ['Вниз', <ArrowDown size={20} strokeWidth={2} />, 0, 1],
-                ['Вправо', <ArrowRight size={20} strokeWidth={2} />, 1, 0],
+                ['Влево', <ArrowLeft size={20} />, -1, 0],
+                ['Вверх', <ArrowUp size={20} />, 0, -1],
+                ['Вниз', <ArrowDown size={20} />, 0, 1],
+                ['Вправо', <ArrowRight size={20} />, 1, 0],
               ] as [string, ReactNode, number, number][]
             ).map(([t, ic, dx, dy]) => (
-              <button key={t} type="button" aria-label={t} onClick={() => onNudge(dx * step, dy * step)} className="grid h-11 flex-1 place-items-center rounded-xl bg-[var(--surface)] text-[var(--text)] shadow-[var(--shadow-sm)]">
+              <Button key={t} variant="secondary" size="lg" aria-label={t} onClick={() => onNudge(dx * step, dy * step)} className="flex-1 px-0 shadow-sm">
                 {ic}
-              </button>
+              </Button>
             ))}
           </div>
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="lg"
             aria-label={`Шаг ${step} мм, нажмите, чтобы сменить`}
             onClick={() => setStep((s) => (s === 1 ? 5 : 1))}
-            className="h-[52px] shrink-0 rounded-xl bg-[var(--accent-soft)] px-3.5 text-[15px] font-medium whitespace-nowrap text-[var(--accent)]"
+            className="tabular shrink-0 px-3.5 text-accent"
           >
             {step} мм
-          </button>
+          </Button>
         </div>
         {box && (
           <>
@@ -547,54 +546,46 @@ export function PhoneFormatBar({
 }) {
   const nextAlign: Record<string, TextProps['align']> = { left: 'center', center: 'right', right: 'left', justify: 'left' };
   const AlignIcon = base.align === 'left' ? AlignLeft : base.align === 'right' ? AlignRight : AlignCenter;
-  const b = (label: string, icon: ReactNode, onClick: () => void, active = false) => (
-    <button
-      type="button"
-      aria-label={label}
-      aria-pressed={active}
-      onClick={onClick}
-      className={cn('grid size-10 shrink-0 place-items-center rounded-lg', active ? 'bg-[var(--accent-soft)] text-[var(--accent)]' : 'text-[var(--text)]')}
-    >
-      {icon}
-    </button>
-  );
   return (
-    <div data-rich-toolbar className="shrink-0 border-t border-[var(--line)] bg-[var(--surface)]" onPointerDown={(e) => e.preventDefault()}>
+    <div data-rich-toolbar className="shrink-0 border-t border-line bg-surface" onPointerDown={(e) => e.preventDefault()}>
       <div className="flex items-center gap-0.5 px-1.5 pt-1">
         <Select
           aria-label="Шрифт"
           value={base.fontFamily}
           onChange={(fontFamily) => onProps({ fontFamily })}
           options={FONTS.map((f) => ({ value: f, label: f }))}
-          className="h-10 w-28 py-0 pr-7 pl-2 text-sm"
+          className="w-28"
         />
-        <span className="flex h-10 items-center rounded-lg bg-[var(--surface-sunken)]">
-          <button type="button" aria-label="Меньше" onClick={() => onProps({ fontSize: Math.max(4, base.fontSize - 1) })} className="grid size-9 place-items-center">
+        <span className="flex items-center rounded-control bg-sunken">
+          <IconButton label="Меньше" onClick={() => onProps({ fontSize: Math.max(4, base.fontSize - 1) })}>
             <Minus size={16} />
-          </button>
-          <span className="tabular min-w-6 text-center text-[15px]">{base.fontSize}</span>
-          <button type="button" aria-label="Больше" onClick={() => onProps({ fontSize: Math.min(200, base.fontSize + 1) })} className="grid size-9 place-items-center">
+          </IconButton>
+          <span className="tabular min-w-6 text-center text-base">{base.fontSize}</span>
+          <IconButton label="Больше" onClick={() => onProps({ fontSize: Math.min(200, base.fontSize + 1) })}>
             <Plus size={16} />
-          </button>
+          </IconButton>
         </span>
         {editor && <Marks editor={editor} />}
-        {b('Выравнивание', <AlignIcon size={20} />, () => onProps({ align: nextAlign[base.align] ?? 'center' }))}
-        <button type="button" aria-label="Готово" onClick={onDone} className="ml-auto grid size-10 shrink-0 place-items-center rounded-lg bg-[var(--accent-button)] text-[var(--accent-contrast)]">
-          <Check size={22} strokeWidth={2.4} />
-        </button>
+        <IconButton label="Выравнивание" className="text-ink" onClick={() => onProps({ align: nextAlign[base.align] ?? 'center' })}>
+          <AlignIcon size={20} />
+        </IconButton>
+        <IconButton label="Готово" variant="primary" className="ml-auto" onClick={onDone}>
+          <Check size={20} />
+        </IconButton>
       </div>
       {/* Поля таблицы — фишками: вставляются в каретку. Ряд прокручивается. */}
       <div className="no-scrollbar flex items-center gap-2 overflow-x-auto px-3 pt-1.5 pb-[max(8px,env(safe-area-inset-bottom))]">
         {fields.map((f) => (
-          <button
+          <Button
             key={f.source}
-            type="button"
+            size="sm"
+            variant="secondary"
+            icon={<Plus size={16} />}
             onClick={() => onInsertField(f)}
-            className="inline-flex h-8 shrink-0 items-center gap-1 rounded-full bg-[var(--accent-soft)] pr-3 pl-2 text-[13px] font-medium whitespace-nowrap text-[var(--accent)]"
+            className="shrink-0 text-accent"
           >
-            <Plus size={13} strokeWidth={2.4} />
             {f.title}
-          </button>
+          </Button>
         ))}
       </div>
     </div>
@@ -609,21 +600,15 @@ function Marks({ editor }: { editor: Editor }) {
   });
   const mark = (name: 'bold' | 'italic' | 'underline') => editor.chain().focus().toggleMark(name).run();
   const b = (label: string, icon: ReactNode, name: 'bold' | 'italic' | 'underline', active: boolean) => (
-    <button
-      type="button"
-      aria-label={label}
-      aria-pressed={active}
-      onClick={() => mark(name)}
-      className={cn('grid size-10 shrink-0 place-items-center rounded-lg', active ? 'bg-[var(--accent-soft)] text-[var(--accent)]' : 'text-[var(--text)]')}
-    >
+    <IconButton label={label} active={active} className={cn(!active && 'text-ink')} onClick={() => mark(name)}>
       {icon}
-    </button>
+    </IconButton>
   );
   return (
     <>
-      {b('Полужирный', <Bold size={19} />, 'bold', state.bold)}
-      {b('Курсив', <Italic size={19} />, 'italic', state.italic)}
-      {b('Подчёркнутый', <Underline size={19} />, 'underline', state.underline)}
+      {b('Полужирный', <Bold size={20} />, 'bold', state.bold)}
+      {b('Курсив', <Italic size={20} />, 'italic', state.italic)}
+      {b('Подчёркнутый', <Underline size={20} />, 'underline', state.underline)}
     </>
   );
 }

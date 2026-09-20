@@ -26,14 +26,15 @@ export function LibrarySortSelect({
   onSort: (value: LibrarySort) => void;
 }) {
   return (
-    <label className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
+    <label className="flex items-center gap-2 text-sm text-muted">
       <span className="sr-only sm:not-sr-only">Порядок</span>
       <Select
         value={sort}
         onChange={onSort}
         options={SORTS.map((s) => ({ value: s.id, label: s.title }))}
         aria-label="Порядок в библиотеке"
-        className="w-48 py-1 text-sm"
+        compact
+        className="w-48"
       />
     </label>
   );

@@ -1,16 +1,26 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { DayPoint } from '../api/analytics';
-import { cn } from '../ui/cn';
 
 /**
  * Столбики по дням на своём SVG — без библиотеки.
  *
  * Одна шкала на график: два ряда (выпуск и проверки) стоят друг под другом
- * на общей оси дат, а не на двух шкалах в одном поле. Наведение показывает
- * день и число, крупные точки ряда подписаны прямо на столбике.
- * Периоды длиннее ста дней сворачиваются в недели: 365 столбиков
- * на ширине карточки не разглядеть.
+ * на общей оси дат, а не на двух шкалах в одном поле. Первый ряд акцентный,
+ * второй приглушённый — цвета только из токенов темы, без своей палитры.
+ * Наведение показывает день и число. Периоды длиннее ста дней
+ * сворачиваются в недели: 365 столбиков на ширине карточки не разглядеть.
  */
+
+export type ChartTone = 'accent' | 'muted';
+
+/** Прежнее имя второго ряда — `ok`; рабочий стол пока зовёт его так. */
+type ToneProp = ChartTone | 'ok';
+
+const FILL: Record<ChartTone, string> = { accent: 'var(--accent)', muted: 'var(--text-muted)' };
+
+function fillOf(tone: ToneProp): string {
+  return FILL[tone === 'ok' ? 'muted' : tone];
+}
 
 const MONTHS = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
 
@@ -63,7 +73,7 @@ export function DayChart({
   unit,
 }: {
   points: DayPoint[];
-  tone?: 'accent' | 'ok';
+  tone?: ToneProp;
   height?: number;
   /** Подпись ряда для скринридера и подсказки: «выпущено». */
   label: string;
@@ -85,7 +95,7 @@ export function DayChart({
   const bar = Math.max(2, Math.min(28, slot - 2));
   const y = (n: number) => padT + innerH * (1 - n / max);
   const ticks = max <= 2 ? [0, max] : [0, Math.round(max / 2), max];
-  const fill = tone === 'ok' ? 'var(--ok)' : 'var(--accent)';
+  const fill = fillOf(tone);
   const weekly = buckets.length > 0 && buckets[0].from !== buckets[0].to;
   const total = buckets.reduce((s, b) => s + b.n, 0);
 
@@ -111,6 +121,7 @@ export function DayChart({
                 textAnchor="end"
                 fontSize="11"
                 fill="var(--text-muted)"
+                className="tabular"
               >
                 {t}
               </text>
@@ -154,7 +165,7 @@ export function DayChart({
           />
           {buckets.length > 1 && (
             <>
-              <text x={padL} y={height - 5} fontSize="11" fill="var(--text-muted)">
+              <text x={padL} y={height - 5} fontSize="11" fill="var(--text-muted)" className="tabular">
                 {shortDay(buckets[0].from)}
               </text>
               <text
@@ -163,6 +174,7 @@ export function DayChart({
                 fontSize="11"
                 textAnchor="end"
                 fill="var(--text-muted)"
+                className="tabular"
               >
                 {shortDay(buckets[buckets.length - 1].to)}
               </text>
@@ -173,9 +185,7 @@ export function DayChart({
       {hovered && hover !== null && (
         <div
           role="status"
-          className={cn(
-            'pointer-events-none absolute top-0 z-10 rounded-lg bg-[var(--text)] px-2.5 py-1.5 text-xs text-[var(--ground)] shadow-[var(--shadow-md)]',
-          )}
+          className="pointer-events-none absolute top-0 z-10 rounded-control bg-ink px-2.5 py-1.5 text-xs text-ground shadow-md"
           style={{
             left: Math.min(
               Math.max(0, padL + hover * slot + slot / 2 - 60),
@@ -183,12 +193,12 @@ export function DayChart({
             ),
           }}
         >
-          <div className="text-[var(--ground)]/70">
+          <div className="text-ground/70">
             {hovered.from === hovered.to
               ? shortDay(hovered.from)
               : `${shortDay(hovered.from)} — ${shortDay(hovered.to)}`}
           </div>
-          <div className="font-medium tabular-nums">{unit(hovered.n)}</div>
+          <div className="tabular font-medium">{unit(hovered.n)}</div>
         </div>
       )}
     </div>
@@ -202,7 +212,7 @@ export function Sparkline({
   className = '',
 }: {
   points: DayPoint[];
-  tone?: 'accent' | 'ok';
+  tone?: ToneProp;
   className?: string;
 }) {
   const w = 84;
@@ -214,7 +224,7 @@ export function Sparkline({
     (b, i) =>
       `${((i * (w - 2)) / (buckets.length - 1) + 1).toFixed(1)},${(h - 2 - (h - 6) * (b.n / max)).toFixed(1)}`,
   );
-  const stroke = tone === 'ok' ? 'var(--ok)' : 'var(--accent)';
+  const stroke = fillOf(tone);
   const last = pts[pts.length - 1].split(',');
   return (
     <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} aria-hidden className={className}>
