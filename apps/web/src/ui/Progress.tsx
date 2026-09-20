@@ -79,7 +79,7 @@ export function ProgressBar({
     <div className={cn('grid gap-1.5', className)}>
       <div className="flex items-baseline justify-between gap-3 text-sm">
         <span className="font-medium">{label}</span>
-        <span className="tabular text-[var(--text-muted)]">
+        <span className="tabular text-muted">
           {done + failed} из {total}
         </span>
       </div>
@@ -89,28 +89,28 @@ export function ProgressBar({
         aria-valuemax={total}
         aria-valuenow={done + failed}
         aria-label={`${label}: ${done + failed} из ${total}`}
-        className="h-1.5 overflow-hidden rounded-full bg-[var(--surface-sunken)]"
+        className="h-1.5 overflow-hidden rounded-full bg-sunken"
       >
         <div className="flex h-full">
           <span
-            className="block h-full bg-[var(--accent)] transition-[width] duration-500 ease-out"
+            className="block h-full bg-accent transition-[width] duration-320"
             style={{ width: `${total > 0 ? (done / total) * 100 : 0}%` }}
           />
           {failed > 0 && (
             <span
-              className="block h-full bg-[var(--danger)] transition-[width] duration-500 ease-out"
+              className="block h-full bg-danger transition-[width] duration-320"
               style={{ width: `${(failed / total) * 100}%` }}
             />
           )}
         </div>
       </div>
       <div
-        className="flex justify-between gap-3 text-xs text-[var(--text-muted)]"
+        className="flex justify-between gap-3 text-xs text-muted"
         aria-live="polite"
       >
         <span>
           {percent}%{eta && running ? ` · ${eta}` : ''}
-          {failed > 0 && <span className="text-[var(--danger)]"> · ошибок {failed}</span>}
+          {failed > 0 && <span className="text-danger"> · ошибок {failed}</span>}
         </span>
         {running && <span>Можно закрыть вкладку</span>}
       </div>

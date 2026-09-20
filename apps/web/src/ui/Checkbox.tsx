@@ -21,10 +21,10 @@ import { cn } from './cn';
 const box =
   'grid size-[18px] shrink-0 place-items-center rounded-[5px] ring-1 transition-colors ' +
   'peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 ' +
-  'peer-focus-visible:outline-[var(--focus)] peer-disabled:opacity-40';
+  'peer-focus-visible:outline-focus peer-disabled:opacity-40';
 
-const on = 'bg-[var(--accent)] ring-[var(--accent)]';
-const off = 'bg-[var(--surface)] ring-[var(--line-strong)]';
+const on = 'bg-accent ring-accent';
+const off = 'bg-surface ring-line-strong';
 
 interface Shared {
   disabled?: boolean;
@@ -52,7 +52,7 @@ export function Checkbox({
   required?: boolean;
 }) {
   const control = (
-    <span className="relative inline-flex items-center">
+    <span className="relative inline-flex size-6 items-center justify-center">
       <input
         type="checkbox"
         className="peer sr-only"
@@ -64,7 +64,7 @@ export function Checkbox({
         aria-label={rest['aria-label']}
       />
       <span aria-hidden className={cn(box, checked ? on : off)}>
-        {checked && <Check size={12} strokeWidth={3} className="text-[var(--accent-contrast)]" />}
+        {checked && <Check size={12} strokeWidth={3} className="text-on-accent" />}
       </span>
     </span>
   );
@@ -92,7 +92,7 @@ export function Radio({
   name: string;
 }) {
   const control = (
-    <span className="relative inline-flex items-center">
+    <span className="relative inline-flex size-6 items-center justify-center">
       <input
         type="radio"
         className="peer sr-only"
@@ -103,7 +103,7 @@ export function Radio({
         aria-label={rest['aria-label']}
       />
       <span aria-hidden className={cn(box, 'rounded-full', checked ? on : off)}>
-        {checked && <span className="size-1.5 rounded-full bg-[var(--accent-contrast)]" />}
+        {checked && <span className="size-1.5 rounded-full bg-on-accent" />}
       </span>
     </span>
   );
@@ -176,7 +176,7 @@ function Framed({
       <span className="mt-0.5">{control}</span>
       <span>
         {label}
-        {hint && <span className="mt-0.5 block text-[var(--text-muted)]">{hint}</span>}
+        {hint && <span className="mt-0.5 block text-muted">{hint}</span>}
       </span>
     </label>
   );

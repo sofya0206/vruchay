@@ -2,106 +2,174 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { Button } from './Button';
 import { IconButton } from './IconButton';
+import { BottomSheet } from './BottomSheet';
+import { cn } from './cn';
+import { focusFirst, useOverlayState, useScrollLock } from './overlay/useOverlayState';
+import { usePhone } from './useMediaQuery';
 
-/** Окно поверх страницы — одно на кабинет. */
+const ENTER_MS = 240;
+
+type Size = 'sm' | 'md' | 'lg';
+const widths: Record<Size, string> = { sm: 'max-w-md', md: 'max-w-xl', lg: 'max-w-4xl' };
+
+/**
+ * Окно поверх страницы — одно на кабинет.
+ *
+ * Нативный `<dialog>` с `showModal()`: верхний слой, Esc, недоступный
+ * фон и возврат фокуса опенеру браузер даёт сам, без своей ловушки.
+ * Затемнение рисуем внутри диалога, а не через `::backdrop` — у
+ * псевдоэлемента нет анимации появления в Safari до 17.5.
+ *
+ * Появляется от центра, с 0.96, а не из нуля: ничто в мире не возникает
+ * из точки. На телефоне то же окно становится нижним листом: кнопки
+ * подтверждения под большим пальцем, а не посреди экрана.
+ */
 export function Dialog({
   title,
+  description,
   onClose,
   children,
   footer,
+  size = 'md',
   wide,
+  dismissible = true,
+  className = '',
 }: {
   title: string;
+  /** Одна строка под заголовком — зачем это окно. */
+  description?: ReactNode;
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
+  size?: Size;
+  /** Прежнее имя широкого окна. */
   wide?: boolean;
+  /** Закрывается ли нажатием мимо и Esc. Нет — только своей кнопкой. */
+  dismissible?: boolean;
+  className?: string;
 }) {
+  const phone = usePhone();
+  if (phone) {
+    return (
+      <BottomSheet open onClose={onClose} title={title} footer={footer}>
+        <div className="px-3 pt-1">
+          {description && <p className="mb-3 text-sm text-muted">{description}</p>}
+          {children}
+        </div>
+      </BottomSheet>
+    );
+  }
+  return (
+    <DesktopDialog
+      title={title}
+      description={description}
+      onClose={onClose}
+      footer={footer}
+      size={wide ? 'lg' : size}
+      dismissible={dismissible}
+      className={className}
+    >
+      {children}
+    </DesktopDialog>
+  );
+}
+
+function DesktopDialog({
+  title,
+  description,
+  onClose,
+  children,
+  footer,
+  size,
+  dismissible,
+  className,
+}: {
+  title: string;
+  description?: ReactNode;
+  onClose: () => void;
+  children: ReactNode;
+  footer?: ReactNode;
+  size: Size;
+  dismissible: boolean;
+  className: string;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
   const panel = useRef<HTMLDivElement>(null);
+  const { shown } = useOverlayState(true, ENTER_MS);
+  useScrollLock(true);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
-  /*
-   * Фокус: внутрь при открытии, по кругу внутри, назад при закрытии.
-   * Без этого Tab уходил за окно на страницу под затемнением, а после
-   * закрытия фокус терялся в начале документа.
-   */
-  useEffect(() => {
-    const opener = document.activeElement as HTMLElement | null;
-    const root = panel.current;
-    if (!root) return;
-    const focusable = () =>
-      Array.from(
-        root.querySelectorAll<HTMLElement>(
-          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-        ),
-      ).filter((el) => el.offsetParent !== null || el === document.activeElement);
-    // Первое поле формы, а не крестик «Закрыть»: человек открыл окно,
-    // чтобы что-то ввести или подтвердить.
-    const first = focusable().find((el) => el.getAttribute('aria-label') !== 'Закрыть') ?? root;
-    first.focus();
-
-    const trap = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab') return;
-      const list = focusable();
-      if (list.length === 0) return;
-      const head = list[0];
-      const tail = list[list.length - 1];
-      if (e.shiftKey && document.activeElement === head) {
-        e.preventDefault();
-        tail.focus();
-      } else if (!e.shiftKey && document.activeElement === tail) {
-        e.preventDefault();
-        head.focus();
-      }
-    };
-    root.addEventListener('keydown', trap);
+    const el = dialog.current;
+    if (!el) return;
+    if (!el.open) {
+      if (typeof el.showModal === 'function') el.showModal();
+      else el.setAttribute('open', '');
+    }
+    focusFirst(panel.current);
     return () => {
-      root.removeEventListener('keydown', trap);
-      opener?.focus?.();
+      if (el.open) el.close();
     };
   }, []);
 
   return (
-    <div
-      // На телефоне окно прижато к низу во всю ширину, как нижний лист: кнопки
-      // подтверждения под большим пальцем, а не посреди экрана.
-      className="fixed inset-0 z-50 grid place-items-center bg-[var(--scrim)] p-4 max-sm:place-items-end max-sm:p-0"
-      role="dialog"
-      aria-modal="true"
+    <dialog
+      ref={dialog}
       aria-label={title}
-      onClick={(e) => e.target === e.currentTarget && onClose()}
+      onCancel={(e) => {
+        e.preventDefault();
+        if (dismissible) onClose();
+      }}
+      // Esc ловим и сами: событие cancel у диалога приходит не во всех
+      // сборках Chromium, а закрываться клавишей окно обязано всегда.
+      onKeyDown={(e) => {
+        if (e.key !== 'Escape') return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (dismissible) onClose();
+      }}
+      className="fixed inset-0 m-0 h-full max-h-none w-full max-w-none overflow-hidden bg-transparent p-0 text-ink backdrop:bg-transparent"
     >
       <div
-        ref={panel}
-        tabIndex={-1}
-        className={`flex max-h-full w-full flex-col overflow-hidden rounded-2xl bg-[var(--surface-raised)] outline-none shadow-lg max-sm:max-h-[85vh] max-sm:rounded-b-none ${
-          wide ? 'max-w-4xl' : 'max-w-xl'
-        }`}
-      >
-        <header className="flex items-center gap-3 border-b border-[var(--line)] px-5 py-3">
-          <h2 className="min-w-0 truncate text-lg font-medium">{title}</h2>
-          <IconButton className="ml-auto" label="Закрыть" onClick={onClose}>
-            <X size={18} />
-          </IconButton>
-        </header>
+        aria-hidden
+        onClick={dismissible ? onClose : undefined}
+        className="absolute inset-0 bg-scrim"
+        style={{ opacity: shown ? 1 : 0, transition: `opacity ${ENTER_MS}ms var(--ease-out)` }}
+      />
+      <div className="absolute inset-0 grid place-items-center p-4" onClick={dismissible ? onClose : undefined}>
+        <div
+          ref={panel}
+          role="document"
+          tabIndex={-1}
+          onClick={(e) => e.stopPropagation()}
+          className={cn(
+            'flex max-h-full w-full flex-col overflow-hidden rounded-sheet bg-raised shadow-lg outline-none',
+            widths[size],
+            className,
+          )}
+          style={{
+            opacity: shown ? 1 : 0,
+            transform: shown ? 'none' : 'scale(0.96)',
+            transition: `opacity ${ENTER_MS}ms var(--ease-out), transform ${ENTER_MS}ms var(--ease-out)`,
+          }}
+        >
+          <header className="flex items-start gap-3 border-b border-line px-5 py-3">
+            <div className="min-w-0 flex-1 pt-1.5">
+              <h2 className="truncate text-lg font-medium leading-tight">{title}</h2>
+              {description && <p className="mt-0.5 text-sm text-muted">{description}</p>}
+            </div>
+            <IconButton label="Закрыть" onClick={onClose}>
+              <X size={18} />
+            </IconButton>
+          </header>
 
-        <div className="min-h-0 flex-1 overflow-auto p-5">{children}</div>
+          <div className="min-h-0 flex-1 overflow-auto p-5">{children}</div>
 
-        {footer && (
-          <footer
-            className="flex items-center justify-end gap-2 border-t border-[var(--line)] px-5 pt-3 max-sm:flex-col-reverse max-sm:items-stretch max-sm:[&>*]:h-11"
-            style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
-          >
-            {footer}
-          </footer>
-        )}
+          {footer && (
+            <footer className="flex items-center justify-end gap-2 border-t border-line px-5 py-3">{footer}</footer>
+          )}
+        </div>
       </div>
-    </div>
+    </dialog>
   );
 }
 
@@ -133,20 +201,21 @@ export function ConfirmDialog({
     <Dialog
       title={title}
       onClose={onClose}
+      size="sm"
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
             Отмена
           </Button>
-          <Button variant={danger ? 'danger' : 'primary'} disabled={pending} onClick={onConfirm}>
+          <Button variant={danger ? 'danger' : 'primary'} loading={pending} onClick={onConfirm}>
             {confirmLabel}
           </Button>
         </>
       }
     >
-      {children && <div className="text-[var(--text-muted)]">{children}</div>}
+      {children && <div className="text-muted">{children}</div>}
       {error && (
-        <p role="alert" className="mt-3 rounded-lg bg-[var(--danger-soft)] p-3 text-[var(--danger)]">
+        <p role="alert" className="mt-3 rounded-control bg-danger-soft p-3 text-danger">
           {error}
         </p>
       )}

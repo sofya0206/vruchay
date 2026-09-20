@@ -185,6 +185,15 @@ textarea::-webkit-resizer {
   }
 }
 
+/*
+ * Всплывающий слой появляется от точки вызова: меню — от угла кнопки,
+ * список — от поля. Не из нуля, а с 0.96: ничто не возникает из точки.
+ */
+.vru-pop-in {
+  animation: vru-pop 160ms var(--ease-out) both;
+  transform-origin: var(--pop-origin, top left);
+}
+
 /* Медленное «дыхание» вместо вертящегося колеса: на наградной странице
    крутящийся индикатор читается тревожно, а тут ничего не случилось. */
 @keyframes vru-beat {
@@ -234,7 +243,8 @@ textarea::-webkit-resizer {
     transition-duration: 0.01ms !important;
   }
   .vru-loading,
-  .vru-beat {
+  .vru-beat,
+  .vru-pop-in {
     animation: none;
   }
 }

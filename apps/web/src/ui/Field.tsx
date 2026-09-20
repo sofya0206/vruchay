@@ -7,30 +7,49 @@ import {
   type ReactNode,
   type TextareaHTMLAttributes,
 } from 'react';
+import { Badge, type BadgeTone } from './Badge';
 import { cn } from './cn';
 
-const control =
-  'w-full rounded-lg bg-[var(--surface)] px-3 py-2 text-[var(--text)] ' +
-  'ring-1 ring-[var(--line)] transition-colors outline-none ' +
-  'placeholder:text-[var(--text-muted)] focus:ring-2 focus:ring-[var(--focus)]';
+/**
+ * Один класс на все поля: высота 40, скругление контрола, волосяная
+ * рамка, фокус — кольцо цвета фокуса, ошибка — красная рамка.
+ * `w-full` — умолчание, которое снаружи заменяют через `cn`.
+ */
+export const control =
+  'h-10 w-full rounded-control bg-surface px-3 text-sm text-ink ring-1 ring-line outline-none ' +
+  'transition-[box-shadow,background-color] placeholder:text-muted ' +
+  'focus-visible:ring-2 focus-visible:ring-focus aria-invalid:ring-danger ' +
+  'disabled:cursor-not-allowed disabled:opacity-50';
+
+/** Поле в строке таблицы или на панели: ниже и теснее. */
+export const controlCompact = 'h-8 px-2.5';
 
 /**
  * Подпись поля. Настоящий `label`: с `htmlFor` читалка называет поле
- * по подписи, а клик по ней ставит курсор в поле. Без `htmlFor` она
- * работает только как обёртка — тогда лучше `<Field>` ниже.
+ * по подписи, а клик по ней ставит курсор в поле.
  */
 export function Label({
   children,
   hint,
   htmlFor,
+  required,
+  className = '',
 }: {
   children: ReactNode;
   hint?: ReactNode;
   htmlFor?: string;
+  required?: boolean;
+  className?: string;
 }) {
   return (
-    <label htmlFor={htmlFor} className="mb-1.5 block text-sm font-medium text-[var(--text-muted)]">
+    <label htmlFor={htmlFor} className={cn('mb-1.5 block text-sm font-medium text-muted', className)}>
       {children}
+      {required && (
+        <span aria-hidden className="text-danger">
+          {' '}
+          *
+        </span>
+      )}
       {hint}
     </label>
   );
@@ -40,12 +59,17 @@ export function Label({
  * Подпись + поле одной парой: id рождается здесь и уходит в оба.
  * `<Field label="Почта"><Input … /></Field>` — и поле подписано
  * для читалки, и клик по подписи попадает в него.
+ *
+ * `layout="inline"` — подпись слева, поле справа: для длинных форм
+ * настроек на широком экране, где стопка подписей растягивает страницу.
  */
 export function Field({
   label,
   hint,
   help,
   error,
+  required,
+  layout = 'stack',
   children,
   className = '',
 }: {
@@ -55,72 +79,77 @@ export function Field({
   help?: ReactNode;
   /** Текст ошибки под полем: красный и связан с полем через aria. */
   error?: ReactNode;
+  required?: boolean;
+  layout?: 'stack' | 'inline';
   children: ReactElement<{ id?: string; 'aria-describedby'?: string; 'aria-invalid'?: boolean }>;
   className?: string;
 }) {
   const generated = useId();
   const id = (isValidElement(children) && children.props.id) || generated;
   const helpId = help || error ? `${id}-help` : undefined;
-  const control = isValidElement(children)
+  const field = isValidElement(children)
     ? cloneElement(children, {
         id,
         'aria-describedby': helpId,
         'aria-invalid': error ? true : undefined,
       })
     : children;
+  const note = (error || help) && (
+    <p id={helpId} className={cn('mt-1.5 text-sm', error ? 'text-danger' : 'text-muted')}>
+      {error || help}
+    </p>
+  );
+
+  if (layout === 'inline') {
+    return (
+      <div className={cn('grid gap-1.5 sm:grid-cols-[minmax(10rem,1fr)_2fr] sm:items-start sm:gap-6', className)}>
+        <Label htmlFor={id} hint={hint} required={required} className="sm:mb-0 sm:pt-2.5">
+          {label}
+        </Label>
+        <div>
+          {field}
+          {note}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={className}>
-      <Label htmlFor={id} hint={hint}>
+      <Label htmlFor={id} hint={hint} required={required}>
         {label}
       </Label>
-      {control}
-      {(error || help) && (
-        <p
-          id={helpId}
-          className={`mt-1.5 text-sm ${error ? 'text-[var(--danger)]' : 'text-[var(--text-muted)]'}`}
-        >
-          {error || help}
-        </p>
-      )}
+      {field}
+      {note}
     </div>
   );
 }
 
-export function Input({ className = '', ...rest }: InputHTMLAttributes<HTMLInputElement>) {
-  return <input className={cn(control, className)} {...rest} />;
+export function Input({
+  className = '',
+  compact,
+  ...rest
+}: InputHTMLAttributes<HTMLInputElement> & { compact?: boolean }) {
+  return <input className={cn(control, compact && controlCompact, className)} {...rest} />;
 }
 
 export function Textarea({ className = '', ...rest }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea className={cn(control, className)} {...rest} />;
+  return <textarea className={cn(control, 'h-auto min-h-24 py-2', className)} {...rest} />;
 }
 
 export type ChipTone = 'neutral' | 'progress' | 'done' | 'warn' | 'error';
 
-/**
- * Состояние выводим формой и цветом сразу — чтобы читалось не только
- * по тексту. Пять оттенков: «никак», «идёт», «готово», «требует внимания»
- * и «беда» — реестру нужно отличать замену и отзыв от простого «идёт».
- *
- * Цвета — семантические, а не оттенки одного синего: зелёный — сделано
- * и дошло, жёлтый — заменён и истёк, красный — отозван и не дошло,
- * синий — идёт. Иначе на реестре из пятидесяти строк беду от нормы
- * было не отличить.
- */
+const chipTones: Record<ChipTone, BadgeTone> = {
+  neutral: 'neutral',
+  progress: 'info',
+  done: 'ok',
+  warn: 'warn',
+  error: 'danger',
+};
+
+/** Прежнее имя метки состояния — теперь это `Badge`. */
 export function StatusChip({ tone, children }: { tone: ChipTone; children: ReactNode }) {
-  const tones = {
-    neutral: 'bg-[var(--surface-sunken)] text-[var(--text-muted)]',
-    progress: 'bg-[var(--award-soft)] text-[var(--award)]',
-    done: 'bg-[var(--ok-soft)] text-[var(--ok)]',
-    warn: 'bg-[var(--warn-soft)] text-[var(--warn)]',
-    error: 'bg-[var(--danger-soft)] text-[var(--danger)]',
-  } as const;
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap ${tones[tone]}`}
-    >
-      {children}
-    </span>
-  );
+  return <Badge tone={chipTones[tone]}>{children}</Badge>;
 }
 
 /**
@@ -128,27 +157,11 @@ export function StatusChip({ tone, children }: { tone: ChipTone; children: React
  *
  * Подпись — часть кнопки, а не текст рядом: попасть по самому ползунку
  * с телефона трудно, а промах по настройке безопасности стоит дорого.
- *
- * Размер `lg` — для разделов в полный экран: там ползунок и подпись идут
- * в один кегль с остальными настройками, а не мельче их.
+ * Дорожка 24 точки в высоту — цель, в которую попадают пальцем.
  */
 const toggleSizes = {
-  md: {
-    track: 'h-5 w-9',
-    knob: 'h-4 w-4',
-    shift: 'translate-x-4',
-    label: 'text-sm',
-    hint: 'pl-12 text-xs',
-  },
-  lg: {
-    track: 'h-6 w-11',
-    knob: 'h-5 w-5',
-    shift: 'translate-x-5',
-    label: 'text-base',
-    // Длинную строку пояснения подрезаем: крупный переключатель стоит
-    // в широкой карточке, и текст во всю её ширину не читается.
-    hint: 'max-w-3xl pl-14 text-sm',
-  },
+  md: { label: 'text-sm', hint: 'pl-14 text-xs' },
+  lg: { label: 'text-base', hint: 'max-w-3xl pl-14 text-sm' },
 } as const;
 
 export function Toggle({
@@ -180,19 +193,21 @@ export function Toggle({
       >
         <span
           aria-hidden
-          className={`mt-0.5 inline-flex shrink-0 items-center rounded-full p-0.5 transition-colors ${s.track} ${
-            checked ? 'bg-[var(--accent)]' : 'bg-[var(--line-strong)]'
-          }`}
+          className={cn(
+            'mt-px inline-flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition-colors',
+            checked ? 'bg-accent' : 'bg-line-strong',
+          )}
         >
           <span
-            className={`rounded-full bg-white transition-transform ${s.knob} ${
-              checked ? s.shift : ''
-            }`}
+            className={cn(
+              'size-5 rounded-full bg-white shadow-sm transition-transform duration-180',
+              checked && 'translate-x-5',
+            )}
           />
         </span>
-        <span className={s.label}>{label}</span>
+        <span className={cn('pt-0.5', s.label)}>{label}</span>
       </button>
-      {hint && <p className={`mt-1 text-[var(--text-muted)] ${s.hint}`}>{hint}</p>}
+      {hint && <p className={cn('mt-1 text-muted', s.hint)}>{hint}</p>}
     </div>
   );
 }

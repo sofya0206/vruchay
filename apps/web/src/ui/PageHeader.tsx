@@ -1,47 +1,56 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronRight } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
+import { cn } from './cn';
 
 /**
- * Заголовок страницы — один на весь кабинет.
+ * Шапка страницы — одна на весь кабинет.
  *
- * `h1` в одном кегле везде, подводка под ним, действия справа. У вложенных
- * экранов — путь «Документы › Название»: это и есть дорога назад, ясная
- * и с подписью, вместо безымянной стрелки по истории браузера.
+ * Название с числом, одно действие справа, при необходимости — путь
+ * назад с подписью (не безымянная стрелка по истории браузера) и строка
+ * вкладок под названием. Стоит внутри панели `SectionLayout`/`PageLayout`,
+ * поэтому сама отступов не несёт.
  */
 export function PageHeader({
   title,
+  count,
   about,
-  parent,
   actions,
-  children,
+  tabs,
+  back,
+  className = '',
 }: {
   title: ReactNode;
+  count?: number | null;
   about?: ReactNode;
-  /** Родительский раздел: ссылка перед названием. */
-  parent?: { to: string; label: string };
+  /** Действия справа — одно залитое, остальные вторичные. */
   actions?: ReactNode;
-  /** Строка под заголовком: вкладки, поиск. */
-  children?: ReactNode;
+  /** Строка под названием: вкладки, поиск. */
+  tabs?: ReactNode;
+  /** Родительский раздел: «‹ Документы». */
+  back?: { to: string; label: string };
+  className?: string;
 }) {
   return (
-    <div className="mb-6">
-      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
-        <div className="min-w-0">
-          {parent && (
-            <p className="mb-1 flex items-center gap-1 text-sm text-[var(--text-muted)]">
-              <Link to={parent.to} className="hover:text-[var(--text)] hover:underline">
-                {parent.label}
-              </Link>
-              <ChevronRight size={14} aria-hidden />
-            </p>
-          )}
-          <h1 className="text-2xl font-medium">{title}</h1>
-          {about && <p className="mt-1 max-w-2xl text-[var(--text-muted)]">{about}</p>}
+    <div className={cn('min-w-0 flex-1', className)}>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        {back && (
+          <Link
+            to={back.to}
+            className="pressable -ml-2 inline-flex h-8 items-center gap-0.5 rounded-control pr-2 pl-1 text-sm text-muted hover:bg-sunken hover:text-ink"
+          >
+            <ChevronLeft size={16} aria-hidden />
+            {back.label}
+          </Link>
+        )}
+        <div className="flex min-w-0 items-baseline gap-2">
+          <h1 className="truncate text-lg font-medium">{title}</h1>
+          {count != null && <span className="tabular text-sm text-muted">{count}</span>}
         </div>
-        {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+        {actions && <div className="ml-auto flex shrink-0 items-center gap-2">{actions}</div>}
       </div>
-      {children && <div className="mt-4">{children}</div>}
+      {about && <p className="mt-0.5 text-sm text-muted">{about}</p>}
+      {tabs && <div className="mt-3">{tabs}</div>}
     </div>
   );
 }

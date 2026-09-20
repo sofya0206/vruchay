@@ -54,9 +54,9 @@ export function Outcome({
 }
 
 const tones = {
-  ok: 'bg-[var(--ok-soft)] text-[var(--ok)]',
-  danger: 'bg-[var(--danger-soft)] text-[var(--danger)]',
-  warn: 'bg-[var(--warn-soft)] text-[var(--warn)]',
+  ok: 'bg-ok-soft text-ok',
+  danger: 'bg-danger-soft text-danger',
+  warn: 'bg-warn-soft text-warn',
 } as const;
 
 function Counter({
@@ -74,7 +74,7 @@ function Counter({
     <span className="inline-flex items-center gap-2">
       <span className={cn('grid size-6 place-items-center rounded-full', tones[tone])}>{icon}</span>
       <span className="tabular text-xl font-medium leading-none">{n}</span>
-      <span className="text-sm text-[var(--text-muted)]">{label}</span>
+      <span className="text-sm text-muted">{label}</span>
     </span>
   );
 }

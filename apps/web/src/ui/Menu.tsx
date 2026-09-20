@@ -8,7 +8,9 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useLocation } from 'react-router-dom';
+import { Check } from 'lucide-react';
 import { BottomSheet } from './BottomSheet';
+import { Kbd } from './Kbd';
 import { cn } from './cn';
 import { useMediaQuery } from './useMediaQuery';
 
@@ -162,10 +164,17 @@ export function Menu({
             ref={panel}
             role="menu"
             onClick={closeOnPick}
-            className="card fixed z-50 min-w-56 overflow-y-auto bg-[var(--surface-raised)] p-1.5 shadow-lg"
+            className="vru-pop-in fixed z-[60] min-w-56 overflow-y-auto rounded-card bg-raised p-1.5 shadow-lg ring-1 ring-line"
             // Предел высоты — по месту, которое осталось: длинное меню
-            // прокручивается, а не уезжает за край окна.
-            style={{ left: box.left, top: box.top, bottom: box.bottom, maxHeight: Math.max(160, box.room) }}
+            // прокручивается, а не уезжает за край окна. Появляется от
+            // угла кнопки, а не из центра: так видно, откуда оно.
+            style={{
+              left: box.left,
+              top: box.top,
+              bottom: box.bottom,
+              maxHeight: Math.max(160, box.room),
+              ['--pop-origin' as string]: `${box.bottom !== undefined ? 'bottom' : 'top'} ${align}`,
+            }}
           >
             {children}
           </div>,
@@ -176,7 +185,7 @@ export function Menu({
 }
 
 const itemClass =
-  'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[15px] text-[var(--text)] transition-colors hover:bg-[var(--surface-sunken)] disabled:opacity-50 disabled:hover:bg-transparent ' +
+  'flex w-full items-center gap-2.5 rounded-control px-2.5 py-2 text-left text-sm text-ink transition-colors hover:bg-sunken disabled:opacity-50 disabled:hover:bg-transparent ' +
   // Под палец: 48 точек в высоту, как у пунктов системных листов.
   'pointer-coarse:min-h-12 pointer-coarse:px-3 pointer-coarse:text-base';
 
@@ -184,6 +193,8 @@ export function MenuItem({
   icon,
   to,
   danger,
+  shortcut,
+  checked,
   children,
   className = '',
   ...rest
@@ -192,28 +203,40 @@ export function MenuItem({
   /** Ссылка вместо кнопки. */
   to?: string;
   danger?: boolean;
+  /** Горячая клавиша — справа серым, на сенсорном экране не показывается. */
+  shortcut?: string;
+  /** Пункт-переключатель: галочка справа. */
+  checked?: boolean;
 }) {
-  const cls = cn(itemClass, danger && 'text-[var(--danger)] hover:bg-[var(--danger-soft)]', className);
+  const cls = cn(itemClass, danger && 'text-danger hover:bg-danger-soft', className);
+  const body = (
+    <>
+      {icon}
+      <span className="min-w-0 flex-1 truncate">{children}</span>
+      {shortcut && <Kbd>{shortcut}</Kbd>}
+      {checked !== undefined && (
+        <Check size={16} aria-hidden className={cn('shrink-0', checked ? 'text-accent' : 'invisible')} />
+      )}
+    </>
+  );
   if (to) {
     return (
       <Link role="menuitem" to={to} className={cls}>
-        {icon}
-        {children}
+        {body}
       </Link>
     );
   }
   return (
-    <button type="button" role="menuitem" className={cls} {...rest}>
-      {icon}
-      {children}
+    <button type="button" role="menuitem" aria-checked={checked} className={cls} {...rest}>
+      {body}
     </button>
   );
 }
 
 export function MenuDivider() {
-  return <div className="my-1.5 h-px bg-[var(--line)]" />;
+  return <div className="my-1.5 h-px bg-line" />;
 }
 
 export function MenuLabel({ children }: { children: ReactNode }) {
-  return <div className="truncate px-2.5 pt-1 pb-2 text-sm text-[var(--text-muted)]">{children}</div>;
+  return <div className="truncate px-2.5 pt-1 pb-2 text-sm text-muted">{children}</div>;
 }

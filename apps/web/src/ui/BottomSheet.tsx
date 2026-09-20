@@ -118,13 +118,13 @@ export function BottomSheet({
         e.preventDefault();
         onClose();
       }}
-      className="fixed inset-0 m-0 h-full max-h-none w-full max-w-none overflow-hidden bg-transparent p-0 text-[var(--text)] backdrop:bg-transparent"
+      className="fixed inset-0 m-0 h-full max-h-none w-full max-w-none overflow-hidden bg-transparent p-0 text-ink backdrop:bg-transparent"
       style={{ overscrollBehavior: 'contain' }}
     >
       <div
         aria-hidden
         onClick={onClose}
-        className="absolute inset-0 bg-[var(--scrim)] transition-opacity"
+        className="absolute inset-0 bg-scrim transition-opacity"
         style={{
           opacity: shown ? 1 : 0,
           transitionDuration: `${shown ? ENTER_MS : EXIT_MS}ms`,
@@ -134,7 +134,7 @@ export function BottomSheet({
       <div
         ref={panel}
         className={cn(
-          'sheet-max-h absolute inset-x-0 flex flex-col rounded-t-2xl bg-[var(--surface)] shadow-lg ring-1 ring-[var(--line)]',
+          'sheet-max-h absolute inset-x-0 flex flex-col rounded-t-sheet bg-surface shadow-lg ring-1 ring-line',
           className,
         )}
         style={{
@@ -142,7 +142,7 @@ export function BottomSheet({
           transform: `translateY(${shown ? drag : '100%'}${shown ? 'px' : ''})`,
           transition: dragging
             ? 'none'
-            : `transform ${shown ? ENTER_MS : EXIT_MS}ms cubic-bezier(0.32, 0.72, 0, 1)`,
+            : `transform ${shown ? ENTER_MS : EXIT_MS}ms var(--ease-drawer)`,
           // Полоса «домой» на айфонах без кнопки — поверх неё не кладём.
           paddingBottom: keyboard ? 0 : 'env(safe-area-inset-bottom)',
         }}
@@ -154,7 +154,7 @@ export function BottomSheet({
           onPointerUp={onHandleUp}
           onPointerCancel={onHandleUp}
         >
-          <div aria-hidden className="mx-auto mt-2 h-1 w-10 rounded-full bg-[var(--line-strong)]" />
+          <div aria-hidden className="mx-auto mt-2 h-1 w-10 rounded-full bg-line-strong" />
           <header className="flex items-center gap-2 py-1 pr-2 pl-5">
             <h2 className="min-w-0 flex-1 truncate text-base font-medium">{title}</h2>
             <button
@@ -162,7 +162,7 @@ export function BottomSheet({
               aria-label="Закрыть"
               onClick={onClose}
               onPointerDown={(e) => e.stopPropagation()}
-              className="grid size-11 place-items-center rounded-full text-[var(--text-muted)] hover:bg-[var(--surface-sunken)]"
+              className="pressable grid size-11 place-items-center rounded-full text-muted hover:bg-sunken"
             >
               <X size={20} />
             </button>
@@ -170,7 +170,7 @@ export function BottomSheet({
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-3">{children}</div>
         {footer && (
-          <footer className="flex shrink-0 gap-2 border-t border-[var(--line)] px-4 py-3">{footer}</footer>
+          <footer className="flex shrink-0 gap-2 border-t border-line px-4 py-3">{footer}</footer>
         )}
       </div>
     </dialog>

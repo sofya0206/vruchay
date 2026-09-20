@@ -1,6 +1,7 @@
 import { useId, useMemo, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from './cn';
+import { control, controlCompact } from './Field';
 import { useTooltip } from './Tooltip';
 import { Popover } from './Popover';
 import { useDismiss } from './useDismiss';
@@ -39,6 +40,7 @@ export function Select<T extends string = string>({
   options,
   placeholder,
   disabled,
+  compact,
   className,
   title,
   ...rest
@@ -49,6 +51,8 @@ export function Select<T extends string = string>({
   /** Подпись кнопки, когда значения нет среди опций. */
   placeholder?: string;
   disabled?: boolean;
+  /** Ростом в строку таблицы или панели. */
+  compact?: boolean;
   className?: string;
   title?: string;
   'aria-label'?: string;
@@ -179,10 +183,9 @@ export function Select<T extends string = string>({
         onClick={() => show(!open)}
         onKeyDown={onKeyDown}
         className={cn(
-          'w-full rounded-lg bg-[var(--surface)] px-3 py-2 text-left text-[var(--text)]',
-          'flex items-center justify-between gap-2 ring-1 ring-[var(--line)]',
-          'transition-colors outline-none focus:ring-2 focus:ring-[var(--focus)]',
-          'disabled:cursor-not-allowed disabled:opacity-50',
+          control,
+          compact && controlCompact,
+          'flex items-center justify-between gap-2 text-left',
           className,
         )}
       >
@@ -191,7 +194,7 @@ export function Select<T extends string = string>({
             <>
               {selected.label}
               {selected.hint && (
-                <span className="text-[var(--text-muted)]"> · {selected.hint}</span>
+                <span className="text-muted"> · {selected.hint}</span>
               )}
             </>
           ) : (
@@ -199,7 +202,7 @@ export function Select<T extends string = string>({
              * Значение, которого нет среди опций, не подменяем первым пунктом:
              * в условии награждения это тихо переписало бы само правило.
              */
-            <span className={value === '' ? 'text-[var(--text-muted)]' : undefined}>
+            <span className={value === '' ? 'text-muted' : undefined}>
               {placeholder ?? value}
             </span>
           )}
@@ -208,7 +211,7 @@ export function Select<T extends string = string>({
           size={16}
           aria-hidden
           className={cn(
-            'shrink-0 text-[var(--text-muted)] transition-transform',
+            'shrink-0 text-muted transition-transform',
             open && 'rotate-180',
           )}
         />
@@ -217,12 +220,12 @@ export function Select<T extends string = string>({
 
       {open && (
         <Popover open anchor={trigger} panelRef={panel} role="listbox" width="anchor">
-          <div id={`${id}-list`}>
+          <div id={`${id}-list`} className="py-1">
             {rows.map((row) =>
               row.kind === 'group' ? (
                 <p
                   key={`g:${row.label}`}
-                  className="px-3 pt-2 pb-1 text-xs font-medium text-[var(--text-muted)]"
+                  className="px-3 pt-2 pb-1 text-xs font-medium text-muted"
                 >
                   {row.label}
                 </p>
@@ -239,7 +242,7 @@ export function Select<T extends string = string>({
               ),
             )}
             {options.length === 0 && (
-              <p className="px-3 py-2 text-sm text-[var(--text-muted)]">Выбирать не из чего</p>
+              <p className="px-3 py-2 text-sm text-muted">Выбирать не из чего</p>
             )}
           </div>
         </Popover>
@@ -278,16 +281,16 @@ function Item<T extends string>({
         if (active) node?.scrollIntoView({ block: 'nearest' });
       }}
       className={cn(
-        'flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm',
-        'pointer-coarse:py-3 pointer-coarse:text-base',
+        'flex min-h-9 w-full items-center justify-between gap-3 px-3 py-1.5 text-left text-sm',
+        'pointer-coarse:min-h-12 pointer-coarse:text-base',
         'disabled:cursor-not-allowed disabled:opacity-40',
-        active && !option.disabled && 'bg-[var(--surface-sunken)]',
-        chosen && 'bg-[var(--accent-soft)] text-[var(--accent)]',
+        active && !option.disabled && 'bg-sunken',
+        chosen && 'bg-accent-soft text-accent',
       )}
     >
       <span className="truncate">{option.label}</span>
       {option.hint && (
-        <span className="shrink-0 text-xs text-[var(--text-muted)]">{option.hint}</span>
+        <span className="shrink-0 text-xs text-muted">{option.hint}</span>
       )}
     </button>
   );
