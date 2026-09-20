@@ -104,7 +104,7 @@ function Invoices() {
 
   if (invoices.data?.length === 0) {
     return (
-      <p className="rounded-2xl bg-[var(--surface-sunken)] p-5 text-sm text-[var(--text-muted)]">
+      <p className="rounded-sheet bg-sunken p-5 text-sm text-muted">
         Счетов пока нет. Они выставляются сами, когда организация проходит подбор
         тарифа на сайте и указывает ИНН.
       </p>
@@ -131,14 +131,14 @@ function Invoices() {
               {!inv.sentAt && <StatusChip tone="neutral">Не отправлен</StatusChip>}
             </div>
             <p className="mt-1 text-sm">{inv.buyerName}</p>
-            <p className="text-xs text-[var(--text-muted)]">
+            <p className="text-xs text-muted">
               ИНН {inv.buyerInn} · {inv.email} · от {when(inv.createdAt)}
             </p>
           </div>
 
           <div className="text-right">
             <p className="text-lg">{money(inv.amountKopecks)} ₽</p>
-            <p className="text-xs text-[var(--text-muted)]">{inv.tariff}</p>
+            <p className="text-xs text-muted">{inv.tariff}</p>
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -176,8 +176,8 @@ function Invoices() {
 /** Один и тот же ответ на «сюда нельзя» — во всех трёх вкладках. */
 function NoAccess() {
   return (
-    <div className="rounded-2xl bg-[var(--surface-sunken)] p-5 text-sm text-[var(--text-muted)]">
-      <p className="text-[var(--text)]">Этот раздел — для владельца сервиса.</p>
+    <div className="rounded-sheet bg-sunken p-5 text-sm text-muted">
+      <p className="text-ink">Этот раздел — для владельца сервиса.</p>
       <p className="mt-1">
         Здесь наша собственная бухгалтерия, а не данные вашей организации. Всё, что нужно вам,
         находится в «Настройках» и в списке материалов.
@@ -198,7 +198,7 @@ function Leads() {
 
   if (leads.data?.length === 0) {
     return (
-      <p className="rounded-2xl bg-[var(--surface-sunken)] p-5 text-sm text-[var(--text-muted)]">
+      <p className="rounded-sheet bg-sunken p-5 text-sm text-muted">
         Заявок пока нет.
       </p>
     );
@@ -216,15 +216,15 @@ function Leads() {
             {lead.tariff && <StatusChip tone="progress">{lead.tariff}</StatusChip>}
             {/* Заявка без ИНН счётом не стала — это видно сразу. */}
             {!lead.inn && <StatusChip tone="neutral">без ИНН, счёт не выставлен</StatusChip>}
-            <span className="ml-auto text-xs text-[var(--text-muted)]">{when(lead.createdAt)}</span>
+            <span className="ml-auto text-xs text-muted">{when(lead.createdAt)}</span>
           </div>
           <p className="mt-1 text-sm">
             {lead.contact} · {lead.email}
             {lead.phone ? ` · ${lead.phone}` : ''}
           </p>
-          {lead.volume && <p className="text-xs text-[var(--text-muted)]">{lead.volume}</p>}
+          {lead.volume && <p className="text-xs text-muted">{lead.volume}</p>}
           {lead.comment && (
-            <p className="mt-2 text-sm whitespace-pre-line text-[var(--text-muted)]">
+            <p className="mt-2 text-sm whitespace-pre-line text-muted">
               {lead.comment}
             </p>
           )}
@@ -290,7 +290,7 @@ function Organizations() {
   if (orgs.isError) return <NoAccess />;
 
   const items = orgs.data ?? [];
-  if (items.length === 0) return <p className="text-[var(--text-muted)]">Организаций пока нет.</p>;
+  if (items.length === 0) return <p className="text-muted">Организаций пока нет.</p>;
 
   return (
     <div className="space-y-2">
@@ -306,12 +306,12 @@ function Organizations() {
                 {org.plan === 'paid' ? 'оплачен' : 'бесплатная проба'}
               </StatusChip>
             </div>
-            <p className="mt-1 text-sm text-[var(--text-muted)]">
+            <p className="mt-1 text-sm text-muted">
               {org.ownerName ? `${org.ownerName} · ` : ''}
               {org.ownerEmail || 'владелец не найден'} · выпущено {org.issued} · с{' '}
               {when(org.createdAt)}
             </p>
-            <p className="mt-1 text-sm text-[var(--text-muted)]">
+            <p className="mt-1 text-sm text-muted">
               {org.verifiedIssuer ? 'верифицированный эмитент' : 'без значка'}
               {org.inn ? ` · ИНН ${org.inn}` : ' · ИНН не указан'}
               {org.slug

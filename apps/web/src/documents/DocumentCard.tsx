@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   CalendarPlus,
-  Check,
   ChevronLeft,
   ChevronRight,
   CornerUpLeft,
@@ -10,7 +9,7 @@ import {
   Folder,
   FolderMinus,
   LayoutTemplate,
-  MoreVertical,
+  MoreHorizontal,
   Pencil,
   PencilRuler,
   RotateCcw,
@@ -19,11 +18,14 @@ import {
 import { daysLeftInTrash, TRASH_DAYS } from '@gramota/shared';
 import type { DocumentSummary } from '../api/types';
 import { useFolders } from '../api/folders';
-import { formatWhen } from '../overview/format';
+import { formatWhen, plural } from '../overview/format';
 import { SheetRenderer } from '../render/SheetRenderer';
 import { Button } from '../ui/Button';
+import { Card } from '../ui/Card';
 import { ConfirmDialog } from '../ui/Dialog';
+import { IconButton } from '../ui/IconButton';
 import { Menu, MenuDivider, MenuItem } from '../ui/Menu';
+import { cn } from '../ui/cn';
 import { SheetThumbnail } from './SheetThumbnail';
 
 /**
@@ -39,6 +41,7 @@ import { SheetThumbnail } from './SheetThumbnail';
  */
 export function DocumentCard({
   doc,
+  tour,
   onRename,
   onMove,
   onDuplicate,
@@ -48,6 +51,8 @@ export function DocumentCard({
   onSaveAsTemplate,
 }: {
   doc: DocumentSummary;
+  /** Метка для обучения — на первой карточке списка. */
+  tour?: string;
   onRename: (doc: DocumentSummary) => void;
   /** Переложить в папку; `null` — вынуть из папок совсем. */
   onMove: (doc: DocumentSummary, folderId: string | null) => void;
@@ -75,7 +80,7 @@ export function DocumentCard({
   }
 
   return (
-    <li className="card group relative overflow-hidden transition-shadow hover:shadow-lg">
+    <Card interactive padding="none" data-tour={tour} className="group relative overflow-hidden">
       {/* Шаблон по нажатию даёт новый документ, а не открывает себя: его
           выбирают, чтобы начать работу, и правка самого шаблона в ответ на
           это читалась как «ничего не произошло». Править — из меню. */}
@@ -87,26 +92,24 @@ export function DocumentCard({
             Пропорции самого документа задавать рамке нельзя: A5 книжная
             рядом с A4 альбомной рвёт сетку, названия оказываются на разной
             высоте, и список перестаёт читаться как список. */}
-        <div className="relative aspect-[4/3] overflow-hidden border-b border-[var(--line)] bg-[var(--surface-sunken)]">
+        <div className="relative aspect-[4/3] overflow-hidden border-b border-line bg-sunken">
           {empty ? (
             <div className="grid h-full place-items-center">
-              <FileText size={26} className="text-[var(--line-strong)]" strokeWidth={1.5} />
+              <FileText size={24} className="text-line-strong" strokeWidth={1.75} />
             </div>
           ) : (
             <DocumentPreview doc={doc} />
           )}
           {/* Слева внизу: справа вверху стоит меню действий. */}
           {(doc.sheetCount ?? 1) > 1 && (
-            <span className="absolute bottom-2 left-2 rounded-lg bg-[var(--surface)]/90 px-1.5 py-0.5 text-xs text-[var(--text-muted)]">
-              {doc.sheetCount} листа
+            <span className="tabular absolute bottom-2 left-2 rounded-control bg-surface/90 px-1.5 py-0.5 text-xs text-muted">
+              {doc.sheetCount} {plural(doc.sheetCount ?? 0, 'лист', 'листа', 'листов')}
             </span>
           )}
         </div>
         <div className="px-3 py-3 text-center">
           <h3 className="truncate text-base font-medium">{doc.title}</h3>
-          <p className="tabular mt-0.5 text-sm text-[var(--text-muted)]">
-            {formatWhen(doc.updatedAt)}
-          </p>
+          <p className="tabular mt-0.5 text-sm text-muted">{formatWhen(doc.updatedAt)}</p>
         </div>
       </Link>
 
@@ -116,9 +119,9 @@ export function DocumentCard({
         <div className="-mt-1 px-3 pb-3 text-center">
           <Link
             to={`/documents/${doc.source.id}`}
-            className="inline-flex max-w-full items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--text)]"
+            className="inline-flex max-w-full items-center gap-1.5 text-sm text-muted hover:text-ink"
           >
-            <CornerUpLeft size={13} className="shrink-0" />
+            <CornerUpLeft size={16} className="shrink-0" aria-hidden />
             <span className="truncate">на основе «{doc.source.title}»</span>
           </Link>
         </div>
@@ -134,7 +137,7 @@ export function DocumentCard({
         onDuplicate={() => onDuplicate(doc)}
         onDelete={() => onDelete(doc)}
       />
-    </li>
+    </Card>
   );
 }
 
@@ -160,11 +163,11 @@ function TrashedCard({
   const [purging, setPurging] = useState(false);
 
   return (
-    <li className="card overflow-hidden">
-      <div className="relative aspect-[4/3] overflow-hidden border-b border-[var(--line)] bg-[var(--surface-sunken)] opacity-45">
+    <Card padding="none" className="overflow-hidden">
+      <div className="relative aspect-[4/3] overflow-hidden border-b border-line bg-sunken opacity-45">
         {empty ? (
           <div className="grid h-full place-items-center">
-            <FileText size={26} className="text-[var(--line-strong)]" strokeWidth={1.5} />
+            <FileText size={24} className="text-line-strong" strokeWidth={1.75} />
           </div>
         ) : (
           <DocumentPreview doc={doc} />
@@ -173,17 +176,17 @@ function TrashedCard({
 
       <div className="px-3 py-3 text-center">
         <h3 className="truncate text-base font-medium">{doc.title}</h3>
-        <p className="mt-0.5 text-sm text-[var(--text-muted)]">
-          {left === 0 ? 'Будет стёрт сегодня ночью' : `Будет стёрт через ${left} ${dayWord(left)}`}
+        <p className="mt-0.5 text-sm text-muted">
+          {left === 0 ? 'Будет стёрт сегодня ночью' : `Будет стёрт через ${left} ${plural(left, 'день', 'дня', 'дней')}`}
         </p>
 
         <div className="mt-3 flex justify-center gap-2">
-          <Button size="sm" icon={<RotateCcw size={14} />} onClick={onRestore}>
+          <Button size="sm" icon={<RotateCcw size={16} />} onClick={onRestore}>
             Восстановить
           </Button>
           {/* Подтверждение: отменить это нечем, а кнопка стоит рядом
               с безобидным «Восстановить». */}
-          <Button size="sm" variant="danger" icon={<Trash2 size={14} />} onClick={() => setPurging(true)}>
+          <Button size="sm" variant="danger" icon={<Trash2 size={16} />} onClick={() => setPurging(true)}>
             Стереть
           </Button>
         </div>
@@ -204,18 +207,8 @@ function TrashedCard({
           проверки. Отменить нельзя.
         </ConfirmDialog>
       )}
-    </li>
+    </Card>
   );
-}
-
-/** «5 дней», «2 дня», «1 день» — иначе подпись читается как машинная. */
-function dayWord(n: number): string {
-  const tens = n % 100;
-  if (tens >= 11 && tens <= 14) return 'дней';
-  const ones = n % 10;
-  if (ones === 1) return 'день';
-  if (ones >= 2 && ones <= 4) return 'дня';
-  return 'дней';
 }
 
 /** Первый лист материала, ужатый до рамки карточки. */
@@ -269,31 +262,30 @@ function ActionsMenu({
     <div className="absolute top-2 right-2">
       <Menu
         trigger={({ open, toggle }) => (
-          <button
-            type="button"
+          <IconButton
+            variant="secondary"
+            label={`Действия с документом «${title}»`}
+            aria-expanded={open}
             onClick={() => {
               if (open) setMoving(false);
               toggle();
             }}
-            aria-label={`Действия с документом «${title}»`}
-            aria-expanded={open}
             /* На мыши кнопка проступает при наведении, чтобы не спорить с самим
                листом; на телефоне наведения нет — там она видна всегда. */
-            className={
-              'hairline grid h-9 w-9 place-items-center rounded-lg bg-[var(--surface)]/90 text-[var(--text-muted)] ' +
-              'transition-colors hover:bg-[var(--surface)] hover:text-[var(--text)] ' +
-              (open ? '' : 'md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100')
-            }
+            className={cn(
+              'bg-surface/90 transition-opacity',
+              !open && 'md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100',
+            )}
           >
-            <MoreVertical size={16} />
-          </button>
+            <MoreHorizontal size={16} />
+          </IconButton>
         )}
       >
         {moving ? (
           <>
             <MenuItem
               icon={<ChevronLeft size={16} />}
-              className="text-[var(--text-muted)]"
+              className="text-muted"
               onClick={(e) => {
                 e.stopPropagation();
                 setMoving(false);
@@ -303,20 +295,21 @@ function ActionsMenu({
             </MenuItem>
             <MenuDivider />
             {(folders.data ?? []).map((f) => (
-              <MenuItem key={f.id} icon={<Folder size={16} />} onClick={() => onMove(f.id)}>
-                <span className="flex-1 truncate">{f.name}</span>
-                {folderId === f.id && <Check size={16} className="text-[var(--accent)]" />}
+              <MenuItem
+                key={f.id}
+                icon={<Folder size={16} />}
+                checked={folderId === f.id}
+                onClick={() => onMove(f.id)}
+              >
+                {f.name}
               </MenuItem>
             ))}
             {(folders.data ?? []).length === 0 && (
-              <p className="px-2.5 py-2 text-sm text-[var(--text-muted)]">
-                Папок пока нет — заведите слева в колонке
-              </p>
+              <p className="px-2.5 py-2 text-sm text-muted">Папок пока нет — заведите слева в колонке</p>
             )}
             <MenuDivider />
-            <MenuItem icon={<FolderMinus size={16} />} onClick={() => onMove(null)}>
-              <span className="flex-1">Вне папок</span>
-              {folderId === null && <Check size={16} className="text-[var(--accent)]" />}
+            <MenuItem icon={<FolderMinus size={16} />} checked={folderId === null} onClick={() => onMove(null)}>
+              Вне папок
             </MenuItem>
           </>
         ) : (
@@ -348,17 +341,20 @@ function ActionsMenu({
               </MenuItem>
             )}
             {/* Открывает список папок вместо меню, поэтому окно не закрываем:
-                это не пункт меню для обработчика закрытия. Шаблоны общие
-                на организацию и по папкам не раскладываются. */}
-            {!template && <button
-              type="button"
-              className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[15px] transition-colors hover:bg-[var(--surface-sunken)]"
-              onClick={() => setMoving(true)}
-            >
-              <Folder size={16} />
-              <span className="flex-1">Переложить в папку</span>
-              <ChevronRight size={16} className="text-[var(--text-muted)]" />
-            </button>}
+                это не пункт меню для обработчика закрытия — сырая кнопка
+                со строкой меню намеренно. Шаблоны общие на организацию
+                и по папкам не раскладываются. */}
+            {!template && (
+              <button
+                type="button"
+                onClick={() => setMoving(true)}
+                className="flex w-full items-center gap-2.5 rounded-control px-2.5 py-2 text-left text-sm text-ink transition-colors hover:bg-sunken pointer-coarse:min-h-12 pointer-coarse:px-3 pointer-coarse:text-base"
+              >
+                <Folder size={16} />
+                <span className="flex-1">Переложить в папку</span>
+                <ChevronRight size={16} className="text-muted" />
+              </button>
+            )}
             <MenuDivider />
             <MenuItem icon={<Trash2 size={16} />} danger onClick={onDelete}>
               В корзину

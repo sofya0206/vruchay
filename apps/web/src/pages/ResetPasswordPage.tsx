@@ -1,10 +1,12 @@
 import { FormEvent, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { KeyRound, LoaderCircle } from 'lucide-react';
+import { KeyRound } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../api/client';
+import { AuthCard, AuthLayout, AuthResult } from '../auth/AuthLayout';
 import { Button } from '../ui/Button';
-import { Input, Label } from '../ui/Field';
+import { ErrorBar } from '../ui/ErrorState';
+import { Field, Input } from '../ui/Field';
 
 /**
  * Новый пароль по ссылке из письма.
@@ -23,10 +25,8 @@ export function ResetPasswordPage() {
   const [repeat, setRepeat] = useState('');
 
   const reset = useMutation({
-    mutationFn: () => api.post<{ email: string; name: string; role: string }>('/auth/reset', {
-      token,
-      password,
-    }),
+    mutationFn: () =>
+      api.post<{ email: string; name: string; role: string }>('/auth/reset', { token, password }),
     onSuccess: (me) => {
       qc.setQueryData(['me'], me);
       navigate('/', { replace: true });
@@ -44,43 +44,34 @@ export function ResetPasswordPage() {
 
   if (!token) {
     return (
-      <div className="grid h-full place-items-center p-6">
-        <div className="w-full max-w-sm text-center">
-          <h1 className="font-serif text-2xl">Ссылка неполная</h1>
-          <p className="mt-3 text-sm leading-relaxed text-[var(--text-muted)]">
-            Похоже, адрес скопировался не целиком. Откройте ссылку из письма ещё раз —
-            лучше нажатием на кнопку в самом письме.
-          </p>
-          <Link
-            to="/forgot"
-            className="mt-8 inline-block text-sm underline underline-offset-2"
-          >
+      <AuthResult
+        icon={<KeyRound size={26} strokeWidth={1.75} />}
+        title="Ссылка неполная"
+        footer={
+          <Link to="/forgot" className="text-sm underline underline-offset-2">
             Запросить новое письмо
           </Link>
-        </div>
-      </div>
+        }
+      >
+        Похоже, адрес скопировался не целиком. Откройте ссылку из письма ещё раз — лучше нажатием на кнопку
+        в самом письме.
+      </AuthResult>
     );
   }
 
   return (
-    <div className="grid h-full place-items-center p-6">
-      <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <span className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent)]">
-            <KeyRound size={26} strokeWidth={1.75} />
-          </span>
-          <h1 className="font-serif text-2xl">Новый пароль</h1>
-          <p className="mt-2 text-sm text-[var(--text-muted)]">
-            Придумайте пароль — и сразу попадёте в кабинет.
-          </p>
-        </div>
-
-        <form
-          onSubmit={onSubmit}
-          className="space-y-5 rounded-2xl bg-[var(--surface)] p-7 ring-1 ring-[var(--line)]"
-        >
-          <label className="block">
-            <Label>Новый пароль</Label>
+    <AuthLayout
+      icon={
+        <span className="grid h-14 w-14 place-items-center rounded-sheet bg-accent-soft text-accent">
+          <KeyRound size={26} strokeWidth={1.75} />
+        </span>
+      }
+      title="Новый пароль"
+      subtitle="Придумайте пароль — и сразу попадёте в кабинет"
+    >
+      <AuthCard>
+        <form onSubmit={onSubmit} className="space-y-5">
+          <Field label="Новый пароль" help="Не короче 10 знаков, хотя бы одна буква и одна цифра.">
             <Input
               type="password"
               value={password}
@@ -91,13 +82,9 @@ export function ResetPasswordPage() {
               autoComplete="new-password"
               autoFocus
             />
-            <span className="mt-1.5 block text-xs text-[var(--text-muted)]">
-              Не короче 10 знаков, хотя бы одна буква и одна цифра.
-            </span>
-          </label>
+          </Field>
 
-          <label className="block">
-            <Label>Тот же пароль ещё раз</Label>
+          <Field label="Тот же пароль ещё раз" error={mismatch ? 'Пароли не совпадают' : undefined}>
             <Input
               type="password"
               value={repeat}
@@ -106,33 +93,15 @@ export function ResetPasswordPage() {
               maxLength={200}
               autoComplete="new-password"
             />
-            {mismatch && (
-              <span className="mt-1.5 block text-xs text-[var(--danger)]">
-                Пароли не совпадают
-              </span>
-            )}
-          </label>
+          </Field>
 
-          {error && (
-            <p
-              role="alert"
-              className="rounded-lg bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]"
-            >
-              {error}
-            </p>
-          )}
+          {error && <ErrorBar>{error}</ErrorBar>}
 
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={!ready || reset.isPending}
-            className="w-full"
-            icon={reset.isPending ? <LoaderCircle size={16} className="animate-spin" /> : undefined}
-          >
-            {reset.isPending ? 'Сохраняем' : 'Сохранить и войти'}
+          <Button type="submit" variant="primary" size="lg" disabled={!ready} loading={reset.isPending} className="w-full">
+            Сохранить и войти
           </Button>
         </form>
-      </div>
-    </div>
+      </AuthCard>
+    </AuthLayout>
   );
 }

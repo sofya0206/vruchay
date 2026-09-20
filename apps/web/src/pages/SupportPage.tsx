@@ -3,7 +3,8 @@ import { useLocation } from 'react-router-dom';
 import { Support } from '../settings/Support';
 import { Roadmap } from '../settings/Roadmap';
 import { Review } from '../settings/Review';
-import { PageLayout, SectionTitle } from '../ui/SectionLayout';
+import { PageHeader } from '../ui/PageHeader';
+import { PageLayout } from '../ui/SectionLayout';
 import { SettingsStack } from '../ui/Settings';
 
 /**
@@ -22,7 +23,7 @@ export function SupportPage() {
   }, [hash]);
 
   return (
-    <PageLayout head={<SectionTitle>Поддержка</SectionTitle>}>
+    <PageLayout head={<PageHeader title="Поддержка" />}>
       <div className="mx-auto max-w-3xl">
         <SettingsStack>
           <Support />

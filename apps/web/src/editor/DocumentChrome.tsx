@@ -1,23 +1,24 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  BadgeCheck,
   ChevronLeft,
   FilePlus2,
   FileText,
   LayoutTemplate,
-  ListChecks,
-  LoaderCircle,
   MoreHorizontal,
-  Scale,
   TriangleAlert,
-  type LucideIcon,
 } from 'lucide-react';
-import { useState } from 'react';
-import { BottomSheet } from '../ui/BottomSheet';
-import { MATERIAL_TABS, materialTabPath, workspacePath, type MaterialTab } from '../mailing/workspace-tabs';
+import {
+  MATERIAL_STEPS,
+  materialPath,
+  stepIndex,
+  stepOfView,
+  type MaterialView,
+} from '../documents/material-steps';
+import { Button } from '../ui/Button';
 import { IconButton } from '../ui/IconButton';
 import { Menu, MenuDivider, MenuItem } from '../ui/Menu';
+import { Stepper, type StepItem } from '../ui/Stepper';
 import { useTooltip } from '../ui/Tooltip';
 import { cn } from '../ui/cn';
 import { useUsage } from '../api/org';
@@ -39,11 +40,12 @@ export type MenuEntry =
     };
 
 /**
- * Рамка страницы материала: путь, лента вкладок, действие и меню «…».
+ * Рамка документа: путь, лента шагов, главное действие и меню «…».
  *
- * Одна на все стороны материала. Лист, список, правила, проверка, письмо
- * и подлинность — не разные разделы, а один материал с разных сторон:
- * при переходе меняется только содержимое под рамкой.
+ * Одна на все шаги. Лист, получатели, проверка, письмо и выпуск — не
+ * разные разделы, а один документ на разных шагах: при переходе меняется
+ * только содержимое под рамкой. Шаги идут в одном порядке
+ * (documents/material-steps.ts), и лента говорит, где человек сейчас.
  *
  * Значок библиотеки и название — и заголовок, и дорога назад: значок ведёт
  * в «Документы» (у шаблона — в «Шаблоны»), а не безымянной стрелкой
@@ -59,7 +61,7 @@ export function DocumentChrome({
   documentId,
   title,
   actions,
-  tab,
+  view,
   toolbar,
   action,
   isTemplate = false,
@@ -74,16 +76,14 @@ export function DocumentChrome({
   isTemplate?: boolean;
   /** Пункты меню «…». */
   actions: MenuEntry[];
-  /** Какая сторона материала открыта — она подсвечена в ленте вкладок. */
-  tab: MaterialTab;
+  /** Какой шаг документа открыт — он подсвечен в ленте шагов. */
+  view: MaterialView;
   /** Панель значков под лентой. Своя у листа и у таблицы. */
   toolbar?: ReactNode;
   /**
-   * Чем «Выпустить» занимается на этой вкладке.
-   *
-   * Выпускать можно только со списка — там отмечают, кому. На остальных
-   * вкладках кнопка остаётся на месте и ведёт к списку: место главного
-   * действия не должно переезжать от вкладки к вкладке.
+   * Главное действие в рамке. По умолчанию — «Выпуск», ведущий на шаг
+   * выпуска: место главного действия не должно переезжать от шага к шагу.
+   * `null` — ничего: на самом шаге выпуска кнопка стоит в теле страницы.
    */
   action?: ReactNode;
   /**
@@ -93,20 +93,29 @@ export function DocumentChrome({
    */
   titleActions?: ReactNode;
 }) {
+  const current = stepOfView(view);
+  const at = stepIndex(current);
+  const steps: StepItem[] = MATERIAL_STEPS.map((step, i) => ({
+    id: step.id,
+    label: step.label,
+    to: materialPath(documentId, step.id),
+    state: i < at ? 'done' : i === at ? 'current' : 'todo',
+  }));
+
   return (
-    <header className="shrink-0 border-b border-[var(--line)] bg-[var(--surface)]">
+    <header className="shrink-0 border-b border-line bg-surface">
       {/* На телефоне строка переносится: название и действия сверху, лента
           вкладок — второй строкой во всю ширину. В одну строку лента
           сжималась до нуля, и из листа нельзя было попасть в таблицу. */}
-      <div className="flex flex-wrap items-center gap-1 px-3 max-md:pt-1 md:h-12 md:flex-nowrap md:border-b md:border-[var(--line)]">
+      <div className="flex flex-wrap items-center gap-1 px-3 max-md:pt-1 md:h-12 md:flex-nowrap md:border-b md:border-line">
         <h1 className="flex min-w-0 items-center gap-1 text-sm font-medium max-md:flex-1 md:max-w-[32ch] md:shrink">
           {/* На телефоне — стрелка под палец вместо значка библиотеки. */}
           <Link
             to={isTemplate ? '/documents/templates' : '/documents'}
             aria-label={isTemplate ? 'Все шаблоны' : 'Все документы'}
-            className="-ml-2 grid size-11 shrink-0 place-items-center rounded-lg text-[var(--text-muted)] active:bg-[var(--surface-sunken)] md:hidden"
+            className="-ml-2 grid size-11 shrink-0 place-items-center rounded-control text-muted active:bg-sunken md:hidden"
           >
-            <ChevronLeft size={22} />
+            <ChevronLeft size={24} />
           </Link>
           <span className="max-md:hidden">
             <LibraryLink isTemplate={isTemplate} />
@@ -114,25 +123,11 @@ export function DocumentChrome({
           <DocumentTitle documentId={documentId} title={title} />
         </h1>
 
-        <span aria-hidden className="mx-2 h-5 w-px shrink-0 bg-[var(--line)] max-md:hidden" />
+        <span aria-hidden className="mx-2 h-5 w-px shrink-0 bg-line max-md:hidden" />
 
-        {/* Лента прокручивается внутри себя: страница вбок не едет даже
-            тогда, когда шесть вкладок в ширину не помещаются. */}
-        <nav
-          aria-label="Стороны материала"
-          className="no-scrollbar flex min-w-0 flex-1 items-stretch gap-0.5 self-stretch overflow-x-auto max-md:order-last max-md:h-11 max-md:basis-full max-md:overflow-visible"
-        >
-          <div className="contents max-md:hidden">
-            {MATERIAL_TABS.map((item) => (
-              <SpineTab key={item.id} to={materialTabPath(documentId, item.id)} active={item.id === tab}>
-                {item.label}
-              </SpineTab>
-            ))}
-          </div>
-          <div className="contents md:hidden">
-            <PhoneTabs documentId={documentId} tab={tab} />
-          </div>
-        </nav>
+        <div className="min-w-0 flex-1 max-md:order-last max-md:basis-full" data-tour="stepper">
+          <Stepper steps={steps} />
+        </div>
 
         {titleActions && <div className="flex shrink-0 items-center md:hidden">{titleActions}</div>}
 
@@ -140,18 +135,26 @@ export function DocumentChrome({
             он не помещается рядом с названием. */}
         <div className="flex shrink-0 items-center gap-1 pl-2 [&>a:first-child]:max-md:hidden [&>button:first-child]:max-md:hidden">
           {isTemplate ? (
-            <Link
-              to={`/documents?new=1&template=${documentId}`}
-              className="inline-flex h-9 items-center gap-2 rounded-lg bg-[var(--accent)] px-3 text-sm font-medium text-[var(--accent-contrast)] transition-colors hover:bg-[var(--accent-hover)]"
-            >
-              <FilePlus2 size={15} />
+            <Button variant="primary" size="sm" to={`/documents?new=1&template=${documentId}`} icon={<FilePlus2 size={16} />}>
               Документ по шаблону
-            </Link>
-          ) : action ?? <ReleaseLink to={workspacePath(documentId)} />}
+            </Button>
+          ) : action === undefined ? (
+            <Button
+              variant="primary"
+              size="sm"
+              to={materialPath(documentId, 'issue')}
+              title="К выпуску: отметить получателей и выпустить"
+              data-tour="issue"
+            >
+              Выпуск
+            </Button>
+          ) : (
+            action
+          )}
           <Menu
             trigger={({ open, toggle }) => (
-              <IconButton label="Ещё действия" aria-expanded={open} onClick={toggle} size="sm" className="size-11 md:size-9">
-                <MoreHorizontal size={18} />
+              <IconButton label="Ещё действия" aria-expanded={open} onClick={toggle}>
+                <MoreHorizontal size={20} />
               </IconButton>
             )}
           >
@@ -161,15 +164,13 @@ export function DocumentChrome({
               ) : (
                 <MenuItem
                   key={i}
-                  icon={<span className="grid w-4 place-items-center text-[var(--text-muted)]">{entry.icon}</span>}
+                  icon={<span className="grid w-4 place-items-center text-muted">{entry.icon}</span>}
                   disabled={entry.disabled}
                   danger={entry.danger}
+                  shortcut={entry.shortcut}
                   onClick={entry.onSelect}
                 >
-                  <span className="flex-1 whitespace-nowrap">{entry.label}</span>
-                  {entry.shortcut && (
-                    <span className="shrink-0 text-xs text-[var(--text-muted)] pointer-coarse:hidden">{entry.shortcut}</span>
-                  )}
+                  {entry.label}
                 </MenuItem>
               ),
             )}
@@ -188,18 +189,13 @@ export function DocumentChrome({
   );
 }
 
-/*
- * «Выпуск» — главное действие материала, одной формы на всех вкладках.
- * Нажатие чуть поджимает кнопку: без отклика она казалась нарисованной.
- */
-const releaseClass =
-  'inline-flex h-9 items-center gap-2 rounded-lg bg-[var(--accent-button)] px-3.5 text-sm font-medium text-[var(--accent-contrast)] transition-[background-color,scale] duration-150 hover:bg-[var(--accent-button-hover)] active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100';
-
 /**
  * Кнопка выпуска на списке получателей.
  *
  * Число отмеченных — плашкой внутри, а не хвостом слова: «Выпустить 12»
  * читалось как одна фраза, а счётчик должен читаться счётчиком.
+ * Предупреждаем в момент действия, а не после отказа сервера: отмечено
+ * больше, чем осталось по плану, — счётчик становится предупреждающим.
  */
 export function ReleaseButton({
   count,
@@ -212,44 +208,30 @@ export function ReleaseButton({
   disabled: boolean;
   onClick: () => void;
 }) {
-  /*
-   * Предупреждаем в момент действия, а не после отказа сервера:
-   * отмечено больше, чем осталось по плану, — счётчик становится
-   * предупреждающим, а подсказка говорит, сколько именно.
-   */
   const { data: usage } = useUsage();
   const short = usage?.left !== null && usage?.left !== undefined && count > usage.left;
-  const { triggerProps, tooltip } = useTooltip(
-    short && usage ? `Отмечено ${count}, осталось ${usage.left}. Выпустятся первые ${usage.left}` : undefined,
-  );
   return (
-    <button type="button" className={releaseClass} disabled={disabled} onClick={onClick} {...triggerProps}>
-      {running && <LoaderCircle size={15} className="animate-spin" />}
+    <Button
+      variant="primary"
+      size="sm"
+      loading={running}
+      disabled={disabled}
+      onClick={onClick}
+      title={short && usage ? `Отмечено ${count}, осталось ${usage.left}. Выпустятся первые ${usage.left}` : undefined}
+    >
       {running ? 'Выпускаем' : 'Выпуск'}
       {!running && count > 0 && (
         <span
           className={cn(
             'tabular -mr-1 grid h-5 min-w-5 place-items-center rounded-md px-1.5 text-xs leading-none',
-            short ? 'bg-[var(--warn)] text-white' : 'bg-[var(--accent-contrast)]/20',
+            short ? 'bg-warn text-white' : 'bg-on-accent/20',
           )}
         >
           {short && <TriangleAlert size={11} className="mr-1" aria-hidden />}
           {count}
         </span>
       )}
-      {tooltip}
-    </button>
-  );
-}
-
-/** На остальных вкладках выпуск на том же месте, но ведёт к списку. */
-function ReleaseLink({ to }: { to: string }) {
-  const { triggerProps, tooltip } = useTooltip('Отметить получателей и выпустить');
-  return (
-    <Link to={to} className={releaseClass} {...triggerProps}>
-      Выпуск
-      {tooltip}
-    </Link>
+    </Button>
   );
 }
 
@@ -267,92 +249,12 @@ function LibraryLink({ isTemplate }: { isTemplate: boolean }) {
     <Link
       to={isTemplate ? '/documents/templates' : '/documents'}
       aria-label={label}
-      className="grid size-8 shrink-0 place-items-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
+      className="pressable grid size-8 shrink-0 place-items-center rounded-control text-muted hover:bg-sunken hover:text-ink"
       {...triggerProps}
     >
-      <Icon size={17} strokeWidth={1.75} />
+      <Icon size={16} strokeWidth={1.75} />
       {tooltip}
     </Link>
-  );
-}
-
-/**
- * Вкладка хребта.
- *
- * Ссылка, а не кнопка: у каждой стороны материала свой адрес, и его надо
- * уметь открыть в соседней вкладке браузера и послать коллеге.
- */
-function SpineTab({ to, active, children }: { to: string; active: boolean; children: ReactNode }) {
-  return (
-    <Link
-      to={to}
-      aria-current={active ? 'page' : undefined}
-      className={`-mb-px inline-flex shrink-0 items-center whitespace-nowrap border-b-2 px-2.5 text-sm transition-colors max-md:flex-1 max-md:justify-center max-md:px-1 max-md:text-[15px] ${
-        active
-          ? 'border-[var(--accent)] font-medium text-[var(--accent)]'
-          : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text)]'
-      }`}
-    >
-      {children}
-    </Link>
-  );
-}
-
-/*
- * На телефоне шесть подписей в ширину не помещаются. Видны три стороны,
- * с которыми работают на ходу, остальные — под «Ещё» нижним листом:
- * так делают вкладки, которые не влезают, в приложениях Google и Apple.
- * Открыта сторона из «Ещё» — её название встаёт на место слова «Ещё».
- */
-const PHONE_TABS: MaterialTab[] = ['sheet', 'table', 'mail'];
-const MORE_TABS: { id: MaterialTab; icon: LucideIcon; hint: string }[] = [
-  { id: 'rules', icon: Scale, hint: 'Кому какой документ' },
-  { id: 'check', icon: ListChecks, hint: 'Ошибки в строках' },
-  { id: 'verify', icon: BadgeCheck, hint: 'Срок и страница проверки' },
-];
-
-function PhoneTabs({ documentId, tab }: { documentId: string; tab: MaterialTab }) {
-  const [open, setOpen] = useState(false);
-  const label = (id: MaterialTab) => MATERIAL_TABS.find((t) => t.id === id)?.label ?? '';
-  const inMore = MORE_TABS.some((t) => t.id === tab);
-  return (
-    <>
-      {PHONE_TABS.map((id) => (
-        <SpineTab key={id} to={materialTabPath(documentId, id)} active={id === tab}>
-          {label(id)}
-        </SpineTab>
-      ))}
-      <button
-        type="button"
-        aria-haspopup="dialog"
-        onClick={() => setOpen(true)}
-        className={`-mb-px inline-flex flex-1 items-center justify-center border-b-2 px-1 text-[15px] whitespace-nowrap ${
-          inMore ? 'border-[var(--accent)] font-medium text-[var(--accent)]' : 'border-transparent text-[var(--text-muted)]'
-        }`}
-      >
-        {inMore ? label(tab) : 'Ещё'}
-      </button>
-      <BottomSheet open={open} onClose={() => setOpen(false)} title="Ещё">
-        <div className="px-2 pb-3">
-          {MORE_TABS.map((item) => (
-            <Link
-              key={item.id}
-              to={materialTabPath(documentId, item.id)}
-              onClick={() => setOpen(false)}
-              className={`flex min-h-14 items-center gap-3 rounded-xl px-3 ${
-                item.id === tab ? 'bg-[var(--accent-soft)] text-[var(--accent)]' : 'text-[var(--text)] active:bg-[var(--surface-sunken)]'
-              }`}
-            >
-              <item.icon size={20} strokeWidth={1.75} className="shrink-0" />
-              <span className="flex min-w-0 flex-col">
-                <span className="text-base font-medium">{label(item.id)}</span>
-                <span className="text-[13px] text-[var(--text-muted)]">{item.hint}</span>
-              </span>
-            </Link>
-          ))}
-        </div>
-      </BottomSheet>
-    </>
   );
 }
 
@@ -379,5 +281,5 @@ export function ToolButton({
 
 /** Черта между смысловыми группами значков. */
 export function ToolDivider() {
-  return <span aria-hidden className="mx-1 h-5 w-px bg-[var(--line)]" />;
+  return <span aria-hidden className="mx-1 h-5 w-px bg-line" />;
 }

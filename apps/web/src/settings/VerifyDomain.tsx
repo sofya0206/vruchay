@@ -49,7 +49,7 @@ export function VerifyDomain() {
 
       <form
         onSubmit={submit}
-        className="mt-4 max-w-xl space-y-3 rounded-2xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]"
+        className="mt-4 max-w-xl space-y-3 rounded-sheet bg-surface p-4 ring-1 ring-line"
       >
         <div>
           <Label>Домен</Label>
@@ -60,15 +60,15 @@ export function VerifyDomain() {
             autoComplete="off"
             placeholder="diplom.sca-swimming.com"
           />
-          <p className="mt-1.5 text-sm text-[var(--text-muted)]">
+          <p className="mt-1.5 text-sm text-muted">
             Ссылка будет выглядеть так:{' '}
-            <code className="font-mono break-all text-[var(--text)]">
+            <code className="font-mono break-all text-ink">
               https://{shown}/c/K7M2-9QXR-4TVB
             </code>
           </p>
         </div>
 
-        <div className="rounded-xl bg-[var(--surface-sunken)] p-3 text-sm text-[var(--text-muted)]">
+        <div className="rounded-card bg-sunken p-3 text-sm text-muted">
           Домен сохраняется, но пока не обслуживается: чтобы ссылка открывалась, на него нужен
           сертификат и маршрут до нас — напишите в поддержку, включим вручную.
         </div>
@@ -78,13 +78,13 @@ export function VerifyDomain() {
             {save.isPending ? 'Сохраняем…' : 'Сохранить домен'}
           </Button>
           {saved && (
-            <span className="flex items-center gap-1.5 text-sm text-[var(--accent)]">
+            <span className="flex items-center gap-1.5 text-sm text-accent">
               <Check size={15} /> Сохранено
             </span>
           )}
         </div>
         {error && (
-          <p role="alert" className="text-sm text-[var(--danger)]">
+          <p role="alert" className="text-sm text-danger">
             {error}
           </p>
         )}

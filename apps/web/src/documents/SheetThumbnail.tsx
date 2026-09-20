@@ -81,8 +81,13 @@ export function SheetThumbnail({
       <div ref={box} className="grid h-full w-full place-items-center">
         {scale > 0 && near && (
           <div
-            className="overflow-hidden bg-[var(--sheet-paper)] shadow-sm"
-            style={{ width: `${widthMm * scale}mm`, height: `${heightMm * scale}mm` }}
+            // Цвет бумаги — токен без утилиты Tailwind: он нужен только листу.
+            className="overflow-hidden shadow-sm"
+            style={{
+              background: 'var(--sheet-paper)',
+              width: `${widthMm * scale}mm`,
+              height: `${heightMm * scale}mm`,
+            }}
           >
             <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}>
               {children}

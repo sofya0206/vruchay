@@ -162,8 +162,8 @@ export function TextMailingForm() {
       />
 
       {locked && (
-        <p className="flex items-center gap-2 rounded-xl bg-[var(--surface-sunken)] px-4 py-3 text-sm">
-          <Lock size={15} className="shrink-0 text-[var(--text-muted)]" />
+        <p className="flex items-center gap-2 rounded-card bg-sunken px-4 py-3 text-sm">
+          <Lock size={15} className="shrink-0 text-muted" />
           <span className="flex-1">Ушла — текст не меняется</span>
           <Button variant="ghost" icon={<Plus size={15} />} onClick={startOver}>
             Новая
@@ -228,7 +228,7 @@ export function TextMailingForm() {
           disabled={locked}
           rows={8}
           spellCheck
-          className="w-full rounded-xl bg-[var(--surface)] px-3 py-2 text-sm ring-1 ring-[var(--line)] focus:ring-2 focus:ring-[var(--accent)] focus:outline-none disabled:bg-[var(--surface-sunken)]"
+          className="w-full rounded-card bg-surface px-3 py-2 text-sm ring-1 ring-line focus:ring-2 focus:ring-accent focus:outline-none disabled:bg-sunken"
         />
       </div>
 
@@ -236,7 +236,7 @@ export function TextMailingForm() {
         <Label>
           Кому
           {addresses > 0 && (
-            <span className="ml-2 font-normal text-[var(--text-muted)] tabular-nums">
+            <span className="ml-2 font-normal text-muted tabular-nums">
               {addresses}
             </span>
           )}
@@ -279,8 +279,8 @@ export function TextMailingForm() {
         >
           Себе
         </Button>
-        {test.isSuccess && <span className="text-sm text-[var(--accent)]">→ {test.data.to}</span>}
-        {error && <span className="text-sm text-[var(--danger)]">{errorText(error)}</span>}
+        {test.isSuccess && <span className="text-sm text-accent">→ {test.data.to}</span>}
+        {error && <span className="text-sm text-danger">{errorText(error)}</span>}
       </div>
 
       {audience && !confirm && <AudienceLine audience={audience} />}
@@ -305,11 +305,11 @@ export function TextMailingForm() {
         >
           <AudienceLine audience={audience} />
           {/* Отправленное не отзывается — предупреждаем до нажатия. */}
-          <p className="mt-3 text-sm text-[var(--text-muted)]">
+          <p className="mt-3 text-sm text-muted">
             Отозвать письма после отправки нельзя.
           </p>
           {kind === 'marketing' && (
-            <p className="mt-2 text-sm text-[var(--text-muted)]">
+            <p className="mt-2 text-sm text-muted">
               Только тем, кто согласился на рекламу, — с пометкой и отпиской.
             </p>
           )}
@@ -323,19 +323,19 @@ export function TextMailingForm() {
 function AudienceLine({ audience }: { audience: TextAudience }) {
   if (audience.refusal) {
     return (
-      <p className="rounded-xl bg-[var(--danger-soft)] px-4 py-3 text-sm text-[var(--danger)]">
+      <p className="rounded-card bg-danger-soft px-4 py-3 text-sm text-danger">
         {audience.refusal}
       </p>
     );
   }
   return (
-    <div className="rounded-xl bg-[var(--surface-sunken)] px-4 py-3 text-sm">
+    <div className="rounded-card bg-sunken px-4 py-3 text-sm">
       <p className="flex flex-wrap gap-x-4">
         <span>
           Уйдёт: <b className="tabular-nums">{audience.willSend}</b>
         </span>
         {audience.skipped.length > 0 && (
-          <span className="text-[var(--danger)]">
+          <span className="text-danger">
             Не уйдёт: <b className="tabular-nums">{audience.skipped.length}</b>
           </span>
         )}
@@ -347,7 +347,7 @@ function AudienceLine({ audience }: { audience: TextAudience }) {
 
 function SentLine({ result }: { result: TextSendResult }) {
   return (
-    <div className="rounded-xl bg-[var(--ok-soft)] px-4 py-3 text-sm">
+    <div className="rounded-card bg-ok-soft px-4 py-3 text-sm">
       <p>
         В очереди: <b className="tabular-nums">{result.queued}</b>
       </p>
@@ -360,17 +360,17 @@ function Skipped({ items }: { items: TextAudience['skipped'] }) {
   if (items.length === 0) return null;
   return (
     <details className="mt-2">
-      <summary className="cursor-pointer text-[var(--text-muted)]">Причины</summary>
+      <summary className="cursor-pointer text-muted">Причины</summary>
       <ul className="mt-1 space-y-0.5">
         {items.slice(0, 100).map((item, i) => (
           <li key={`${item.email}-${i}`}>
             <span className="font-mono">{item.email || '—'}</span>
-            <span className="text-[var(--text-muted)]"> — {item.reason}</span>
+            <span className="text-muted"> — {item.reason}</span>
           </li>
         ))}
       </ul>
       {items.length > 100 && (
-        <p className="mt-1 text-[var(--text-muted)]">…и ещё {items.length - 100}</p>
+        <p className="mt-1 text-muted">…и ещё {items.length - 100}</p>
       )}
     </details>
   );

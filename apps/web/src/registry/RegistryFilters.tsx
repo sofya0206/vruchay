@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Search, SlidersHorizontal, X } from 'lucide-react';
-import { Input, Label } from '../ui/Field';
-import { DateField } from '../ui/DateField';
-import { Select } from '../ui/Select';
-import { Button } from '../ui/Button';
+import { Badge } from '../ui/Badge';
 import { BottomSheet } from '../ui/BottomSheet';
+import { Button } from '../ui/Button';
+import { DateField } from '../ui/DateField';
+import { Input, Label } from '../ui/Field';
+import { Select, type SelectOption } from '../ui/Select';
+import { humanIso } from '../ui/calendar';
+import { cn } from '../ui/cn';
 import { usePhone } from '../ui/useMediaQuery';
 import type { RegistryFacets, RegistryFilters as Filters } from '../api/registry';
 
@@ -48,12 +51,60 @@ export function documentOptions(
   return [...known, { id: documentId, label: 'Выбранный материал' }];
 }
 
+const STATE_OPTIONS: SelectOption<Filters['state']>[] = [
+  { value: 'valid', label: 'Действителен' },
+  { value: 'replaced', label: 'Заменён' },
+  { value: 'expired', label: 'Срок истёк' },
+  { value: 'revoked', label: 'Отозван' },
+];
+
+const MAIL_OPTIONS: SelectOption[] = [
+  { value: 'none', label: 'Не отправлялось' },
+  { value: 'sent', label: 'Отправлено' },
+  { value: 'delivered', label: 'Доставлено' },
+  { value: 'opened', label: 'Прочитано' },
+  { value: 'bounced', label: 'Не доставлено' },
+  { value: 'failed', label: 'Ошибка отправки' },
+];
+
+/** Пустой пункт списка: на широком экране подписей над полями нет, и он сам называет поле. */
+function withAny<T extends string>(any: string, options: SelectOption<T>[]): SelectOption<T | ''>[] {
+  return [{ value: '', label: any }, ...options];
+}
+
+interface Chip {
+  key: keyof Filters;
+  label: string;
+}
+
+/** Что сейчас стоит в отборе — чипами, каждый снимается по отдельности. */
+export function activeChips(value: Filters, facets: RegistryFacets | undefined): Chip[] {
+  const chips: Chip[] = [];
+  if (value.documentId) {
+    const doc = documentOptions(facets, value.documentId).find((d) => d.id === value.documentId);
+    chips.push({ key: 'documentId', label: doc?.label ?? 'Материал' });
+  }
+  if (value.event) chips.push({ key: 'event', label: value.event });
+  if (value.state) {
+    const state = STATE_OPTIONS.find((o) => o.value === value.state);
+    chips.push({ key: 'state', label: state?.label ?? value.state });
+  }
+  if (value.mail) {
+    const mail = MAIL_OPTIONS.find((o) => o.value === value.mail);
+    chips.push({ key: 'mail', label: `Письмо: ${(mail?.label ?? value.mail).toLowerCase()}` });
+  }
+  if (value.from) chips.push({ key: 'from', label: `с ${humanIso(value.from) ?? value.from}` });
+  if (value.to) chips.push({ key: 'to', label: `по ${humanIso(value.to) ?? value.to}` });
+  return chips;
+}
+
 /**
  * Отбор в реестре.
  *
- * Поиск отдельной широкой строкой, остальное — рядом и мелко. Так и ищут:
+ * Поиск — первым и самым широким, остальное рядом и мелко: так и ищут,
  * человек помнит фамилию, а не мероприятие, и уж точно не помнит,
- * в каком материале выпускалась грамота.
+ * в каком материале выпускалась грамота. Что стоит в отборе, видно
+ * по чипам под строкой — каждый снимается своим крестиком.
  */
 export function RegistryFilters({ value, facets, onChange, onReset }: Props) {
   const phone = usePhone();
@@ -61,148 +112,186 @@ export function RegistryFilters({ value, facets, onChange, onReset }: Props) {
   const set = <K extends keyof Filters>(key: K, next: Filters[K]) =>
     onChange({ ...value, [key]: next });
 
-  const active =
-    value.documentId || value.event || value.state || value.mail || value.from || value.to;
+  const chips = activeChips(value, facets);
+  const compact = !phone;
 
-  const activeCount = [value.documentId, value.event, value.state, value.mail, value.from || value.to].filter(Boolean).length;
-
-  const grid = (
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        {/* Обёртка перестала быть label: подпись к кнопке-списку
-            привязывается через aria-label, а <Label> рисует её глазу. */}
-        <div className="block">
-          <Label>Материал</Label>
-          <Select
-            value={value.documentId}
-            onChange={(id) => set('documentId', id)}
-            aria-label="Материал"
-            options={[
-              { value: '', label: 'Любой' },
-              ...documentOptions(facets, value.documentId).map((doc) => ({
-                value: doc.id,
-                label: doc.label,
-              })),
-            ]}
-          />
-        </div>
-
-        <div className="block">
-          <Label>Мероприятие</Label>
-          <Select
-            value={value.event}
-            onChange={(event) => set('event', event)}
-            aria-label="Мероприятие"
-            options={[
-              { value: '', label: 'Любое' },
-              ...(facets?.events ?? []).map((event) => ({ value: event, label: event })),
-            ]}
-          />
-        </div>
-
-        <div className="block">
-          <Label>Состояние</Label>
-          <Select
-            value={value.state}
-            onChange={(state) => set('state', state)}
-            aria-label="Состояние"
-            options={[
-              { value: '' as Filters['state'], label: 'Любое' },
-              { value: 'valid' as Filters['state'], label: 'Действителен' },
-              { value: 'replaced' as Filters['state'], label: 'Заменён' },
-              { value: 'expired' as Filters['state'], label: 'Срок истёк' },
-              { value: 'revoked' as Filters['state'], label: 'Отозван' },
-            ]}
-          />
-        </div>
-
-        <div className="block">
-          <Label>Письмо</Label>
-          <Select
-            value={value.mail}
-            onChange={(mail) => set('mail', mail)}
-            aria-label="Письмо"
-            options={[
-              { value: '', label: 'Любое' },
-              { value: 'none', label: 'Не отправлялось' },
-              { value: 'sent', label: 'Отправлено' },
-              { value: 'delivered', label: 'Доставлено' },
-              { value: 'opened', label: 'Прочитано' },
-              { value: 'bounced', label: 'Не доставлено' },
-              { value: 'failed', label: 'Ошибка отправки' },
-            ]}
-          />
-        </div>
-
-        <div className="block">
-          <Label>Выдан с</Label>
-          <DateField
-            value={value.from}
-            onChange={(from) => set('from', from)}
-            max={value.to || undefined}
-            aria-label="Выдан с"
-            placeholder="Любая дата"
-          />
-        </div>
-
-        <div className="block">
-          <Label>по</Label>
-          <DateField
-            value={value.to}
-            onChange={(to) => set('to', to)}
-            min={value.from || undefined}
-            aria-label="Выдан по"
-            placeholder="Любая дата"
-          />
-        </div>
-      </div>
+  const material = (
+    <Select
+      compact={compact}
+      value={value.documentId}
+      onChange={(id) => set('documentId', id)}
+      aria-label="Материал"
+      className={cn(compact && 'w-52')}
+      options={withAny(
+        'Все материалы',
+        documentOptions(facets, value.documentId).map((doc) => ({ value: doc.id, label: doc.label })),
+      )}
+    />
+  );
+  const event = (
+    <Select
+      compact={compact}
+      value={value.event}
+      onChange={(next) => set('event', next)}
+      aria-label="Мероприятие"
+      className={cn(compact && 'w-48')}
+      options={withAny(
+        'Все мероприятия',
+        (facets?.events ?? []).map((name) => ({ value: name, label: name })),
+      )}
+    />
+  );
+  const state = (
+    <Select
+      compact={compact}
+      value={value.state}
+      onChange={(next) => set('state', next)}
+      aria-label="Состояние"
+      className={cn(compact && 'w-44')}
+      options={withAny('Любое состояние', STATE_OPTIONS)}
+    />
+  );
+  const mail = (
+    <Select
+      compact={compact}
+      value={value.mail}
+      onChange={(next) => set('mail', next)}
+      aria-label="Письмо"
+      className={cn(compact && 'w-44')}
+      options={withAny('Письмо: любое', MAIL_OPTIONS)}
+    />
+  );
+  /* У поля даты нет `compact` — ужимаем классами до роста остальных контролов строки. */
+  const dateClass = compact ? 'h-8 w-40 py-0 text-sm' : undefined;
+  const from = (
+    <DateField
+      value={value.from}
+      onChange={(next) => set('from', next)}
+      max={value.to || undefined}
+      aria-label="Выдан с"
+      placeholder="Выдан с"
+      className={dateClass}
+    />
+  );
+  const to = (
+    <DateField
+      value={value.to}
+      onChange={(next) => set('to', next)}
+      min={value.from || undefined}
+      aria-label="Выдан по"
+      placeholder="по"
+      className={dateClass}
+    />
   );
 
   return (
     <div className="space-y-3">
-      {/* На телефоне поиск и кнопка «Фильтры» в одну строку, сами отборы —
-          нижним листом: шесть полей столбиком выталкивали документы за экран. */}
-      <div className="flex gap-2">
-        <div className="relative min-w-0 flex-1">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-0 flex-1 md:max-w-72">
           <Search
             size={16}
-            className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-[var(--text-muted)]"
+            aria-hidden
+            className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-muted"
           />
           <Input
-            className="pl-9 max-md:h-11"
+            compact={compact}
+            data-tour="registry-search"
+            className="pl-8"
             placeholder="Фамилия, почта или код"
             value={value.search}
             onChange={(e) => set('search', e.target.value)}
             aria-label="Поиск по реестру"
           />
         </div>
-        {phone && (
-          <button
-            type="button"
+
+        {/* На телефоне остальные поля — нижним листом: шесть полей столбиком
+            выталкивали документы за экран. */}
+        {phone ? (
+          <Button
+            icon={<SlidersHorizontal size={16} />}
             onClick={() => setOpen(true)}
-            className="relative inline-flex h-11 shrink-0 items-center gap-2 rounded-lg border border-[var(--line-strong)] px-3 text-sm font-medium"
+            aria-haspopup="dialog"
           >
-            <SlidersHorizontal size={16} />
             Фильтры
-            {activeCount > 0 && (
-              <span className="grid h-5 min-w-5 place-items-center rounded-full bg-[var(--accent)] px-1 text-[11px] font-semibold text-white">{activeCount}</span>
+            {chips.length > 0 && (
+              <Badge tone="accent" size="sm">
+                {chips.length}
+              </Badge>
             )}
-          </button>
+          </Button>
+        ) : (
+          <>
+            {material}
+            {event}
+            {state}
+            {mail}
+            {from}
+            {to}
+          </>
         )}
       </div>
 
-      {phone ? (
-        <BottomSheet open={open} onClose={() => setOpen(false)} title="Фильтры">
-          <div className="px-3 pb-2">{grid}</div>
+      {phone && (
+        <BottomSheet
+          open={open}
+          onClose={() => setOpen(false)}
+          title="Фильтры"
+          footer={
+            <>
+              <Button variant="ghost" onClick={onReset} disabled={chips.length === 0}>
+                Сбросить
+              </Button>
+              <Button variant="primary" className="ml-auto" onClick={() => setOpen(false)}>
+                Готово
+              </Button>
+            </>
+          }
+        >
+          {/* Обёртка не label: подпись к кнопке-списку привязана через aria-label,
+              а <Label> рисует её глазу. */}
+          <div className="grid gap-3 px-3 pb-2">
+            <Labeled label="Материал">{material}</Labeled>
+            <Labeled label="Мероприятие">{event}</Labeled>
+            <Labeled label="Состояние">{state}</Labeled>
+            <Labeled label="Письмо">{mail}</Labeled>
+            <div className="grid grid-cols-2 gap-3">
+              <Labeled label="Выдан с">{from}</Labeled>
+              <Labeled label="по">{to}</Labeled>
+            </div>
+          </div>
         </BottomSheet>
-      ) : (
-        grid
       )}
 
-      {(active || value.search) && (
-        <Button size="sm" variant="ghost" icon={<X size={14} />} onClick={onReset}>
-          Сбросить отбор
-        </Button>
+      {(chips.length > 0 || value.search) && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {chips.map((chip) => (
+            <button
+              key={chip.key}
+              type="button"
+              onClick={() => set(chip.key, '')}
+              aria-label={`Убрать из отбора: ${chip.label}`}
+              className="pressable rounded-full"
+            >
+              <Badge tone="accent" className="pr-1.5">
+                {chip.label}
+                <X size={12} strokeWidth={3} aria-hidden />
+              </Badge>
+            </button>
+          ))}
+          <Button size="sm" variant="ghost" onClick={onReset}>
+            Сбросить отбор
+          </Button>
+        </div>
       )}
+    </div>
+  );
+}
+
+function Labeled({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div>
+      <Label>{label}</Label>
+      {children}
     </div>
   );
 }

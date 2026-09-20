@@ -2,6 +2,9 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Building2, Globe, Mail, Phone, Search, ShieldCheck } from 'lucide-react';
 import { Meta } from '../seo/Meta';
+import { Button } from '../ui/Button';
+import { Input } from '../ui/Field';
+import { Segmented } from '../ui/Tabs';
 
 interface Program {
   id: string;
@@ -75,7 +78,7 @@ export function IssuerPage() {
   }, [slug]);
 
   if (page === null) {
-    return <p className="p-10 text-center text-[var(--text-muted)]">Открываем…</p>;
+    return <p className="p-10 text-center text-muted">Открываем…</p>;
   }
 
   if (page === 'missing') {
@@ -87,15 +90,15 @@ export function IssuerPage() {
           path={`/org/${slug}`}
           noindex
         />
-        <div className="grid min-h-full place-items-center bg-[var(--ground)] px-6 py-16">
-          <main className="w-full max-w-md rounded-2xl bg-[var(--surface)] p-8 text-center ring-1 ring-[var(--line)]">
-            <Building2 size={40} className="mx-auto text-[var(--text-muted)]" strokeWidth={1.5} />
-            <h1 className="mt-4 font-serif text-2xl">Страница не найдена</h1>
-            <p className="mt-2 text-[var(--text-muted)]">
+        <div className="grid min-h-full place-items-center bg-ground px-6 py-16">
+          <main className="card w-full max-w-md p-8 text-center">
+            <Building2 size={40} className="mx-auto text-muted" strokeWidth={1.5} />
+            <h1 className="mt-4 text-2xl font-semibold">Страница не найдена</h1>
+            <p className="mt-2 text-muted">
               Такой организации нет, либо она не открыла публичную страницу. Проверить документ
               можно по его коду.
             </p>
-            <Link to="/" className="mt-4 inline-block text-sm text-[var(--accent)] hover:underline">
+            <Link to="/" className="mt-4 inline-block text-sm text-accent hover:underline">
               На главную
             </Link>
           </main>
@@ -122,38 +125,38 @@ export function IssuerPage() {
           ...(page.inn ? { taxID: page.inn } : {}),
         }}
       />
-      <div className="min-h-full bg-[var(--ground)] px-6 py-12">
+      <div className="min-h-full bg-ground px-6 py-12">
         <main className="mx-auto max-w-3xl space-y-8">
           <header className="flex flex-wrap items-start gap-5">
             {page.logoUrl ? (
               <img
                 src={page.logoUrl}
                 alt=""
-                className="h-20 w-20 rounded-2xl bg-[var(--surface)] object-contain p-2 ring-1 ring-[var(--line)]"
+                className="h-20 w-20 rounded-sheet bg-surface object-contain p-2 ring-1 ring-line"
               />
             ) : (
-              <div className="grid h-20 w-20 place-items-center rounded-2xl bg-[var(--surface)] ring-1 ring-[var(--line)]">
-                <Building2 size={32} className="text-[var(--text-muted)]" strokeWidth={1.5} />
+              <div className="grid h-20 w-20 place-items-center rounded-sheet bg-surface ring-1 ring-line">
+                <Building2 size={32} className="text-muted" strokeWidth={1.5} />
               </div>
             )}
             <div className="min-w-0 flex-1">
-              <h1 className="font-serif text-3xl">{page.name}</h1>
+              <h1 className="text-3xl font-semibold">{page.name}</h1>
               {page.verified && (
                 <p
-                  className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-xs font-medium text-[var(--accent)]"
+                  className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-2.5 py-1 text-xs font-medium text-accent"
                   title="Домен и реквизиты организации проверены сервисом"
                 >
                   <ShieldCheck size={13} /> Верифицированный эмитент
                 </p>
               )}
               {page.description && (
-                <p className="mt-3 whitespace-pre-line text-[var(--text)]">{page.description}</p>
+                <p className="mt-3 whitespace-pre-line text-ink">{page.description}</p>
               )}
-              <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm text-[var(--text-muted)]">
+              <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted">
                 {page.inn && (
                   <div className="flex gap-1.5">
                     <dt>ИНН</dt>
-                    <dd className="font-medium text-[var(--text)]">{page.inn}</dd>
+                    <dd className="font-medium text-ink">{page.inn}</dd>
                   </div>
                 )}
                 {page.website && (
@@ -163,7 +166,7 @@ export function IssuerPage() {
                       href={page.website}
                       rel="noopener noreferrer nofollow"
                       target="_blank"
-                      className="text-[var(--accent)] hover:underline"
+                      className="text-accent hover:underline"
                     >
                       {page.website.replace(/^https?:\/\//, '')}
                     </a>
@@ -174,7 +177,7 @@ export function IssuerPage() {
                     <Mail size={14} />
                     <a
                       href={`mailto:${page.contactEmail}`}
-                      className="text-[var(--accent)] hover:underline"
+                      className="text-accent hover:underline"
                     >
                       {page.contactEmail}
                     </a>
@@ -193,13 +196,13 @@ export function IssuerPage() {
           <DocumentSearch slug={slug} byName={page.searchByName} />
 
           <section>
-            <h2 className="font-serif text-xl">Программы и мероприятия</h2>
+            <h2 className="text-xl font-medium">Программы и мероприятия</h2>
             {page.programs.length === 0 ? (
-              <p className="mt-2 text-sm text-[var(--text-muted)]">
+              <p className="mt-2 text-sm text-muted">
                 Выданных документов, открытых для проверки, пока нет.
               </p>
             ) : (
-              <ul className="mt-3 divide-y divide-[var(--line)] rounded-2xl bg-[var(--surface)] ring-1 ring-[var(--line)]">
+              <ul className="hairline mt-3 divide-y divide-line overflow-hidden rounded-sheet bg-surface">
                 {page.programs.map((program) => (
                   <li
                     key={program.id}
@@ -208,14 +211,14 @@ export function IssuerPage() {
                     <div className="min-w-0 flex-1">
                       <p className="font-medium">{program.title}</p>
                       {(program.eventName || program.eventDate) && (
-                        <p className="text-sm text-[var(--text-muted)]">
+                        <p className="text-sm text-muted">
                           {program.eventName}
                           {program.eventName && program.eventDate ? ', ' : ''}
                           {program.eventDate}
                         </p>
                       )}
                     </div>
-                    <p className="text-sm text-[var(--text-muted)] tabular-nums">
+                    <p className="tabular text-sm text-muted">
                       выдано {program.issued.toLocaleString('ru-RU')}
                       {program.lastIssuedAt
                         ? `, последний ${formatDate(program.lastIssuedAt)}`
@@ -227,9 +230,9 @@ export function IssuerPage() {
             )}
           </section>
 
-          <p className="text-center text-sm text-[var(--text-muted)]">
+          <p className="text-center text-sm text-muted">
             Реестр ведётся сервисом{' '}
-            <Link to="/" className="text-[var(--accent)] hover:underline">
+            <Link to="/" className="text-accent hover:underline">
               Вручай
             </Link>
             . Подлинность каждого документа подтверждается его страницей проверки.
@@ -295,82 +298,61 @@ function DocumentSearch({ slug, byName }: { slug: string; byName: boolean }) {
   }
 
   return (
-    <section className="rounded-2xl bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]">
+    <section className="card p-5">
       <h2 className="flex items-center gap-2 font-medium">
-        <Search size={16} className="text-[var(--text-muted)]" />
+        <Search size={16} className="text-muted" aria-hidden />
         Проверить документ
       </h2>
       {byName && (
-        <div
-          role="tablist"
-          className="mt-3 inline-flex rounded-lg bg-[var(--surface-sunken)] p-0.5 text-sm"
-        >
-          {(
-            [
-              ['code', 'По номеру'],
-              ['name', 'По фамилии'],
-            ] as const
-          ).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              role="tab"
-              aria-selected={mode === value}
-              onClick={() => {
-                setMode(value);
-                setMatches(null);
-                setError('');
-              }}
-              className={`rounded-md px-3 py-1 ${
-                mode === value ? 'bg-[var(--surface)] font-medium' : 'text-[var(--text-muted)]'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <Segmented
+          label="Способ поиска"
+          value={mode}
+          onChange={(value) => {
+            setMode(value);
+            setMatches(null);
+            setError('');
+          }}
+          items={[
+            { id: 'code' as const, label: 'По номеру' },
+            { id: 'name' as const, label: 'По фамилии' },
+          ]}
+          className="mt-3"
+        />
       )}
       <form onSubmit={(e) => void submit(e)} className="mt-3 flex flex-wrap gap-2">
-        <input
+        <Input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={mode === 'code' ? 'K7M2-9QXR-4TVB' : 'Фамилия и имя'}
           aria-label={mode === 'code' ? 'Номер документа' : 'Фамилия и имя'}
-          className="min-w-0 flex-1 rounded-lg bg-[var(--surface)] px-3 py-2 ring-1 ring-[var(--line-strong)] outline-none placeholder:text-[var(--text-muted)] focus:ring-2 focus:ring-[var(--focus)]"
+          className="min-w-0 flex-1"
           maxLength={mode === 'code' ? 64 : 200}
         />
-        <button
-          type="submit"
-          disabled={busy || !query.trim()}
-          className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--accent-contrast)] hover:bg-[var(--accent-hover)] disabled:opacity-50"
-        >
-          {busy ? 'Ищем…' : 'Найти'}
-        </button>
+        <Button type="submit" variant="primary" loading={busy} disabled={!query.trim()}>
+          Найти
+        </Button>
       </form>
-      <p className="mt-2 text-xs text-[var(--text-muted)]">
+      <p className="mt-2 text-xs text-muted">
         {mode === 'code'
           ? 'Номер напечатан на документе рядом с QR-кодом. Буквы O, I и L в нём не встречаются — это цифры 0 и 1.'
           : 'Показываются документы, выданные этой организацией. Имя — так, как разрешила показывать организация.'}
       </p>
       {error && (
-        <p role="alert" className="mt-3 text-sm text-[var(--danger)]">
+        <p role="alert" className="mt-3 text-sm text-danger">
           {error}
         </p>
       )}
       {matches && (
-        <ul className="mt-3 divide-y divide-[var(--line)] text-sm">
-          {matches.length === 0 && (
-            <li className="py-2 text-[var(--text-muted)]">Ничего не найдено</li>
-          )}
+        <ul className="mt-3 divide-y divide-line text-sm">
+          {matches.length === 0 && <li className="py-2 text-muted">Ничего не найдено</li>}
           {matches.map((m) => (
             <li key={m.code} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 py-2">
-              <Link to={m.path} className="font-medium text-[var(--accent)] hover:underline">
+              <Link to={m.path} className="font-medium text-accent hover:underline">
                 {m.name || m.code}
               </Link>
-              <span className="text-[var(--text-muted)]">
+              <span className="text-muted">
                 {m.title}
-                {m.eventName ? `, ${m.eventName}` : ''} · {formatDate(m.issuedAt)} ·{' '}
-                {STATE_LABEL[m.state]}
+                {m.eventName ? `, ${m.eventName}` : ''} · {formatDate(m.issuedAt)} · {STATE_LABEL[m.state]}
               </span>
             </li>
           ))}

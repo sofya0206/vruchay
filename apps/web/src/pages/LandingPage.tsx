@@ -134,7 +134,7 @@ function Hero() {
         <h1 className="vru-display vru-enter mx-auto mt-6 max-w-[900px]">
           Сервис массовой выдачи документов
         </h1>
-        <p className="vru-enter vru-delay mx-auto mt-5 max-w-[640px] text-[length:var(--text-subheading)] leading-[var(--leading-subheading)] text-[var(--text-muted)]">
+        <p className="vru-enter vru-delay mx-auto mt-5 max-w-[640px] text-lg text-[var(--text-muted)]">
           Сопровождаем весь процесс от создания документов до отправки адресантам и контроля
           верификации
         </p>

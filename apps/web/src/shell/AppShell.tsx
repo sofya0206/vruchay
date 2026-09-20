@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { InstallHint } from '../ui/InstallHint';
+import { Toaster } from '../ui/Toast';
 import { useMe } from '../auth/useAuth';
 import { Guide } from '../onboarding/Guide';
-import { HintCard } from '../onboarding/HintCard';
-import { HelpButton } from '../onboarding/HelpButton';
 import { SectionTips } from '../onboarding/SectionTips';
 import { onboarding } from '../onboarding/store';
 import { AccountMenu } from './AccountMenu';
 import { Brand } from './Brand';
 import { BurgerMenu } from './BurgerMenu';
+import { HelpMenu } from './HelpMenu';
 import { SideNav } from './SideNav';
 
 const SIDEBAR_KEY = 'vruchay:sidebar';
@@ -22,42 +22,40 @@ function storedCollapsed(): boolean {
   }
 }
 
-/** Материал и его письмо: листу нужна вся ширина, колонка сама сжимается в рейку. */
+/** Документ на любом шаге: листу и таблице нужна вся ширина, колонка сама сжимается в рейку. */
 function isMaterial(pathname: string): boolean {
-  return /^\/(documents|mailing)\/[^/]+/.test(pathname);
+  return /^\/documents\/(?!archive$|templates$)[^/]+/.test(pathname);
 }
 
 /**
- * Оболочка кабинета: шапка сверху, колонка разделов слева — на каждом экране.
+ * Оболочка кабинета: колонка разделов слева — на каждом экране.
  *
- * Стрелки «назад» нет: дорога назад у каждой страницы своя и подписана —
- * путь в заголовке вложенного экрана, ссылка на список, колонка слева.
- * Безымянная стрелка по истории браузера дублировала кнопку самого
- * браузера и ела строку на каждом экране.
+ * На широком экране верхней полосы нет: знак, помощь и аккаунт живут
+ * в колонке, а каждая страница получает лишние 56 точек по высоте.
+ * На телефоне колонки нет, и полоса сверху держит бургер, знак, помощь
+ * и учётную запись.
  *
- * Высоту редактору и рабочему месту письма даёт обёртка `Outlet`: ровно
- * окно минус шапка, чтобы лист получил всё, что осталось, и не появился
- * лишний скролл. Страницы длиннее окна из обёртки просто выступают —
- * прокручивает их само окно, и липкие колонки разделов продолжают
- * считать своё место от шапки.
+ * Стрелки «назад» нет: дорога назад у каждой страницы своя и подписана.
+ *
+ * Высоту редактору и рабочему месту даёт обёртка `Outlet`: ровно окно
+ * минус полоса (на широком экране — ноль), чтобы лист получил всё, что
+ * осталось. Страницы длиннее окна из обёртки просто выступают —
+ * прокручивает их само окно, и липкие колонки продолжают считать своё
+ * место от полосы.
  */
 export function AppShell() {
   const { pathname } = useLocation();
   const email = useMe().data?.email;
 
-  // Погасшие точки у каждого, кто вошёл, свои.
+  // Погасшие подсказки у каждого, кто вошёл, свои.
   useEffect(() => {
     if (email) onboarding.load(email);
   }, [email]);
 
   /*
    * Колонка разделов: человек сворачивает её сам, и это запоминается.
-   * В материале она свёрнута всегда, но развернуть на время можно.
-   *
-   * При переходе колонка остаётся такой, какой была в момент перехода:
-   * из редактора со свёрнутой рейкой человек уходит в «Письма» — и рейка
-   * не разворачивается у него на глазах. Значит, вид на момент перехода
-   * и становится запомненным.
+   * В документе она свёрнута всегда, но развернуть на время можно.
+   * При переходе колонка остаётся такой, какой была в момент перехода.
    */
   const [stored, setStored] = useState(storedCollapsed);
   const [override, setOverride] = useState<boolean | null>(null);
@@ -91,25 +89,21 @@ export function AppShell() {
 
   return (
     <div className="flex min-h-full flex-col">
-      <header className="sticky top-0 z-20 shrink-0 border-b border-[var(--line)] bg-[var(--surface)]">
-        {/* Во всю ширину окна, а не колонкой по центру: шапка — рама экрана.
-            Минус пиксель — нижняя линия, она входит в ту же высоту. */}
-        <div className="flex h-[calc(var(--app-header)-1px)] items-center gap-3 px-3 sm:px-5">
-          {/* Бургер — только на узком экране, где колонки нет. */}
+      {/* Верхняя полоса — только на телефоне. Минус пиксель — нижняя линия входит в ту же высоту. */}
+      <header className="sticky top-0 z-20 shrink-0 border-b border-line bg-surface md:hidden">
+        <div className="flex h-[calc(var(--app-header)-1px)] items-center gap-1 px-2">
           <BurgerMenu />
-
           <Link
             to="/"
             aria-label="На главную"
-            className="-mx-2 inline-flex items-center gap-3 rounded-xl px-2 py-1.5 transition-colors hover:bg-[var(--surface-sunken)]"
+            className="pressable inline-flex items-center gap-2.5 rounded-control px-2 py-1.5 hover:bg-sunken"
           >
-            <Brand size={40} />
-            <span className="text-2xl font-medium">Вручай</span>
+            <Brand size={28} />
+            <span className="text-lg font-medium">Вручай</span>
           </Link>
-
           <div className="ml-auto flex items-center gap-1">
-            <HelpButton />
-            <AccountMenu />
+            <HelpMenu variant="icon" />
+            <AccountMenu variant="avatar" />
           </div>
         </div>
       </header>
@@ -117,31 +111,20 @@ export function AppShell() {
       <div className="flex flex-1">
         <SideNav collapsed={collapsed} onToggle={toggleSidebar} />
 
-        {/* `min-w-0` обязателен: лента вкладок редактора, холст и таблица
-            реестра прокручиваются внутри себя, а без него они распирали бы
-            колонку и вместе с ней всю страницу вбок.
-
-            Высота — `min-h`, а не `h`: с жёсткой высотой эта строка (и вместе
-            с ней колонка разделов) обрывалась ровно на одном экране, а более
-            длинная страница просто рисовалась поверх обрыва. Тогда `sticky`
-            внутри колонки разделов упирался в потолок этой обрубленной рамки
-            и переставал липнуть, как только страница прокручивалась дальше
-            первого экрана, — колонка «уезжала». `min-h` держит экран как
-            минимум, но растёт вместе с содержимым, и колонка разделов
-            растягивается вровень с ним на всю длину страницы.
-
-            Страницам с фиксированной высотой — редактору листа и рабочему
-            месту материала — при этом константа не нужна отсюда: у них есть
-            свой собственный `h-[calc(100dvh-var(--app-header))]` в корне. */}
+        {/* `min-w-0` обязателен: лента шагов, холст и таблица реестра
+            прокручиваются внутри себя, а без него они распирали бы колонку
+            и вместе с ней всю страницу вбок. Высота — `min-h`, а не `h`:
+            с жёсткой высотой липкая колонка теряла прилипание на длинных
+            страницах. */}
         <div className="flex min-h-[calc(100dvh-var(--app-header))] min-w-0 flex-1 flex-col">
           <Outlet />
         </div>
       </div>
 
       <InstallHint />
-      <HintCard />
       <SectionTips />
       <Guide />
+      <Toaster />
     </div>
   );
 }

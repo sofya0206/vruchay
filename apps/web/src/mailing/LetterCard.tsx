@@ -124,16 +124,16 @@ export function LetterCard({
   const variables = columns.data ?? [];
 
   return (
-    <section className="rounded-2xl bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]">
+    <section className="rounded-sheet bg-surface p-5 ring-1 ring-line">
       <header className="mb-4 flex flex-wrap items-center gap-3">
         <h3 className="font-medium">
           {title}
           {subtitle && (
-            <span className="block text-sm font-normal text-[var(--text-muted)]">{subtitle}</span>
+            <span className="block text-sm font-normal text-muted">{subtitle}</span>
           )}
         </h3>
         {audience && !audience.refusal && (
-          <span className="text-sm text-[var(--text-muted)]">
+          <span className="text-sm text-muted">
             уйдёт писем: {audience.willSend}
           </span>
         )}
@@ -153,7 +153,7 @@ export function LetterCard({
               onChange={(e) => setAdvertiser(e.target.value)}
               placeholder="ООО «Ромашка», ИНН 7700000000"
             />
-            <p className="mt-1.5 text-xs text-[var(--text-muted)]">
+            <p className="mt-1.5 text-xs text-muted">
               Попадёт в низ письма рядом с пометкой «Реклама» — этого требует закон.
             </p>
           </div>
@@ -168,7 +168,7 @@ export function LetterCard({
             <FormatButton onClick={() => applyFormat('_')} title="Курсив">
               <Italic size={15} />
             </FormatButton>
-            <span className="ml-2 text-xs text-[var(--text-muted)]">
+            <span className="ml-2 text-xs text-muted">
               Пустая строка — новый абзац. Адрес сайта сам станет ссылкой.
             </span>
           </div>
@@ -178,25 +178,20 @@ export function LetterCard({
             onChange={(e) => setBody(e.target.value)}
             rows={8}
             spellCheck
-            className="w-full rounded-xl bg-[var(--surface)] px-3 py-2 text-sm ring-1 ring-[var(--line)] focus:ring-2 focus:ring-[var(--accent)] focus:outline-none"
+            className="w-full rounded-card bg-surface px-3 py-2 text-sm ring-1 ring-line focus:ring-2 focus:ring-accent focus:outline-none"
           />
         </div>
 
         {variables.length > 0 && (
-          <div className="rounded-xl bg-[var(--surface-sunken)] p-3">
-            <p className="text-xs text-[var(--text-muted)]">
+          <div className="rounded-card bg-sunken p-3">
+            <p className="text-xs text-muted">
               Подставить данные получателя — нажмите, чтобы добавить в текст:
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               {variables.map((name) => (
-                <button
-                  key={name}
-                  type="button"
-                  onClick={() => insert(name)}
-                  className="rounded-lg bg-[var(--surface)] px-2 py-1 font-mono text-xs ring-1 ring-[var(--line)] hover:ring-[var(--accent)]"
-                >
+                <Button key={name} size="sm" onClick={() => insert(name)} className="font-mono text-xs">
                   %{name}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -208,7 +203,7 @@ export function LetterCard({
             <span className="flex items-center gap-1.5 font-medium">
               <Paperclip size={14} /> Прикладывать документ к письму
             </span>
-            <span className="mt-0.5 block text-[var(--text-muted)]">
+            <span className="mt-0.5 block text-muted">
               Тем, у кого документ ещё не создан, письмо не уйдёт — они попадут в список
               пропущенных.
             </span>
@@ -243,17 +238,17 @@ export function LetterCard({
           </Menu>
 
           {saved && (
-            <span className="flex items-center gap-1.5 text-sm text-[var(--accent)]">
+            <span className="flex items-center gap-1.5 text-sm text-accent">
               <Check size={15} /> Сохранено
             </span>
           )}
           {test.isSuccess && (
-            <span className="text-sm text-[var(--accent)]">
+            <span className="text-sm text-accent">
               Письмо отправлено на {test.data.to}
             </span>
           )}
           {(save.isError || test.isError) && (
-            <span className="text-sm text-[var(--danger)]">
+            <span className="text-sm text-danger">
               {((save.error ?? test.error) as Error).message}
             </span>
           )}
@@ -280,33 +275,33 @@ export function LetterCard({
 function AudienceReport({ audience }: { audience: Audience }) {
   if (audience.refusal) {
     return (
-      <p className="rounded-xl bg-[var(--danger-soft)] px-4 py-3 text-sm text-[var(--danger)]">
+      <p className="rounded-card bg-danger-soft px-4 py-3 text-sm text-danger">
         {audience.refusal}
       </p>
     );
   }
 
   return (
-    <div className="rounded-xl bg-[var(--surface-sunken)] p-4 text-sm">
+    <div className="rounded-card bg-sunken p-4 text-sm">
       <p>
         Писем уйдёт: <b>{audience.willSend}</b>
       </p>
 
       {audience.skipped.length > 0 && (
         <details className="mt-3" open={audience.willSend === 0}>
-          <summary className="cursor-pointer text-[var(--text-muted)]">
+          <summary className="cursor-pointer text-muted">
             Не уйдёт: {audience.skipped.length} — посмотреть причины
           </summary>
           <ul className="mt-2 space-y-1">
             {audience.skipped.slice(0, 100).map((item, i) => (
               <li key={`${item.email}-${i}`} className="flex flex-wrap gap-x-2">
                 <span className="font-medium">{item.name || item.email || 'Без имени'}</span>
-                <span className="text-[var(--text-muted)]">— {item.reason}</span>
+                <span className="text-muted">— {item.reason}</span>
               </li>
             ))}
           </ul>
           {audience.skipped.length > 100 && (
-            <p className="mt-2 text-[var(--text-muted)]">
+            <p className="mt-2 text-muted">
               …и ещё {audience.skipped.length - 100}
             </p>
           )}

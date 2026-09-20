@@ -5,27 +5,15 @@ import { SETTINGS_SECTIONS } from './sections';
  * Адреса разделов — часть обещания: по ссылке из письма или из переписки
  * с поддержкой должен открыться именно нужный раздел. Переименование
  * пути ломает чужие закладки молча, поэтому список закреплён тестом.
+ * Прежние адреса (domains, senders, privacy, tokens, support, referral)
+ * ведут в новые места — см. shell/redirects.test.ts.
  */
-const REQUIRED = [
-  'account',
-  'organization',
-  'domains',
-  'senders',
-  'team',
-  'security',
-  'interface',
-  'privacy',
-  'audit',
-  'tokens',
-];
-
-/* «Поддержка» и «Пригласить друга» переехали из настроек: их старые адреса
-   редиректят на /support и /referral — см. App.tsx. */
+const REQUIRED = ['account', 'interface', 'security', 'organization', 'team', 'mail', 'billing', 'integrations', 'audit'];
 
 describe('разделы настроек', () => {
-  it('у каждого обязательного раздела есть свой адрес', () => {
+  it('ровно девять разделов, и у каждого свой адрес', () => {
     const paths = SETTINGS_SECTIONS.map((s) => s.path);
-    for (const required of REQUIRED) expect(paths).toContain(required);
+    expect(paths).toEqual(REQUIRED);
   });
 
   it('адреса не повторяются', () => {

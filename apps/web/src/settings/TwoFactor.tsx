@@ -65,7 +65,7 @@ export function TwoFactor() {
     <section>
       <SectionHead title="Вход по коду" about={<>Второй шаг после пароля: шесть цифр из приложения на телефоне. Украденного пароля станет мало, чтобы войти в кабинет и выпустить документы от вашего имени.</>} />
 
-      <div className="mt-4 max-w-xl space-y-4 rounded-2xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]">
+      <div className="mt-4 max-w-xl space-y-4 rounded-sheet bg-surface p-4 ring-1 ring-line">
         <div className="flex flex-wrap items-center gap-3">
           {enabled ? (
             <StatusChip tone="done">
@@ -77,7 +77,7 @@ export function TwoFactor() {
             </StatusChip>
           )}
           {enabled && (
-            <span className="text-sm text-[var(--text-muted)]">
+            <span className="text-sm text-muted">
               Резервных кодов осталось: {status.data?.backupCodesLeft ?? 0}
             </span>
           )}
@@ -101,14 +101,14 @@ export function TwoFactor() {
               <img
                 src={qr}
                 alt="QR-код для приложения проверки подлинности"
-                className="rounded-lg bg-[var(--sheet-paper)] p-2"
+                className="rounded-control bg-[var(--sheet-paper)] p-2"
                 width={220}
                 height={220}
               />
             )}
-            <p className="text-sm text-[var(--text-muted)]">
+            <p className="text-sm text-muted">
               Камера не читает? Введите ключ вручную:{' '}
-              <code className="font-mono break-all text-[var(--text)]">{setup.secret}</code>
+              <code className="font-mono break-all text-ink">{setup.secret}</code>
             </p>
 
             <form
@@ -141,7 +141,7 @@ export function TwoFactor() {
         {enabled && <ManageEnabled onCodes={setBackupCodes} onChanged={refresh} />}
 
         {error && (
-          <p role="alert" className="text-sm text-[var(--danger)]">
+          <p role="alert" className="text-sm text-danger">
             {error}
           </p>
         )}
@@ -209,7 +209,7 @@ function ManageEnabled({
         else regenerate.mutate();
       }}
     >
-      <p className="text-sm text-[var(--text-muted)]">
+      <p className="text-sm text-muted">
         {mode === 'disable'
           ? 'Выключение снимает защиту со входа — подтвердите паролем и кодом.'
           : 'Старые резервные коды перестанут действовать сразу.'}
@@ -248,7 +248,7 @@ function ManageEnabled({
         </Button>
       </div>
       {error && (
-        <p role="alert" className="text-sm text-[var(--danger)]">
+        <p role="alert" className="text-sm text-danger">
           {error}
         </p>
       )}
@@ -262,9 +262,9 @@ function ManageEnabled({
  */
 function BackupCodes({ codes, onDone }: { codes: string[]; onDone: () => void }) {
   return (
-    <div className="rounded-xl bg-[var(--accent-soft)] p-4">
+    <div className="rounded-card bg-accent-soft p-4">
       <h3 className="font-medium">Резервные коды</h3>
-      <p className="mt-1 text-sm text-[var(--text-muted)]">
+      <p className="mt-1 text-sm text-muted">
         Каждый работает один раз — вместо кода из приложения, если телефон потерян. Сохраните их
         сейчас: показать их ещё раз не сможем и мы.
       </p>

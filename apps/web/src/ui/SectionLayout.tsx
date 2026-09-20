@@ -42,7 +42,7 @@ export function SectionLayout({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-      <aside className="border-b border-[var(--line)] max-md:hidden md:w-60 md:shrink-0 md:border-r md:border-b-0">
+      <aside className="border-b border-line max-md:hidden md:w-60 md:shrink-0 md:border-r md:border-b-0">
         <div className="p-3 max-md:px-2 max-md:py-2 md:sticky md:top-[var(--app-header)] md:max-h-[calc(100vh-var(--app-header))] md:overflow-y-auto">
           {column}
         </div>
@@ -51,17 +51,17 @@ export function SectionLayout({
       <div className="flex min-w-0 flex-1 flex-col">
         {/* На телефоне заголовок — своей строкой, инструменты (поиск) — второй
             во всю ширину: в одну строку поле поиска сжималось до обрывка. */}
-        <div className="z-10 flex flex-wrap items-center gap-3 border-b border-[var(--line)] bg-[var(--surface)] px-6 py-3 max-md:gap-2 max-md:px-4 md:sticky md:top-[var(--app-header)]">
+        <div className="z-10 flex flex-wrap items-center gap-3 border-b border-line bg-surface px-6 py-3 max-md:gap-2 max-md:px-4 md:sticky md:top-[var(--app-header)]">
           <div className="min-w-[10rem] flex-1 max-md:hidden">{head}</div>
           <button
             type="button"
             onClick={() => setOpen(true)}
             aria-haspopup="dialog"
             aria-label={`${columnTitle}: выбрать`}
-            className="-mx-1 flex min-w-0 basis-full items-center gap-1.5 rounded-lg px-1 py-0.5 text-left active:bg-[var(--surface-sunken)] md:hidden"
+            className="-mx-1 flex min-w-0 basis-full items-center gap-1.5 rounded-control px-1 py-0.5 text-left active:bg-sunken md:hidden"
           >
             <span className="min-w-0">{head}</span>
-            <ChevronsUpDown size={16} className="shrink-0 text-[var(--text-muted)]" />
+            <ChevronsUpDown size={16} className="shrink-0 text-muted" />
           </button>
           {tools && <div className="flex min-w-0 items-center gap-2 max-md:w-full max-md:[&>*:first-child]:flex-1">{tools}</div>}
         </div>
@@ -70,7 +70,7 @@ export function SectionLayout({
 
         {bar && (
           <div
-            className="sticky bottom-0 z-10 flex flex-wrap items-center gap-3 border-t border-[var(--line)] bg-[var(--surface)] px-4 pt-2.5 text-sm sm:px-6"
+            className="sticky bottom-0 z-10 flex flex-wrap items-center gap-3 border-t border-line bg-surface px-4 pt-2.5 text-sm sm:px-6"
             // Полоса «домой» у айфонов без кнопки: панель над ней, а не под ней.
             style={{ paddingBottom: 'max(10px, env(safe-area-inset-bottom))' }}
           >
@@ -107,7 +107,7 @@ export function PageLayout({
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="z-10 flex flex-wrap items-center gap-3 border-b border-[var(--line)] bg-[var(--surface)] px-6 py-3 md:sticky md:top-[var(--app-header)]">
+      <div className="z-10 flex flex-wrap items-center gap-3 border-b border-line bg-surface px-6 py-3 md:sticky md:top-[var(--app-header)]">
         <div className="min-w-[10rem] flex-1">{head}</div>
         {tools}
       </div>
@@ -122,7 +122,7 @@ export function SectionTitle({ children, count }: { children: ReactNode; count?:
   return (
     <div className="flex min-w-0 items-baseline gap-2">
       <h1 className="truncate text-lg font-medium">{children}</h1>
-      {count != null && <span className="tabular text-sm text-[var(--text-muted)]">{count}</span>}
+      {count != null && <span className="tabular text-sm text-muted">{count}</span>}
     </div>
   );
 }
@@ -154,13 +154,13 @@ export function columnRowClass({ active, nested }: { active?: boolean; nested?: 
   return cn(
     'flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-3 py-2 text-sm whitespace-nowrap transition-colors md:px-2 md:py-1.5',
     // Телефон: строка нижнего листа — под палец, обычным кеглем.
-    'max-md:min-h-12 max-md:rounded-xl max-md:text-base',
+    'max-md:min-h-12 max-md:rounded-card max-md:text-base',
     // Вложенная строка отступает на ширину значка родителя: папки читаются
     // как ветка «Моих документов», а не как второй плоский список.
     nested && 'max-md:pl-9 md:pl-5 md:text-[13px]',
     active
-      ? 'bg-[var(--accent-soft)] font-medium text-[var(--accent)]'
-      : 'text-[var(--text-muted)] hover:bg-[var(--row-hover)] hover:text-[var(--text)]',
+      ? 'bg-accent-soft font-medium text-accent'
+      : 'text-muted hover:bg-row-hover hover:text-ink',
   );
 }
 
@@ -202,7 +202,7 @@ export function ColumnRow({
       >
         <Icon size={16} strokeWidth={1.75} className={cn('shrink-0 max-md:size-5', !active && tint)} />
         <span className="flex-1 truncate">{children}</span>
-        {count ? <span className="tabular text-xs text-[var(--text-muted)] max-md:text-sm">{count}</span> : null}
+        {count ? <span className="tabular text-xs text-muted max-md:text-sm">{count}</span> : null}
       </NavLink>
       {trailing}
     </li>

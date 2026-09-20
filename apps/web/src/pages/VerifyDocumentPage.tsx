@@ -14,6 +14,8 @@ import {
   X,
 } from 'lucide-react';
 import { Meta } from '../seo/Meta';
+import { Brand } from '../shell/Brand';
+import { Button } from '../ui/Button';
 import { sameDigest, sha256Hex } from '../verify/sha256';
 
 type State = 'valid' | 'revoked' | 'replaced' | 'expired';
@@ -126,17 +128,15 @@ export function VerifyDocumentPage() {
           открывают сканом QR с бумаги, и ответ «подлинный / отозван»
           должен быть виден сразу, без прокрутки и без пустого поля над ним. */}
       <div
-        className="grid min-h-full justify-items-center bg-[var(--ground)] px-4 py-5 sm:place-items-center sm:px-6 sm:py-16"
+        className="grid min-h-full justify-items-center bg-ground px-4 py-5 sm:place-items-center sm:px-6 sm:py-16"
         style={{ paddingBottom: 'max(20px, env(safe-area-inset-bottom))' }}
       >
         <main className="w-full max-w-md">
-          {outcome.kind === 'pending' && (
-            <p className="text-center text-[var(--text-muted)]">Проверяем…</p>
-          )}
+          {outcome.kind === 'pending' && <p className="text-center text-muted">Проверяем…</p>}
           {outcome.kind === 'throttled' && (
             <Card tone="muted">
-              <h1 className="font-serif text-2xl">Слишком много проверок</h1>
-              <p className="mt-2 text-[var(--text-muted)]">
+              <h1 className="text-2xl font-semibold">Слишком много проверок</h1>
+              <p className="mt-2 text-muted">
                 С вашего адреса пришло много запросов подряд. Подождите минуту и откройте
                 страницу снова.
               </p>
@@ -144,8 +144,8 @@ export function VerifyDocumentPage() {
           )}
           {outcome.kind === 'error' && (
             <Card tone="muted">
-              <h1 className="font-serif text-2xl">Не удалось проверить</h1>
-              <p className="mt-2 text-[var(--text-muted)]">
+              <h1 className="text-2xl font-semibold">Не удалось проверить</h1>
+              <p className="mt-2 text-muted">
                 Что-то пошло не так на нашей стороне. Попробуйте ещё раз через минуту.
               </p>
             </Card>
@@ -153,10 +153,10 @@ export function VerifyDocumentPage() {
           {outcome.kind === 'missing' && <NotFound reason={outcome.reason} typed={publicId} />}
           {data && <Verdict data={data} />}
 
-          <p className="mt-6 text-center text-sm text-[var(--text-muted)]">
+          <p className="mt-6 flex items-center justify-center gap-1.5 text-center text-sm text-muted">
             Проверка выполнена сервисом{' '}
-            <Link to="/" className="text-[var(--accent)] hover:underline">
-              Вручай
+            <Link to="/" className="inline-flex items-center gap-1.5 text-accent hover:underline">
+              <Brand size={16} /> Вручай
             </Link>
           </p>
         </main>
@@ -173,7 +173,7 @@ type Tone = 'ok' | 'warn' | 'bad' | 'muted';
  * край экрана: на телефоне в 320 точек на неё остаётся точек двести.
  */
 const ROW = 'flex justify-between gap-4';
-const LABEL = 'shrink-0 text-[var(--text-muted)]';
+const LABEL = 'shrink-0 text-muted';
 const VALUE = 'min-w-0 text-right font-medium break-words';
 
 /**
@@ -183,13 +183,13 @@ const VALUE = 'min-w-0 text-right font-medium break-words';
  */
 function Card({ tone, children }: { tone: Tone; children: React.ReactNode }) {
   const ring: Record<Tone, string> = {
-    ok: 'ring-2 ring-[var(--accent)]',
-    warn: 'ring-2 ring-[var(--award)]',
-    bad: 'ring-2 ring-[var(--danger)]',
-    muted: 'ring-1 ring-[var(--line)]',
+    ok: 'ring-2 ring-accent',
+    warn: 'ring-2 ring-warn',
+    bad: 'ring-2 ring-danger',
+    muted: 'ring-1 ring-line',
   };
   return (
-    <div className={`rounded-2xl bg-[var(--surface)] px-5 py-6 text-center sm:p-8 ${ring[tone]}`}>
+    <div className={`rounded-sheet bg-surface px-5 py-6 text-center sm:p-8 ${ring[tone]}`}>
       {children}
     </div>
   );
@@ -202,13 +202,13 @@ const VERDICT: Record<
   valid: {
     tone: 'ok',
     title: 'Документ подлинный',
-    icon: <BadgeCheck size={44} className="mx-auto text-[var(--accent)]" strokeWidth={1.5} />,
+    icon: <BadgeCheck size={44} className="mx-auto text-accent" strokeWidth={1.5} />,
     text: '',
   },
   expired: {
     tone: 'warn',
     title: 'Срок действия истёк',
-    icon: <CalendarX size={44} className="mx-auto text-[var(--award)]" strokeWidth={1.5} />,
+    icon: <CalendarX size={44} className="mx-auto text-warn" strokeWidth={1.5} />,
     text:
       'Документ подлинный, но срок его действия закончился. Он подтверждает то, ' +
       'что было на момент выдачи, а не сегодняшний день.',
@@ -216,7 +216,7 @@ const VERDICT: Record<
   replaced: {
     tone: 'warn',
     title: 'Этот документ заменён',
-    icon: <RefreshCw size={44} className="mx-auto text-[var(--award)]" strokeWidth={1.5} />,
+    icon: <RefreshCw size={44} className="mx-auto text-warn" strokeWidth={1.5} />,
     /*
      * Замена — не отзыв, и говорить о ней надо иначе. Отозванный документ
      * признан недействительным, и предъявителю остаётся идти в организацию.
@@ -231,7 +231,7 @@ const VERDICT: Record<
   revoked: {
     tone: 'bad',
     title: 'Документ отозван',
-    icon: <ShieldX size={44} className="mx-auto text-[var(--danger)]" strokeWidth={1.5} />,
+    icon: <ShieldX size={44} className="mx-auto text-danger" strokeWidth={1.5} />,
     text: 'Выдавшая организация признала этот документ недействительным.',
   },
 };
@@ -242,8 +242,8 @@ function Verdict({ data }: { data: VerifyResult }) {
     <>
       <Card tone={verdict.tone}>
         {verdict.icon}
-        <h1 className="mt-4 font-serif text-2xl">{verdict.title}</h1>
-        {verdict.text && <p className="mt-2 text-[var(--text-muted)]">{verdict.text}</p>}
+        <h1 className="mt-4 text-2xl font-semibold">{verdict.title}</h1>
+        {verdict.text && <p className="mt-2 text-muted">{verdict.text}</p>}
         {data.state === 'revoked' && (
           <dl className="mt-4 space-y-1 text-left text-sm">
             {data.revokedReason && (
@@ -262,27 +262,24 @@ function Verdict({ data }: { data: VerifyResult }) {
         )}
         {data.state === 'replaced' &&
           (data.replacedBy ? (
-            <Link
-              to={data.replacedBy.path}
-              className="mt-4 inline-flex h-11 items-center justify-center rounded-lg bg-[var(--accent)] px-4 text-sm font-medium text-[var(--accent-contrast)] hover:bg-[var(--accent-hover)] max-sm:w-full"
-            >
+            <Button variant="primary" size="lg" to={data.replacedBy.path} className="mt-4 max-sm:w-full">
               Проверить действующий документ
-            </Link>
+            </Button>
           ) : (
-            <p className="mt-3 text-sm text-[var(--text-muted)]">
+            <p className="mt-3 text-sm text-muted">
               Проверить новый документ здесь пока нельзя — обратитесь в выдавшую организацию.
             </p>
           ))}
 
         <p className="mt-4 font-medium">{data.title}</p>
         {data.event.name && (
-          <p className="text-sm text-[var(--text-muted)]">
+          <p className="text-sm text-muted">
             {data.event.name}
             {data.event.date ? `, ${data.event.date}` : ''}
           </p>
         )}
 
-        <dl className="mt-6 space-y-2 border-t border-[var(--line)] pt-6 text-left text-sm">
+        <dl className="mt-6 space-y-2 border-t border-line pt-6 text-left text-sm">
           {Object.entries(data.fields).map(([key, value]) => (
             <div key={key} className={ROW}>
               <dt className={LABEL}>{fieldLabel(key)}</dt>
@@ -315,14 +312,14 @@ function Verdict({ data }: { data: VerifyResult }) {
             <dt className={LABEL}>Выдан организацией</dt>
             <dd className={VALUE}>
               {data.issuer.publicPath ? (
-                <Link to={data.issuer.publicPath} className="text-[var(--accent)] hover:underline">
+                <Link to={data.issuer.publicPath} className="text-accent hover:underline">
                   {data.issuer.name}
                 </Link>
               ) : (
                 data.issuer.name
               )}
               {data.issuer.verified && (
-                <span className="ml-1.5 inline-flex items-center gap-1 rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--accent)]">
+                <span className="ml-1.5 inline-flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent">
                   <ShieldCheck size={11} /> Верифицированный эмитент
                 </span>
               )}
@@ -377,22 +374,13 @@ function Actions({ data }: { data: VerifyResult }) {
     // На телефоне кнопки во всю ширину и высотой под палец — стопкой,
     // а не парой мелких посередине карточки.
     <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-center">
-      <button
-        type="button"
-        onClick={() => void share()}
-        className="inline-flex h-11 items-center justify-center gap-1.5 rounded-lg px-4 text-sm text-[var(--text)] ring-1 ring-[var(--line-strong)] hover:bg-[var(--surface-sunken)] sm:h-9 sm:px-3"
-      >
-        {copied ? <Check size={16} /> : <Share2 size={16} />}
+      <Button size="lg" className="sm:h-9" icon={copied ? <Check size={16} /> : <Share2 size={16} />} onClick={() => void share()}>
         {copied ? 'Ссылка скопирована' : 'Поделиться'}
-      </button>
+      </Button>
       {report && (
-        <a
-          href={report}
-          className="inline-flex h-11 items-center justify-center gap-1.5 rounded-lg px-4 text-sm text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)] sm:h-9 sm:px-3"
-        >
-          <Flag size={14} />
+        <Button variant="ghost" size="lg" className="sm:h-9" icon={<Flag size={16} />} to={report}>
           Сообщить о проблеме
-        </a>
+        </Button>
       )}
     </div>
   );
@@ -429,14 +417,14 @@ function FileCheck({ expected }: { expected: string | null }) {
   }
 
   return (
-    <section className="mt-4 rounded-2xl bg-[var(--surface)] p-5 ring-1 ring-[var(--line)] sm:p-6">
+    <section className="mt-4 card p-5 sm:p-6">
       <h2 className="flex items-center gap-2 font-medium">
-        <FileSearch size={16} className="text-[var(--text-muted)]" />
+        <FileSearch size={16} className="text-muted" />
         Проверить мой файл
       </h2>
       {expected ? (
         <>
-          <p className="mt-1 text-sm text-[var(--text-muted)]">
+          <p className="mt-1 text-sm text-muted">
             Выберите PDF, который вам прислали. Отпечаток считается прямо в браузере — файл
             никуда не отправляется.
           </p>
@@ -448,37 +436,38 @@ function FileCheck({ expected }: { expected: string | null }) {
             onChange={(e) => void onFile(e.target.files?.[0])}
           />
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <button
-              type="button"
+            <Button
+              variant="primary"
+              size="lg"
+              className="max-sm:w-full sm:h-9"
+              loading={verdict.kind === 'busy'}
               onClick={() => input.current?.click()}
-              disabled={verdict.kind === 'busy'}
-              className="h-11 rounded-lg bg-[var(--accent)] px-4 text-sm font-medium text-[var(--accent-contrast)] hover:bg-[var(--accent-hover)] disabled:opacity-50 max-sm:w-full sm:h-9 sm:px-3"
             >
-              {verdict.kind === 'busy' ? 'Считаем…' : 'Выбрать файл'}
-            </button>
+              Выбрать файл
+            </Button>
             {verdict.kind === 'match' && (
-              <span className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--accent)]">
+              <span className="inline-flex items-center gap-1.5 text-sm font-medium text-accent">
                 <Check size={15} /> Файл совпадает с выпущенным
               </span>
             )}
             {verdict.kind === 'mismatch' && (
-              <span className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--danger)]">
+              <span className="inline-flex items-center gap-1.5 text-sm font-medium text-danger">
                 <X size={15} /> Файл не совпадает с выпущенным
               </span>
             )}
             {verdict.kind === 'failed' && (
-              <span className="text-sm text-[var(--danger)]">Не удалось прочитать файл</span>
+              <span className="text-sm text-danger">Не удалось прочитать файл</span>
             )}
           </div>
           {verdict.kind === 'mismatch' && (
-            <p className="mt-2 text-xs text-[var(--text-muted)]">
+            <p className="mt-2 text-xs text-muted">
               Так бывает, если файл пересохранили, распечатали и отсканировали или это другой
               документ. Сверьте номер и данные выше с тем, что напечатано.
             </p>
           )}
         </>
       ) : (
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
+        <p className="mt-1 text-sm text-muted">
           Для этого документа отпечаток файла при выпуске не сохранялся — сверьте номер и данные
           выше с тем, что напечатано.
         </p>
@@ -507,13 +496,13 @@ function NotFound({ reason, typed }: { reason: NotFoundReason; typed: string }) 
 
   return (
     <Card tone="muted">
-      <ShieldAlert size={44} className="mx-auto text-[var(--text-muted)]" strokeWidth={1.5} />
-      <h1 className="mt-4 font-serif text-2xl">Документ не найден</h1>
-      <p className="mt-2 text-[var(--text-muted)]">{text}</p>
+      <ShieldAlert size={44} className="mx-auto text-muted" strokeWidth={1.5} />
+      <h1 className="mt-4 text-2xl font-semibold">Документ не найден</h1>
+      <p className="mt-2 text-muted">{text}</p>
       {typed && (
-        <p className="mt-3 font-mono text-sm text-[var(--text)]">{typed}</p>
+        <p className="mt-3 font-mono text-sm text-ink">{typed}</p>
       )}
-      <p className="mt-4 text-xs text-[var(--text-muted)]">
+      <p className="mt-4 text-xs text-muted">
         Чаще всего путают: {CONFUSABLES.join(', ')}. В коде нет букв I, L, O и U — на их месте
         всегда цифры.
       </p>

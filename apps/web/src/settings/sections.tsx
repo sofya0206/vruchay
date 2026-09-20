@@ -1,11 +1,10 @@
 import type { ReactNode } from 'react';
 import {
-  AtSign,
   Building2,
-  Eye,
-  Globe,
-  KeyRound,
+  CreditCard,
+  Mail,
   Palette,
+  Plug,
   ScrollText,
   ShieldCheck,
   UserRound,
@@ -16,7 +15,6 @@ import { MyProfile, OrgName } from './Organization';
 import { ChangePassword } from './ChangePassword';
 import { TwoFactor } from './TwoFactor';
 import { DeleteAccount } from './DeleteAccount';
-import { Billing } from './Billing';
 import { MailDomains } from './MailDomains';
 import { VerifyDomain } from './VerifyDomain';
 import { DesktopFirst } from '../ui/DesktopFirst';
@@ -25,19 +23,19 @@ import { Team } from './Team';
 import { RolePermissions } from './RolePermissions';
 import { Sessions } from './Sessions';
 import { AuditLog } from './AuditLog';
-import { ApiTokens } from './ApiTokens';
 import { Interface } from './Interface';
 import { PublicProfile } from './PublicProfile';
 import { RetentionPolicy } from './RetentionPolicy';
+import { BillingSection } from './BillingSection';
+import { IntegrationsSection } from './IntegrationsSection';
 import { SettingsStack } from '../ui/Settings';
 
-/** Кому принадлежит настройка: человеку, организации или её интеграциям. */
-export type SettingsGroup = 'you' | 'org' | 'dev';
+/** Кому принадлежит настройка: человеку или организации. */
+export type SettingsGroup = 'you' | 'org';
 
 export const SETTINGS_GROUPS: { key: SettingsGroup; title: string }[] = [
   { key: 'you', title: 'Вы' },
   { key: 'org', title: 'Организация' },
-  { key: 'dev', title: 'Разработчикам' },
 ];
 
 export interface SettingsSection {
@@ -50,16 +48,15 @@ export interface SettingsSection {
 }
 
 /**
- * Разделы настроек.
+ * Разделы настроек — девять, в двух группах.
  *
  * У каждого раздела свой адрес, и список ниже — единственное место,
- * где он заводится: и меню, и маршруты берут его отсюда.
+ * где он заводится: и меню, и маршруты берут его отсюда. Прежние адреса
+ * (домены, адреса рассылки, конфиденциальность, токены, поддержка,
+ * приглашение) ведут в новые места — см. shell/redirects.ts.
  *
- * Разделы сгруппированы по владельцу: личное («Вы»), общее для
- * организации и то, что нужно только тому, кто подключает API.
- * Поддержка, дорожная карта, отзыв и приглашение друга настройками
- * не были и переехали в меню «Помощь» внизу колонки разделов;
- * старые адреса ведут туда — см. App.tsx.
+ * Оплата и интеграции — здесь, а не пунктами главного меню: это
+ * настройки организации, к ним приходят раз в сезон.
  */
 export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
@@ -80,13 +77,14 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   { path: 'security', title: 'Устройства и входы', icon: ShieldCheck, group: 'you', element: <Sessions /> },
   {
     path: 'organization',
-    title: 'Организация и оплата',
+    title: 'Организация',
     icon: Building2,
     group: 'org',
     element: (
       <SettingsStack>
         <OrgName />
-        <Billing />
+        <PublicProfile />
+        <RetentionPolicy />
       </SettingsStack>
     ),
   },
@@ -103,35 +101,26 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     ),
   },
   {
-    path: 'domains',
-    title: 'Домены',
-    icon: Globe,
-    group: 'org',
-    element: (
-      <DesktopFirst
-        title="Настройку доменов"
-        why="Понадобится скопировать несколько длинных DNS-записей в панель регистратора — с двумя окнами рядом это минута, а с телефона легко ошибиться в одном знаке."
-      >
-        <SettingsStack>
-          <MailDomains />
-          <VerifyDomain />
-        </SettingsStack>
-      </DesktopFirst>
-    ),
-  },
-  { path: 'senders', title: 'Адреса рассылки', icon: AtSign, group: 'org', element: <Senders /> },
-  {
-    path: 'privacy',
-    title: 'Конфиденциальность',
-    icon: Eye,
+    path: 'mail',
+    title: 'Почта',
+    icon: Mail,
     group: 'org',
     element: (
       <SettingsStack>
-        <PublicProfile />
-        <RetentionPolicy />
+        <DesktopFirst
+          title="Настройку доменов"
+          why="Понадобится скопировать несколько длинных DNS-записей в панель регистратора — с двумя окнами рядом это минута, а с телефона легко ошибиться в одном знаке."
+        >
+          <SettingsStack>
+            <MailDomains />
+            <VerifyDomain />
+          </SettingsStack>
+        </DesktopFirst>
+        <Senders />
       </SettingsStack>
     ),
   },
+  { path: 'billing', title: 'Тариф и оплата', icon: CreditCard, group: 'org', element: <BillingSection /> },
+  { path: 'integrations', title: 'Интеграции и API', icon: Plug, group: 'org', element: <IntegrationsSection /> },
   { path: 'audit', title: 'Журнал действий', icon: ScrollText, group: 'org', element: <AuditLog /> },
-  { path: 'tokens', title: 'Токены API', icon: KeyRound, group: 'dev', element: <ApiTokens /> },
 ];

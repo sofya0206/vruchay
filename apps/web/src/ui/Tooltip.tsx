@@ -18,7 +18,7 @@ import type { FocusEvent, PointerEvent, ReactNode, RefObject } from 'react';
  */
 
 /** Задержка перед показом: короче — плашки выскакивают при проходе мимо. */
-const SHOW_DELAY = 400;
+const SHOW_DELAY = 300;
 const HIDE_DELAY = 100;
 
 /**
@@ -219,8 +219,8 @@ function Bubble({
       role={describes ? 'tooltip' : undefined}
       aria-hidden={describes ? undefined : true}
       style={{ top: pos?.top ?? 0, left: pos?.left ?? 0 }}
-      className={`pointer-events-none fixed z-[60] max-w-xs rounded-md bg-[var(--text)] px-2 py-1 text-xs text-[var(--ground)] shadow-md transition-opacity duration-100 ${
-        pos ? 'opacity-100' : 'opacity-0'
+      className={`pointer-events-none fixed z-[80] max-w-xs rounded-control bg-ink px-2 py-1 text-xs text-ground shadow-md transition-[opacity,transform] duration-125 ${
+        pos ? 'translate-y-0 opacity-100' : 'translate-y-0.5 opacity-0'
       }`}
     >
       {label}

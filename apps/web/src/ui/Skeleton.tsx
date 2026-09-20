@@ -30,7 +30,7 @@ export function SkeletonRows({
   className?: string;
 }) {
   return (
-    <div className={cn('divide-y divide-[var(--line)]', className)}>
+    <div className={cn('divide-y divide-line', className)}>
       <Announce label={label} />
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className="flex items-center gap-4 px-4 py-3" aria-hidden>
@@ -89,7 +89,7 @@ export function SkeletonForm({
       {Array.from({ length: fields }, (_, i) => (
         <div key={i} className="space-y-2" aria-hidden>
           <Skeleton className="h-3 w-32" />
-          <Skeleton className="h-10 w-full rounded-lg" />
+          <Skeleton className="h-10 w-full rounded-control" />
         </div>
       ))}
     </div>

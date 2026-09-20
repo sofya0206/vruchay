@@ -58,7 +58,7 @@ export function Senders() {
       <SectionHead title="Адреса рассылки" about={<>С этих адресов участники получают письма с документами. На них же придёт ответ, если участник ответит на письмо.</>} />
 
       {verified.length === 0 ? (
-        <div className="mt-4 max-w-2xl rounded-xl bg-[var(--surface-sunken)] p-4 text-sm text-[var(--text-muted)]">
+        <div className="mt-4 max-w-2xl rounded-card bg-sunken p-4 text-sm text-muted">
           <p>
             Своих адресов пока нет — и это рабочее состояние. Письма уходят с адреса{' '}
             <code className="font-mono">noreply@vruchay.ru</code>, отправителем участник видит
@@ -66,7 +66,7 @@ export function Senders() {
           </p>
           <p className="mt-2">
             Свой адрес появится, когда будет подтверждён домен:{' '}
-            <Link to="/settings/domains" className="text-[var(--accent)] underline">
+            <Link to="/settings/domains" className="text-accent underline">
               подключить домен
             </Link>
             .
@@ -78,14 +78,14 @@ export function Senders() {
             {senders.map((s) => (
               <li
                 key={s.id}
-                className="flex flex-wrap items-center gap-3 rounded-xl bg-[var(--surface)] p-3 ring-1 ring-[var(--line)]"
+                className="flex flex-wrap items-center gap-3 rounded-card bg-surface p-3 ring-1 ring-line"
               >
                 <div className="min-w-48 flex-1">
                   <p className="text-sm">
                     <span className="font-medium">{s.displayName || 'Без подписи'}</span> &lt;
                     {s.email}&gt;
                   </p>
-                  <p className="mt-0.5 text-xs text-[var(--text-muted)]">домен {s.domain}</p>
+                  <p className="mt-0.5 text-xs text-muted">домен {s.domain}</p>
                 </div>
                 <Button
                   size="sm"
@@ -143,7 +143,7 @@ export function Senders() {
             </Button>
           </form>
           {error && (
-            <p role="alert" className="mt-2 text-sm text-[var(--danger)]">
+            <p role="alert" className="mt-2 text-sm text-danger">
               {error}
             </p>
           )}
@@ -191,7 +191,7 @@ function SenderDetails({ sender, onSaved }: { sender: Sender; onSaved: () => voi
   }
 
   return (
-    <div className="w-full space-y-3 border-t border-[var(--line)] pt-3">
+    <div className="w-full space-y-3 border-t border-line pt-3">
       <div>
         <Label>Адрес для ответов</Label>
         <Input
@@ -200,7 +200,7 @@ function SenderDetails({ sender, onSaved }: { sender: Sender; onSaved: () => voi
           placeholder={sender.email}
           autoComplete="off"
         />
-        <p className="mt-1 text-xs text-[var(--text-muted)]">
+        <p className="mt-1 text-xs text-muted">
           Куда попадёт участник, нажав «Ответить». Пусто — на сам адрес отправителя. Нужно, когда
           письма уходят с noreply, а отвечать человек должен живому адресату.
         </p>
@@ -214,7 +214,7 @@ function SenderDetails({ sender, onSaved }: { sender: Sender; onSaved: () => voi
           onChange={(e) => setSignature(e.target.value)}
           placeholder="С уважением, приёмная комиссия. Телефон: +7 900 000-00-00"
         />
-        <p className="mt-1 text-xs text-[var(--text-muted)]">
+        <p className="mt-1 text-xs text-muted">
           Дописывается к письму о выдаче документа, отделённая чертой. Рекламе здесь не место:
           рекламный кусок делает рекламным всё письмо, а письмо о выдаче уходит без согласия
           на рекламу.
@@ -247,7 +247,7 @@ function SenderDetails({ sender, onSaved }: { sender: Sender; onSaved: () => voi
         <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
           Свернуть
         </Button>
-        {note && <span className="text-sm text-[var(--text-muted)]">{note}</span>}
+        {note && <span className="text-sm text-muted">{note}</span>}
       </div>
     </div>
   );

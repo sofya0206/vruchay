@@ -33,7 +33,7 @@ export function ApiTokens() {
 
       <div className="mt-4 max-w-2xl">
           {isError ? (
-            <p className="text-sm text-[var(--text-muted)]">
+            <p className="text-sm text-muted">
               Доступ к токенам есть у владельца и управляющего.
             </p>
           ) : (
@@ -61,7 +61,7 @@ function NewToken() {
         e.preventDefault();
         create.mutate({ name, role }, { onSuccess: (r) => { setIssued(r.token); setName(''); } });
       }}
-      className="flex flex-wrap items-end gap-3 rounded-2xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]"
+      className="flex flex-wrap items-end gap-3 rounded-sheet bg-surface p-4 ring-1 ring-line"
     >
       <div className="min-w-52 flex-1">
         <Label>Для чего токен</Label>
@@ -93,7 +93,7 @@ function NewToken() {
       </Button>
 
       {create.isError && (
-        <p role="alert" className="w-full text-sm text-[var(--danger)]">
+        <p role="alert" className="w-full text-sm text-danger">
           {errorText(create.error)}
         </p>
       )}
@@ -109,17 +109,17 @@ function IssuedToken({ token, onClose }: { token: string; onClose: () => void })
   const [copied, setCopied] = useState(false);
 
   return (
-    <div className="rounded-2xl bg-[var(--accent-soft)] p-4">
+    <div className="rounded-sheet bg-accent-soft p-4">
       <p className="flex items-start gap-2 font-medium">
-        <TriangleAlert size={16} className="mt-0.5 shrink-0 text-[var(--accent)]" />
+        <TriangleAlert size={16} className="mt-0.5 shrink-0 text-accent" />
         Скопируйте токен сейчас — больше он нигде не покажется
       </p>
-      <p className="mt-1 text-sm text-[var(--text-muted)]">
+      <p className="mt-1 text-sm text-muted">
         Мы храним не сам токен, а его отпечаток: даже нам его не восстановить. Потеряете — выдадите
         новый, ничего страшного.
       </p>
 
-      <code className="mt-3 block overflow-x-auto rounded-xl bg-[var(--surface)] px-3 py-2.5 font-mono text-sm">
+      <code className="mt-3 block overflow-x-auto rounded-card bg-surface px-3 py-2.5 font-mono text-sm">
         {token}
       </code>
 
@@ -157,17 +157,17 @@ function TokenList({ tokens }: { tokens: ApiTokenInfo[] }) {
   const [error, setError] = useState<string | null>(null);
 
   if (tokens.length === 0) {
-    return <p className="mt-3 text-sm text-[var(--text-muted)]">Действующих токенов нет.</p>;
+    return <p className="mt-3 text-sm text-muted">Действующих токенов нет.</p>;
   }
 
   return (
     <>
-      <ul className="mt-3 divide-y divide-[var(--line)] rounded-2xl bg-[var(--surface)] ring-1 ring-[var(--line)]">
+      <ul className="mt-3 divide-y divide-line rounded-sheet bg-surface ring-1 ring-line">
         {tokens.map((t) => (
           <li key={t.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
             <div className="min-w-40 flex-1">
               <div className="font-medium">{t.name}</div>
-              <div className="text-sm text-[var(--text-muted)]">
+              <div className="text-sm text-muted">
                 <code className="font-mono">{t.prefix}…</code> · {ROLE_TITLE[t.role]} ·{' '}
                 {t.lastUsedAt ? `работал ${when(t.lastUsedAt)}` : 'ни разу не использован'}
               </div>
@@ -201,18 +201,15 @@ function TokenList({ tokens }: { tokens: ApiTokenInfo[] }) {
                 />
               </div>
             ) : (
-              <button
-                onClick={() => setAsking(t.id)}
-                className="text-sm text-[var(--text-muted)] underline underline-offset-2 hover:text-[var(--text)]"
-              >
+              <Button variant="ghost" size="sm" onClick={() => setAsking(t.id)}>
                 Отозвать
-              </button>
+              </Button>
             )}
           </li>
         ))}
       </ul>
       {error && (
-        <p role="alert" className="mt-2 text-sm text-[var(--danger)]">
+        <p role="alert" className="mt-2 text-sm text-danger">
           {error}
         </p>
       )}

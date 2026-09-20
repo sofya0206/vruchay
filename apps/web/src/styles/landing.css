@@ -1,0 +1,435 @@
+/*
+ * Посадочная страница и отраслевые лендинги: свой набор классов `.vru-*`.
+ * Гарнитура и токены те же, что в кабинете; кегли — из шкалы темы.
+ */
+
+/*
+ * Появление первого экрана. Кривая своя: встроенные слабоваты. ease-in
+ * недопустим — он задерживает начало, на которое смотрят в первую секунду.
+ */
+@keyframes vru-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+.vru-enter {
+  animation: vru-rise var(--duration-rise) var(--ease-out) both;
+}
+.vru-delay {
+  animation-delay: 110ms;
+}
+
+/* Задан только размер подзаголовка, которого нет в базовых правилах. */
+.vru-landing h3 {
+  font-size: var(--text-lg);
+  line-height: var(--text-lg--line-height);
+  letter-spacing: var(--text-lg--letter-spacing);
+  font-weight: 600;
+}
+
+.vru-display {
+  font-size: var(--text-6xl);
+  line-height: var(--text-6xl--line-height);
+  letter-spacing: var(--text-6xl--letter-spacing);
+  font-weight: 600;
+  text-wrap: balance;
+}
+
+.vru-h2 {
+  font-size: var(--text-3xl);
+  line-height: var(--text-3xl--line-height);
+  letter-spacing: var(--text-3xl--letter-spacing);
+  font-weight: 600;
+  text-wrap: balance;
+}
+
+/* Дисплейный кегль рассчитан на широкий экран: на телефоне 64px не помещаются. */
+@media (max-width: 640px) {
+  .vru-display {
+    font-size: 40px;
+  }
+  .vru-h2 {
+    font-size: 26px;
+  }
+}
+
+.vru-eyebrow,
+.vru-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunken);
+  padding: 8px 16px;
+  font-size: var(--text-sm);
+}
+.vru-eyebrow {
+  font-weight: 500;
+  color: var(--text);
+}
+.vru-tag {
+  color: var(--text-muted);
+}
+
+/*
+ * Аура: один слой на всю страницу, закреплён за вьюпортом и лежит за
+ * содержимым. Секциям нельзя давать сплошной фон или overflow: hidden —
+ * иначе размытие обрежется по границе секции.
+ */
+.vru-aura {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+}
+.vru-aura__blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(90px);
+  will-change: transform;
+}
+.vru-aura__blob--a {
+  width: 52vw;
+  height: 52vw;
+  max-width: 760px;
+  max-height: 760px;
+  left: 4%;
+  top: 4%;
+  background: radial-gradient(circle, rgba(15, 119, 255, 0.26), rgba(15, 119, 255, 0) 70%);
+  animation: vru-drift-a 24s ease-in-out infinite alternate;
+}
+.vru-aura__blob--b {
+  width: 44vw;
+  height: 44vw;
+  max-width: 640px;
+  max-height: 640px;
+  right: 2%;
+  top: 12%;
+  background: radial-gradient(circle, rgba(176, 131, 65, 0.16), rgba(176, 131, 65, 0) 70%);
+  animation: vru-drift-b 28s ease-in-out infinite alternate;
+}
+.vru-aura__blob--c {
+  width: 48vw;
+  height: 48vw;
+  max-width: 700px;
+  max-height: 700px;
+  left: 30%;
+  bottom: -10%;
+  background: radial-gradient(circle, rgba(143, 192, 255, 0.45), rgba(143, 192, 255, 0) 70%);
+  animation: vru-drift-c 32s ease-in-out infinite alternate;
+}
+@keyframes vru-drift-a {
+  from {
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    transform: translate(10%, 16%) scale(1.1);
+  }
+}
+@keyframes vru-drift-b {
+  from {
+    transform: translate(0, 0) scale(1.05);
+  }
+  to {
+    transform: translate(-14%, 18%) scale(0.95);
+  }
+}
+@keyframes vru-drift-c {
+  from {
+    transform: translate(0, 0) scale(0.95);
+  }
+  to {
+    transform: translate(-10%, -14%) scale(1.1);
+  }
+}
+
+/* Посадочная экранами: одна секция — один экран. Ниже ноутбука экранов нет. */
+html[data-snap='y'] {
+  scroll-behavior: smooth;
+}
+@media (min-width: 1024px) and (min-height: 700px) {
+  html[data-snap='y'] {
+    scroll-snap-type: y mandatory;
+  }
+  .vru-screen {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
+}
+
+/*
+ * Появление при входе в экран: чуть снизу и из прозрачности. Задержка
+ * растёт с порядковым номером (--reveal-i) — элементы выходят друг за другом.
+ */
+.vru-reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 480ms var(--ease-out),
+    transform 480ms var(--ease-out);
+  transition-delay: calc(var(--reveal-i, 0) * 70ms);
+}
+.vru-reveal.is-in {
+  opacity: 1;
+  transform: none;
+}
+
+/* Точки экранов у правого края; подпись выезжает на наведение. */
+.vru-dots {
+  position: fixed;
+  right: 20px;
+  top: 50%;
+  z-index: 20;
+  display: none;
+  flex-direction: column;
+  gap: 14px;
+  transform: translateY(-50%);
+}
+@media (min-width: 1024px) and (min-height: 700px) {
+  .vru-dots {
+    display: flex;
+  }
+}
+.vru-dots__dot {
+  position: relative;
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--line-strong);
+  transition:
+    background var(--duration-fast),
+    transform var(--duration-base) var(--ease-out);
+}
+.vru-dots__dot:hover,
+.vru-dots__dot[aria-current='true'] {
+  background: var(--accent);
+  transform: scale(1.4);
+}
+.vru-dots__label {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  translate: 0 -50%;
+  white-space: nowrap;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  box-shadow: var(--ring-line);
+  padding: 4px 10px;
+  font-size: var(--text-sm);
+  color: var(--text);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-fast);
+}
+.vru-dots__dot:hover .vru-dots__label,
+.vru-dots__dot:focus-visible .vru-dots__label {
+  opacity: 1;
+}
+
+/* Закладки как путь: между шагами стрелка, активный — синий с линией. */
+.vru-tabbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+}
+.vru-tabbar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: none;
+  padding: 0 0 12px;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+  font-family: inherit;
+  font-size: var(--text-lg);
+  font-weight: 500;
+  letter-spacing: var(--text-lg--letter-spacing);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--duration-fast);
+}
+.vru-tabbar button:hover {
+  color: var(--text);
+}
+.vru-tabbar button[aria-selected='true'] {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.vru-tabbar__arrow {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  color: var(--line-strong);
+}
+@media (max-width: 640px) {
+  .vru-tabbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    gap: 12px;
+  }
+  .vru-tabbar::-webkit-scrollbar {
+    display: none;
+  }
+  .vru-tabbar button {
+    white-space: nowrap;
+  }
+}
+/* Без рейки: в кабинете закладки стоят последними на экране. */
+.vru-tabbar--flat {
+  border-bottom: 0;
+}
+
+/*
+ * Карточки «Для организаций» и плитки фактов. Содержимое видно сразу;
+ * на наведение — только подъём и рамка акцентом.
+ */
+.vru-role,
+.vru-fact {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--ring-line);
+  transition:
+    box-shadow var(--duration-base) var(--ease-out),
+    transform var(--duration-base) var(--ease-out);
+}
+.vru-role {
+  padding: 20px;
+}
+.vru-fact {
+  padding: 16px;
+}
+@media (max-width: 639px) {
+  .vru-fact {
+    flex-direction: row;
+    gap: 14px;
+    align-items: flex-start;
+  }
+}
+@media (min-width: 1024px) {
+  .vru-role {
+    padding: 28px;
+  }
+  .vru-fact {
+    padding: 20px;
+  }
+}
+@media (hover: hover) and (pointer: fine) {
+  .vru-role:hover,
+  .vru-fact:hover {
+    box-shadow:
+      inset 0 0 0 1px var(--accent-line),
+      var(--elevation-lg);
+    transform: translateY(-3px);
+  }
+}
+
+/* Шаг «Как это работает»: уходящий пропадает сразу, входящий проявляется. */
+.vru-step {
+  opacity: 0;
+  visibility: hidden;
+}
+.vru-step.is-active {
+  opacity: 1;
+  visibility: visible;
+  animation: vru-fade var(--duration-base) var(--ease-out) both;
+}
+
+/* Окно терминала: та же рамка, что у экранов продукта. */
+.vru-terminal {
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--ring-line), var(--elevation-sheet);
+  overflow: hidden;
+}
+
+.vru-feature__icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-control);
+  background: var(--surface-sunken);
+  color: var(--accent-line);
+}
+
+/* Рамка браузера: продукт и есть главная картинка страницы. */
+.vru-frame {
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--ring-line), var(--elevation-sheet);
+  overflow: hidden;
+}
+.vru-frame__bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+  padding: 12px 16px;
+}
+.vru-frame__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: var(--line);
+}
+.vru-frame__url {
+  margin: 0 auto;
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunken);
+  padding: 2px 16px;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.vru-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-pill);
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.vru-chip--ok {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+.vru-chip--wait {
+  background: var(--info-soft);
+  color: var(--info);
+}
+.vru-chip--bad {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vru-enter,
+  .vru-aura__blob,
+  .vru-step.is-active {
+    animation: none;
+  }
+  .vru-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  html[data-snap='y'] {
+    scroll-behavior: auto;
+  }
+}

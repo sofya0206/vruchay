@@ -1,6 +1,7 @@
 import { Check, Minus } from 'lucide-react';
 import { useRoles } from '../api/team';
 import { SettingsSection } from '../ui/Settings';
+import { TBody, THead, Table, Td, Th, Tr } from '../ui/Table';
 
 /**
  * Что может каждая роль.
@@ -19,40 +20,34 @@ export function RolePermissions() {
       title="Что может каждая роль"
       about="Владелец один, он же распоряжается оплатой. Управляющий делает всё то же, кроме денег."
     >
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-96 border-collapse text-sm">
-          <thead>
-            <tr className="border-b border-[var(--line)] text-left text-xs tracking-wide text-[var(--text-muted)] uppercase">
-              <th className="py-2 pr-4 font-medium" />
-              {data.roles.map((r) => (
-                <th key={r.role} className="px-3 py-2 text-center font-medium">
-                  {r.title}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {data.permissions.map((p) => (
-              <tr key={p.key} className="border-b border-[var(--line)] last:border-0">
-                <td className="py-2.5 pr-4">{p.title}</td>
-                {data.roles.map((r) => (
-                  <td key={r.role} className="px-3 py-2.5 text-center">
-                    {p.roles[r.role] ? (
-                      <Check size={16} className="mx-auto text-[var(--ok)]" aria-label="да" />
-                    ) : (
-                      <Minus
-                        size={16}
-                        className="mx-auto text-[var(--line-strong)]"
-                        aria-label="нет"
-                      />
-                    )}
-                  </td>
-                ))}
-              </tr>
+      <Table caption="Права ролей" stickyHeader={false} dense>
+        <THead>
+          <Tr>
+            <Th />
+            {data.roles.map((r) => (
+              <Th key={r.role} align="center">
+                {r.title}
+              </Th>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </Tr>
+        </THead>
+        <TBody>
+          {data.permissions.map((p) => (
+            <Tr key={p.key}>
+              <Td>{p.title}</Td>
+              {data.roles.map((r) => (
+                <Td key={r.role} align="center">
+                  {p.roles[r.role] ? (
+                    <Check size={16} className="mx-auto text-ok" aria-label="да" />
+                  ) : (
+                    <Minus size={16} className="mx-auto text-line-strong" aria-label="нет" />
+                  )}
+                </Td>
+              ))}
+            </Tr>
+          ))}
+        </TBody>
+      </Table>
     </SettingsSection>
   );
 }

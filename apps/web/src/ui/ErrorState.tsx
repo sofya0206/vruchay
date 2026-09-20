@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { LifeBuoy, RefreshCw, TriangleAlert, WifiOff } from 'lucide-react';
 import { Button } from './Button';
 import { cn } from './cn';
@@ -45,11 +45,11 @@ export function ErrorState({
       role="alert"
       className={cn('flex flex-col items-center px-6 py-12 text-center', className)}
     >
-      <span className="grid size-14 place-items-center rounded-full bg-[var(--danger-soft)] text-[var(--danger)]">
+      <span className="grid size-14 place-items-center rounded-full bg-danger-soft text-danger">
         <Icon size={26} strokeWidth={1.75} />
       </span>
       <p className="mt-4 text-lg font-medium">{title}</p>
-      <div className="mt-1 max-w-md text-sm text-[var(--text-muted)]">
+      <div className="mt-1 max-w-md text-sm text-muted">
         {children ??
           (offline
             ? 'Похоже, пропала связь. Проверьте сеть и попробуйте снова.'
@@ -66,12 +66,9 @@ export function ErrorState({
             Повторить
           </Button>
         )}
-        <Link
-          to={`/settings/support?${context}`}
-          className="inline-flex h-9 items-center gap-2 rounded-lg px-4 text-sm font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
-        >
-          <LifeBuoy size={16} />В поддержку
-        </Link>
+        <Button variant="ghost" to={`/support?${context}`} icon={<LifeBuoy size={16} />}>
+          В поддержку
+        </Button>
       </div>
     </div>
   );
@@ -91,11 +88,11 @@ export function ErrorBar({
     <div
       role="alert"
       className={cn(
-        'flex flex-wrap items-center gap-3 rounded-xl bg-[var(--danger-soft)] px-4 py-3 text-sm',
+        'flex flex-wrap items-center gap-3 rounded-card bg-danger-soft px-4 py-3 text-sm',
         className,
       )}
     >
-      <TriangleAlert size={16} className="shrink-0 text-[var(--danger)]" />
+      <TriangleAlert size={16} className="shrink-0 text-danger" />
       <span className="min-w-0 flex-1">{children}</span>
       {onRetry && (
         <Button size="sm" onClick={onRetry} icon={<RefreshCw size={14} />}>

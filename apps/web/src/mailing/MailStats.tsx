@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { ChartColumn, FileText, Mail } from 'lucide-react';
-import { EmptyState } from '../ui/EmptyState';
+import { Card } from '../ui/Card';
 import { ErrorState } from '../ui/ErrorState';
+import { NextAction } from '../ui/NextAction';
 import { SkeletonTiles } from '../ui/Skeleton';
-import { Tabs } from '../ui/Tabs';
+import { Stat } from '../ui/Stat';
+import { TBody, THead, Table, Td, Th, Tr } from '../ui/Table';
+import { Segmented } from '../ui/Tabs';
 import { cn } from '../ui/cn';
 import { useMailStats, type Funnel, type StatsDay, type StatsSource } from './api';
 import { dayLabel, groupByEvent, share } from './mail-stats';
@@ -32,9 +35,9 @@ export function MailStats({ period }: { period: { from: string; to: string } }) 
 
   if (totals.total === 0) {
     return (
-      <EmptyState icon={ChartColumn} title="Писем за этот отрезок нет">
-        Выберите отрезок длиннее
-      </EmptyState>
+      <Card padding="none">
+        <NextAction icon={ChartColumn} title="Писем за этот отрезок нет" text="Выберите отрезок длиннее." />
+      </Card>
     );
   }
 
@@ -67,21 +70,15 @@ function Tiles({ totals }: { totals: Funnel }) {
   ];
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       {tiles.map((tile) => (
-        <div key={tile.label} className="card p-5">
-          <p className="text-sm text-[var(--text-muted)]">{tile.label}</p>
-          <p
-            className={cn(
-              'mt-1 text-3xl tabular-nums',
-              tile.tone === 'accent' && 'text-[var(--accent)]',
-              tile.tone === 'danger' && tile.value > 0 && 'text-[var(--danger)]',
-            )}
-          >
-            {fmt(tile.value)}
-          </p>
-          <p className="mt-1 h-5 text-sm text-[var(--text-muted)] tabular-nums">{tile.note}</p>
-        </div>
+        <Stat
+          key={tile.label}
+          label={tile.label}
+          value={fmt(tile.value)}
+          hint={tile.note || ' '}
+          tone={tile.tone === 'accent' ? 'accent' : tile.tone === 'danger' && tile.value > 0 ? 'danger' : 'default'}
+        />
       ))}
     </div>
   );
@@ -138,7 +135,7 @@ function DaysChart({ days }: { days: StatsDay[] }) {
     <section>
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-3">
         <h2 className="text-lg font-medium">По дням</h2>
-        <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-[var(--text-muted)]">
+        <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
           {SEGMENTS.map((s) => (
             <li key={s.key} className="flex items-center gap-1.5">
               <span
@@ -158,10 +155,10 @@ function DaysChart({ days }: { days: StatsDay[] }) {
           {ticks.map((tick) => (
             <div
               key={tick}
-              className="absolute right-0 left-0 border-t border-[var(--line)]"
+              className="absolute right-0 left-0 border-t border-line"
               style={{ bottom: (tick / top) * CHART_H }}
             >
-              <span className="absolute -top-2.5 -left-10 w-8 text-right text-xs text-[var(--text-muted)] tabular-nums">
+              <span className="absolute -top-2.5 -left-10 w-8 text-right text-xs text-muted tabular-nums">
                 {fmt(tick)}
               </span>
             </div>
@@ -181,8 +178,8 @@ function DaysChart({ days }: { days: StatsDay[] }) {
                   // Мишень — вся высота колонки, а не только столбец:
                   // в невысокий столбец иначе не попасть.
                   className={cn(
-                    'flex h-full min-w-0 flex-1 flex-col-reverse rounded-t-[4px] focus-visible:outline-2 focus-visible:outline-[var(--focus)]',
-                    hover === i && 'bg-[var(--row-hover)]',
+                    'flex h-full min-w-0 flex-1 flex-col-reverse rounded-t-[4px] focus-visible:outline-2 focus-visible:outline-focus',
+                    hover === i && 'bg-row-hover',
                   )}
                 >
                   {SEGMENTS.map((s, idx) =>
@@ -209,7 +206,7 @@ function DaysChart({ days }: { days: StatsDay[] }) {
           )}
         </div>
 
-        <div className="mt-2 flex gap-[2px] text-xs text-[var(--text-muted)]">
+        <div className="mt-2 flex gap-[2px] text-xs text-muted">
           {days.map((day, i) => (
             <span
               key={day.day}
@@ -266,7 +263,7 @@ function DayTooltip({ day, left }: { day: StatsDay; left: number }) {
   return (
     <div
       role="tooltip"
-      className="pointer-events-none absolute -top-2 z-10 w-44 -translate-y-full rounded-lg bg-[var(--surface-raised)] p-3 text-sm shadow-[var(--shadow-md)] ring-1 ring-[var(--line)]"
+      className="pointer-events-none absolute -top-2 z-10 w-44 -translate-y-full rounded-control bg-raised p-3 text-sm shadow-md ring-1 ring-line"
       style={{ left: `clamp(0px, calc(${left}% - 88px), calc(100% - 176px))` }}
     >
       <p className="mb-1.5 font-medium">
@@ -276,7 +273,7 @@ function DayTooltip({ day, left }: { day: StatsDay; left: number }) {
         {SEGMENTS.map((s) => (
           <li key={s.key} className="flex items-center gap-2">
             <span className="size-2.5 rounded-[3px]" style={{ background: s.color }} aria-hidden />
-            <span className="flex-1 text-[var(--text-muted)]">{s.label}</span>
+            <span className="flex-1 text-muted">{s.label}</span>
             <span className="tabular-nums">{fmt(p[s.key])}</span>
           </li>
         ))}
@@ -307,70 +304,57 @@ function Sources({ sources }: { sources: StatsSource[] }) {
     <section>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-medium">Откуда письма</h2>
-        <Tabs
+        <Segmented
           label="Разбивка"
           value={view}
           onChange={setView}
           items={[
-            { id: 'documents', label: 'Материалы' },
+            { id: 'documents', label: 'Документы' },
             { id: 'events', label: 'Мероприятия' },
           ]}
         />
       </div>
 
-      <div className="card overflow-x-auto">
-        <table className="w-full text-sm whitespace-nowrap">
-          <thead className="text-left text-[var(--text-muted)]">
-            <tr className="border-b border-[var(--line)]">
-              <th className="px-3 py-2.5 font-normal">Название</th>
-              <th className="px-3 py-2.5 text-right font-normal">Писем</th>
-              <th className="px-3 py-2.5 font-normal">Прочитано</th>
-              <th className="px-3 py-2.5 text-right font-normal">Не дошло</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[var(--line)]">
+      <Card padding="none" className="overflow-hidden">
+        <Table caption="Откуда письма" stickyHeader={false} dense>
+          <THead>
+            <Tr>
+              <Th>Название</Th>
+              <Th align="right">Писем</Th>
+              <Th>Прочитано</Th>
+              <Th align="right">Не дошло</Th>
+            </Tr>
+          </THead>
+          <TBody>
             {rows.map((row) => (
-              <tr key={row.id}>
-                <td className="w-full max-w-0 px-3 py-2.5">
+              <Tr key={row.id}>
+                <Td className="w-full max-w-0">
                   <span className="flex items-center gap-2">
                     {row.type === 'mailing' ? (
-                      <Mail
-                        size={15}
-                        className="shrink-0 text-[var(--text-muted)]"
-                        aria-label="Рассылка текстом"
-                      />
+                      <Mail size={16} className="shrink-0 text-muted" aria-label="Рассылка текстом" />
                     ) : (
-                      <FileText
-                        size={15}
-                        className="shrink-0 text-[var(--text-muted)]"
-                        aria-label="Материал"
-                      />
+                      <FileText size={16} className="shrink-0 text-muted" aria-label="Документ" />
                     )}
                     <span className="truncate">{row.title || 'Без названия'}</span>
                   </span>
                   {view === 'documents' && row.eventName && (
-                    <span className="block truncate pl-[23px] text-xs text-[var(--text-muted)]">
-                      {row.eventName}
-                    </span>
+                    <span className="block truncate pl-6 text-xs text-muted">{row.eventName}</span>
                   )}
-                </td>
-                <td className="px-3 py-2.5 text-right tabular-nums">{fmt(row.total)}</td>
-                <td className="px-3 py-2.5">
+                </Td>
+                <Td align="right" numeric>
+                  {fmt(row.total)}
+                </Td>
+                <Td>
                   <ShareBar value={row.opened} funnel={row} />
-                </td>
-                <td
-                  className={cn(
-                    'px-3 py-2.5 text-right tabular-nums',
-                    row.failed > 0 && 'text-[var(--danger)]',
-                  )}
-                >
+                </Td>
+                <Td align="right" numeric className={cn(row.failed > 0 && 'text-danger')}>
                   {fmt(row.failed)}
-                </td>
-              </tr>
+                </Td>
+              </Tr>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </TBody>
+        </Table>
+      </Card>
     </section>
   );
 }
@@ -381,9 +365,9 @@ function ShareBar({ value, funnel }: { value: number; funnel: Funnel }) {
   const width = base > 0 ? (value / base) * 100 : 0;
   return (
     <span className="flex items-center gap-2">
-      <span className="h-1.5 w-12 overflow-hidden rounded-full bg-[var(--surface-sunken)]">
+      <span className="h-1.5 w-12 overflow-hidden rounded-full bg-sunken">
         <span
-          className="block h-full rounded-full bg-[var(--accent)]"
+          className="block h-full rounded-full bg-accent"
           style={{ width: `${width}%` }}
         />
       </span>

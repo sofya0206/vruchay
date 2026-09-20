@@ -62,15 +62,15 @@ export function CanvasMenu({
     <div
       ref={root}
       role="menu"
-      className="fixed z-40 w-56 rounded-xl bg-[var(--surface)] py-1 shadow-lg ring-1 ring-[var(--line)]"
+      className="fixed z-40 min-w-56 rounded-card bg-raised p-1.5 shadow-lg ring-1 ring-line"
       style={{ left: pos.x, top: pos.y }}
       onContextMenu={(e) => e.preventDefault()}
     >
-      <MenuItem icon={<Type size={15} />} onClick={() => pick({ type: 'text' })}>
+      <MenuItem icon={<Type size={16} />} onClick={() => pick({ type: 'text' })}>
         Текст
       </MenuItem>
       <MenuItem
-        icon={<ImagePlus size={15} />}
+        icon={<ImagePlus size={16} />}
         onClick={() => {
           onClose();
           onImage();
@@ -78,27 +78,27 @@ export function CanvasMenu({
       >
         Картинка
       </MenuItem>
-      <MenuItem icon={<QrCode size={15} />} onClick={() => pick({ type: 'qr' })}>
+      <MenuItem icon={<QrCode size={16} />} onClick={() => pick({ type: 'qr' })}>
         QR-код
       </MenuItem>
-      <MenuItem icon={<Link2 size={15} />} onClick={() => pick({ type: 'link' })}>
+      <MenuItem icon={<Link2 size={16} />} onClick={() => pick({ type: 'link' })}>
         Ссылка
       </MenuItem>
       <MenuDivider />
-      <MenuItem icon={<Minus size={15} />} onClick={() => pick({ type: 'shape', kind: 'line' })}>
+      <MenuItem icon={<Minus size={16} />} onClick={() => pick({ type: 'shape', kind: 'line' })}>
         Линия
       </MenuItem>
-      <MenuItem icon={<Square size={15} />} onClick={() => pick({ type: 'shape', kind: 'rect' })}>
+      <MenuItem icon={<Square size={16} />} onClick={() => pick({ type: 'shape', kind: 'rect' })}>
         Прямоугольник
       </MenuItem>
-      <MenuItem icon={<Circle size={15} />} onClick={() => pick({ type: 'shape', kind: 'ellipse' })}>
+      <MenuItem icon={<Circle size={16} />} onClick={() => pick({ type: 'shape', kind: 'ellipse' })}>
         Овал
       </MenuItem>
       {canPaste && (
         <>
           <MenuDivider />
           <MenuItem
-            icon={<ClipboardPaste size={15} />}
+            icon={<ClipboardPaste size={16} />}
             onClick={() => {
               onClose();
               onPaste();

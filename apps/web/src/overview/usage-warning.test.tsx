@@ -66,14 +66,16 @@ describe('плитка остатка', () => {
 
   it('пока запас велик — ни тревоги, ни лишних слов', () => {
     const out = html({ warn: 'none', left: 400 });
-    expect(out).not.toContain('--danger');
+    // Ни красной полосы, ни красного числа — цвета теперь утилитами токенов.
+    expect(out).not.toContain('danger');
     expect(out).not.toContain('Срок плана закончился');
   });
 
   it('на десяти процентах предупреждает цветом', () => {
     // Приёмка задания: «на 90% появляется предупреждение».
     const out = html({ warn: 'critical', left: 50 });
-    expect(out).toContain('--danger');
+    expect(out).toContain('bg-danger');
+    expect(out).toContain('text-danger');
   });
 
   it('после окончания срока обещает, что выданное осталось действительным', () => {

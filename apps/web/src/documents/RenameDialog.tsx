@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '../ui/Button';
 import { Dialog } from '../ui/Dialog';
-import { Input, Label } from '../ui/Field';
+import { Field, Input } from '../ui/Field';
 
 /**
  * Переименовать материал из библиотеки.
@@ -28,36 +28,29 @@ export function RenameDialog({
   return (
     <Dialog
       title="Переименовать документ"
+      size="sm"
       onClose={onClose}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
             Отмена
           </Button>
-          <Button
-            variant="primary"
-            disabled={!ready || pending}
-            onClick={() => onSubmit(title.trim())}
-          >
-            {pending ? 'Сохраняем…' : 'Сохранить'}
+          <Button variant="primary" disabled={!ready} loading={pending} onClick={() => onSubmit(title.trim())}>
+            Сохранить
           </Button>
         </>
       }
     >
-      <Label>Название</Label>
-      <Input
-        autoFocus
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && ready) onSubmit(title.trim());
-        }}
-      />
-      {error && (
-        <p role="alert" className="mt-2 text-sm text-[var(--danger)]">
-          {error}
-        </p>
-      )}
+      <Field label="Название" error={error}>
+        <Input
+          autoFocus
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && ready) onSubmit(title.trim());
+          }}
+        />
+      </Field>
     </Dialog>
   );
 }

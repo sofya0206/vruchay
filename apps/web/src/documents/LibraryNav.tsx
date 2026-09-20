@@ -20,7 +20,6 @@ import {
   LayoutTemplate,
   MoreHorizontal,
   Pencil,
-  Plus,
   Trash2,
 } from 'lucide-react';
 import { errorText } from '../api/client';
@@ -33,6 +32,8 @@ import {
   type Folder as FolderItem,
 } from '../api/folders';
 import { ConfirmDialog } from '../ui/Dialog';
+import { IconButton } from '../ui/IconButton';
+import { MenuDivider, MenuItem, MenuLabel } from '../ui/Menu';
 import { usePhone } from '../ui/useMediaQuery';
 import { SectionLayout, columnRowClass } from '../ui/SectionLayout';
 import { cn } from '../ui/cn';
@@ -43,8 +44,8 @@ import { useTooltip } from '../ui/Tooltip';
  * строка состояния снизу.
  *
  * Раздел устроен как файловый менеджер, а не как страница: слева стоят
- * списки и кнопка создания, сверху — название текущего списка, поиск
- * и то же создание под правой рукой, снизу — сколько всего лежит
+ * списки, сверху — название текущего списка, поиск и создание под правой
+ * рукой, снизу — сколько всего лежит
  * и в каком порядке показано. Так работают все программы, из которых
  * сюда приходят, и человеку не приходится заново искать, куда нажимать.
  *
@@ -72,30 +73,6 @@ interface Item {
   count?: number | null;
   /** Папка — вложена в «Мои документы» и подписана мельче. */
   nested?: boolean;
-}
-
-/**
- * Создание материала — ссылка, а не кнопка с состоянием.
- *
- * Стоит в двух местах сразу: в колонке слева и в правом углу панели.
- * Обе ведут в один адрес `/documents?new=1`, поэтому создание открывается
- * и из архива, и из шаблонов, и по прямой ссылке, а страница не хранит
- * отдельного «открыта ли форма» — это решает адрес.
- */
-function CreateLink({ label, className = '' }: { label: string; className?: string }) {
-  return (
-    <Link
-      to="/documents?new=1"
-      className={
-        'inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--accent)] px-4 py-2 max-md:h-11 ' +
-        'text-sm font-medium whitespace-nowrap text-[var(--accent-contrast)] transition-colors ' +
-        `hover:bg-[var(--accent-hover)] ${className}`
-      }
-    >
-      <Plus size={16} />
-      {label}
-    </Link>
-  );
 }
 
 /**
@@ -284,7 +261,7 @@ export function LibraryNav({ archiveCount }: { archiveCount?: number | null }) {
   ];
 
   return (
-    <nav aria-label="Разделы библиотеки" className="mt-3 max-md:mt-0">
+    <nav aria-label="Разделы библиотеки" data-tour="library-nav">
       <div>
         <ul className="flex flex-col gap-1" {...dragHandlers}>
           <RootRow
@@ -348,7 +325,7 @@ export function LibraryNav({ archiveCount }: { archiveCount?: number | null }) {
                 onClick={startFolder}
                 className={cn(columnRowClass({ nested: true }), 'w-full text-left')}
               >
-                <FolderPlus size={14} strokeWidth={1.75} className="shrink-0" />
+                <FolderPlus size={16} strokeWidth={1.75} className="shrink-0" />
                 <span>Папка</span>
               </button>
             </li>
@@ -478,47 +455,45 @@ function ContextMenu({
         // Меню у правого или нижнего края уехало бы за экран, поэтому
         // упираем его в край с небольшим полем.
         style={{ left: Math.min(x, window.innerWidth - 240), top: Math.min(y, window.innerHeight - 200) }}
-        className="card fixed z-50 w-56 overflow-hidden py-1 shadow-lg"
+        className="vru-pop-in fixed z-50 min-w-56 rounded-card bg-raised p-1.5 shadow-lg ring-1 ring-line"
       >
-        <p className="truncate px-3 pt-1 pb-2 text-xs text-[var(--text-muted)]">
-          {folder ? folder.name : 'Мои документы'}
-        </p>
-        <MenuItem icon={<FileText size={14} />} onClick={run(onNewDocument)}>
+        <MenuLabel>{folder ? folder.name : 'Мои документы'}</MenuLabel>
+        <MenuItem icon={<FileText size={16} />} onClick={run(onNewDocument)}>
           {folder ? 'Новый документ в папке' : 'Новый документ'}
         </MenuItem>
         {/* «Новая папка» — только в корне: папки плоские, вложенности нет,
             и в меню самой папки этот пункт обещал бы подпапку, а заводил
             бы соседнюю рядом с ней. */}
         {!folder && (
-          <MenuItem icon={<FolderPlus size={14} />} onClick={run(onNewFolder)}>
+          <MenuItem icon={<FolderPlus size={16} />} onClick={run(onNewFolder)}>
             Новая папка
           </MenuItem>
         )}
         {folder && (
           <>
-            <div className="my-1 border-t border-[var(--line)]" />
+            <MenuDivider />
             {/* Перетаскивание мышью недоступно с клавиатуры, а на сенсорном
                 экране требует точности, которой там нет. Те же два шага
                 словами — здесь. */}
             <MenuItem
-              icon={<ArrowUp size={14} />}
+              icon={<ArrowUp size={16} />}
               disabled={position <= 0}
               onClick={run(() => onMove(position - 1))}
             >
               Выше
             </MenuItem>
             <MenuItem
-              icon={<ArrowDown size={14} />}
+              icon={<ArrowDown size={16} />}
               disabled={position < 0 || position >= total - 1}
               onClick={run(() => onMove(position + 1))}
             >
               Ниже
             </MenuItem>
-            <div className="my-1 border-t border-[var(--line)]" />
-            <MenuItem icon={<Pencil size={14} />} onClick={run(onRename)}>
+            <MenuDivider />
+            <MenuItem icon={<Pencil size={16} />} onClick={run(onRename)}>
               Переименовать
             </MenuItem>
-            <MenuItem icon={<Trash2 size={14} />} danger onClick={run(onDelete)}>
+            <MenuItem icon={<Trash2 size={16} />} danger onClick={run(onDelete)}>
               Удалить папку
             </MenuItem>
           </>
@@ -590,7 +565,7 @@ function FolderRow({
         /* Куда ляжет папка — линия на границе, а не рамка вокруг строки:
            рамка показывала «эта папка», хотя вопрос был «между какими». */
         over &&
-          'after:absolute after:inset-x-2 after:z-10 after:h-0.5 after:rounded-full after:bg-[var(--accent)] after:content-[""]',
+          'after:absolute after:inset-x-2 after:z-10 after:h-0.5 after:rounded-full after:bg-accent after:content-[""]',
         // Ровно посередине четырёхточечного зазора: линия у края строки
         // читалась как её подчёркивание, а не как место между двумя.
         over === 'before' && 'after:-top-[3px]',
@@ -613,7 +588,7 @@ function FolderRow({
           'pr-7 md:pr-7',
         )}
       >
-        <Folder size={14} strokeWidth={1.75} className="shrink-0" />
+        <Folder size={16} strokeWidth={1.75} className="shrink-0" />
         <span ref={name} className="min-w-0 md:flex-1 md:truncate">
           {folder.name}
         </span>
@@ -621,52 +596,20 @@ function FolderRow({
       {tooltip}
 
       {folder.count ? (
-        <span className="tabular pointer-events-none absolute right-2 text-xs text-[var(--text-muted)] transition-opacity max-md:hidden md:group-hover:opacity-0">
+        <span className="tabular pointer-events-none absolute right-2 text-xs text-muted transition-opacity max-md:hidden md:group-hover:opacity-0">
           {folder.count}
         </span>
       ) : null}
 
-      <button
-        type="button"
+      <IconButton
+        size="sm"
+        label={`Меню папки «${folder.name}»`}
         onClick={onMenu}
-        aria-label={`Меню папки «${folder.name}»`}
-        className="absolute right-0 px-1.5 py-1.5 text-[var(--text-muted)] transition-opacity hover:text-[var(--text)] focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100"
+        className="absolute right-0 transition-opacity focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100"
       >
-        <MoreHorizontal size={15} strokeWidth={1.75} />
-      </button>
+        <MoreHorizontal size={16} strokeWidth={1.75} />
+      </IconButton>
     </li>
-  );
-}
-
-function MenuItem({
-  icon,
-  children,
-  danger = false,
-  disabled = false,
-  onClick,
-}: {
-  icon: ReactNode;
-  children: ReactNode;
-  danger?: boolean;
-  /** Крайняя папка никуда не двигается — пункт виден, но не нажимается:
-      исчезающий пункт менял бы высоту меню от папки к папке. */
-  disabled?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="menuitem"
-      disabled={disabled}
-      onClick={onClick}
-      className={
-        'flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors disabled:pointer-events-none disabled:opacity-40 hover:bg-[var(--surface-sunken)] ' +
-        (danger ? 'text-[var(--danger)]' : 'text-[var(--text)]')
-      }
-    >
-      <span className="shrink-0 text-[var(--text-muted)]">{icon}</span>
-      {children}
-    </button>
   );
 }
 
@@ -760,11 +703,11 @@ function FolderNameForm({
         aria-label="Название папки"
         placeholder="Название папки"
         className={
-          'w-full rounded-lg bg-[var(--surface-sunken)] px-2 py-1.5 text-[13px] outline-none ring-1 ' +
-          (error ? 'ring-[var(--danger)]' : 'ring-[var(--accent)]')
+          'w-full rounded-control bg-sunken px-2 py-1.5 text-[13px] outline-none ring-1 ' +
+          (error ? 'ring-danger' : 'ring-accent')
         }
       />
-      {error && <p className="mt-1 text-xs text-[var(--danger)]">{error}</p>}
+      {error && <p className="mt-1 text-xs text-danger">{error}</p>}
     </form>
   );
 }
@@ -778,10 +721,10 @@ function Row({ item }: { item: Item }) {
         aria-current={item.active ? 'page' : undefined}
         className={columnRowClass({ active: item.active, nested: item.nested })}
       >
-        <item.icon size={item.nested ? 14 : 16} strokeWidth={1.75} className="shrink-0" />
+        <item.icon size={16} strokeWidth={1.75} className="shrink-0" />
         <span className="md:flex-1 md:truncate">{item.label}</span>
         {item.count ? (
-          <span className="tabular text-xs text-[var(--text-muted)]">{item.count}</span>
+          <span className="tabular text-xs text-muted">{item.count}</span>
         ) : null}
       </Link>
     </li>
@@ -825,19 +768,19 @@ function RootRow({
         <FolderOpen size={16} strokeWidth={1.75} className="shrink-0" />
         <span className="md:flex-1 md:truncate">Мои документы</span>
       </Link>
-      <button
-        type="button"
-        onClick={onToggle}
+      <IconButton
+        size="sm"
+        label={expanded ? 'Свернуть папки' : 'Показать папки'}
         aria-expanded={expanded}
-        aria-label={expanded ? 'Свернуть папки' : 'Показать папки'}
-        className="shrink-0 px-2 py-2 text-[var(--text-muted)] hover:text-[var(--text)] max-md:hidden"
+        onClick={onToggle}
+        className="max-md:hidden"
       >
         <ChevronDown
-          size={15}
+          size={16}
           strokeWidth={1.75}
           className={`transition-transform ${expanded ? '' : '-rotate-90'}`}
         />
-      </button>
+      </IconButton>
     </li>
   );
 }
@@ -845,8 +788,8 @@ function RootRow({
 /**
  * Рама библиотеки — общая `SectionLayout` с колонкой папок.
  *
- * «Создать» — одна кнопка: в колонке на широком экране, в панели — только
- * на телефоне, где колонки нет.
+ * Кнопки создания в колонке нет: главное действие стоит в панели страницы
+ * (`tools`) — одно на экран, и на широком экране, и на телефоне.
  */
 export function LibraryLayout({
   archiveCount,
@@ -864,21 +807,9 @@ export function LibraryLayout({
   return (
     <SectionLayout
       columnTitle="Документы"
-      column={
-        <>
-          <div className="hidden md:block">
-            <CreateLink label="Создать документ" className="w-full" />
-          </div>
-          <LibraryNav archiveCount={archiveCount} />
-        </>
-      }
+      column={<LibraryNav archiveCount={archiveCount} />}
       head={head}
-      tools={
-        <>
-          {tools}
-          <CreateLink label="Создать" className="md:hidden" />
-        </>
-      }
+      tools={tools}
       bar={bar}
     >
       {children}

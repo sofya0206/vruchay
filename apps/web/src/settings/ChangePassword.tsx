@@ -41,7 +41,7 @@ export function ChangePassword() {
           about="Меняйте, если его кто-то узнал или вы вводили его на чужом компьютере"
         >
           {done && (
-            <span className="flex items-center gap-1.5 text-sm text-[var(--ok)]">
+            <span className="flex items-center gap-1.5 text-sm text-ok">
               <Check size={15} /> Изменён
             </span>
           )}
@@ -96,7 +96,7 @@ export function ChangePassword() {
             </Field>
 
             {changePassword.isError && (
-              <p role="alert" className="text-sm text-[var(--danger)]">
+              <p role="alert" className="text-sm text-danger">
                 {errorText(changePassword.error)}
               </p>
             )}

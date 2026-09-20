@@ -36,8 +36,8 @@ describe('строка колонки: класс снаружи сильнее 
 
   it('под указателем строка красится тихим токеном, а не сиреневой плашкой', () => {
     const cls = columnRowClass();
-    expect(cls).toContain('hover:bg-[var(--row-hover)]');
-    expect(cls).not.toContain('hover:bg-[var(--surface-sunken)]');
+    expect(cls).toContain('hover:bg-row-hover');
+    expect(cls).not.toContain('hover:bg-sunken');
   });
 });
 

@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
 import { List, Plus, Trash2 } from 'lucide-react';
 import type { Sheet } from '../api/types';
+import { IconButton } from '../ui/IconButton';
+import { Menu, MenuItem } from '../ui/Menu';
+import { cn } from '../ui/cn';
 
 /**
  * Закладки листов внизу экрана.
@@ -29,106 +31,69 @@ export function SheetTabs({
   onDelete: (sheetId: string) => void;
   adding?: boolean;
 }) {
-  const [listOpen, setListOpen] = useState(false);
-  const wrap = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!listOpen) return;
-    const close = (e: PointerEvent) => {
-      if (!wrap.current?.contains(e.target as Node)) setListOpen(false);
-    };
-    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setListOpen(false);
-    document.addEventListener('pointerdown', close);
-    document.addEventListener('keydown', esc);
-    return () => {
-      document.removeEventListener('pointerdown', close);
-      document.removeEventListener('keydown', esc);
-    };
-  }, [listOpen]);
-
   return (
-    <div className="flex shrink-0 items-center gap-1 border-t border-[var(--line)] bg-[var(--surface)] px-2 py-1.5">
-      <button
-        type="button"
-        aria-label="Добавить лист"
-        disabled={adding}
-        onClick={onAdd}
-        className="grid h-7 w-7 place-items-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)] disabled:opacity-40 pointer-coarse:size-11"
-      >
+    <div className="flex shrink-0 items-center gap-1 border-t border-line bg-surface px-2 py-1.5">
+      <IconButton size="sm" label="Добавить лист" disabled={adding} onClick={onAdd}>
         <Plus size={16} />
-      </button>
+      </IconButton>
 
-      <div ref={wrap} className="relative">
-        <button
-          type="button"
-          aria-label="Все листы"
-          aria-expanded={listOpen}
-          aria-haspopup="menu"
-          onClick={() => setListOpen((v) => !v)}
-          className="grid h-7 w-7 place-items-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)] pointer-coarse:size-11"
-        >
-          <List size={16} />
-        </button>
-
-        {listOpen && (
-          <div
-            role="menu"
-            className="absolute bottom-full left-0 z-30 mb-1 min-w-[220px] rounded-xl bg-[var(--surface)] py-1.5 shadow-lg ring-1 ring-[var(--line)]"
-          >
-            {sheets.map((sheet, i) => (
-              <div key={sheet.id} className="flex items-center">
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setListOpen(false);
-                    onSelect(sheet.id);
-                  }}
-                  className={`flex-1 px-3.5 py-2 text-left text-sm transition-colors hover:bg-[var(--surface-sunken)] pointer-coarse:py-3 pointer-coarse:text-base ${
-                    sheet.id === activeId ? 'font-medium text-[var(--accent)]' : ''
-                  }`}
-                >
-                  Лист {i + 1}
-                </button>
-                {/* Единственный лист удалить нельзя: документ без листа
-                    печатать нечем. */}
-                {sheets.length > 1 && (
-                  <button
-                    type="button"
-                    aria-label={`Удалить лист ${i + 1}`}
-                    onClick={() => {
-                      setListOpen(false);
-                      onDelete(sheet.id);
-                    }}
-                    className="mr-1.5 grid h-7 w-7 place-items-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--danger-soft)] hover:text-[var(--danger)] pointer-coarse:size-11"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
+      <Menu
+        align="left"
+        side="top"
+        title="Листы"
+        trigger={({ open, toggle }) => (
+          <IconButton size="sm" label="Все листы" active={open} aria-expanded={open} aria-haspopup="menu" onClick={toggle}>
+            <List size={16} />
+          </IconButton>
         )}
-      </div>
-
-      <span aria-hidden className="mx-1 h-5 w-px bg-[var(--line)]" />
-
-      <div className="flex min-w-0 items-center gap-1 overflow-x-auto">
+      >
         {sheets.map((sheet, i) => (
-          <button
-            key={sheet.id}
-            type="button"
-            aria-current={sheet.id === activeId ? 'page' : undefined}
-            onClick={() => onSelect(sheet.id)}
-            className={`shrink-0 rounded-lg px-3 py-1 text-sm transition-colors pointer-coarse:py-2.5 ${
-              sheet.id === activeId
-                ? 'bg-[var(--accent-soft)] font-medium text-[var(--accent)]'
-                : 'text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]'
-            }`}
-          >
-            Лист {i + 1}
-          </button>
+          <div key={sheet.id} className="flex items-center gap-1">
+            <MenuItem
+              onClick={() => onSelect(sheet.id)}
+              className={cn('flex-1', sheet.id === activeId && 'font-medium text-accent')}
+            >
+              Лист {i + 1}
+            </MenuItem>
+            {/* Единственный лист удалить нельзя: документ без листа
+                печатать нечем. Кнопка — пункт меню, чтобы список
+                закрывался после неё так же, как после выбора листа. */}
+            {sheets.length > 1 && (
+              <IconButton
+                size="sm"
+                role="menuitem"
+                label={`Удалить лист ${i + 1}`}
+                className="hover:bg-danger-soft hover:text-danger"
+                onClick={() => onDelete(sheet.id)}
+              >
+                <Trash2 size={16} />
+              </IconButton>
+            )}
+          </div>
         ))}
+      </Menu>
+
+      <span aria-hidden className="mx-1 h-5 w-px bg-line" />
+
+      <div role="tablist" aria-label="Листы" className="no-scrollbar flex min-w-0 items-center gap-0.5 overflow-x-auto rounded-control bg-sunken p-0.5">
+        {sheets.map((sheet, i) => {
+          const active = sheet.id === activeId;
+          return (
+            <button
+              key={sheet.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => onSelect(sheet.id)}
+              className={cn(
+                'pressable h-7 shrink-0 rounded-[6px] px-3 text-sm whitespace-nowrap pointer-coarse:h-10',
+                active ? 'bg-surface font-medium text-ink shadow-sm' : 'text-muted hover:text-ink',
+              )}
+            >
+              Лист {i + 1}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

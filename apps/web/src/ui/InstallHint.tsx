@@ -61,21 +61,21 @@ export function InstallHint() {
   return (
     // На телефоне — сверху, под шапкой: внизу там стоят главные кнопки
     // экранов («Создать документ», панель редактора), и подсказка их закрывала.
-    <div className="fixed inset-x-4 bottom-4 z-40 mx-auto max-w-md rounded-xl bg-[var(--surface)] p-4 shadow-lg ring-1 ring-[var(--line)] max-md:top-[calc(var(--app-header)+8px)] max-md:bottom-auto">
+    <div className="fixed inset-x-4 bottom-4 z-40 mx-auto max-w-md rounded-card bg-surface p-4 shadow-lg ring-1 ring-line max-md:top-[calc(var(--app-header)+8px)] max-md:bottom-auto">
       <div className="flex items-start gap-3">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-control bg-accent-soft text-accent">
           <Download size={17} />
         </span>
         <div className="min-w-0 flex-1">
           <p className="font-medium">Установить приложение</p>
           {showIosHint ? (
-            <p className="mt-1 flex flex-wrap items-center gap-1 text-sm text-[var(--text-muted)]">
+            <p className="mt-1 flex flex-wrap items-center gap-1 text-sm text-muted">
               Нажмите <Share size={14} className="inline" /> «Поделиться», затем «На экран
               «Домой»». Так приложение откроется без адресной строки и сможет присылать
               уведомления о готовности документов.
             </p>
           ) : (
-            <p className="mt-1 text-sm text-[var(--text-muted)]">
+            <p className="mt-1 text-sm text-muted">
               Откроется в отдельном окне и будет присылать уведомления, когда документы готовы.
             </p>
           )}
@@ -95,7 +95,7 @@ export function InstallHint() {
         <button
           onClick={dismiss}
           aria-label="Скрыть предложение"
-          className="-mt-2 -mr-2 grid size-11 shrink-0 place-items-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] md:m-0 md:size-7"
+          className="-mt-2 -mr-2 grid size-11 shrink-0 place-items-center rounded-control text-muted hover:bg-sunken md:m-0 md:size-7"
         >
           <X size={16} />
         </button>

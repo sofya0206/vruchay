@@ -28,6 +28,8 @@ import { isSafeHrefTemplate, type TextProps } from '@gramota/shared';
 import type { FieldInfo } from '../fields';
 import { FONTS, WEIGHTS } from '../fonts-list';
 import { ColorPicker } from '../../ui/ColorPicker';
+import { Button } from '../../ui/Button';
+import { Input } from '../../ui/Field';
 import { NumberField } from '../../ui/NumberField';
 import { Popover } from '../../ui/Popover';
 import { Select } from '../../ui/Select';
@@ -160,7 +162,7 @@ export function FormatToolbar({
       data-rich-toolbar
       role="toolbar"
       aria-label="Оформление текста"
-      className="fixed z-40 flex items-center gap-0.5 rounded-xl bg-[var(--surface-raised)] p-1 shadow-lg ring-1 ring-[var(--line)]"
+      className="fixed z-40 flex items-center gap-0.5 rounded-card bg-raised p-1 shadow-lg ring-1 ring-line"
       style={{ left: place?.left ?? -9999, top: place?.top ?? -9999 }}
       onPointerDown={(e) => {
         // Поля ввода фокус получают; всё остальное не уводит его из текста.
@@ -175,12 +177,13 @@ export function FormatToolbar({
           { value: '', label: base.fontFamily, group: 'Как у блока' },
           ...FONTS.map((f) => ({ value: f, label: f, group: 'Другой шрифт' })),
         ]}
-        className="h-8 w-36 bg-transparent px-2 py-0 text-sm ring-0 hover:bg-[var(--surface-sunken)]"
+        compact
+        className="w-36 bg-transparent ring-0 hover:bg-sunken"
       />
 
       <div className="flex items-center">
         <Tool title="Меньше" onClick={() => setStyle({ fontSize: Math.max(4, size - 1) })}>
-          <Minus size={14} />
+          <Minus size={16} />
         </Tool>
         <NumberField
           aria-label="Кегль, pt"
@@ -194,20 +197,20 @@ export function FormatToolbar({
           className="w-14 [&_input]:px-1 [&_input]:text-center"
         />
         <Tool title="Больше" onClick={() => setStyle({ fontSize: Math.min(200, size + 1) })}>
-          <Plus size={14} />
+          <Plus size={16} />
         </Tool>
       </div>
 
       <Divider />
 
       <Tool active={state.bold} title="Полужирный (Ctrl+B)" onClick={() => toggle('bold')}>
-        <Bold size={15} />
+        <Bold size={16} />
       </Tool>
       <Tool active={state.italic} title="Курсив (Ctrl+I)" onClick={() => toggle('italic')}>
-        <Italic size={15} />
+        <Italic size={16} />
       </Tool>
       <Tool active={state.underline} title="Подчёркнутый (Ctrl+U)" onClick={() => toggle('underline')}>
-        <Underline size={15} />
+        <Underline size={16} />
       </Tool>
       <ColorPicker
         letter
@@ -224,8 +227,8 @@ export function FormatToolbar({
         width={232}
         label={
           <>
-            <AlignIcon size={15} />
-            <ChevronDown size={12} />
+            <AlignIcon size={16} />
+            <ChevronDown size={16} />
           </>
         }
       >
@@ -243,7 +246,7 @@ export function FormatToolbar({
                   .run()
               }
             >
-              <Icon size={15} />
+              <Icon size={16} />
             </Tool>
           ))}
           <Divider />
@@ -252,14 +255,14 @@ export function FormatToolbar({
             title="Маркированный список"
             onClick={() => editor.chain().focus().toggleBulletList().run()}
           >
-            <List size={15} />
+            <List size={16} />
           </Tool>
           <Tool
             active={state.ordered}
             title="Нумерованный список"
             onClick={() => editor.chain().focus().toggleOrderedList().run()}
           >
-            <ListOrdered size={15} />
+            <ListOrdered size={16} />
           </Tool>
         </div>
       </Menu>
@@ -270,36 +273,36 @@ export function FormatToolbar({
         width={248}
         label={
           <>
-            <CaseSensitive size={17} />
-            <ChevronDown size={12} />
+            <CaseSensitive size={16} />
+            <ChevronDown size={16} />
           </>
         }
       >
         <div className="space-y-2 p-2">
           <div className="flex items-center gap-0.5">
             <Tool active={state.strike} title="Зачёркнутый" onClick={() => toggle('strike')}>
-              <Strikethrough size={15} />
+              <Strikethrough size={16} />
             </Tool>
             <Tool
               active={state.superscript}
               title="Верхний индекс"
               onClick={() => editor.chain().focus().toggleSuperscript().run()}
             >
-              <Superscript size={15} />
+              <Superscript size={16} />
             </Tool>
             <Tool
               active={state.subscript}
               title="Нижний индекс"
               onClick={() => editor.chain().focus().toggleSubscript().run()}
             >
-              <Subscript size={15} />
+              <Subscript size={16} />
             </Tool>
           </div>
           <Row label="Подложка">
             <div className="flex items-center gap-1">
               {Boolean(state.style.background) && (
                 <Tool title="Убрать подложку" onClick={() => setStyle({ background: null })}>
-                  <X size={14} />
+                  <X size={16} />
                 </Tool>
               )}
               <ColorPicker
@@ -359,7 +362,7 @@ export function FormatToolbar({
         onClick={() => editor.chain().focus().insertContent('@').run()}
         disabled={fields.length === 0}
       >
-        <AtSign size={15} />
+        <AtSign size={16} />
       </Tool>
       <LinkMenu editor={editor} active={state.link} href={state.linkHref} />
     </div>,
@@ -400,7 +403,7 @@ function LinkMenu({ editor, active, href }: { editor: Editor; active: boolean; h
         setDraft(href || 'https://');
         setError(null);
       }}
-      label={<Link2 size={15} />}
+      label={<Link2 size={16} />}
     >
       {(close) => (
         <form
@@ -410,7 +413,8 @@ function LinkMenu({ editor, active, href }: { editor: Editor; active: boolean; h
             apply(close);
           }}
         >
-          <input
+          <Input
+            compact
             autoFocus
             value={draft}
             onChange={(e) => {
@@ -419,28 +423,24 @@ function LinkMenu({ editor, active, href }: { editor: Editor; active: boolean; h
             }}
             placeholder="https://example.ru/{{code}}"
             aria-label="Адрес ссылки"
-            className="h-8 w-full rounded-lg bg-[var(--surface)] px-2 text-sm ring-1 ring-[var(--line)] outline-none focus:ring-2 focus:ring-[var(--focus)]"
           />
-          {error && <p className="text-xs text-[var(--danger)]">{error}</p>}
+          {error && <p className="text-xs text-danger">{error}</p>}
           <div className="flex justify-end gap-1">
             {active && (
-              <button
-                type="button"
+              <Button
+                size="sm"
+                variant="ghost"
                 onClick={() => {
                   editor.chain().focus().unsetMark('link').run();
                   close();
                 }}
-                className="h-7 rounded-md px-2 text-xs text-[var(--text-muted)] hover:bg-[var(--surface-sunken)]"
               >
                 Убрать
-              </button>
+              </Button>
             )}
-            <button
-              type="submit"
-              className="h-7 rounded-md bg-[var(--accent-button)] px-3 text-xs text-[var(--accent-contrast)]"
-            >
+            <Button type="submit" size="sm" variant="primary">
               Готово
-            </button>
+            </Button>
           </div>
         </form>
       )}
@@ -532,14 +532,14 @@ function useDismissOutsideLayers(
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className="text-xs text-[var(--text-muted)]">{label}</span>
+      <span className="text-xs text-muted">{label}</span>
       {children}
     </div>
   );
 }
 
 function Divider() {
-  return <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-[var(--line)]" />;
+  return <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-line" />;
 }
 
 function Tool({
@@ -571,13 +571,9 @@ function Tool({
       aria-pressed={active}
       disabled={disabled}
       onClick={onClick}
-      className={`flex h-8 shrink-0 items-center justify-center gap-0.5 rounded-md transition-colors disabled:opacity-40 ${
+      className={`pressable flex h-8 shrink-0 items-center justify-center gap-0.5 rounded-control disabled:cursor-not-allowed disabled:opacity-50 ${
         wide ? 'px-1.5' : 'w-8'
-      } ${
-        active
-          ? 'bg-[var(--accent-soft)] text-[var(--accent)]'
-          : 'text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]'
-      }`}
+      } ${active ? 'bg-accent-soft text-accent' : 'text-muted hover:bg-sunken hover:text-ink'}`}
     >
       {children}
       {tooltip}

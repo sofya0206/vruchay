@@ -1,79 +1,69 @@
 import { useLocation } from 'react-router-dom';
-import {
-  BookOpen,
-  CircleHelp,
-  Gift,
-  GraduationCap,
-  LifeBuoy,
-  Map,
-  MessageSquareQuote,
-} from 'lucide-react';
+import { CircleHelp } from 'lucide-react';
 import { Menu, MenuDivider, MenuItem } from '../ui/Menu';
 import { useTooltip } from '../ui/Tooltip';
 import { cn } from '../ui/cn';
-import { onboarding } from '../onboarding/store';
-
-const HELP_PATHS = ['/docs', '/support', '/referral'];
+import { HELP_PATHS, helpItems } from './help-items';
 
 /**
- * «Помощь» внизу колонки разделов: одно меню вместо трёх пунктов.
+ * «Помощь» — одно меню на кабинет.
  *
- * База знаний, обучение, поддержка с дорожной картой и отзывом,
- * приглашение друга — всё, что не работа и не настройка. Так устроено
- * в Linear и Notion: «?» в углу, а под ним всё, куда ходят за помощью.
+ * Внизу колонки разделов строкой, в верхней полосе телефона значком «?».
+ * Первый пункт — подсказки по открытому экрану, если у экрана они есть;
+ * дальше обучение, база знаний, поддержка. Список один (help-items.ts),
+ * поэтому бургер на телефоне показывает то же самое.
  */
-export function HelpMenu({ collapsed }: { collapsed: boolean }) {
-  const { pathname } = useLocation();
+export function HelpMenu({
+  variant = 'row',
+  collapsed = false,
+}: {
+  variant?: 'row' | 'icon';
+  collapsed?: boolean;
+}) {
+  const { pathname, search } = useLocation();
   const active = HELP_PATHS.some((p) => pathname.startsWith(p));
-  const tip = useTooltip(collapsed ? 'Помощь' : undefined, { placement: 'right' });
+  const compact = variant === 'icon' || collapsed;
+  const tip = useTooltip(compact ? 'Помощь' : undefined, { placement: variant === 'icon' ? 'bottom' : 'right' });
+  const items = helpItems(pathname, search);
 
   return (
     <Menu
-      side="top"
-      align="left"
+      side={variant === 'row' ? 'top' : 'bottom'}
+      align={variant === 'row' ? 'left' : 'right'}
       title="Помощь"
       trigger={({ open, toggle }) => (
         <button
           type="button"
           aria-haspopup="menu"
           aria-expanded={open}
-          aria-label={collapsed ? 'Помощь' : undefined}
+          aria-label={compact ? 'Помощь' : undefined}
           {...tip.triggerProps}
           onClick={toggle}
           className={cn(
-            'flex h-11 w-full items-center gap-3 rounded-xl text-base transition-colors',
-            collapsed ? 'justify-center' : 'px-3',
-            active || open
-              ? 'bg-[var(--accent-soft)] font-medium text-[var(--accent)]'
-              : 'text-[var(--text)] hover:bg-[var(--surface-sunken)]',
+            'pressable flex h-10 items-center gap-3 rounded-control text-sm transition-colors',
+            variant === 'icon' ? 'w-10 justify-center' : collapsed ? 'w-full justify-center' : 'w-full px-2.5',
+            active || open ? 'bg-accent-soft font-medium text-accent' : 'text-ink hover:bg-sunken',
           )}
         >
           <CircleHelp size={20} strokeWidth={1.75} className="shrink-0" />
-          {!collapsed && <span className="truncate">Помощь</span>}
+          {!compact && <span className="truncate">Помощь</span>}
           {tip.tooltip}
         </button>
       )}
     >
-      <MenuItem to="/docs" icon={<BookOpen size={17} strokeWidth={1.75} />}>
-        База знаний
-      </MenuItem>
-      <MenuItem onClick={() => onboarding.open()} icon={<GraduationCap size={17} strokeWidth={1.75} />}>
-        Обучение
-      </MenuItem>
-      <MenuDivider />
-      <MenuItem to="/support" icon={<LifeBuoy size={17} strokeWidth={1.75} />}>
-        Написать в поддержку
-      </MenuItem>
-      <MenuItem to="/support#roadmap" icon={<Map size={17} strokeWidth={1.75} />}>
-        Что дальше
-      </MenuItem>
-      <MenuItem to="/support#review" icon={<MessageSquareQuote size={17} strokeWidth={1.75} />}>
-        Оценить сервис
-      </MenuItem>
-      <MenuDivider />
-      <MenuItem to="/referral" icon={<Gift size={17} strokeWidth={1.75} />}>
-        Пригласить друга
-      </MenuItem>
+      {items.map((item, i) =>
+        item.kind === 'divider' ? (
+          <MenuDivider key={i} />
+        ) : item.kind === 'link' ? (
+          <MenuItem key={item.to} to={item.to} icon={<item.icon size={16} strokeWidth={1.75} />}>
+            {item.label}
+          </MenuItem>
+        ) : (
+          <MenuItem key={item.label} onClick={item.run} icon={<item.icon size={16} strokeWidth={1.75} />}>
+            {item.label}
+          </MenuItem>
+        ),
+      )}
     </Menu>
   );
 }

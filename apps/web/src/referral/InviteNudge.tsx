@@ -25,15 +25,15 @@ export function InviteNudge({ documentsMade }: { documentsMade: number }) {
   if (hidden || documentsMade < MIN_DOCUMENTS || !quietPeriodPassed()) return null;
 
   return (
-    <div className="flex flex-wrap items-center gap-3 border-b border-[var(--line)] px-4 py-2.5 text-sm">
-      <Gift size={15} className="text-[var(--accent)]" />
-      <span className="text-[var(--text-muted)]">
+    <div className="flex flex-wrap items-center gap-3 border-b border-line px-4 py-2.5 text-sm">
+      <Gift size={15} className="text-accent" />
+      <span className="text-muted">
         Знаете коллегу, который до сих пор подписывает грамоты вручную?
       </span>
       <Link
         to="/settings"
         onClick={remember}
-        className="underline underline-offset-2 hover:text-[var(--text)]"
+        className="underline underline-offset-2 hover:text-ink"
       >
         Пригласить и получить бесплатные документы
       </Link>
@@ -43,7 +43,7 @@ export function InviteNudge({ documentsMade }: { documentsMade: number }) {
           setHidden(true);
         }}
         aria-label="Скрыть"
-        className="ml-auto text-[var(--text-muted)] hover:text-[var(--text)]"
+        className="ml-auto text-muted hover:text-ink"
       >
         <X size={14} />
       </button>

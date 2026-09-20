@@ -2,17 +2,19 @@ import { Link } from 'react-router-dom';
 import { Gift } from 'lucide-react';
 import { useUsage } from '../api/org';
 import { DiscussTermsLink } from '../billing/DiscussTermsLink';
+import { Stat } from '../ui/Stat';
+import { cn } from '../ui/cn';
 
 /**
  * Остаток документов: по бесплатной пробе или по назначенному плану.
  *
- * Стоит на главной странице кабинета, а не всплывает в отказе. Узнать
+ * Стоит над списком документов, а не всплывает в отказе. Узнать
  * о конце квоты на сорок седьмом документе из пятидесяти — это уже
  * испорченное награждение: человек не успевает ни договориться
  * о продолжении, ни разбить список на части.
  *
  * Там, где предела нет вовсе, не показывается: считать нечего, а лишняя
- * полоска на главной только отвлекает.
+ * плитка над списком только отвлекает.
  */
 export function UsageBar() {
   const { data } = useUsage();
@@ -31,34 +33,22 @@ export function UsageBar() {
   const trial = data.source === 'trial';
 
   return (
-    <div className="mb-6 rounded-2xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]">
-      <div className="flex flex-wrap items-baseline gap-x-2 text-sm">
-        <span className="font-medium">
-          {data.planName}: осталось {data.left} из {data.limit}
-        </span>
-        {trial && data.bonus > 0 && (
-          <span className="flex items-center gap-1 text-[var(--accent)]">
-            <Gift size={14} /> +{data.bonus} за приглашённых друзей
+    <Stat
+      className="mb-6"
+      label={`${data.planName}: осталось`}
+      value={data.left}
+      unit={`из ${data.limit}`}
+      tone={low ? 'danger' : soon ? 'warn' : 'default'}
+      aside={
+        trial &&
+        data.bonus > 0 && (
+          <span className="flex items-center gap-1 text-sm text-accent">
+            <Gift size={16} aria-hidden /> +{data.bonus} за приглашённых друзей
           </span>
-        )}
-      </div>
-
-      <div
-        className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--surface-sunken)]"
-        role="progressbar"
-        aria-valuenow={used}
-        aria-valuemin={0}
-        aria-valuemax={data.limit}
-        aria-label="Использовано документов из квоты"
-      >
-        <div
-          className={`h-full rounded-full ${low ? 'bg-[var(--danger)]' : 'bg-[var(--accent)]'}`}
-          style={{ width: `${percent}%` }}
-        />
-      </div>
-
-      <p className="mt-2 text-sm text-[var(--text-muted)]">
-        {data.expired ? (
+        )
+      }
+      hint={
+        data.expired ? (
           <>
             Срок плана закончился, поэтому новый выпуск не начнётся. Уже выданные документы
             остаются действительными, и проверка по QR-коду работает.{' '}
@@ -69,7 +59,7 @@ export function UsageBar() {
             <>
               Проба закончилась. Напишите нам —{' '}
               <DiscussTermsLink>обсудим условия и добавим документов</DiscussTermsLink>. Или{' '}
-              <Link to="/settings/referral" className="underline underline-offset-2">
+              <Link to="/referral" className="underline underline-offset-2">
                 пригласите коллегу
               </Link>
               : за каждого, кто начнёт работать, добавим документов.
@@ -88,7 +78,7 @@ export function UsageBar() {
             {trial ? ' или ' : '.'}
             {trial && (
               <>
-                <Link to="/settings/referral" className="underline underline-offset-2">
+                <Link to="/referral" className="underline underline-offset-2">
                   пригласите коллегу
                 </Link>
                 .
@@ -102,8 +92,22 @@ export function UsageBar() {
             Считаются только созданные файлы. Черновики, правки макета и повторные
             просмотры не тратят ничего.
           </span>
-        )}
-      </p>
-    </div>
+        )
+      }
+    >
+      <div
+        role="progressbar"
+        aria-valuenow={used}
+        aria-valuemin={0}
+        aria-valuemax={data.limit}
+        aria-label="Использовано документов из квоты"
+        className="h-1 overflow-hidden rounded-full bg-sunken"
+      >
+        <div
+          className={cn('h-full rounded-full', low ? 'bg-danger' : soon ? 'bg-warn' : 'bg-accent')}
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+    </Stat>
   );
 }

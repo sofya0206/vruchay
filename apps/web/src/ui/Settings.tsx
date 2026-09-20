@@ -15,7 +15,7 @@ import { cn } from './cn';
 
 /** Стопка секций: между ними линия, а не пустота. */
 export function SettingsStack({ children }: { children: ReactNode }) {
-  return <div className="divide-y divide-[var(--line)] [&>*]:py-8 [&>*:first-child]:pt-0">{children}</div>;
+  return <div className="divide-y divide-line [&>*]:py-8 [&>*:first-child]:pt-0">{children}</div>;
 }
 
 /** Заголовок секции: название, одна строка пояснения, действие справа. */
@@ -34,7 +34,7 @@ export function SectionHead({
     <div className={cn('flex flex-wrap items-start justify-between gap-x-4 gap-y-2', className)}>
       <div className="min-w-0">
         <h2 className="text-base font-medium">{title}</h2>
-        {about && <p className="mt-0.5 max-w-2xl text-sm text-[var(--text-muted)]">{about}</p>}
+        {about && <p className="mt-0.5 max-w-2xl text-sm text-muted">{about}</p>}
       </div>
       {action && <div className="shrink-0">{action}</div>}
     </div>
@@ -63,7 +63,7 @@ export function SettingsSection({
 
 /** Строки настроек, разделённые линией. */
 export function SettingRows({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn('divide-y divide-[var(--line)]', className)}>{children}</div>;
+  return <div className={cn('divide-y divide-line', className)}>{children}</div>;
 }
 
 /**
@@ -86,7 +86,7 @@ export function SettingRow({
     <div className={cn('flex flex-wrap items-center gap-x-6 gap-y-2 py-3', className)}>
       <div className="min-w-[14rem] flex-1">
         <div className="text-sm font-medium">{title}</div>
-        {about && <div className="text-sm text-[var(--text-muted)]">{about}</div>}
+        {about && <div className="text-sm text-muted">{about}</div>}
       </div>
       {children && <div className="ml-auto flex shrink-0 flex-wrap items-center gap-2">{children}</div>}
     </div>
@@ -110,11 +110,11 @@ export function DangerZone({
 }) {
   return (
     <section>
-      <div className="rounded-xl p-4 ring-1 ring-[var(--danger)]/50">
+      <div className="rounded-card p-4 ring-1 ring-danger/50">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
           <div className="min-w-0 flex-1">
             <h2 className="text-sm font-medium">{title}</h2>
-            {about && <p className="text-sm text-[var(--text-muted)]">{about}</p>}
+            {about && <p className="text-sm text-muted">{about}</p>}
           </div>
           {action && <div className="shrink-0">{action}</div>}
         </div>

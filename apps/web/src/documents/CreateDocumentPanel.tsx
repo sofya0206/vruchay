@@ -1,18 +1,21 @@
-import { FormEvent, useState, type ReactNode } from 'react';
+import { useId, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, FilePlus2, Plus } from 'lucide-react';
+import { FilePlus2, Plus } from 'lucide-react';
 import { api, errorText } from '../api/client';
-import type { DocumentDetail, DocumentList } from '../api/types';
+import type { DocumentDetail, DocumentList, DocumentSummary } from '../api/types';
 import { useFolders } from '../api/folders';
+import { protocolTitle } from '../overview/format';
 import { Button } from '../ui/Button';
-import { Input } from '../ui/Field';
+import { Dialog } from '../ui/Dialog';
+import { ErrorBar } from '../ui/ErrorState';
+import { Field, Input } from '../ui/Field';
+import { OptionCard, OptionGroup } from '../ui/OptionCard';
 import { Select } from '../ui/Select';
-import { cn } from '../ui/cn';
 import { DocumentPreview } from './DocumentCard';
 import { PageSizePicker, type PageSizeValue } from './PageSizePicker';
 
-/** Список шаблонов организации — общий ключ для панели и раздела «Шаблоны». */
+/** Список шаблонов организации — общий ключ для окна и раздела «Шаблоны». */
 export function useTemplates() {
   return useQuery({
     queryKey: ['documents', 'templates'],
@@ -28,8 +31,9 @@ export function useTemplates() {
  * не говорят ничего. Первая плитка — чистый лист, у него и только у него
  * выбирается размер: макет шаблона свёрстан под свой лист.
  *
- * Созданный документ сразу открывается. Раньше он молча появлялся в списке,
- * и человек оставался перед той же страницей, будто ничего не произошло.
+ * Название подставлено сразу — мероприятий за сезон десятки, и «Мероприятие
+ * от 20.09.2026» отличит вчерашнее от прошлогоднего; переименовать можно
+ * в шапке документа. Созданный документ сразу открывается.
  */
 export function CreateDocumentPanel({
   initialTemplateId,
@@ -44,9 +48,11 @@ export function CreateDocumentPanel({
   const navigate = useNavigate();
   const folders = useFolders();
   const templates = useTemplates();
+  // Кнопка «Создать» стоит в подвале окна, вне формы, — связаны атрибутом.
+  const formId = useId();
 
   const [templateId, setTemplateId] = useState<string | null>(initialTemplateId);
-  const [title, setTitle] = useState('');
+  const [title, setTitle] = useState(() => protocolTitle());
   const [folderId, setFolderId] = useState<string>(initialFolderId ?? '');
   // A4 альбомная — то, на чём печатают грамоты чаще всего.
   const [size, setSize] = useState<PageSizeValue>({ widthMm: 297, heightMm: 210 });
@@ -76,121 +82,118 @@ export function CreateDocumentPanel({
   }
 
   return (
-    <form onSubmit={onSubmit} className="card mb-6 space-y-4 p-4">
-      <div className="flex items-baseline justify-between gap-2">
-        <h2 className="font-medium">Новый документ</h2>
-        <button
-          type="button"
-          onClick={onClose}
-          className="text-sm text-[var(--text-muted)] underline underline-offset-4 hover:text-[var(--text)]"
-        >
-          Отмена
-        </button>
-      </div>
-
-      <div
-        role="radiogroup"
-        aria-label="Основа документа"
-        className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3"
-      >
-        <BasisTile selected={!chosen} onSelect={() => setTemplateId(null)} label="Чистый лист">
-          <div className="grid h-full place-items-center">
-            <FilePlus2 size={26} strokeWidth={1.5} className="text-[var(--text-muted)]" />
-          </div>
-        </BasisTile>
-        {list.map((t) => (
-          <BasisTile
-            key={t.id}
-            selected={chosen?.id === t.id}
-            onSelect={() => setTemplateId(t.id)}
-            label={t.title}
+    <Dialog
+      title="Новый документ"
+      description="Сначала основа, потом название"
+      size="lg"
+      onClose={onClose}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Отмена
+          </Button>
+          <Button
+            type="submit"
+            form={formId}
+            variant="primary"
+            icon={<Plus size={16} />}
+            loading={create.isPending}
+            disabled={!title.trim()}
           >
-            <DocumentPreview doc={t} />
-          </BasisTile>
-        ))}
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        <Input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Название, например «Сертификат участника семинара»"
-          aria-label="Название документа"
-          className="min-w-64 flex-1"
-          autoFocus
-        />
-        {/* Внутри папки она и подставлена: человек нажал «Создать», стоя
-            в своей папке, — документ ждут там же. Пока папок нет, выбирать
-            не из чего — тогда поля нет вовсе. */}
-        {(folders.data ?? []).length > 0 && (
-          <Select
-            value={folderId}
-            onChange={setFolderId}
-            options={[
-              { value: '', label: 'Вне папок' },
-              ...(folders.data ?? []).map((f) => ({ value: f.id, label: f.name })),
-            ]}
-            aria-label="Папка нового документа"
-            className="w-56"
-          />
-        )}
-        <Button
-          type="submit"
-          variant="primary"
-          icon={<Plus size={16} />}
-          disabled={create.isPending || !title.trim()}
+            Создать
+          </Button>
+        </>
+      }
+    >
+      <form id={formId} onSubmit={onSubmit} className="space-y-5">
+        <OptionGroup
+          label="Основа документа"
+          className="[grid-template-columns:repeat(auto-fill,minmax(10rem,1fr))]"
         >
-          Создать
-        </Button>
-      </div>
+          <OptionCard
+            icon={FilePlus2}
+            title="Чистый лист"
+            description="Свой бланк и размер"
+            selected={!chosen}
+            onSelect={() => setTemplateId(null)}
+          />
+          {list.map((t) => (
+            <TemplateTile
+              key={t.id}
+              doc={t}
+              selected={chosen?.id === t.id}
+              onSelect={() => setTemplateId(t.id)}
+            />
+          ))}
+        </OptionGroup>
 
-      {/* Размер выбирается до создания, а не после: поменять его у документа,
-          на котором уже расставлен текст, значит сдвинуть весь макет. */}
-      {!chosen && <PageSizePicker value={size} onChange={setSize} />}
+        {/* Размер выбирается до создания, а не после: поменять его у документа,
+            на котором уже расставлен текст, значит сдвинуть весь макет. */}
+        {!chosen && <PageSizePicker value={size} onChange={setSize} />}
 
-      {create.isError && (
-        <p role="alert" className="text-sm text-[var(--danger)]">
-          {errorText(create.error)}
-        </p>
-      )}
-    </form>
+        <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_14rem]">
+          <Field label="Название">
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Например, «Сертификат участника семинара»"
+              maxLength={200}
+            />
+          </Field>
+          {/* Внутри папки она и подставлена: человек нажал «Создать», стоя
+              в своей папке, — документ ждут там же. Пока папок нет, выбирать
+              не из чего — тогда поля нет вовсе. */}
+          {(folders.data ?? []).length > 0 && (
+            <Field label="Папка">
+              <Select
+                value={folderId}
+                onChange={setFolderId}
+                options={[
+                  { value: '', label: 'Вне папок' },
+                  ...(folders.data ?? []).map((f) => ({ value: f.id, label: f.name })),
+                ]}
+                aria-label="Папка нового документа"
+              />
+            </Field>
+          )}
+        </div>
+
+        {create.isError && <ErrorBar>{errorText(create.error)}</ErrorBar>}
+      </form>
+    </Dialog>
   );
 }
 
-/** Плитка основы: лист сверху, подпись снизу, выбранная — в рамке акцента. */
-function BasisTile({
+/**
+ * Шаблон — плиткой с самим листом, сверху вниз: лист, под ним подпись.
+ *
+ * У `OptionCard` нет места под миниатюру, поэтому лист стоит в `title`
+ * вместе с подписью, а внутренние поля карточки сняты. Имя для читалки —
+ * отдельно: текст ужатого листа («%name») в него попадать не должен.
+ */
+function TemplateTile({
+  doc,
   selected,
   onSelect,
-  label,
-  children,
 }: {
+  doc: DocumentSummary;
   selected: boolean;
   onSelect: () => void;
-  label: string;
-  children: ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={selected}
-      onClick={onSelect}
-      className={cn(
-        'relative overflow-hidden rounded-xl text-left ring-1 transition-shadow',
-        selected
-          ? 'ring-2 ring-[var(--accent)]'
-          : 'ring-[var(--line)] hover:ring-[var(--line-strong)]',
-      )}
-    >
-      <div className="aspect-[4/3] overflow-hidden border-b border-[var(--line)] bg-[var(--surface-sunken)]">
-        {children}
-      </div>
-      <p className="truncate px-2 py-1.5 text-sm">{label}</p>
-      {selected && (
-        <span className="absolute top-1.5 right-1.5 grid size-5 place-items-center rounded-full bg-[var(--accent)] text-[var(--accent-contrast)]">
-          <Check size={12} strokeWidth={3} />
-        </span>
-      )}
-    </button>
+    <OptionCard
+      selected={selected}
+      onSelect={onSelect}
+      aria-label={doc.title}
+      className="gap-0 overflow-hidden p-0"
+      title={
+        <>
+          <span className="block aspect-[4/3] overflow-hidden border-b border-line bg-sunken">
+            <DocumentPreview doc={doc} />
+          </span>
+          <span className="block truncate px-3 py-2">{doc.title}</span>
+        </>
+      }
+    />
   );
 }

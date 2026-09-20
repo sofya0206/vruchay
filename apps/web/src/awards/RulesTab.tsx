@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Copy, Plus, Save, Wand2 } from 'lucide-react';
+import { Copy, ListChecks, Plus, Save, Wand2 } from 'lucide-react';
 import type { AwardRule, AwardRuleSet } from '@gramota/shared';
 import { AWARD_RULES_SCHEMA_VERSION } from '@gramota/shared';
 import { ApiError, errorText } from '../api/client';
@@ -13,7 +13,11 @@ import {
 } from '../api/awards';
 import type { RuleSetPayload } from '../api/awards';
 import { Button } from '../ui/Button';
-import { Input, Label } from '../ui/Field';
+import { Card } from '../ui/Card';
+import { DesktopFirst } from '../ui/DesktopFirst';
+import { ErrorBar } from '../ui/ErrorState';
+import { Field, Input } from '../ui/Field';
+import { OptionCard, OptionGroup } from '../ui/OptionCard';
 import { Select } from '../ui/Select';
 import { Loading } from '../ui/Loading';
 import { RuleCard } from './RuleCard';
@@ -33,7 +37,18 @@ interface Props {
  * федерация настраивает награждение один раз на сезон и на следующем
  * протоколе выбирает готовый набор, а не собирает его заново.
  */
-export function RulesTab({ documentId, ruleSetId }: Props) {
+export function RulesTab(props: Props) {
+  return (
+    <DesktopFirst
+      title="Правила награждения"
+      why="Условия удобнее собирать за столом: несколько выпадающих списков в строке на телефоне не помещаются."
+    >
+      <RulesEditor {...props} />
+    </DesktopFirst>
+  );
+}
+
+function RulesEditor({ documentId, ruleSetId }: Props) {
   const sets = useRuleSets();
   const attached = useRuleSet(ruleSetId);
   const templates = useAwardTemplates();
@@ -160,81 +175,65 @@ export function RulesTab({ documentId, ruleSetId }: Props) {
     <div className="min-h-0 flex-1 overflow-auto">
       <div className="flex max-w-6xl flex-col gap-4 p-6 lg:flex-row">
         <div className="min-w-0 flex-1 space-y-4">
-          <section className="grid gap-3 rounded-xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)] sm:grid-cols-3">
-            <div className="sm:col-span-3">
-              <Label>Название набора</Label>
-              <Input
-                value={draft.name}
-                onChange={(e) => patch({ name: e.target.value })}
-                placeholder="Награждение по протоколу"
-              />
-            </div>
-
-            <div>
-              <Label>Колонка группы</Label>
-              <Select
-                value={draft.groupColumn}
-                onChange={(groupColumn) => patch({ groupColumn })}
-                aria-label="Колонка группы"
-                options={[
-                  { value: '', label: 'весь протокол — одна группа' },
-                  ...columns.map((c) => ({ value: c, label: c })),
-                ]}
-              />
-              <p className="mt-1 text-xs text-[var(--text-muted)]">
-                По ней ищутся повторы получателя и, если у условия взведено «внутри группы»,
-                пересчитывается место.
-              </p>
-            </div>
-
-            <div>
-              <Label>Колонка статуса</Label>
-              <Select
-                value={draft.statusColumn}
-                onChange={(statusColumn) => patch({ statusColumn })}
-                aria-label="Колонка статуса"
-                options={[
-                  { value: '', label: 'статусов нет' },
-                  ...columns.map((c) => ({ value: c, label: c })),
-                ]}
-              />
-              <p className="mt-1 text-xs text-[var(--text-muted)]">
-                DSQ, DNS, «снят» — по ней работает правило «не выдавать».
-              </p>
-            </div>
-
-            <div className="flex items-end gap-2">
-              <Button
-                variant="primary"
-                icon={<Save size={15} />}
-                onClick={() => void save()}
-                disabled={mutations.create.isPending || mutations.update.isPending}
-              >
-                Сохранить
-              </Button>
-              {!draft.id.startsWith('new-') && (
+          <Card
+            padding="sm"
+            title="Набор правил"
+            action={
+              <div className="flex items-center gap-2">
+                {!draft.id.startsWith('new-') && (
+                  <Button
+                    size="sm"
+                    icon={<Copy size={16} />}
+                    title="Копия набора — чтобы поправить под другое соревнование"
+                    onClick={() => void attempt(async () => setDraft(await mutations.duplicate.mutateAsync(draft.id)))}
+                  >
+                    Копия
+                  </Button>
+                )}
                 <Button
-                  icon={<Copy size={15} />}
-                  title="Копия набора — чтобы поправить под другое соревнование"
-                  onClick={() =>
-                    void attempt(async () =>
-                      setDraft(await mutations.duplicate.mutateAsync(draft.id)),
-                    )
-                  }
+                  variant="primary"
+                  size="sm"
+                  icon={<Save size={16} />}
+                  onClick={() => void save()}
+                  loading={mutations.create.isPending || mutations.update.isPending}
                 >
-                  Копия
+                  Сохранить
                 </Button>
-              )}
+              </div>
+            }
+          >
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Название набора" className="sm:col-span-2">
+                <Input
+                  value={draft.name}
+                  onChange={(e) => patch({ name: e.target.value })}
+                  placeholder="Награждение по протоколу"
+                />
+              </Field>
+              <Field
+                label="Колонка группы"
+                help="По ней ищутся повторы получателя и, если у условия взведено «внутри группы», пересчитывается место."
+              >
+                <Select
+                  value={draft.groupColumn}
+                  onChange={(groupColumn) => patch({ groupColumn })}
+                  aria-label="Колонка группы"
+                  options={[{ value: '', label: 'весь протокол — одна группа' }, ...columns.map((c) => ({ value: c, label: c }))]}
+                />
+              </Field>
+              <Field label="Колонка статуса" help="DSQ, DNS, «снят» — по ней работает правило «не выдавать».">
+                <Select
+                  value={draft.statusColumn}
+                  onChange={(statusColumn) => patch({ statusColumn })}
+                  aria-label="Колонка статуса"
+                  options={[{ value: '', label: 'статусов нет' }, ...columns.map((c) => ({ value: c, label: c }))]}
+                />
+              </Field>
             </div>
+            {saveError && <ErrorBar className="mt-3">{saveError}</ErrorBar>}
+          </Card>
 
-            {saveError && (
-              <p className="rounded-lg bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)] sm:col-span-3">
-                {saveError}
-              </p>
-            )}
-          </section>
-
-          <p className="text-sm text-[var(--text-muted)]">
+          <p className="text-sm text-muted">
             Правила проверяются сверху вниз: выигрывает первое совпавшее. Последним ставьте правило
             без условий — оно поймает всех, кого не разобрали правила выше.
           </p>
@@ -256,10 +255,7 @@ export function RulesTab({ documentId, ruleSetId }: Props) {
             ))}
           </ul>
 
-          <Button
-            icon={<Plus size={15} />}
-            onClick={() => setRules([...draft.rules, blankRule(columns[0] ?? 'place')])}
-          >
+          <Button icon={<Plus size={16} />} onClick={() => setRules([...draft.rules, blankRule(columns[0] ?? 'place')])}>
             Добавить правило
           </Button>
         </div>
@@ -295,69 +291,56 @@ function StartScreen({
   error: string | null;
 }) {
   return (
-    <div className="mx-auto max-w-2xl space-y-5 p-8">
+    <div className="mx-auto w-full max-w-2xl space-y-5 p-4 sm:p-8">
       <div>
         <h2 className="text-lg font-medium">Правила награждения</h2>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
+        <p className="mt-1 text-sm text-muted">
           «Первое место — диплом победителя, снятым ничего, остальным грамота участника». Набор
           сохраняется и переиспользуется на следующем соревновании.
         </p>
       </div>
 
+      {error && <ErrorBar>{error}</ErrorBar>}
+
       {sets.length > 0 && (
         <section>
-          <Label>Готовые наборы</Label>
-          <ul className="space-y-2">
+          <p className="mb-2 text-sm font-medium text-muted">Готовые наборы</p>
+          <OptionGroup label="Готовые наборы" columns={1}>
             {sets.map((s) => (
-              <li key={s.id}>
-                <button
-                  onClick={() => onPick(s.id)}
-                  className="flex w-full items-center gap-3 rounded-xl bg-[var(--surface)] px-4 py-3 text-left ring-1 ring-[var(--line)] transition-colors hover:bg-[var(--surface-sunken)]"
-                >
-                  <span className="font-medium">{s.name}</span>
-                  <span className="ml-auto text-sm text-[var(--text-muted)]">
-                    правил: {s.ruleCount}
-                    {s.documentCount > 0 && ` · применён: ${s.documentCount}`}
-                  </span>
-                </button>
-              </li>
+              <OptionCard
+                key={s.id}
+                icon={ListChecks}
+                title={s.name}
+                description={`правил: ${s.ruleCount}${s.documentCount > 0 ? ` · применён: ${s.documentCount}` : ''}`}
+                onSelect={() => onPick(s.id)}
+              />
             ))}
-          </ul>
+          </OptionGroup>
         </section>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        <Tooltip label={hasColumns ? undefined : 'Сначала загрузите протокол на вкладке «Получатели»'}>
+      <div className="flex flex-wrap items-center gap-3">
+        <Tooltip label={hasColumns ? undefined : 'Сначала загрузите протокол на шаге «Получатели»'}>
           <Button
             variant="primary"
-            icon={<Wand2 size={15} />}
+            icon={<Wand2 size={16} />}
             onClick={onSuggest}
-            disabled={!hasColumns || suggesting}
+            disabled={!hasColumns}
+            loading={suggesting}
           >
             Собрать по колонкам протокола
           </Button>
         </Tooltip>
         {/* Второй кнопкой это читалось как выбор из двух равных, хотя
             пустой набор нужен редко. Остаётся, но тихо. */}
-        <button
-          type="button"
-          onClick={onBlank}
-          className="inline-flex items-center gap-1 self-center text-sm text-[var(--text-muted)] underline-offset-4 hover:text-[var(--text)] hover:underline"
-        >
-          <Plus size={14} />
+        <Button variant="link" icon={<Plus size={16} />} onClick={onBlank}>
           или начать с нуля
-        </button>
+        </Button>
       </div>
 
-      {error && (
-        <p role="alert" className="rounded-lg bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]">
-          {error}
-        </p>
-      )}
-
       {!hasColumns && (
-        <p className="text-sm text-[var(--text-muted)]">
-          В таблице получателей пока нет колонок. Загрузите протокол на вкладке «Получатели» — тогда
+        <p className="text-sm text-muted">
+          В таблице получателей пока нет колонок. Загрузите протокол на шаге «Получатели» — тогда
           заготовка сама найдёт место, группу и статус.
         </p>
       )}

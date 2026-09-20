@@ -112,10 +112,10 @@ function Strip({
   return (
     <div
       role="status"
-      className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-[var(--line)] bg-[var(--accent-soft)] px-4 py-2.5 text-sm"
+      className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-line bg-accent-soft px-4 py-2.5 text-sm"
     >
-      <span className="shrink-0 text-[var(--accent)]">{icon}</span>
-      <p className="min-w-0 flex-1 text-[var(--text)]">{children}</p>
+      <span className="shrink-0 text-accent">{icon}</span>
+      <p className="min-w-0 flex-1 text-ink">{children}</p>
       {/* Крестик в разметке раньше кнопки: на телефоне кнопка уходит второй
           строкой во всю ширину, а крестик остаётся справа от текста.
           На широком экране он встаёт последним, как обычно. */}
@@ -124,7 +124,7 @@ function Strip({
           type="button"
           aria-label="Не предлагать"
           onClick={onDismiss}
-          className="grid size-11 shrink-0 place-items-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--surface)] md:order-last md:size-8"
+          className="grid size-11 shrink-0 place-items-center rounded-control text-muted hover:bg-surface md:order-last md:size-8"
         >
           <X size={16} />
         </button>

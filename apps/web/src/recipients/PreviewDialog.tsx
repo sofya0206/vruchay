@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { api } from '../api/client';
 import { useOrgProfile } from '../api/org';
 import { mergeVariables } from '@gramota/shared';
 import type { DocumentDetail, Sheet } from '../api/types';
 import { SheetRenderer } from '../render/SheetRenderer';
-import { Button } from '../ui/Button';
+import { Dialog } from '../ui/Dialog';
+import { IconButton } from '../ui/IconButton';
+import { ICON, STROKE } from '../ui/icon';
 
 interface Row {
   id: string;
@@ -39,93 +41,91 @@ export function PreviewDialog({
   });
   const org = useOrgProfile();
 
+  // Стрелками листаем получателей; Esc — за окном.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
       if (e.key === 'ArrowRight') setIndex((i) => Math.min(i + 1, rows.length - 1));
       if (e.key === 'ArrowLeft') setIndex((i) => Math.max(i - 1, 0));
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [onClose, rows.length]);
+  }, [rows.length]);
 
   const row = rows[index];
   const sheets = doc.data?.sheets ?? [];
 
   return (
-    <div
-      className="fixed inset-0 z-50 grid place-items-center bg-[var(--scrim)] p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Предпросмотр документа"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
+    <Dialog
+      size="lg"
+      title="Будущий документ"
+      description={
+        <>
+          {row?.data.name || 'Без имени'} ·{' '}
+          <span className="tabular">
+            {index + 1} из {rows.length}
+          </span>
+        </>
+      }
+      onClose={onClose}
+      footer={
+        <>
+          <IconButton
+            size="sm"
+            variant="secondary"
+            label="Предыдущий получатель"
+            disabled={index === 0}
+            onClick={() => setIndex((i) => i - 1)}
+          >
+            <ChevronLeft size={ICON.sm} strokeWidth={STROKE} />
+          </IconButton>
+          <IconButton
+            size="sm"
+            variant="secondary"
+            label="Следующий получатель"
+            disabled={index >= rows.length - 1}
+            onClick={() => setIndex((i) => i + 1)}
+          >
+            <ChevronRight size={ICON.sm} strokeWidth={STROKE} />
+          </IconButton>
+        </>
+      }
     >
-      <div className="flex max-h-full w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-[var(--surface)]">
-        <header className="flex items-center gap-3 border-b border-[var(--line)] px-4 py-3">
-          <div className="min-w-0">
-            <p className="truncate font-medium">{row?.data.name || 'Без имени'}</p>
-            <p className="tabular text-sm text-[var(--text-muted)]">
-              {index + 1} из {rows.length}
-            </p>
-          </div>
-          <div className="ml-auto flex items-center gap-1">
-            <Button
-              size="sm"
-              variant="ghost"
-              icon={<ChevronLeft size={16} />}
-              disabled={index === 0}
-              onClick={() => setIndex((i) => i - 1)}
-              aria-label="Предыдущий получатель"
-            />
-            <Button
-              size="sm"
-              variant="ghost"
-              icon={<ChevronRight size={16} />}
-              disabled={index >= rows.length - 1}
-              onClick={() => setIndex((i) => i + 1)}
-              aria-label="Следующий получатель"
-            />
-            <Button size="sm" variant="ghost" icon={<X size={16} />} onClick={onClose} aria-label="Закрыть" />
-          </div>
-        </header>
-
-        <div className="min-h-0 flex-1 overflow-auto bg-[var(--surface-sunken)] p-6">
-          {doc.isPending && <p className="text-center text-[var(--text-muted)]">Загрузка…</p>}
-          <div className="space-y-6">
-            {sheets.map((sheet) => (
-              <Scaled
-                key={sheet.id}
+      <div className="rounded-card bg-sunken p-4">
+        {doc.isPending && <p className="text-center text-sm text-muted">Загружаем документ</p>}
+        <div className="space-y-6">
+          {sheets.map((sheet) => (
+            <Scaled
+              key={sheet.id}
+              widthMm={doc.data!.pageWidthMm}
+              heightMm={doc.data!.pageHeightMm}
+            >
+              <SheetPreview
+                sheet={sheet}
                 widthMm={doc.data!.pageWidthMm}
                 heightMm={doc.data!.pageHeightMm}
-              >
-                <SheetPreview
-                  sheet={sheet}
-                  widthMm={doc.data!.pageWidthMm}
-                  heightMm={doc.data!.pageHeightMm}
-                  /* Служебные переменные подставляем и здесь: иначе
-                     в предпросмотре на месте даты и номера пустота,
-                     и человек решает, что переменная не работает. */
-                  data={mergeVariables(row?.data ?? {}, {
-                    issuedAt: new Date(),
-                    number: index + 1,
-                    // Проверочный код выделяется в момент печати, до неё
-                    // его нет. Показываем словами, а не пустотой.
-                    publicId: 'код появится при выпуске',
-                    orgName: org.data?.orgName,
-                    event: {
-                      name: doc.data?.eventName,
-                      date: doc.data?.eventDate,
-                      place: doc.data?.eventPlace,
-                      hours: doc.data?.eventHours,
-                    },
-                  })}
-                />
-              </Scaled>
-            ))}
-          </div>
+                /* Служебные переменные подставляем и здесь: иначе
+                   в предпросмотре на месте даты и номера пустота,
+                   и человек решает, что переменная не работает. */
+                data={mergeVariables(row?.data ?? {}, {
+                  issuedAt: new Date(),
+                  number: index + 1,
+                  // Проверочный код выделяется в момент печати, до неё
+                  // его нет. Показываем словами, а не пустотой.
+                  publicId: 'код появится при выпуске',
+                  orgName: org.data?.orgName,
+                  event: {
+                    name: doc.data?.eventName,
+                    date: doc.data?.eventDate,
+                    place: doc.data?.eventPlace,
+                    hours: doc.data?.eventHours,
+                  },
+                })}
+              />
+            </Scaled>
+          ))}
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 }
 
@@ -203,7 +203,9 @@ function Scaled({
           className="mx-auto overflow-hidden shadow-lg"
           style={{ width: `${widthMm * scale}mm`, height: `${heightMm * scale}mm` }}
         >
-          <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}>{children}</div>
+          <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}>
+            {children}
+          </div>
         </div>
       )}
     </div>

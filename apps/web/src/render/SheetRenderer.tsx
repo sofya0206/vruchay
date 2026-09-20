@@ -353,7 +353,7 @@ function TextElementView({
             }
           : undefined
       }
-      className={selected ? 'outline-2 outline-indigo-500 outline-dashed' : undefined}
+      className={selected ? 'outline-2 outline-focus outline-dashed' : undefined}
       style={{ ...boxStyle(element), ...textBlockStyle(element.props, fit) }}
     >
       {editing && renderEditing ? (
@@ -416,7 +416,7 @@ function PlainElementView({
             onEdit(element.id);
           }
         : undefined,
-    className: selected ? 'outline-2 outline-indigo-500 outline-dashed' : undefined,
+    className: selected ? 'outline-2 outline-focus outline-dashed' : undefined,
   };
 
   if (element.type === 'text') return null;

@@ -65,17 +65,17 @@ export function DateField({
         disabled={disabled}
         onClick={() => (open ? close() : setOpen(true))}
         className={cn(
-          'w-full rounded-lg bg-[var(--surface)] px-3 py-2 text-left text-[var(--text)]',
-          'flex items-center justify-between gap-2 ring-1 ring-[var(--line)]',
-          'transition-colors outline-none focus:ring-2 focus:ring-[var(--focus)]',
+          'w-full rounded-control bg-surface px-3 py-2 text-left text-ink',
+          'flex items-center justify-between gap-2 ring-1 ring-line',
+          'transition-colors outline-none focus:ring-2 focus:ring-focus',
           'disabled:cursor-not-allowed disabled:opacity-50',
           className,
         )}
       >
-        <span className={cn('truncate', !value && 'text-[var(--text-muted)]')}>
+        <span className={cn('truncate', !value && 'text-muted')}>
           {humanIso(value) ?? placeholder}
         </span>
-        <CalendarDays size={16} aria-hidden className="shrink-0 text-[var(--text-muted)]" />
+        <CalendarDays size={16} aria-hidden className="shrink-0 text-muted" />
       </button>
 
       {open && (
@@ -137,7 +137,7 @@ function Month({
 
       <div className="grid grid-cols-7 gap-0.5 text-center">
         {WEEKDAYS.map((name) => (
-          <span key={name} className="py-1 text-xs text-[var(--text-muted)]">
+          <span key={name} className="py-1 text-xs text-muted">
             {name}
           </span>
         ))}
@@ -155,12 +155,12 @@ function Month({
                 className={cn(
                   'tabular grid h-8 place-items-center rounded-md text-sm transition-colors',
                   'disabled:cursor-not-allowed disabled:opacity-30',
-                  day.outside && 'text-[var(--text-muted)]',
-                  !chosen && 'hover:bg-[var(--surface-sunken)]',
+                  day.outside && 'text-muted',
+                  !chosen && 'hover:bg-sunken',
                   // Сегодня обводим, выбранное заливаем: два разных признака
                   // не должны читаться одинаково.
-                  day.iso === today && !chosen && 'ring-1 ring-[var(--line-strong)]',
-                  chosen && 'bg-[var(--accent)] text-[var(--accent-contrast)]',
+                  day.iso === today && !chosen && 'ring-1 ring-line-strong',
+                  chosen && 'bg-accent text-on-accent',
                 )}
               >
                 {day.day}
@@ -169,7 +169,7 @@ function Month({
           })}
       </div>
 
-      <div className="mt-1.5 flex gap-1 border-t border-[var(--line)] pt-1.5">
+      <div className="mt-1.5 flex gap-1 border-t border-line pt-1.5">
         <Action onClick={() => onPick(today)} disabled={!!blocked(today)}>
           Сегодня
         </Action>
@@ -197,7 +197,7 @@ function Step({
       type="button"
       aria-label={label}
       onClick={onClick}
-      className="grid size-7 place-items-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
+      className="grid size-7 place-items-center rounded-md text-muted transition-colors hover:bg-sunken hover:text-ink"
     >
       {children}
     </button>
@@ -221,9 +221,9 @@ function Action({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'flex-1 rounded-md py-1.5 text-sm transition-colors hover:bg-[var(--surface-sunken)]',
+        'flex-1 rounded-md py-1.5 text-sm transition-colors hover:bg-sunken',
         'disabled:cursor-not-allowed disabled:opacity-40',
-        muted ? 'text-[var(--text-muted)]' : 'text-[var(--accent)]',
+        muted ? 'text-muted' : 'text-accent',
       )}
     >
       {children}

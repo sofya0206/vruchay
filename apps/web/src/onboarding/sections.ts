@@ -1,11 +1,14 @@
 import type { CoachText } from './Coach';
+import { stepsSentence } from '../documents/material-steps';
 
 /**
  * Подсказки по разделам — 2–4 шага у настоящих элементов экрана.
  *
- * Место ищется по устойчивым признакам: подписи для читалок, заголовку
- * поля, тексту кнопки. Не нашлось (раздел пуст, кнопка спрятана) — шаг
- * пропускается молча, а в статистике он виден отдельно.
+ * Место ищется по метке `data-tour` на элементе — она не меняется вместе
+ * с текстом кнопки. Старые признаки (подписи для читалок, текст кнопки)
+ * остаются запасными, пока метки не расставлены везде. Не нашлось
+ * (раздел пуст, кнопка спрятана) — шаг пропускается молча, а в статистике
+ * он виден отдельно.
  */
 
 type Find = string | { text: string; in?: string };
@@ -22,15 +25,15 @@ export interface Section {
 }
 
 const RELEASE: TipStep = {
-  at: [{ text: 'Выпуск', in: 'header a, header button' }],
+  at: ['[data-tour="issue"]', { text: 'Выпуск', in: 'header a, header button' }],
   title: 'Выпуск — отсюда',
-  text: 'Кнопка всегда на месте: с любой вкладки ведёт к списку, откуда выпускают.',
+  text: 'Кнопка всегда на месте: с любого шага ведёт к выпуску, где всё сходится.',
   placement: 'bottom',
 };
 const SIDES: TipStep = {
-  at: ['nav[aria-label="Стороны материала"]'],
-  title: 'Весь путь — по вкладкам',
-  text: 'Лист → Получатели → Проверка → Письмо → Подлинность. Идите слева направо.',
+  at: ['[data-tour="stepper"]', 'nav[aria-label="Шаги выпуска"]'],
+  title: 'Весь путь — по шагам',
+  text: `${stepsSentence()}. Идите слева направо, возвращаться можно.`,
   placement: 'bottom',
 };
 
@@ -40,21 +43,21 @@ export const SECTIONS: Section[] = [
     title: 'Главная',
     steps: [
       {
-        at: [{ text: 'Создать документ', in: 'main button, main a' }],
+        at: ['[data-tour="create-document"]', { text: 'Создать документ', in: 'main button, main a' }],
         title: 'Начните с документа',
         text: 'Документ — это макет грамоты и список получателей для одного мероприятия.',
         placement: 'bottom',
       },
       {
-        at: ['input[placeholder^="Фамилия"]'],
+        at: ['[data-tour="registry-search"]', 'input[placeholder^="Фамилия"]'],
         title: 'Реестр всего выданного',
         text: 'Найдите документ по фамилии или коду с бланка и перешлите его заново.',
         placement: 'bottom',
       },
       {
-        at: ['nav[aria-label="Разделы"]'],
+        at: ['[data-tour="nav"]', 'nav[aria-label="Разделы"]'],
         title: 'Разделы — слева',
-        text: 'Документы, письма, реестр, интеграции и оплата. Внизу — обучение.',
+        text: 'Документы, письма и реестр. Внизу — настройки и помощь.',
         placement: 'right',
       },
     ],
@@ -64,19 +67,19 @@ export const SECTIONS: Section[] = [
     title: 'Документы',
     steps: [
       {
-        at: [{ text: 'Создать документ' }, { text: 'Создать' }],
+        at: ['[data-tour="create-document"]', { text: 'Создать документ' }, { text: 'Создать' }],
         title: 'Новый документ',
         text: 'Загрузите свой бланк или начните с пустого листа.',
         placement: 'bottom',
       },
       {
-        at: ['nav[aria-label="Разделы библиотеки"]'],
+        at: ['[data-tour="library-nav"]', 'nav[aria-label="Разделы библиотеки"]'],
         title: 'Папки и архив',
         text: 'Раскладывайте документы по мероприятиям. Удалённые хранятся в архиве.',
         placement: 'right',
       },
       {
-        at: ['main li.card'],
+        at: ['[data-tour="document-card"]', 'main li.card'],
         title: 'Карточка документа',
         text: 'Нажмите, чтобы открыть. В меню «…» — копия под новое мероприятие.',
         placement: 'right',
@@ -89,13 +92,13 @@ export const SECTIONS: Section[] = [
     steps: [
       SIDES,
       {
-        at: [{ text: 'Вставить' }, '[aria-label="Вставить"]'],
+        at: ['[data-tour="insert"]', { text: 'Вставить' }, '[aria-label="Вставить"]'],
         title: 'Текст, картинка, QR',
         text: 'Добавляйте на лист блоки и двигайте мышью.',
         placement: 'bottom',
       },
       {
-        at: ['[role="tab"][data-panel="fields"]', '[aria-label="Данные"]', { text: 'Данные', in: 'aside button' }],
+        at: ['[data-tour="fields-panel"]', '[role="tab"][data-panel="fields"]', '[aria-label="Данные"]', { text: 'Данные', in: 'aside button' }],
         title: 'Поля из таблицы',
         text: 'Перетащите поле на лист — в каждом документе подставится значение из своей строки.',
         placement: 'left',
@@ -108,19 +111,19 @@ export const SECTIONS: Section[] = [
     title: 'Получатели',
     steps: [
       {
-        at: [{ text: 'Загрузить файл' }, '[aria-label^="Загрузить"]'],
+        at: ['[data-tour="import"]', { text: 'Загрузить файл' }, '[aria-label^="Загрузить"]'],
         title: 'Список из Excel или CSV',
         text: 'Шапку и пустые строки уберём сами. Можно вставить из буфера — Ctrl+V.',
         placement: 'bottom',
       },
       {
-        at: ['[aria-label="Отметить все"]'],
+        at: ['[data-tour="check-all"]', '[aria-label="Отметить все"]'],
         title: 'Кому выпускать',
         text: 'Выпустятся только отмеченные строки.',
         placement: 'right',
       },
       {
-        at: ['[aria-label="Проверить строки"]'],
+        at: ['[data-tour="check-rows"]', '[aria-label="Проверить строки"]'],
         title: 'Проверка перед выпуском',
         text: 'Найдём пустые ФИО, ошибки в почте и текст, который не влезает.',
         placement: 'bottom',
@@ -133,7 +136,7 @@ export const SECTIONS: Section[] = [
     title: 'Проверка',
     steps: [
       {
-        at: [{ text: 'Проверить отмеченные' }, { text: 'Проверить' , in: 'main button' }],
+        at: ['[data-tour="check-run"]', { text: 'Проверить отмеченные' }, { text: 'Проверить', in: 'main button' }],
         title: 'Проверьте до выпуска',
         text: 'Ничего не меняем и не выпускаем — только показываем, что пойдёт не так.',
         placement: 'bottom',
@@ -151,13 +154,13 @@ export const SECTIONS: Section[] = [
     title: 'Письма',
     steps: [
       {
-        at: ['nav[aria-label="Папки писем"]'],
+        at: ['[data-tour="mail-status"]', 'nav[aria-label="Папки писем"]'],
         title: 'Письма по состоянию',
-        text: 'Отправленные, доставленные и недошедшие — в отдельных папках.',
+        text: 'Отправленные, доставленные и недошедшие — по состоянию.',
         placement: 'right',
       },
       {
-        at: ['[aria-label="Поиск в письмах"]'],
+        at: ['[data-tour="mail-search"]', '[aria-label="Поиск в письмах"]'],
         title: 'Поиск по адресу',
         text: 'Найдите письмо конкретного человека и отправьте заново.',
         placement: 'bottom',
@@ -169,13 +172,13 @@ export const SECTIONS: Section[] = [
     title: 'Реестр',
     steps: [
       {
-        at: ['input[placeholder^="Фамилия, адрес"]'],
+        at: ['[data-tour="registry-search"]', 'input[placeholder^="Фамилия"]'],
         title: 'Поиск выданного',
         text: 'По фамилии, почте или проверочному коду с бланка.',
         placement: 'bottom',
       },
       {
-        at: ['[aria-label="Разделы реестра"]'],
+        at: ['[data-tour="registry-tabs"]', '[aria-label="Разделы реестра"]'],
         title: 'Выданные и отозванные',
         text: 'Отозванный документ на странице проверки покажется недействительным.',
         placement: 'bottom',
@@ -184,27 +187,27 @@ export const SECTIONS: Section[] = [
   },
 ];
 
-/** Какой раздел открыт: по адресу и вкладке материала. */
-export function sectionOf(pathname: string, search: string): Section | null {
-  const tab = new URLSearchParams(search).get('tab');
+/** Какой раздел открыт — по адресу. */
+export function sectionOf(pathname: string, _search = ''): Section | null {
+  const material = pathname.match(/^\/documents\/([^/]+)(?:\/([^/]+))?\/?$/);
   const key =
     pathname === '/'
       ? 'home'
-      : /^\/documents\/?$|^\/documents\/(archive|folder)/.test(pathname)
+      : /^\/documents\/?$|^\/documents\/(archive|templates)\/?$/.test(pathname)
         ? 'documents'
-        : /^\/documents\/[^/]+$/.test(pathname)
-          ? 'editor'
-          : /^\/mailing\/[^/]+$/.test(pathname)
-            ? !tab || tab === 'table'
+        : material
+          ? !material[2]
+            ? 'editor'
+            : material[2] === 'recipients'
               ? 'recipients'
-              : tab === 'check'
+              : material[2] === 'check'
                 ? 'check'
                 : 'material'
-            : pathname.startsWith('/mailing')
-              ? 'mailing'
-              : pathname.startsWith('/registry')
-                ? 'registry'
-                : null;
+          : pathname.startsWith('/mailing')
+            ? 'mailing'
+            : pathname.startsWith('/registry')
+              ? 'registry'
+              : null;
   return SECTIONS.find((s) => s.key === key) ?? null;
 }
 

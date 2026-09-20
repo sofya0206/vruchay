@@ -18,11 +18,11 @@ const SWATCHES = [
   '#b1bbcd',
   '#e1e9f0',
   '#ffffff',
-  '#127ee3',
+  '#0f6ac1',
   '#0f77ff',
-  '#d92d3f',
-  '#1f5d3f',
-  '#8a6d2f',
+  '#c9273a',
+  '#14764a',
+  '#9e5a0c',
 ];
 
 /**
@@ -77,21 +77,21 @@ export function ColorPicker({
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          'shrink-0 rounded-lg transition-shadow',
+          'shrink-0 rounded-control transition-shadow',
           'disabled:cursor-not-allowed disabled:opacity-40',
           letter
-            ? 'grid size-8 place-items-center rounded-md hover:bg-[var(--surface-sunken)]'
-            : 'ring-1 ring-[var(--line-strong)]',
+            ? 'grid size-8 place-items-center rounded-md hover:bg-sunken'
+            : 'ring-1 ring-line-strong',
           !letter && (compact ? 'size-8' : 'h-[38px] w-11'),
-          open && 'ring-2 ring-[var(--focus)]',
+          open && 'ring-2 ring-focus',
           className,
         )}
         style={letter ? undefined : { background: shown }}
       >
         {letter && (
           <span aria-hidden className="flex flex-col items-center leading-none">
-            <span className="text-[15px] font-semibold text-[var(--text)]">А</span>
-            <span className="mt-0.5 h-[3px] w-4 rounded-sm ring-1 ring-[var(--line)]" style={{ background: shown }} />
+            <span className="text-[15px] font-semibold text-ink">А</span>
+            <span className="mt-0.5 h-[3px] w-4 rounded-sm ring-1 ring-line" style={{ background: shown }} />
           </span>
         )}
       </button>
@@ -154,8 +154,8 @@ function Palette({
             className={cn(
               'h-6 rounded-md ring-1 transition-shadow',
               normalizeHex(value) === hex
-                ? 'ring-2 ring-[var(--focus)]'
-                : 'ring-[var(--line-strong)]',
+                ? 'ring-2 ring-focus'
+                : 'ring-line-strong',
             )}
             style={{ background: hex }}
           />
@@ -172,7 +172,7 @@ function Palette({
         // Ушли из поля с недописанным кодом — возвращаем действующий цвет,
         // чтобы в поле не осталось значение, которого нет на листе.
         onBlur={() => setText(value)}
-        className="w-full rounded-lg bg-[var(--surface)] px-2 py-1.5 font-mono text-sm uppercase ring-1 ring-[var(--line-strong)] outline-none focus:ring-2 focus:ring-[var(--focus)]"
+        className="w-full rounded-control bg-surface px-2 py-1.5 font-mono text-sm uppercase ring-1 ring-line-strong outline-none focus:ring-2 focus:ring-focus"
       />
     </div>
   );
@@ -205,7 +205,7 @@ function Spectrum({
     <div
       ref={area}
       // Перетаскивание не должно уезжать в прокрутку страницы на сенсорном.
-      className="relative h-32 w-full touch-none rounded-lg ring-1 ring-[var(--line)]"
+      className="relative h-32 w-full touch-none rounded-control ring-1 ring-line"
       style={{
         background:
           'linear-gradient(to top, #000, transparent), ' +
@@ -239,7 +239,7 @@ function Hue({ hue, onPick }: { hue: number; onPick: (h: number) => void }) {
   return (
     <div
       ref={strip}
-      className="relative h-3 w-full touch-none rounded-full ring-1 ring-[var(--line)]"
+      className="relative h-3 w-full touch-none rounded-full ring-1 ring-line"
       style={{
         background:
           'linear-gradient(to right, #f00, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00)',
@@ -252,7 +252,7 @@ function Hue({ hue, onPick }: { hue: number; onPick: (h: number) => void }) {
     >
       <span
         aria-hidden
-        className="pointer-events-none absolute top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white ring-1 ring-[var(--line-strong)]"
+        className="pointer-events-none absolute top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white ring-1 ring-line-strong"
         style={{ left: `${(hue / 360) * 100}%` }}
       />
     </div>

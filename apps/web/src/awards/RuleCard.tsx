@@ -1,8 +1,10 @@
 import type { ReactNode } from 'react';
 import { ArrowDown, ArrowUp, Ban, Copy, FileText, Plus, Trash2, X } from 'lucide-react';
 import type { AwardOutput, AwardRule } from '@gramota/shared';
+import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Checkbox } from '../ui/Checkbox';
+import { IconButton } from '../ui/IconButton';
 import { Input } from '../ui/Field';
 import { Select } from '../ui/Select';
 import type { AwardTemplate } from '../api/awards';
@@ -59,15 +61,11 @@ export function RuleCard({
     });
 
   return (
-    <li
-      className={`rounded-xl bg-[var(--surface)] ring-1 transition-opacity ${
-        rule.enabled ? 'ring-[var(--line)]' : 'opacity-60 ring-[var(--line)]'
-      }`}
-    >
-      <header className="flex flex-wrap items-center gap-2 border-b border-[var(--line)] px-4 py-2.5">
+    <li className={`card transition-opacity ${rule.enabled ? '' : 'opacity-60'}`}>
+      <header className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-2.5">
         <span
-          className="tabular grid size-6 shrink-0 place-items-center rounded-full bg-[var(--surface-sunken)] text-xs font-medium text-[var(--text-muted)]"
-          title="Порядок проверки: выигрывает первое совпавшее правило"
+          className="tabular grid size-6 shrink-0 place-items-center rounded-full bg-sunken text-xs font-medium text-muted"
+          aria-label={`Правило ${index + 1}: выигрывает первое совпавшее`}
         >
           {index + 1}
         </span>
@@ -82,49 +80,31 @@ export function RuleCard({
           />
         </Sized>
 
-        {isFallback && (
-          <span className="rounded-full bg-[var(--surface-sunken)] px-2 py-1 text-xs text-[var(--text-muted)]">
-            без условий — срабатывает всегда
-          </span>
-        )}
+        {isFallback && <Badge>без условий — срабатывает всегда</Badge>}
 
         <Checkbox
           checked={rule.enabled}
           onChange={(enabled) => onChange({ ...rule, enabled })}
           label="включено"
-          className="ml-auto items-center text-[var(--text-muted)]"
+          className="ml-auto items-center text-muted"
         />
 
         <div className="flex items-center">
-          <button
-            onClick={() => onMove(-1)}
-            disabled={index === 0}
-            aria-label="Выше"
-            className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] disabled:opacity-30"
-          >
-            <ArrowUp size={15} />
-          </button>
-          <button
-            onClick={() => onMove(1)}
-            disabled={index === total - 1}
-            aria-label="Ниже"
-            className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] disabled:opacity-30"
-          >
-            <ArrowDown size={15} />
-          </button>
-          <button
-            onClick={onRemove}
-            aria-label="Удалить правило"
-            className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-[var(--danger-soft)] hover:text-[var(--danger)]"
-          >
-            <Trash2 size={15} />
-          </button>
+          <IconButton size="sm" label="Выше" disabled={index === 0} onClick={() => onMove(-1)}>
+            <ArrowUp size={16} />
+          </IconButton>
+          <IconButton size="sm" label="Ниже" disabled={index === total - 1} onClick={() => onMove(1)}>
+            <ArrowDown size={16} />
+          </IconButton>
+          <IconButton size="sm" label="Удалить правило" className="hover:bg-danger-soft hover:text-danger" onClick={onRemove}>
+            <Trash2 size={16} />
+          </IconButton>
         </div>
       </header>
 
       <div className="space-y-3 px-4 py-3">
         <section className="space-y-2">
-          <div className="flex items-center gap-2 text-xs font-medium tracking-wide text-[var(--text-muted)] uppercase">
+          <div className="flex items-center gap-2 text-xs font-medium tracking-wide text-muted uppercase">
             Если
             {rule.conditions.length > 1 && (
               <Sized width="w-52">
@@ -163,7 +143,7 @@ export function RuleCard({
           <Button
             variant="ghost"
             size="sm"
-            icon={<Plus size={14} />}
+            icon={<Plus size={16} />}
             onClick={() =>
               onChange({
                 ...rule,
@@ -178,9 +158,9 @@ export function RuleCard({
           </Button>
         </section>
 
-        <section className="space-y-2 border-t border-[var(--line)] pt-3">
+        <section className="space-y-2 border-t border-line pt-3">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-medium tracking-wide text-[var(--text-muted)] uppercase">
+            <span className="text-xs font-medium tracking-wide text-muted uppercase">
               То
             </span>
             <Sized width="w-48">
@@ -206,8 +186,8 @@ export function RuleCard({
           </div>
 
           {skip ? (
-            <p className="flex items-start gap-2 rounded-lg bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--text-muted)]">
-              <Ban size={15} className="mt-0.5 shrink-0" />
+            <p className="flex items-start gap-2 rounded-control bg-sunken px-3 py-2 text-sm text-muted">
+              <Ban size={16} className="mt-0.5 shrink-0" />
               Строка снимается с награждения и дальше не проверяется. В отчёте она
               останется — с пометкой, каким правилом снята.
             </p>
@@ -215,7 +195,7 @@ export function RuleCard({
             <>
               {rule.outputs.map((output, i) => (
                 <div key={i} className="flex flex-wrap items-center gap-2">
-                  <FileText size={15} className="shrink-0 text-[var(--text-muted)]" />
+                  <FileText size={16} className="shrink-0 text-muted" />
                   <Sized width="w-60">
                     <Select
                       aria-label="Шаблон"
@@ -228,7 +208,7 @@ export function RuleCard({
                     />
                   </Sized>
 
-                  <span className="text-sm text-[var(--text-muted)]">кому:</span>
+                  <span className="text-sm text-muted">кому:</span>
                   <Sized width="w-48">
                     <Select
                       aria-label="Получатель"
@@ -266,22 +246,20 @@ export function RuleCard({
                     </Sized>
                   )}
 
-                  <button
-                    onClick={() =>
-                      onChange({ ...rule, outputs: rule.outputs.filter((_, j) => j !== i) })
-                    }
-                    aria-label="Убрать документ"
-                    className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
+                  <IconButton
+                    size="sm"
+                    label="Убрать документ"
+                    onClick={() => onChange({ ...rule, outputs: rule.outputs.filter((_, j) => j !== i) })}
                   >
-                    <X size={15} />
-                  </button>
+                    <X size={16} />
+                  </IconButton>
                 </div>
               ))}
 
               <Button
                 variant="ghost"
                 size="sm"
-                icon={<Copy size={14} />}
+                icon={<Copy size={16} />}
                 onClick={() =>
                   onChange({
                     ...rule,
@@ -304,7 +282,7 @@ export function RuleCard({
         </section>
 
         {rule.conditions.length > 0 && (
-          <p className="text-xs text-[var(--text-muted)]">
+          <p className="text-xs text-muted">
             Если {rule.conditions.map(describeCondition).join(rule.match === 'any' ? ' или ' : ' и ')}
           </p>
         )}

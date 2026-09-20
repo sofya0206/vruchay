@@ -1,33 +1,36 @@
 import { Check, CheckCheck, Clock, Mail, RefreshCw, X, type LucideIcon } from 'lucide-react';
+import { Badge, type BadgeTone } from '../ui/Badge';
 import { Button } from '../ui/Button';
+import { Card } from '../ui/Card';
+import { NextAction } from '../ui/NextAction';
+import { TBody, THead, Table, Td, Th, Tr } from '../ui/Table';
+import { toast } from '../ui/Toast';
 import { useResendFailed, type LogItem } from './api';
 import { STATUS_LABELS, statusTone } from './letter-preview';
 import { formatLetterTime, letterList, type MailList } from './mail-lists';
 import { errorText } from '../api/client';
 
 /**
- * Список писем открытой папки.
+ * Журнал писем.
  *
  * Отвечает на единственный вопрос, ради которого сюда заходят: дошло ли
  * письмо и почему не дошло. Причина словами, а не кодом шлюза: «550 5.1.1»
  * не подсказывает, что делать, а «такого адреса не существует» —
- * подсказывает.
- *
- * Отбор по состоянию делают папки слева, поэтому здесь остались только
- * сами письма и повтор недоставленных.
+ * подсказывает. На телефоне — карточками: таблица уезжала вбок, и
+ * состояние письма было за краем.
  */
 export function MailingLogTable({
   items,
-  list,
+  status,
   documentId,
   undelivered,
   searching,
   truncated,
 }: {
   items: LogItem[];
-  /** Какая папка открыта — от неё зависит текст на пустом месте. */
-  list: MailList;
-  /** Выбранный материал: без него повтор недоставленных недоступен. */
+  /** Какое состояние отобрано — от него зависит текст на пустом месте. */
+  status: MailList;
+  /** Выбранный документ: без него повтор недоставленных недоступен. */
   documentId: string;
   undelivered: number;
   /** Стоит ли поиск или отрезок времени — тогда пустота о них, а не о папке. */
@@ -35,95 +38,107 @@ export function MailingLogTable({
   truncated: boolean;
 }) {
   const resend = useResendFailed();
-  const empty = letterList(list);
+  const empty = letterList(status);
+
+  async function resendAll() {
+    try {
+      const result = await resend.mutateAsync(documentId);
+      toast({
+        title: `Поставлено в очередь заново: ${result.queued}`,
+        description:
+          result.skipped.length > 0
+            ? `Не повторяли ${result.skipped.length}: адрес надо исправить в таблице`
+            : undefined,
+        tone: 'ok',
+      });
+    } catch (err) {
+      toast({ title: 'Повторить не удалось', description: errorText(err), tone: 'danger' });
+    }
+  }
 
   return (
     <div className="space-y-4">
-      {/* Повторить можно только по одному материалу: «переотправить всё
+      {/* Повторить можно только по одному документу: «переотправить всё
           вообще» — это рассылка вслепую по всем прошлым выпускам. */}
       {documentId && undelivered > 0 && (
-        <div className="flex flex-wrap items-center gap-3 rounded-xl bg-[var(--danger-soft)] px-4 py-3 text-sm">
-          <span>
-            Не доставлено писем: <b>{undelivered}</b>
+        <Card tone="info" padding="sm" className="flex flex-wrap items-center gap-3 text-sm">
+          <span className="flex-1">
+            Не доставлено писем: <b className="tabular">{undelivered}</b>
           </span>
-          <Button
-            icon={<RefreshCw size={15} />}
-            onClick={() => resend.mutate(documentId)}
-            disabled={resend.isPending}
-          >
+          <Button size="sm" icon={<RefreshCw size={16} />} loading={resend.isPending} onClick={() => void resendAll()}>
             Отправить повторно
           </Button>
-        </div>
+        </Card>
       )}
 
-      {resend.isSuccess && (
-        <div className="rounded-xl bg-[var(--surface-sunken)] p-4 text-sm">
-          <p>Поставлено в очередь заново: {resend.data.queued}</p>
-          {resend.data.skipped.length > 0 && (
-            <>
-              <p className="mt-2 text-[var(--text-muted)]">
-                Не повторяли — повтор ничего не изменит, адрес надо исправить в таблице:
-              </p>
-              <ul className="mt-1 space-y-1">
-                {resend.data.skipped.map((item) => (
-                  <li key={item.email}>
-                    {item.email} — {item.reason}
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-        </div>
-      )}
-
-      {resend.isError && (
-        <p className="text-sm text-[var(--danger)]">{errorText(resend.error)}</p>
+      {resend.isSuccess && resend.data.skipped.length > 0 && (
+        <Card padding="sm" className="text-sm">
+          <p className="text-muted">Не повторяли — повтор ничего не изменит, адрес надо исправить в таблице:</p>
+          <ul className="mt-1 space-y-1">
+            {resend.data.skipped.map((item) => (
+              <li key={item.email}>
+                {item.email} — {item.reason}
+              </li>
+            ))}
+          </ul>
+        </Card>
       )}
 
       {items.length === 0 ? (
-        <Empty
-          title={searching ? 'Ничего не нашлось' : (empty?.emptyTitle ?? 'Писем нет')}
-          hint={
-            searching
-              ? 'Попробуйте другой запрос или другой отрезок времени.'
-              : (empty?.emptyHint ?? '')
-          }
-        />
+        <Card padding="none">
+          {searching ? (
+            <NextAction
+              compact
+              icon={Mail}
+              title="Ничего не нашлось"
+              text="Попробуйте другой запрос или другой отрезок времени."
+            />
+          ) : status === 'all' ? (
+            <NextAction
+              icon={Mail}
+              title="Разошлите первые документы"
+              text="Письма участникам уходят с шага «Выпуск» у документа. Их доставка появится здесь."
+              primary={{ label: 'К документам', to: '/documents' }}
+            />
+          ) : (
+            <NextAction compact icon={Mail} title={empty?.emptyTitle ?? 'Писем нет'} text={empty?.emptyHint} />
+          )}
+        </Card>
       ) : (
-        <>
-        {/* На телефоне — карточками: таблица в 832 точки уезжала вбок,
-            и состояние письма — то, ради чего сюда смотрят, — было за краем. */}
-        <ul className="divide-y divide-[var(--line)] overflow-hidden rounded-2xl ring-1 ring-[var(--line)] md:hidden">
-          {items.map((item) => (
-            <CardRow key={item.id} item={item} />
-          ))}
-        </ul>
-        <div className="overflow-x-auto rounded-2xl ring-1 ring-[var(--line)] max-md:hidden">
-          <table className="w-full min-w-[52rem] text-sm">
-            <thead className="bg-[var(--surface-sunken)] text-left text-[var(--text-muted)]">
-              <tr>
-                <th className="px-4 py-2 font-medium">Получатель</th>
-                <th className="px-4 py-2 font-medium">Письмо</th>
-                <th className="px-4 py-2 font-medium">Материал</th>
-                <th className="px-4 py-2 font-medium">Когда</th>
-                <th className="px-4 py-2 font-medium">Состояние</th>
-              </tr>
-            </thead>
-            <tbody>
+        <Card padding="none" className="overflow-hidden">
+          <Table
+            caption="Письма"
+            cards={
+              <ul className="divide-y divide-line">
+                {items.map((item) => (
+                  <CardRow key={item.id} item={item} />
+                ))}
+              </ul>
+            }
+          >
+            <THead>
+              <Tr>
+                <Th>Получатель</Th>
+                <Th>Письмо</Th>
+                <Th>Документ</Th>
+                <Th>Когда</Th>
+                <Th>Состояние</Th>
+              </Tr>
+            </THead>
+            <TBody>
               {items.map((item) => (
                 <Row key={item.id} item={item} />
               ))}
-            </tbody>
-          </table>
-        </div>
-        </>
+            </TBody>
+          </Table>
+        </Card>
       )}
 
       {truncated && (
-        <p className="text-sm text-[var(--text-muted)]">
+        <p className="text-sm text-muted">
           {searching
             ? 'Показаны последние 200 найденных писем — уточните поиск.'
-            : 'Раздел показывает последние 200 писем. Найдите нужное поиском или выберите материал в нижней строке.'}
+            : 'Показаны последние 200 писем. Найдите нужное поиском или выберите документ.'}
         </p>
       )}
     </div>
@@ -140,104 +155,70 @@ const STATUS_ICONS: Record<LogItem['status'], LucideIcon> = {
   failed: X,
 };
 
-const TONE_COLORS = {
-  neutral: 'bg-[var(--surface-sunken)] text-[var(--text-muted)]',
-  progress: 'bg-[var(--award-soft)] text-[var(--award)]',
-  done: 'bg-[var(--ok-soft)] text-[var(--ok)]',
-  danger: 'bg-[var(--danger-soft)] text-[var(--danger)]',
-} as const;
+const TONES: Record<ReturnType<typeof statusTone>, BadgeTone> = {
+  neutral: 'neutral',
+  progress: 'info',
+  done: 'ok',
+  danger: 'danger',
+};
+
+function StatusBadge({ item }: { item: LogItem }) {
+  const Icon = STATUS_ICONS[item.status];
+  return (
+    <Badge tone={TONES[statusTone(item.status)]}>
+      <Icon size={12} strokeWidth={2.5} aria-hidden />
+      {STATUS_LABELS[item.status]}
+    </Badge>
+  );
+}
 
 /** Письмо на телефоне: кому и состояние — первой строкой, тема и время — второй. */
 function CardRow({ item }: { item: LogItem }) {
-  const Icon = STATUS_ICONS[item.status];
   return (
     <li className="flex flex-col gap-1 px-4 py-3">
       <span className="flex items-center justify-between gap-3">
-        <span className="min-w-0 truncate text-[15px] font-medium">{item.toEmail}</span>
-        <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${TONE_COLORS[statusTone(item.status)]}`}>
-          <Icon size={12} strokeWidth={2} />
-          {STATUS_LABELS[item.status]}
-        </span>
+        <span className="min-w-0 truncate text-base font-medium">{item.toEmail}</span>
+        <StatusBadge item={item} />
       </span>
-      <span className="truncate text-[13px] text-[var(--text-muted)]">{item.subject}</span>
-      <span className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
-        <span className="tabular-nums">{formatLetterTime(item.sentAt ?? item.queuedAt)}</span>
+      <span className="truncate text-sm text-muted">{item.subject}</span>
+      <span className="flex items-center gap-2 text-xs text-muted">
+        <span className="tabular">{formatLetterTime(item.sentAt ?? item.queuedAt)}</span>
         {item.documentTitle && <span className="min-w-0 truncate">· {item.documentTitle}</span>}
       </span>
-      {item.problem && <span className="text-[13px] text-[var(--danger)]">{item.problem.reason}</span>}
+      {item.problem && <span className="text-sm text-danger">{item.problem.reason}</span>}
     </li>
   );
 }
 
 function Row({ item }: { item: LogItem }) {
-  const tone = statusTone(item.status);
-  const colors = {
-    neutral: 'bg-[var(--surface-sunken)] text-[var(--text-muted)]',
-    progress: 'bg-[var(--award-soft)] text-[var(--award)]',
-    done: 'bg-[var(--ok-soft)] text-[var(--ok)]',
-    danger: 'bg-[var(--danger-soft)] text-[var(--danger)]',
-  } as const;
-  const Icon = STATUS_ICONS[item.status];
-
   return (
-    <tr className="border-t border-[var(--line)] align-top transition-colors hover:bg-[var(--surface-sunken)]">
-      <td className="px-4 py-2.5">{item.toEmail}</td>
-      <td className="px-4 py-2.5">
+    <Tr className="align-top">
+      <Td className="h-auto py-2.5">{item.toEmail}</Td>
+      <Td className="h-auto py-2.5">
         <span className="block">{item.subject}</span>
-        {item.kind === 'marketing' && (
-          <span className="text-xs text-[var(--text-muted)]">реклама</span>
-        )}
-      </td>
-      <td className="px-4 py-2.5 text-[var(--text-muted)]">{item.documentTitle}</td>
+        {item.kind === 'marketing' && <span className="text-xs text-muted">реклама</span>}
+      </Td>
+      <Td className="h-auto py-2.5 text-muted">{item.documentTitle}</Td>
       {/* Время отправки, а не постановки в очередь: у ушедшего письма
           спрашивают, когда оно ушло. Пока оно ждёт очереди — когда встало. */}
-      <td className="tabular px-4 py-2.5 whitespace-nowrap text-[var(--text-muted)]">
+      <Td numeric className="h-auto py-2.5 whitespace-nowrap text-muted">
         {formatLetterTime(item.sentAt ?? item.queuedAt)}
-      </td>
-      <td className="px-4 py-2.5">
-        <span
-          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${colors[tone]}`}
-        >
-          <Icon size={13} strokeWidth={2} />
-          {STATUS_LABELS[item.status]}
-        </span>
+      </Td>
+      <Td className="h-auto py-2.5">
+        <StatusBadge item={item} />
         {item.problem && (
           <>
-            <p className="mt-1 text-[var(--text)]">{item.problem.reason}</p>
+            <p className="mt-1 text-ink">{item.problem.reason}</p>
             {item.problem.details && (
-              // Ответ шлюза нужен поддержке, а не человеку: под спойлером,
-              // чтобы не мешал читать понятную причину.
+              // Ответ шлюза нужен поддержке, а не человеку: под спойлером.
               <details className="mt-1">
-                <summary className="cursor-pointer text-xs text-[var(--text-muted)]">
-                  Ответ почтового сервера
-                </summary>
-                <p className="mt-1 font-mono text-xs break-words text-[var(--text-muted)]">
-                  {item.problem.details}
-                </p>
+                <summary className="cursor-pointer text-xs text-muted">Ответ почтового сервера</summary>
+                <p className="mt-1 font-mono text-xs break-words text-muted">{item.problem.details}</p>
               </details>
             )}
           </>
         )}
-      </td>
-    </tr>
-  );
-}
-
-/**
- * Пустая папка.
- *
- * Крупный знак и две строки посередине, а не строчка серым в углу: пустой
- * раздел человек видит в первый день работы, и он должен читаться как
- * «сюда придут письма», а не как «что-то сломалось».
- */
-function Empty({ title, hint }: { title: string; hint: string }) {
-  return (
-    <div className="px-6 py-16 text-center">
-      <span className="mx-auto mb-5 grid h-28 w-28 place-items-center rounded-full bg-[var(--surface-sunken)]">
-        <Mail size={44} strokeWidth={1.25} className="text-[var(--line-strong)]" />
-      </span>
-      <p className="text-lg font-medium">{title}</p>
-      <p className="mx-auto mt-2 max-w-sm text-sm text-[var(--text-muted)]">{hint}</p>
-    </div>
+      </Td>
+    </Tr>
   );
 }

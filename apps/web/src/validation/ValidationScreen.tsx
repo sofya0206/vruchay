@@ -1,16 +1,5 @@
 import { useMemo, useState } from 'react';
-import {
-  CheckCircle2,
-  ChevronRight,
-  CircleAlert,
-  Info,
-  ListChecks,
-  LoaderCircle,
-  ShieldCheck,
-  TriangleAlert,
-  Wand2,
-  X,
-} from 'lucide-react';
+import { CheckCircle2, ChevronRight, CircleAlert, Info, ListChecks, ShieldCheck, TriangleAlert, Wand2, X } from 'lucide-react';
 import {
   PROBLEM_KINDS,
   quotaFits,
@@ -21,8 +10,16 @@ import {
 } from '@gramota/shared';
 import { useValidation, useValidationFixes, type CellFix } from '../api/validation';
 import { DiscussTermsLink } from '../billing/DiscussTermsLink';
+import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
+import { Card } from '../ui/Card';
+import { ErrorBar } from '../ui/ErrorState';
 import { Input } from '../ui/Field';
+import { IconButton } from '../ui/IconButton';
+import { NextAction } from '../ui/NextAction';
+import { TBody, THead, Table, Td, Th, Tr } from '../ui/Table';
+import { Segmented } from '../ui/Tabs';
+import { cn } from '../ui/cn';
 import { errorText } from '../api/client';
 
 /**
@@ -42,7 +39,7 @@ export function ValidationScreen({
   onDone,
 }: {
   documentId: string;
-  /** Проверка пройдена — можно возвращаться к выпуску. */
+  /** Проверка пройдена — дальше по шагам, к письму. */
   onDone: () => void;
 }) {
   const validation = useValidation(documentId);
@@ -86,7 +83,28 @@ export function ValidationScreen({
 
   if (!report) {
     return (
-      <Intro onRun={() => void run()} busy={validation.isPending} error={error} />
+      <div className="mx-auto w-full max-w-2xl p-6">
+        {error && <ErrorBar className="mb-4">{error}</ErrorBar>}
+        <Card padding="none">
+          <NextAction
+            icon={ShieldCheck}
+            title="Проверьте строки до выпуска"
+            text="Пройдём по каждой отмеченной строке и посмотрим, что случится на печати: влезет ли фамилия, не пустое ли обязательное поле, нет ли повторов, дойдёт ли письмо. Ничего не выпускаем и не меняем — только показываем."
+            primary={
+              <Button
+                variant="primary"
+                size="lg"
+                icon={<ListChecks size={16} />}
+                loading={validation.isPending}
+                onClick={() => void run()}
+                data-tour="check-run"
+              >
+                Проверить отмеченные
+              </Button>
+            }
+          />
+        </Card>
+      </div>
     );
   }
 
@@ -104,14 +122,20 @@ export function ValidationScreen({
         onDone={onDone}
       />
 
-      {error && (
-        <p role="alert" className="border-b border-[var(--line)] px-4 py-2 text-sm text-[var(--danger)]">
-          {error}
-        </p>
-      )}
+      {error && <ErrorBar className="mx-4 mt-3">{error}</ErrorBar>}
 
       {report.rows.length === 0 ? (
-        <AllClean total={report.total} onDone={onDone} />
+        <div className="mx-auto w-full max-w-2xl p-6">
+          <Card padding="none">
+            <NextAction
+              icon={CheckCircle2}
+              title="Замечаний нет — можно дальше"
+              text={`Проверили ${report.total} ${plural(report.total, 'строку', 'строки', 'строк')} — всё на месте.`}
+              primary={{ label: 'Дальше: Письмо', onClick: onDone }}
+              secondary={{ label: 'Проверить ещё раз', onClick: () => void run() }}
+            />
+          </Card>
+        </div>
       ) : (
         <>
           <Filters report={report} value={filter} onChange={setFilter} />
@@ -124,67 +148,6 @@ export function ValidationScreen({
           />
         </>
       )}
-    </div>
-  );
-}
-
-/** Первый экран: объясняем, что проверка делает, до того как её запустили. */
-function Intro({
-  onRun,
-  busy,
-  error,
-}: {
-  onRun: () => void;
-  busy: boolean;
-  error: string | null;
-}) {
-  return (
-    <div className="flex min-h-0 flex-1 items-center justify-center p-6">
-      <div className="max-w-md text-center">
-        <ShieldCheck size={40} className="mx-auto text-[var(--accent)]" />
-        <h2 className="mt-4 font-serif text-xl">Проверить все строки до выпуска</h2>
-        <p className="mt-2 text-sm text-[var(--text-muted)]">
-          Пройдём по каждой строке и посмотрим, что случится на печати: влезет ли
-          фамилия в блок, не пустое ли обязательное поле, нет ли повторов, дойдёт ли
-          письмо. Ничего не выпускаем и не меняем — просто смотрим.
-        </p>
-
-        {error && (
-          <p role="alert" className="mt-4 text-sm text-[var(--danger)]">
-            {error}
-          </p>
-        )}
-
-        <Button variant="primary" className="mt-5" onClick={onRun} disabled={busy}>
-          {busy ? (
-            <>
-              <LoaderCircle size={16} className="animate-spin" /> Проверяем…
-            </>
-          ) : (
-            <>
-              <ListChecks size={16} /> Проверить отмеченные строки
-            </>
-          )}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function AllClean({ total, onDone }: { total: number; onDone: () => void }) {
-  return (
-    <div className="flex min-h-0 flex-1 items-center justify-center p-6">
-      <div className="max-w-sm text-center">
-        <CheckCircle2 size={40} className="mx-auto text-[var(--accent)]" />
-        <h2 className="mt-4 font-serif text-xl">Замечаний нет</h2>
-        <p className="mt-2 text-sm text-[var(--text-muted)]">
-          Проверили <span className="tabular">{total}</span>{' '}
-          {plural(total, 'строку', 'строки', 'строк')} — всё на месте.
-        </p>
-        <Button variant="primary" className="mt-5" onClick={onDone}>
-          Дальше — к подлинности
-        </Button>
-      </div>
     </div>
   );
 }
@@ -205,31 +168,28 @@ function Summary({
   const warnings = report.rows.length - report.blocked;
 
   return (
-    <div className="border-b border-[var(--line)] bg-[var(--surface)]">
+    <div className="border-b border-line bg-surface">
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3">
-        <Stat value={report.clean} label="без замечаний" tone="ok" />
-        {report.blocked > 0 && <Stat value={report.blocked} label="нельзя выпускать" tone="bad" />}
-        {warnings > 0 && <Stat value={warnings} label="стоит посмотреть" tone="warn" />}
+        <Count value={report.clean} label="без замечаний" tone="ok" />
+        {report.blocked > 0 && <Count value={report.blocked} label="нельзя выпускать" tone="danger" />}
+        {warnings > 0 && <Count value={warnings} label="стоит посмотреть" tone="warn" />}
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          <Button size="sm" onClick={onRecheck} disabled={busy}>
-            {busy ? <LoaderCircle size={14} className="animate-spin" /> : null}
+          <Button size="sm" loading={busy} onClick={onRecheck}>
             Проверить заново
           </Button>
           {report.blocked > 0 ? (
             /*
              * Кнопка снимает отметки и на этом останавливается — выпуск
-             * человек запускает сам на вкладке получателей. Прежнее
-             * «Выпустить только чистые» обещало выпуск, которого не было:
-             * человек нажимал, видел, что список поредел, и уходил в полной
-             * уверенности, что грамоты создаются.
+             * человек запускает сам на шаге выпуска. Прежнее «Выпустить
+             * только чистые» обещало выпуск, которого не было.
              */
-            <Button size="sm" variant="primary" onClick={onUncheckBlocked} disabled={busy}>
+            <Button size="sm" variant="primary" disabled={busy} onClick={onUncheckBlocked}>
               Снять отметки с проблемных строк: {report.blocked}
             </Button>
           ) : (
-            <Button size="sm" variant="primary" onClick={onDone} disabled={busy}>
-              Вернуться к выпуску
+            <Button size="sm" variant="primary" disabled={busy} onClick={onDone} icon={<ChevronRight size={16} />}>
+              Дальше: Письмо
             </Button>
           )}
         </div>
@@ -241,16 +201,12 @@ function Summary({
   );
 }
 
-function Stat({ value, label, tone }: { value: number; label: string; tone: 'ok' | 'warn' | 'bad' }) {
-  const colors = {
-    ok: 'text-[var(--accent)]',
-    warn: 'text-[var(--award)]',
-    bad: 'text-[var(--danger)]',
-  } as const;
+function Count({ value, label, tone }: { value: number; label: string; tone: 'ok' | 'warn' | 'danger' }) {
+  const colors = { ok: 'text-ok', warn: 'text-warn', danger: 'text-danger' } as const;
   return (
     <span className="flex items-baseline gap-1.5">
-      <span className={`tabular text-lg font-medium ${colors[tone]}`}>{value}</span>
-      <span className="text-sm text-[var(--text-muted)]">{label}</span>
+      <span className={cn('tabular text-lg font-medium', colors[tone])}>{value}</span>
+      <span className="text-sm text-muted">{label}</span>
     </span>
   );
 }
@@ -260,7 +216,8 @@ function Stat({ value, label, tone }: { value: number; label: string; tone: 'ok'
  *
  * Узнать об исчерпанной пробе на сорок седьмом документе из пятидесяти —
  * это уже испорченное награждение, и здесь у нас последняя возможность
- * сказать об этом заранее.
+ * сказать об этом заранее. Доплаты не предлагаем — выпуска сверх предела
+ * в сервисе нет; путь дальше один — разговор об условиях.
  */
 function QuotaLine({ quota }: { quota: BatchValidation['quota'] }) {
   if (quota.plan === 'paid' || quota.limit === null) return null;
@@ -269,65 +226,43 @@ function QuotaLine({ quota }: { quota: BatchValidation['quota'] }) {
 
   if (quotaFits(quota)) {
     return (
-      <p className="border-t border-[var(--line)] px-4 py-2 text-sm text-[var(--text-muted)]">
+      <p className="border-t border-line px-4 py-2 text-sm text-muted">
         Бесплатная проба: останется <span className="tabular">{left - quota.adding}</span> из{' '}
         <span className="tabular">{quota.limit}</span> документов.
       </p>
     );
   }
 
-  /*
-   * Не хватает — так и пишем.
-   *
-   * Никакой доплаты здесь не предлагается: выпуска сверх предела в сервисе
-   * нет, кнопка «Создать документы» на этом же наборе строк ответит отказом.
-   * Раньше тут стояла доплата за документы сверх предела — обещание,
-   * которого продукт не выполняет, и человек упирался в отказ уже после того,
-   * как поверил проверке.
-   *
-   * Но и тупика быть не должно: рядом с отказом стоит путь дальше —
-   * разговор об условиях. Он единственный: цен у сервиса нет, купить
-   * себе предел кнопкой человек не может.
-   */
   return (
-    <p className="flex flex-wrap items-baseline gap-x-1.5 border-t border-[var(--line)] bg-[var(--award-soft)] px-4 py-2 text-sm">
-      <TriangleAlert size={14} className="self-center text-[var(--award)]" />
+    <p className="flex flex-wrap items-baseline gap-x-1.5 border-t border-line bg-warn-soft px-4 py-2 text-sm">
+      <TriangleAlert size={16} className="self-center text-warn" aria-hidden />
       <span>
         Отмечено <span className="tabular font-medium">{quota.adding}</span>{' '}
         {plural(quota.adding, 'строка', 'строки', 'строк')}, а на бесплатной пробе доступно{' '}
-        <span className="tabular font-medium">{left}</span>{' '}
-        {plural(left, 'документ', 'документа', 'документов')} из{' '}
-        <span className="tabular">{quota.limit}</span>. Выпуск не начнётся: снимите лишние
-        отметки или <DiscussTermsLink>обсудите условия под ваш объём</DiscussTermsLink>.
+        <span className="tabular font-medium">{left}</span> {plural(left, 'документ', 'документа', 'документов')} из{' '}
+        <span className="tabular">{quota.limit}</span>. Выпуск не начнётся: снимите лишние отметки или{' '}
+        <DiscussTermsLink>обсудите условия под ваш объём</DiscussTermsLink>.
       </span>
     </p>
   );
 }
 
 /**
- * Чего проверка не знает.
- *
- * Показываем, а не прячем. Проверка, молчащая о своих границах, внушает
- * больше доверия, чем заслуживает, — и человек перестаёт смотреть грамоты
- * сам, положившись на неё там, где она не отвечает.
+ * Чего проверка не знает. Показываем, а не прячем: проверка, молчащая
+ * о своих границах, внушает больше доверия, чем заслуживает.
  */
 function Caveats({ items }: { items: string[] }) {
   const [open, setOpen] = useState(false);
   if (!items.length) return null;
 
   return (
-    <div className="border-t border-[var(--line)] px-4 py-2">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text)]"
-      >
-        <Info size={13} />
+    <div className="border-t border-line px-3 py-1.5">
+      <Button variant="ghost" size="sm" onClick={() => setOpen(!open)} aria-expanded={open} icon={<Info size={16} />}>
         Что проверка не смотрела ({items.length})
-        <ChevronRight size={13} className={open ? 'rotate-90 transition-transform' : 'transition-transform'} />
-      </button>
+        <ChevronRight size={16} className={cn('transition-transform', open && 'rotate-90')} aria-hidden />
+      </Button>
       {open && (
-        <ul className="mt-2 space-y-1 pl-5 text-xs text-[var(--text-muted)]">
+        <ul className="mt-1 space-y-1 pl-9 text-xs text-muted">
           {items.map((item, i) => (
             <li key={i} className="list-disc">
               {item}
@@ -360,40 +295,17 @@ function Filters({
   }, [report]);
 
   return (
-    <div className="flex flex-wrap gap-1.5 border-b border-[var(--line)] px-4 py-2">
-      <Chip active={value === 'all'} onClick={() => onChange('all')}>
-        Все замечания ({report.rows.length})
-      </Chip>
-      {counts.map(([code, count]) => (
-        <Chip key={code} active={value === code} onClick={() => onChange(code)}>
-          {PROBLEM_KINDS[code].title} ({count})
-        </Chip>
-      ))}
+    <div className="border-b border-line px-4 py-2">
+      <Segmented
+        label="Замечания"
+        value={value}
+        onChange={onChange}
+        items={[
+          { id: 'all' as const, label: 'Все', count: report.rows.length },
+          ...counts.map(([code, count]) => ({ id: code, label: PROBLEM_KINDS[code].title, count })),
+        ]}
+      />
     </div>
-  );
-}
-
-function Chip({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-full px-2.5 py-1 text-xs transition-colors ${
-        active
-          ? 'bg-[var(--accent)] text-[var(--accent-contrast)]'
-          : 'bg-[var(--surface-sunken)] text-[var(--text-muted)] hover:text-[var(--text)]'
-      }`}
-    >
-      {children}
-    </button>
   );
 }
 
@@ -416,19 +328,15 @@ function ProblemTable({
   const [shown, setShown] = useState(PAGE);
 
   const rows = useMemo(
-    () =>
-      filter === 'all'
-        ? report.rows
-        : report.rows.filter((r) => r.problems.some((p) => p.code === filter)),
+    () => (filter === 'all' ? report.rows : report.rows.filter((r) => r.problems.some((p) => p.code === filter))),
     [report, filter],
   );
 
   /**
    * Одинаковые правки во всём списке — то, ради чего экран и нужен.
-   *
    * «ФИО прописными» в выгрузке из протокола встречается не в одной строке,
-   * а во всех трёхстах, и чинить их по одной — это ровно тот ручной труд,
-   * от которого сервис избавляет.
+   * а во всех трёхстах, и чинить их по одной — ручной труд, от которого
+   * сервис избавляет.
    */
   const bulk = useMemo(() => {
     const map = new Map<ProblemCode, CellFix[]>();
@@ -445,53 +353,37 @@ function ProblemTable({
 
   return (
     <div className="min-h-0 flex-1 overflow-auto">
-      {/* Предложения, применимые сразу ко многим строкам. */}
-      {[...bulk].filter(([, fixes]) => fixes.length > 1).map(([code, fixes]) => (
-        <div
-          key={code}
-          className="flex flex-wrap items-center gap-2 border-b border-[var(--line)] bg-[var(--accent-soft)] px-4 py-2 text-sm"
-        >
-          <Wand2 size={15} className="text-[var(--accent)]" />
-          <span>
-            «{PROBLEM_KINDS[code].title}» — в {fixes.length}{' '}
-            {plural(fixes.length, 'строке', 'строках', 'строках')}. Исправление
-            подставляется однозначно.
-          </span>
-          <Button
-            size="sm"
-            variant="primary"
-            className="ml-auto"
-            disabled={busy}
-            onClick={() => onFix(fixes)}
-          >
-            Исправить все {fixes.length}
-          </Button>
-        </div>
-      ))}
+      {[...bulk]
+        .filter(([, fixes]) => fixes.length > 1)
+        .map(([code, fixes]) => (
+          <div key={code} className="flex flex-wrap items-center gap-2 border-b border-line bg-accent-soft px-4 py-2 text-sm">
+            <Wand2 size={16} className="text-accent" aria-hidden />
+            <span>
+              «{PROBLEM_KINDS[code].title}» — в {fixes.length} {plural(fixes.length, 'строке', 'строках', 'строках')}.
+              Исправление подставляется однозначно.
+            </span>
+            <Button size="sm" className="ml-auto" disabled={busy} onClick={() => onFix(fixes)}>
+              Исправить все {fixes.length}
+            </Button>
+          </div>
+        ))}
 
-      <table className="w-full border-collapse text-sm">
-        <thead className="sticky top-0 z-10 bg-[var(--surface-sunken)] text-left">
-          <tr className="text-xs tracking-wide text-[var(--text-muted)] uppercase">
-            {/* Имя занимает больше номера: по нему строку и узнают в лицо,
-                а в три строки завёрнутое «Иванов Пётр Ильич» не читается. */}
-            <th className="w-56 px-4 py-2 font-medium">Строка</th>
-            <th className="w-44 px-3 py-2 font-medium">Проблема</th>
-            <th className="px-3 py-2 font-medium">Причина</th>
-            <th className="w-64 px-3 py-2 font-medium">Что сделать</th>
-          </tr>
-        </thead>
-        <tbody>
+      <Table caption="Замечания по строкам" stickyHeader={false}>
+        <THead>
+          <Tr>
+            {/* Имя занимает больше номера: по нему строку и узнают в лицо. */}
+            <Th className="w-56">Строка</Th>
+            <Th className="w-44">Проблема</Th>
+            <Th>Причина</Th>
+            <Th className="w-72">Что сделать</Th>
+          </Tr>
+        </THead>
+        <TBody>
           {rows.slice(0, shown).map((row) => (
-            <RowBlock
-              key={row.rowId}
-              row={row}
-              busy={busy}
-              onFix={onFix}
-              onExclude={() => onExclude([row.rowId])}
-            />
+            <RowBlock key={row.rowId} row={row} busy={busy} onFix={onFix} onExclude={() => onExclude([row.rowId])} />
           ))}
-        </tbody>
-      </table>
+        </TBody>
+      </Table>
 
       {rows.length > shown && (
         <div className="p-4 text-center">
@@ -518,44 +410,28 @@ function RowBlock({
   return (
     <>
       {row.problems.map((problem, index) => (
-        <tr
-          key={`${problem.code}-${index}`}
-          className={`border-b border-[var(--line)] align-top ${
-            index === 0 ? '' : 'border-t-0'
-          }`}
-        >
-          {/* Номер и имя пишем один раз на строку списка, а не на каждое
-              её замечание: иначе таблица читается как перечень повторов. */}
+        <Tr key={`${problem.code}-${index}`} className="align-top">
+          {/* Номер и имя пишем один раз на строку списка, а не на каждое замечание. */}
           {index === 0 ? (
-            <td className="px-4 py-2.5" rowSpan={row.problems.length}>
+            <Td className="h-auto py-2.5" rowSpan={row.problems.length}>
               <span className="tabular font-medium">{row.position}</span>
-              <span className="mt-0.5 block text-xs break-words text-[var(--text-muted)]">
-                {row.title}
-              </span>
-            </td>
+              <span className="mt-0.5 block text-xs break-words text-muted">{row.title}</span>
+            </Td>
           ) : null}
 
-          <td className="px-3 py-2.5">
+          <Td className="h-auto py-2.5">
             <ProblemBadge code={problem.code} />
-          </td>
+          </Td>
 
-          <td className="px-3 py-2.5">
+          <Td className="h-auto py-2.5">
             <span className="block break-words">{problem.detail}</span>
-            <span className="mt-0.5 block text-xs text-[var(--text-muted)]">
-              {PROBLEM_KINDS[problem.code].consequence}
-            </span>
-          </td>
+            <span className="mt-0.5 block text-xs text-muted">{PROBLEM_KINDS[problem.code].consequence}</span>
+          </Td>
 
-          <td className="px-3 py-2.5">
-            <Action
-              row={row}
-              problem={problem}
-              busy={busy}
-              onFix={onFix}
-              onExclude={index === 0 ? onExclude : undefined}
-            />
-          </td>
-        </tr>
+          <Td className="h-auto py-2.5">
+            <Action row={row} problem={problem} busy={busy} onFix={onFix} onExclude={index === 0 ? onExclude : undefined} />
+          </Td>
+        </Tr>
       ))}
     </>
   );
@@ -565,16 +441,10 @@ function ProblemBadge({ code }: { code: ProblemCode }) {
   const kind = PROBLEM_KINDS[code];
   const blocking = kind.severity === 'blocker';
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium ${
-        blocking
-          ? 'bg-[var(--danger-soft)] text-[var(--danger)]'
-          : 'bg-[var(--award-soft)] text-[var(--award)]'
-      }`}
-    >
-      {blocking ? <CircleAlert size={12} /> : <TriangleAlert size={12} />}
+    <Badge tone={blocking ? 'danger' : 'warn'}>
+      {blocking ? <CircleAlert size={12} aria-hidden /> : <TriangleAlert size={12} aria-hidden />}
       {kind.title}
-    </span>
+    </Badge>
   );
 }
 
@@ -606,42 +476,31 @@ function Action({
     return onExclude ? <ExcludeButton busy={busy} onClick={onExclude} /> : null;
   }
 
+  const commit = () => {
+    onFix([{ rowId: row.rowId, column: problem.column!, value }]);
+    setEditing(false);
+  };
+
   if (editing) {
     return (
       <div className="flex items-center gap-1.5">
         <Input
           autoFocus
+          compact
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Escape') setEditing(false);
-            if (e.key === 'Enter') {
-              onFix([{ rowId: row.rowId, column: problem.column!, value }]);
-              setEditing(false);
-            }
+            if (e.key === 'Enter') commit();
           }}
-          className="py-1 text-sm"
           aria-label={`Новое значение колонки «${problem.column}»`}
         />
-        <Button
-          size="sm"
-          variant="primary"
-          disabled={busy}
-          onClick={() => {
-            onFix([{ rowId: row.rowId, column: problem.column!, value }]);
-            setEditing(false);
-          }}
-        >
+        <Button size="sm" variant="primary" disabled={busy} onClick={commit}>
           ОК
         </Button>
-        <button
-          type="button"
-          onClick={() => setEditing(false)}
-          aria-label="Отменить правку"
-          className="text-[var(--text-muted)] hover:text-[var(--text)]"
-        >
+        <IconButton size="sm" label="Отменить правку" onClick={() => setEditing(false)}>
           <X size={16} />
-        </button>
+        </IconButton>
       </div>
     );
   }
@@ -651,18 +510,15 @@ function Action({
       {problem.suggestion && (
         <Button
           size="sm"
-          variant="primary"
           disabled={busy}
-          onClick={() =>
-            onFix([{ rowId: row.rowId, column: problem.column!, value: problem.suggestion! }])
-          }
+          icon={<Wand2 size={16} />}
+          onClick={() => onFix([{ rowId: row.rowId, column: problem.column!, value: problem.suggestion! }])}
           title={`Заменить на «${problem.suggestion}»`}
         >
-          <Wand2 size={13} />
           <span className="max-w-40 truncate">{problem.suggestion}</span>
         </Button>
       )}
-      <Button size="sm" disabled={busy} onClick={() => setEditing(true)}>
+      <Button size="sm" variant="ghost" disabled={busy} onClick={() => setEditing(true)}>
         Исправить
       </Button>
       {onExclude && <ExcludeButton busy={busy} onClick={onExclude} />}

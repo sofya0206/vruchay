@@ -56,7 +56,7 @@ export function DeleteAccount() {
       {blocked && (
         <ul className="mt-3 space-y-2">
           {list.map((text) => (
-            <li key={text} className="rounded-lg bg-[var(--warn-soft)] px-3 py-2 text-sm text-[var(--text)]">
+            <li key={text} className="rounded-control bg-warn-soft px-3 py-2 text-sm text-ink">
               {text}
             </li>
           ))}
@@ -65,7 +65,7 @@ export function DeleteAccount() {
 
       {!blocked && open && (
         <form
-          className="mt-4 max-w-sm space-y-3 border-t border-[var(--line)] pt-4"
+          className="mt-4 max-w-sm space-y-3 border-t border-line pt-4"
           onSubmit={(e) => {
             e.preventDefault();
             if (password.length === 0) return;

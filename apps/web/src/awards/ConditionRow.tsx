@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import type { AwardCondition, AwardOp, AwardStatus } from '@gramota/shared';
 import { AWARD_STATUSES, AWARD_STATUS_TITLES } from '@gramota/shared';
 import { Checkbox } from '../ui/Checkbox';
+import { IconButton } from '../ui/IconButton';
 import { Input } from '../ui/Field';
 import { NumberField } from '../ui/NumberField';
 import { Select } from '../ui/Select';
@@ -77,7 +78,7 @@ export function ConditionRow({ condition, columns, hasGroupColumn, onChange, onR
 
       {isPlace && (
         <label
-          className="flex items-center gap-1.5 text-sm text-[var(--text-muted)]"
+          className="flex items-center gap-1.5 text-sm text-muted"
           title={
             hasGroupColumn
               ? 'Пересчитать место среди строк той же группы. Нужно, когда нумерация в файле сквозная на весь протокол'
@@ -93,13 +94,9 @@ export function ConditionRow({ condition, columns, hasGroupColumn, onChange, onR
         </label>
       )}
 
-      <button
-        onClick={onRemove}
-        aria-label="Убрать условие"
-        className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
-      >
-        <X size={15} />
-      </button>
+      <IconButton size="sm" label="Убрать условие" onClick={onRemove}>
+        <X size={16} />
+      </IconButton>
     </div>
   );
 }
@@ -132,7 +129,7 @@ function ConditionValue({
     case 'placeBetween':
       return (
         <div className="flex items-center gap-2">
-          <span className="text-sm text-[var(--text-muted)]">с</span>
+          <span className="text-sm text-muted">с</span>
           <Sized width="w-20">
             <NumberField
               min={1}
@@ -147,7 +144,7 @@ function ConditionValue({
               }
             />
           </Sized>
-          <span className="text-sm text-[var(--text-muted)]">по</span>
+          <span className="text-sm text-muted">по</span>
           <Sized width="w-20">
             <NumberField
               min={1}
@@ -175,10 +172,10 @@ function ConditionValue({
                 key={status}
                 /* Кольцо фокуса здесь своё: сам вход спрятан, и общее
                    правило :focus-visible нарисовало бы его вокруг ничего. */
-                className={`cursor-pointer rounded-full px-2.5 py-1 text-xs ring-1 transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--focus)] ${
+                className={`cursor-pointer rounded-full px-2.5 py-1 text-xs ring-1 transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-focus ${
                   checked
-                    ? 'bg-[var(--award-soft)] text-[var(--award)] ring-transparent'
-                    : 'text-[var(--text-muted)] ring-[var(--line-strong)]'
+                    ? 'bg-info-soft text-info ring-transparent'
+                    : 'text-muted ring-line-strong'
                 }`}
               >
                 <input

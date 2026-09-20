@@ -60,7 +60,7 @@ export function VerifySettings({
         onChange={(checked) => onSave({ verifyEnabled: checked })}
         label={
           <span className="inline-flex items-center gap-1.5">
-            <QrCode size={15} className="text-[var(--text-muted)]" />
+            <QrCode size={16} className="text-muted" />
             Проверка по QR
           </span>
         }
@@ -68,17 +68,17 @@ export function VerifySettings({
 
       <div
         className={cn(
-          'rounded-2xl bg-[var(--ground)] p-3 transition-opacity',
+          'rounded-sheet bg-ground p-3 transition-opacity',
           !doc.verifyEnabled && 'pointer-events-none opacity-40',
         )}
         aria-hidden={!doc.verifyEnabled}
       >
-        <div className="rounded-xl bg-[var(--surface)] p-4 text-center shadow-sm ring-1 ring-[var(--line)]">
-          <BadgeCheck size={28} strokeWidth={1.5} className="mx-auto text-[var(--accent)]" />
+        <div className="rounded-card bg-surface p-4 text-center shadow-sm ring-1 ring-line">
+          <BadgeCheck size={24} strokeWidth={1.75} className="mx-auto text-accent" />
           <p className="mt-1.5 font-serif text-base">Документ подлинный</p>
-          <p className="truncate text-xs text-[var(--text-muted)]">{doc.title}</p>
+          <p className="truncate text-xs text-muted">{doc.title}</p>
 
-          <ul className="mt-3 space-y-0.5 border-t border-[var(--line)] pt-2 text-left text-xs">
+          <ul className="mt-3 space-y-0.5 border-t border-line pt-2 text-left text-xs">
             {columns.map((col) => {
               const shown = fields.includes(col.name);
               const label = FIELD_LABEL[col.name] ?? col.title ?? col.name;
@@ -90,21 +90,21 @@ export function VerifySettings({
                     aria-checked={shown}
                     aria-label={`${label}: ${shown ? 'видно' : 'скрыто'}`}
                     onClick={() => toggleField(col.name)}
-                    className="-mx-1.5 flex w-[calc(100%+0.75rem)] items-center gap-2 rounded-md px-1.5 py-1 transition-colors hover:bg-[var(--surface-sunken)]"
+                    className="-mx-1.5 flex w-[calc(100%+0.75rem)] items-center gap-2 rounded-control px-1.5 py-1 transition-colors hover:bg-sunken"
                   >
-                    <span className="shrink-0 text-[var(--text-muted)]">{label}</span>
+                    <span className="shrink-0 text-muted">{label}</span>
                     <span
                       className={cn(
                         'min-w-0 flex-1 truncate text-right font-medium',
-                        !shown && 'text-[var(--text-muted)] line-through decoration-[var(--line-strong)]',
+                        !shown && 'text-muted line-through decoration-line-strong',
                       )}
                     >
                       {shown ? (SAMPLE[col.name] ?? '…') : '••••••'}
                     </span>
                     {shown ? (
-                      <Eye size={14} className="shrink-0 text-[var(--accent)]" />
+                      <Eye size={16} className="shrink-0 text-accent" />
                     ) : (
-                      <EyeOff size={14} className="shrink-0 text-[var(--text-muted)]" />
+                      <EyeOff size={16} className="shrink-0 text-muted" />
                     )}
                   </button>
                 </li>
@@ -112,9 +112,9 @@ export function VerifySettings({
             })}
             {/* Дата выдачи видна всегда — без неё проверка ничего не подтверждает. */}
             <li className="flex items-center gap-2 px-0 py-1">
-              <span className="text-[var(--text-muted)]">Выдан</span>
+              <span className="text-muted">Выдан</span>
               <span className="tabular flex-1 text-right font-medium">17.06.2026</span>
-              <span className="size-3.5 shrink-0" />
+              <span className="size-4 shrink-0" />
             </li>
           </ul>
         </div>

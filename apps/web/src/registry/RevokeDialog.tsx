@@ -4,8 +4,8 @@ import { ShieldAlert } from 'lucide-react';
 import { api, ApiError } from '../api/client';
 import type { RegistryFilters, RevokePreview, RevokeTarget } from '../api/registry';
 import { Button } from '../ui/Button';
-import { Input, Label, Textarea } from '../ui/Field';
 import { Dialog } from '../ui/Dialog';
+import { Field, Input, Textarea } from '../ui/Field';
 import { plural } from './registry-format';
 
 /**
@@ -43,7 +43,7 @@ export function RevokeDialog({
       .then((data) => alive && setPreview(data))
       .catch(
         (err) =>
-          alive && setError(err instanceof ApiError ? err.message : 'Не удалось собрать список'),
+          alive && setError(err instanceof ApiError ? err.message : 'Список не собрался — попробуйте ещё раз'),
       );
     return () => {
       alive = false;
@@ -61,7 +61,7 @@ export function RevokeDialog({
       }),
     onSuccess: (result) => onDone(result.changed),
     onError: (err) =>
-      setError(err instanceof ApiError ? err.message : 'Не получилось — попробуйте ещё раз'),
+      setError(err instanceof ApiError ? err.message : 'Отзыв не прошёл — попробуйте ещё раз'),
   });
 
   const count = preview?.count ?? 0;
@@ -73,53 +73,51 @@ export function RevokeDialog({
   return (
     <Dialog
       title="Отозвать документы"
+      description="Страница проверки каждого станет красной: «документ отозван» с причиной ниже."
       onClose={onClose}
       footer={
         <>
-          <Button
-            variant="danger"
-            icon={<ShieldAlert size={14} />}
-            disabled={!confirmed || revoke.isPending}
-            onClick={() => revoke.mutate()}
-          >
-            {revoke.isPending ? 'Отзываем…' : `Отозвать ${count || ''}`}
-          </Button>
           <Button variant="ghost" onClick={onClose}>
             Отмена
+          </Button>
+          <Button
+            variant="danger"
+            icon={<ShieldAlert size={16} />}
+            disabled={!confirmed}
+            loading={revoke.isPending}
+            onClick={() => revoke.mutate()}
+          >
+            Отозвать {count || ''}
           </Button>
         </>
       }
     >
       <div className="space-y-4 text-sm">
         <p>
-          Будет отозвано: <strong>{scope}</strong>. Страница проверки каждого станет красной:
-          «документ отозван» с причиной ниже. Вернуть проверку можно, но проверяющие уже увидят
-          отзыв.
+          Будет отозвано: <strong>{scope}</strong>. Вернуть проверку можно, но проверяющие уже
+          увидят отзыв.
         </p>
 
         {error && (
-          <p role="alert" className="rounded-lg bg-[var(--danger-soft)] p-3 text-[var(--danger)]">
+          <p role="alert" className="rounded-control bg-danger-soft p-3 text-danger">
             {error}
           </p>
         )}
 
-        {preview === null && !error && <p className="text-[var(--text-muted)]">Собираем список…</p>}
+        {preview === null && !error && <p className="text-muted">Собираем список…</p>}
 
         {preview && (
-          <div className="rounded-xl bg-[var(--surface-sunken)] p-3">
+          <div className="rounded-card bg-sunken p-3">
             <p className="font-medium">
               {count > 0
                 ? `${count} ${plural(count, 'документ', 'документа', 'документов')}`
                 : 'По этому отбору ничего не найдено'}
               {preview.alreadyRevoked > 0 && (
-                <span className="font-normal text-[var(--text-muted)]">
-                  {' '}
-                  (уже отозвано: {preview.alreadyRevoked})
-                </span>
+                <span className="font-normal text-muted"> (уже отозвано: {preview.alreadyRevoked})</span>
               )}
             </p>
             {preview.sample.length > 0 && (
-              <ul className="mt-2 max-h-48 space-y-1 overflow-auto text-xs text-[var(--text-muted)]">
+              <ul className="mt-2 max-h-48 space-y-1 overflow-auto text-xs text-muted">
                 {preview.sample.map((item) => (
                   <li key={item.fileId} className="flex justify-between gap-3">
                     <span className="truncate">
@@ -134,21 +132,22 @@ export function RevokeDialog({
           </div>
         )}
 
-        <div>
-          <Label>Причина для проверяющих</Label>
+        <Field
+          label="Причина для проверяющих"
+          help="Её увидит любой, кто откроет страницу проверки. Без фамилии получателя."
+        >
           <Input
             value={reasonPublic}
             onChange={(e) => setReasonPublic(e.target.value)}
             maxLength={300}
             placeholder="Выдан по ошибке"
           />
-          <p className="mt-1 text-xs text-[var(--text-muted)]">
-            Её увидит любой, кто откроет страницу проверки. Без фамилии получателя.
-          </p>
-        </div>
+        </Field>
 
-        <div>
-          <Label>Внутренняя причина</Label>
+        <Field
+          label="Внутренняя причина"
+          help="Видна только владельцу и управляющему в карточке документа."
+        >
           <Textarea
             rows={2}
             value={reasonInternal}
@@ -156,24 +155,20 @@ export function RevokeDialog({
             maxLength={1000}
             placeholder="Перепутали протоколы, см. письмо главного судьи от 18.06"
           />
-          <p className="mt-1 text-xs text-[var(--text-muted)]">
-            Видна только владельцу и управляющему в карточке документа.
-          </p>
-        </div>
+        </Field>
 
         {count > 0 && (
-          <div>
-            <Label>Подтверждение</Label>
+          <Field
+            label="Подтверждение"
+            help={`Наберите число документов — ${count} — чтобы подтвердить отзыв.`}
+          >
             <Input
               value={typed}
               onChange={(e) => setTyped(e.target.value)}
               inputMode="numeric"
               placeholder={String(count)}
             />
-            <p className="mt-1 text-xs text-[var(--text-muted)]">
-              Наберите число документов — {count} — чтобы подтвердить отзыв.
-            </p>
-          </div>
+          </Field>
         )}
       </div>
     </Dialog>

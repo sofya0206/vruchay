@@ -78,12 +78,12 @@ export function NumberField({
           nudge(e.key === 'ArrowUp' ? 1 : -1);
         }}
         className={cn(
-          'tabular w-full rounded-lg text-[var(--text)] ring-1 ring-[var(--line)]',
-          'transition-colors outline-none placeholder:text-[var(--text-muted)]',
-          'focus:ring-2 focus:ring-[var(--focus)] disabled:opacity-40',
+          'tabular w-full rounded-control text-ink ring-1 ring-line',
+          'transition-colors outline-none placeholder:text-muted',
+          'focus:ring-2 focus:ring-focus disabled:opacity-40',
           compact
             ? 'h-8 bg-transparent py-0 pr-6 pl-2 text-sm'
-            : 'bg-[var(--surface)] py-2 pr-7 pl-3',
+            : 'bg-surface py-2 pr-7 pl-3',
         )}
       />
       <span
@@ -121,7 +121,7 @@ function Arrow({
       tabIndex={-1}
       disabled={disabled}
       onClick={onClick}
-      className="grid h-3.5 w-5 place-items-center rounded text-[var(--text-muted)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text)]"
+      className="grid h-3.5 w-5 place-items-center rounded text-muted hover:bg-sunken hover:text-ink"
     >
       <Icon size={12} strokeWidth={2.5} />
     </button>

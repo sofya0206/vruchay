@@ -61,7 +61,7 @@ function tabOf(slug: string): Tab {
 }
 
 const menuLink =
-  'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[15px] hover:bg-[var(--surface-sunken)] pointer-coarse:min-h-12';
+  'flex w-full items-center gap-2.5 rounded-control px-2.5 py-2 text-[15px] hover:bg-sunken pointer-coarse:min-h-12';
 
 /** `embedded` — внутри оболочки кабинета: без своей шапки, колонка липнет под шапку кабинета. */
 export function KnowledgeBasePage({ embedded = false }: { embedded?: boolean }) {
@@ -125,7 +125,7 @@ export function KnowledgeBasePage({ embedded = false }: { embedded?: boolean }) 
       <label className="relative block">
         <Search
           size={15}
-          className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-[var(--text-muted)]"
+          className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted"
         />
         <Input
           value={query}
@@ -140,8 +140,8 @@ export function KnowledgeBasePage({ embedded = false }: { embedded?: boolean }) 
   );
 
   const crumbs = page && !home && (
-    <span className="flex min-w-0 items-center gap-1.5 text-sm text-[var(--text-muted)]">
-      <Link to={BASE_PATH} className="shrink-0 hover:text-[var(--text)]">
+    <span className="flex min-w-0 items-center gap-1.5 text-sm text-muted">
+      <Link to={BASE_PATH} className="shrink-0 hover:text-ink">
         База знаний
       </Link>
       <ChevronRight size={14} className="shrink-0" />
@@ -158,7 +158,7 @@ export function KnowledgeBasePage({ embedded = false }: { embedded?: boolean }) 
             <PathLine method={page.meta.method} path={page.meta.path} />
           )}
           {endpoint && (
-            <div className="mt-3 flex flex-wrap gap-1.5 text-xs text-[var(--text-muted)]">
+            <div className="mt-3 flex flex-wrap gap-1.5 text-xs text-muted">
               {page.meta.auth && <Chip>{AUTH_LABEL[page.meta.auth] ?? page.meta.auth}</Chip>}
               {page.meta.roles && page.meta.roles !== 'any' && (
                 <Chip>роль: {page.meta.roles}</Chip>
@@ -201,20 +201,20 @@ export function KnowledgeBasePage({ embedded = false }: { embedded?: boolean }) 
       {/* Гостю шапка кабинета не показывается — своя, той же роли, чтобы
           липкие колонки считали место от неё. */}
       <div
-        className="flex min-h-full flex-1 flex-col bg-[var(--ground)]"
+        className="flex min-h-full flex-1 flex-col bg-ground"
         style={embedded ? undefined : ({ '--app-header': '57px' } as CSSProperties)}
       >
         {!embedded && (
-          <header className="sticky top-0 z-20 border-b border-[var(--line)] bg-[var(--surface)]">
+          <header className="sticky top-0 z-20 border-b border-line bg-surface">
             <div className="flex h-14 items-center gap-3 px-6">
               <Link
                 to="/"
-                className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)] hover:text-[var(--text)]"
+                className="inline-flex items-center gap-2 text-sm text-muted hover:text-ink"
               >
                 <ArrowLeft size={16} />
                 Вручай
               </Link>
-              <span className="text-[var(--line-strong)]">/</span>
+              <span className="text-line-strong">/</span>
               <Link to={BASE_PATH} className="text-sm font-medium">
                 База знаний
               </Link>
@@ -248,9 +248,9 @@ export function KnowledgeBasePage({ embedded = false }: { embedded?: boolean }) 
 function Loading() {
   return (
     <div className="space-y-3" aria-busy>
-      <div className="h-6 w-2/3 animate-pulse rounded bg-[var(--surface-sunken)]" />
-      <div className="h-4 w-full animate-pulse rounded bg-[var(--surface-sunken)]" />
-      <div className="h-4 w-5/6 animate-pulse rounded bg-[var(--surface-sunken)]" />
+      <div className="h-6 w-2/3 animate-pulse rounded bg-sunken" />
+      <div className="h-4 w-full animate-pulse rounded bg-sunken" />
+      <div className="h-4 w-5/6 animate-pulse rounded bg-sunken" />
     </div>
   );
 }
@@ -260,7 +260,7 @@ function groupTitle(all: DocGroup[], slug: string): string {
 }
 
 function Chip({ children }: { children: ReactNode }) {
-  return <span className="rounded-md bg-[var(--surface-sunken)] px-2 py-0.5">{children}</span>;
+  return <span className="rounded-md bg-sunken px-2 py-0.5">{children}</span>;
 }
 
 /** Метод и путь под заголовком, с копированием пути. */
@@ -279,14 +279,14 @@ function PathLine({ method, path }: { method: string; path: string }) {
         }
       }}
       aria-label={`Скопировать путь ${path}`}
-      className="mt-2 inline-flex max-w-full items-center gap-2 rounded-lg bg-[var(--surface-sunken)] px-2.5 py-1.5 font-mono text-[13px] transition-colors hover:bg-[var(--row-hover)]"
+      className="mt-2 inline-flex max-w-full items-center gap-2 rounded-control bg-sunken px-2.5 py-1.5 font-mono text-[13px] transition-colors hover:bg-row-hover"
     >
       <MethodPill method={method} size="md" />
       <span className="truncate">{path}</span>
       {copied ? (
-        <Check size={13} className="shrink-0 text-[var(--ok)]" />
+        <Check size={13} className="shrink-0 text-ok" />
       ) : (
-        <Copy size={13} className="shrink-0 text-[var(--text-muted)]" />
+        <Copy size={13} className="shrink-0 text-muted" />
       )}
     </button>
   );
@@ -314,7 +314,7 @@ function Nav({
     .filter((g) => g.pages.length > 0);
 
   if (visible.length === 0) {
-    return <p className="px-2 text-sm text-[var(--text-muted)]">Ничего не нашлось.</p>;
+    return <p className="px-2 text-sm text-muted">Ничего не нашлось.</p>;
   }
 
   return (
@@ -329,20 +329,20 @@ function Nav({
                 type="button"
                 aria-expanded={expanded}
                 onClick={() => setOpen((s) => ({ ...s, [group.key]: !expanded }))}
-                className="flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-left text-[13px] font-medium text-[var(--text)] hover:bg-[var(--row-hover)] max-md:min-h-11 max-md:text-base"
+                className="flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-left text-[13px] font-medium text-ink hover:bg-row-hover max-md:min-h-11 max-md:text-base"
               >
                 <ChevronRight
                   size={14}
                   className={cn(
-                    'shrink-0 text-[var(--text-muted)] transition-transform',
+                    'shrink-0 text-muted transition-transform',
                     expanded && 'rotate-90',
                   )}
                 />
                 <span className="flex-1 truncate">{group.title}</span>
-                <span className="tabular text-xs text-[var(--text-muted)]">{group.pages.length}</span>
+                <span className="tabular text-xs text-muted">{group.pages.length}</span>
               </button>
             ) : (
-              <p className="px-2 pt-2 pb-1 text-xs font-medium tracking-wide text-[var(--text-muted)] uppercase">
+              <p className="px-2 pt-2 pb-1 text-xs font-medium tracking-wide text-muted uppercase">
                 {group.title}
               </p>
             )}
@@ -359,8 +359,8 @@ function Nav({
                           'flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] max-md:min-h-11 max-md:text-base',
                           collapsible && 'pl-4',
                           active
-                            ? 'bg-[var(--accent-soft)] font-medium text-[var(--accent)]'
-                            : 'text-[var(--text-muted)] hover:bg-[var(--row-hover)] hover:text-[var(--text)]',
+                            ? 'bg-accent-soft font-medium text-accent'
+                            : 'text-muted hover:bg-row-hover hover:text-ink',
                         )}
                       >
                         {item.meta.method ? (
@@ -407,15 +407,15 @@ function Toc({ doc }: { doc: SplitDoc }) {
   if (doc.toc.length < 2) return null;
   return (
     <nav aria-label="На этой странице" className="text-sm">
-      <p className="mb-2 text-xs font-medium tracking-wide text-[var(--text-muted)] uppercase">
+      <p className="mb-2 text-xs font-medium tracking-wide text-muted uppercase">
         На этой странице
       </p>
-      <ul className="flex flex-col border-l border-[var(--line)]">
+      <ul className="flex flex-col border-l border-line">
         {doc.toc.map((h) => (
           <li key={h.id}>
             <a
               href={`#${h.id}`}
-              className="-ml-px block border-l border-transparent py-1 pl-3 text-[var(--text-muted)] hover:border-[var(--accent)] hover:text-[var(--text)]"
+              className="-ml-px block border-l border-transparent py-1 pl-3 text-muted hover:border-accent hover:text-ink"
             >
               {h.title}
             </a>
@@ -455,10 +455,10 @@ function CopyMenu({ page, raw }: { page: DocPage; raw: string }) {
           onClick={toggle}
           aria-haspopup="menu"
           aria-expanded={open}
-          icon={copied ? <Check size={14} className="text-[var(--ok)]" /> : <Copy size={14} />}
+          icon={copied ? <Check size={14} className="text-ok" /> : <Copy size={14} />}
         >
           {copied ? 'Скопировано' : 'Скопировать'}
-          <ChevronDown size={14} className="-mr-1 text-[var(--text-muted)]" />
+          <ChevronDown size={14} className="-mr-1 text-muted" />
         </Button>
       )}
     >

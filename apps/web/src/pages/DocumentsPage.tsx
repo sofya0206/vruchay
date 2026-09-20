@@ -1,28 +1,31 @@
-import { useEffect, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Archive, FileText, LayoutTemplate, Plus, Search } from 'lucide-react';
-import { UsageBar } from '../documents/UsageBar';
-import { LibraryLayout } from '../documents/LibraryNav';
+import { Archive, FileText, FolderOpen, LayoutTemplate, Plus, Search } from 'lucide-react';
 import { TRASH_DAYS } from '@gramota/shared';
 import { api, errorText } from '../api/client';
-import type { DocumentDetail, DocumentList, DocumentSummary } from '../api/types';
-import { Button } from '../ui/Button';
-import { Input } from '../ui/Field';
-import { DocumentCard } from '../documents/DocumentCard';
-import { CreateDocumentPanel } from '../documents/CreateDocumentPanel';
 import { useFolders } from '../api/folders';
+import type { DocumentDetail, DocumentList, DocumentSummary } from '../api/types';
+import { CreateDocumentPanel } from '../documents/CreateDocumentPanel';
+import { DocumentCard } from '../documents/DocumentCard';
 import { LibrarySortSelect, type LibrarySort } from '../documents/LibraryFilters';
+import { LibraryLayout } from '../documents/LibraryNav';
 import { RenameDialog } from '../documents/RenameDialog';
-import { EmptyState } from '../ui/EmptyState';
+import { UsageBar } from '../documents/UsageBar';
+import { Button } from '../ui/Button';
 import { ErrorState } from '../ui/ErrorState';
+import { Input } from '../ui/Field';
+import { NextAction } from '../ui/NextAction';
+import { PageHeader } from '../ui/PageHeader';
 import { SkeletonCards } from '../ui/Skeleton';
+
+const NEW_DOCUMENT = '/documents?new=1';
 
 /**
  * Библиотека материалов.
  *
- * Устроена как файловый менеджер: списки и создание — слева, название
- * списка и поиск — сверху, сколько всего лежит и в каком порядке — снизу.
+ * Устроена как файловый менеджер: списки — слева, название списка, поиск
+ * и создание — сверху, сколько всего лежит и в каком порядке — снизу.
  * В середине только свои материалы: папки организация заводит себе сама,
  * в колонке слева.
  *
@@ -50,10 +53,10 @@ export function DocumentsPage({
   const trash = archived;
 
   /*
-   * Открытая папка и форма «с чистого листа» живут в адресе, а не в состоянии
-   * страницы: папки — ссылки в колонке слева, кнопка «Создать» стоит в двух
-   * местах рамки раздела. Иначе на папку нельзя было бы сослаться, а создание
-   * открывалось бы только с той страницы, где нарисована сама форма.
+   * Открытая папка и окно «с чистого листа» живут в адресе, а не в состоянии
+   * страницы: папки — ссылки в колонке слева, а на создание можно сослаться
+   * и открыть его из архива или шаблонов. Иначе окно открывалось бы только
+   * с той страницы, где нарисована сама форма.
    *
    * Чужой идентификатор в `?folder=` — не ошибка, а испорченная ссылка: молча
    * показываем все материалы, а не пустой список по несуществующей папке.
@@ -66,12 +69,26 @@ export function DocumentsPage({
   const scratch = !trash && !templates && params.get('new') === '1';
   /** Шаблон, с которого начать, — из карточки в разделе «Шаблоны». */
   const fromTemplate = scratch ? params.get('template') : null;
-  /** Форму закрываем, папку оставляем: человек вернётся в тот же список. */
-  const closeScratch = () => {
+  /** Окно закрываем, папку оставляем: человек вернётся в тот же список. */
+  const closeScratch = useCallback(() => {
     const next = new URLSearchParams(params);
     next.delete('new');
     next.delete('template');
     setParams(next, { replace: true });
+  }, [params, setParams]);
+
+  /*
+   * Из архива и шаблонов «Создать» ведёт в рабочие — окно живёт только там.
+   * Из папки открывает окно, не теряя папку: новый документ ждут в ней.
+   */
+  const openScratch = () => {
+    if (trash || templates) {
+      navigate(NEW_DOCUMENT);
+      return;
+    }
+    const next = new URLSearchParams(params);
+    next.set('new', '1');
+    setParams(next);
   };
 
   const documents = useQuery({
@@ -153,15 +170,15 @@ export function DocumentsPage({
     onSuccess: () => qc.invalidateQueries({ queryKey: ['documents'] }),
   });
 
-
   /*
    * Esc — шаг назад по уровням: сначала снимается поиск, потом закрывается
-   * форма создания, потом закрывается папка. Клавиша делает ровно то же,
+   * окно создания, потом закрывается папка. Клавиша делает ровно то же,
    * что стрелка «назад», но не требует тянуться к ней мышью — а в списке
    * из полусотни материалов из папки выходят по многу раз за сеанс.
    *
    * Меню карточки закрывает себя само: если бы Esc срабатывал и здесь,
    * одно нажатие закрывало бы меню и вместе с ним выкидывало из папки.
+   * Открытое окно тоже: оно гасит клавишу у себя, сюда она не доходит.
    *
    * Разобранное нажатие помечаем `preventDefault`: над разделом стоит
    * оболочка кабинета, которая по Esc уводит на главную. Без пометки одно
@@ -189,44 +206,47 @@ export function DocumentsPage({
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  });
+  }, [search, scratch, folderId, closeScratch, navigate]);
 
   const items = documents.data?.items ?? [];
   const nothingFound = documents.data?.items.length === 0;
+  const listTitle = trash ? 'Архив' : templates ? 'Шаблоны' : (folder?.name ?? 'Мои документы');
 
   return (
     <LibraryLayout
       archiveCount={trashCount.data}
-      head={
-        <div className="flex min-w-0 items-baseline gap-2">
-          {/* Открытая папка стоит в заголовке: иначе на половине списка
-              непонятно, почему материалов пять, когда их пятьдесят. */}
-          <h1 className="truncate text-lg font-medium">
-            {trash ? 'Архив' : templates ? 'Шаблоны' : (folder?.name ?? 'Мои документы')}
-          </h1>
-          {documents.data && (
-            <span className="tabular text-sm text-[var(--text-muted)]">{documents.data.total}</span>
-          )}
-        </div>
-      }
+      // Открытая папка стоит в заголовке: иначе на половине списка
+      // непонятно, почему материалов пять, когда их пятьдесят.
+      head={<PageHeader title={listTitle} count={documents.data?.total ?? null} />}
       tools={
-        <div className="relative">
-          <Search
-            size={16}
-            className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-[var(--text-muted)]"
-          />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Поиск по названию"
-            aria-label="Поиск по названию"
-            className="w-40 py-1.5 pl-9 text-sm max-md:h-11 max-md:w-full sm:w-56"
-          />
-        </div>
+        <>
+          <div className="relative">
+            <Search
+              size={16}
+              aria-hidden
+              className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-muted"
+            />
+            <Input
+              compact
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Поиск по названию"
+              aria-label="Поиск по названию"
+              className="w-40 pl-8 sm:w-56 max-md:h-10 max-md:w-full"
+            />
+          </div>
+          {/* Главное действие стоит в панели, а не в `actions` шапки: на
+              телефоне рама раздела оборачивает шапку в кнопку выбора списка,
+              и кнопка внутри кнопки — недопустимая разметка. */}
+          <Button variant="primary" icon={<Plus size={16} />} data-tour="create-document" onClick={openScratch}>
+            <span className="max-md:hidden">Создать документ</span>
+            <span className="md:hidden">Создать</span>
+          </Button>
+        </>
       }
       bar={
         <>
-          <span className="tabular text-[var(--text-muted)]">
+          <span className="tabular text-muted">
             {trash ? 'В архиве' : templates ? 'Шаблонов' : 'Документов'}: {documents.data?.total ?? 0}
           </span>
           <div className="ml-auto">
@@ -242,7 +262,7 @@ export function DocumentsPage({
 
       {scratch && (
         <CreateDocumentPanel
-          // Ключ — чтобы нажатие другого шаблона при открытой панели выбрало его.
+          // Ключ — чтобы нажатие другого шаблона при открытом окне выбрало его.
           key={fromTemplate ?? 'blank'}
           initialTemplateId={fromTemplate}
           initialFolderId={folderId}
@@ -257,7 +277,7 @@ export function DocumentsPage({
           </h2>
           {/* Пояснение раздела на телефоне не показываем: там и так тесно,
               а что в разделе — видно по карточкам. */}
-          <p className="mt-0.5 text-sm text-[var(--text-muted)] max-md:hidden">
+          <p className="mt-0.5 text-sm text-muted max-md:hidden">
             {trash ? (
               <>Удалённое хранится {TRASH_DAYS} дней, потом стирается насовсем</>
             ) : templates ? (
@@ -281,51 +301,56 @@ export function DocumentsPage({
           />
         )}
 
+        {/* Кнопка пустого места — вторичная везде, кроме самого первого
+            документа: залитая уже стоит в панели, и вторая рядом с ней
+            спорила бы за внимание. */}
         {nothingFound &&
           (trash ? (
-            <EmptyState icon={Archive} title="Архив пуст">
-              Удалённые материалы лежат здесь {TRASH_DAYS} дней — успеете передумать
-            </EmptyState>
+            <NextAction
+              icon={Archive}
+              title="Архив пока пуст"
+              text={`Удалённые документы лежат здесь ${TRASH_DAYS} дней — успеете передумать`}
+              secondary={{ label: 'К документам', to: '/documents' }}
+            />
           ) : templates && !search ? (
-            <EmptyState icon={LayoutTemplate} title="Шаблонов пока нет">
-              В меню документа — «Сохранить как шаблон». Получатели и мероприятие в шаблон
-              не попадают.
-            </EmptyState>
+            <NextAction
+              icon={LayoutTemplate}
+              title="Сохраните первый шаблон"
+              text="В меню документа — «Сохранить как шаблон». Получатели и мероприятие в шаблон не попадают."
+              secondary={{ label: 'К документам', to: '/documents' }}
+            />
           ) : search ? (
-            <EmptyState icon={FileText} title="Ничего не нашлось">
-              Попробуйте изменить запрос или открыть другую папку
-            </EmptyState>
+            <NextAction
+              icon={Search}
+              title="Попробуйте другой запрос"
+              text={`По запросу «${search}» ничего не нашлось${folder ? ' в этой папке' : ''}`}
+              secondary={{ label: 'Сбросить поиск', onClick: () => setSearch('') }}
+            />
           ) : folder ? (
-            <EmptyState icon={FileText} title="Папка пуста">
-              Переложить сюда материал можно из меню карточки в{' '}
-              <Link to="/documents" className="underline underline-offset-4">
-                рабочих
-              </Link>{' '}
-              — «Переложить в папку». Новый материал кладётся в папку при создании.
-            </EmptyState>
+            <NextAction
+              icon={FolderOpen}
+              title="Положите в папку первый документ"
+              text="Переложить документ можно из меню карточки — «Переложить в папку». Новый документ, созданный отсюда, ложится в папку сам."
+              secondary={{ label: 'Создать в папке', onClick: openScratch }}
+            />
           ) : (
-            <EmptyState
+            <NextAction
               icon={FileText}
-              title="Здесь пока пусто"
-              action={
-                <Button variant="primary" icon={<Plus size={16} />} onClick={() => navigate('/documents?new=1')}>
-                  Создать документ
-                </Button>
-              }
-            >
-              Загрузите свой бланк и подгоните поля: фамилию, место, дату. Пока вы не выпустили
-              файлы, ничего не расходуется.
-            </EmptyState>
+              title="Создайте первый документ"
+              text="Загрузите свой бланк и подгоните поля: фамилию, место, дату. Пока вы не выпустили файлы, ничего не расходуется."
+              primary={{ label: 'Создать документ', icon: <Plus size={16} />, onClick: openScratch }}
+            />
           ))}
 
         {/* Карточки одного размера, сколько влезет в строку: колонка слева
             съедает ширину, и жёсткие «три в ряд» оставляли бы на широком
             экране пустую половину, а на среднем — сплюснутые листы. */}
-        <ul className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
-          {items.map((doc) => (
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
+          {items.map((doc, i) => (
             <DocumentCard
               key={doc.id}
               doc={doc}
+              tour={i === 0 ? 'document-card' : undefined}
               onRename={setRenaming}
               onMove={(d, to) => move.mutate({ id: d.id, folderId: to })}
               onDuplicate={(d) => duplicate.mutate(d.id)}
@@ -335,7 +360,7 @@ export function DocumentsPage({
               onSaveAsTemplate={templates ? undefined : (d) => saveAsTemplate.mutate(d.id)}
             />
           ))}
-        </ul>
+        </div>
       </section>
       {renaming && (
         <RenameDialog

@@ -6,7 +6,9 @@ import { usePreferences } from '../api/org';
 import { ApiError } from '../api/client';
 import { Button } from '../ui/Button';
 import { SectionHead } from '../ui/Settings';
-import { Input, Label, StatusChip, Textarea } from '../ui/Field';
+import { Badge, type BadgeTone } from '../ui/Badge';
+import type { ChipTone } from '../ui/Field';
+import { Input, Label, Textarea } from '../ui/Field';
 import { formatDateTime } from './preferences';
 
 const STATUS: Record<TicketStatus, { title: string; tone: 'done' | 'progress' | 'neutral' }> = {
@@ -23,6 +25,9 @@ const STATUS: Record<TicketStatus, { title: string; tone: 'done' | 'progress' | 
  * переходе нельзя. Список и открытое обращение — один экран: обращений
  * у организации единицы, отдельная страница на каждое не нужна.
  */
+/** Прежние тона чипов — в тона метки. */
+const CHIP_TONE: Record<ChipTone, BadgeTone> = { neutral: 'neutral', progress: 'info', done: 'ok', warn: 'warn', error: 'danger' };
+
 export function Support() {
   const tickets = useTickets();
   const [openId, setOpenId] = useState<string | null>(null);
@@ -56,7 +61,7 @@ export function Support() {
       )}
 
       {tickets.data?.length === 0 && !creating && (
-        <p className="mt-4 text-sm text-[var(--text-muted)]">Обращений ещё не было.</p>
+        <p className="mt-4 text-sm text-muted">Обращений ещё не было.</p>
       )}
 
       <ul className="mt-4 max-w-2xl space-y-2">
@@ -65,13 +70,13 @@ export function Support() {
             <button
               type="button"
               onClick={() => setOpenId(t.id)}
-              className="w-full rounded-xl bg-[var(--surface)] p-3 text-left ring-1 ring-[var(--line)] hover:ring-[var(--line-strong)]"
+              className="card pressable w-full p-3 text-left transition-[box-shadow] hover:[box-shadow:inset_0_0_0_1px_var(--line-strong)]"
             >
               <span className="flex flex-wrap items-center gap-2">
                 <span className="font-medium">{t.subject}</span>
-                <StatusChip tone={STATUS[t.status].tone}>{STATUS[t.status].title}</StatusChip>
+                <Badge tone={CHIP_TONE[STATUS[t.status].tone]}>{STATUS[t.status].title}</Badge>
               </span>
-              <span className="mt-1 block text-xs text-[var(--text-muted)]">
+              <span className="mt-1 block text-xs text-muted">
                 {t.author || 'Сотрудник'} · сообщений: {t.messages} · обновлено{' '}
                 {formatDateTime(t.updatedAt, format)}
               </span>
@@ -100,7 +105,7 @@ function NewTicket({ onDone, onCancel }: { onDone: (id: string) => void; onCance
 
   return (
     <form
-      className="mt-4 max-w-2xl space-y-3 rounded-2xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]"
+      className="mt-4 max-w-2xl space-y-3 rounded-sheet bg-surface p-4 ring-1 ring-line"
       onSubmit={(e: FormEvent) => {
         e.preventDefault();
         create.mutate();
@@ -134,7 +139,7 @@ function NewTicket({ onDone, onCancel }: { onDone: (id: string) => void; onCance
         </Button>
       </div>
       {error && (
-        <p role="alert" className="text-sm text-[var(--danger)]">
+        <p role="alert" className="text-sm text-danger">
           {error}
         </p>
       )}
@@ -174,20 +179,20 @@ function TicketView({ id, onBack }: { id: string; onBack: () => void }) {
 
       <h2 className="mt-2 flex flex-wrap items-center gap-2 text-lg font-medium">
         {data.subject}
-        <StatusChip tone={STATUS[data.status].tone}>{STATUS[data.status].title}</StatusChip>
+        <Badge tone={CHIP_TONE[STATUS[data.status].tone]}>{STATUS[data.status].title}</Badge>
       </h2>
 
       <ul className="mt-4 max-w-2xl space-y-3">
         {data.messages.map((m) => (
           <li
             key={m.id}
-            className={`rounded-xl p-3 ring-1 ${
+            className={`rounded-card p-3 ring-1 ${
               m.fromSupport
-                ? 'bg-[var(--accent-soft)] ring-[var(--accent)]/30'
-                : 'bg-[var(--surface)] ring-[var(--line)]'
+                ? 'bg-accent-soft ring-accent/30'
+                : 'bg-surface ring-line'
             }`}
           >
-            <p className="text-xs text-[var(--text-muted)]">
+            <p className="text-xs text-muted">
               {m.author || 'Сотрудник'} · {formatDateTime(m.createdAt, format)}
             </p>
             {/* Перенос строк сохраняем: человек писал абзацами, а не одной строкой. */}
