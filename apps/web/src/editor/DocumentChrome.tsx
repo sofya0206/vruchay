@@ -6,7 +6,6 @@ import {
   FileText,
   LayoutTemplate,
   MoreHorizontal,
-  TriangleAlert,
 } from 'lucide-react';
 import {
   MATERIAL_STEPS,
@@ -20,8 +19,6 @@ import { IconButton } from '../ui/IconButton';
 import { Menu, MenuDivider, MenuItem } from '../ui/Menu';
 import { Stepper, type StepItem } from '../ui/Stepper';
 import { useTooltip } from '../ui/Tooltip';
-import { cn } from '../ui/cn';
-import { useUsage } from '../api/org';
 import { DocumentTitle } from './DocumentTitle';
 
 /** Пункт меню «…» либо разделитель между смысловыми группами. */
@@ -186,52 +183,6 @@ export function DocumentChrome({
         </div>
       )}
     </header>
-  );
-}
-
-/**
- * Кнопка выпуска на списке получателей.
- *
- * Число отмеченных — плашкой внутри, а не хвостом слова: «Выпустить 12»
- * читалось как одна фраза, а счётчик должен читаться счётчиком.
- * Предупреждаем в момент действия, а не после отказа сервера: отмечено
- * больше, чем осталось по плану, — счётчик становится предупреждающим.
- */
-export function ReleaseButton({
-  count,
-  running,
-  disabled,
-  onClick,
-}: {
-  count: number;
-  running: boolean;
-  disabled: boolean;
-  onClick: () => void;
-}) {
-  const { data: usage } = useUsage();
-  const short = usage?.left !== null && usage?.left !== undefined && count > usage.left;
-  return (
-    <Button
-      variant="primary"
-      size="sm"
-      loading={running}
-      disabled={disabled}
-      onClick={onClick}
-      title={short && usage ? `Отмечено ${count}, осталось ${usage.left}. Выпустятся первые ${usage.left}` : undefined}
-    >
-      {running ? 'Выпускаем' : 'Выпуск'}
-      {!running && count > 0 && (
-        <span
-          className={cn(
-            'tabular -mr-1 grid h-5 min-w-5 place-items-center rounded-md px-1.5 text-xs leading-none',
-            short ? 'bg-warn text-white' : 'bg-on-accent/20',
-          )}
-        >
-          {short && <TriangleAlert size={11} className="mr-1" aria-hidden />}
-          {count}
-        </span>
-      )}
-    </Button>
   );
 }
 

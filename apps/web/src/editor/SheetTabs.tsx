@@ -1,5 +1,8 @@
+import { useState } from 'react';
 import { List, Plus, Trash2 } from 'lucide-react';
 import type { Sheet } from '../api/types';
+import { errorText } from '../api/client';
+import { ConfirmDialog } from '../ui/Dialog';
 import { IconButton } from '../ui/IconButton';
 import { Menu, MenuItem } from '../ui/Menu';
 import { cn } from '../ui/cn';
@@ -14,7 +17,12 @@ import { cn } from '../ui/cn';
  * любой редактор таблиц и презентаций.
  *
  * Удаление стоит в списке, а не крестиком на закладке: лист — это готовая
- * страница документа, и терять её промахом мыши нельзя.
+ * страница документа, и терять её промахом мыши нельзя. Само удаление —
+ * без возможности отмены (это отдельный запрос от истории холста), поэтому
+ * клик по корзине только открывает диалог, а не удаляет сразу: список
+ * закрылся бы тем же кликом и без своего состояния диалог не успел бы
+ * появиться (см. `Menu` — список — это `children`, и он размонтируется
+ * в момент закрытия).
  */
 export function SheetTabs({
   sheets,
@@ -28,9 +36,29 @@ export function SheetTabs({
   activeId: string | undefined;
   onSelect: (sheetId: string) => void;
   onAdd: () => void;
-  onDelete: (sheetId: string) => void;
+  onDelete: (sheetId: string) => Promise<unknown>;
   adding?: boolean;
 }) {
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; index: number } | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  function confirmDelete() {
+    if (!pendingDelete) return;
+    setDeleting(true);
+    setDeleteError(null);
+    onDelete(pendingDelete.id).then(
+      () => {
+        setDeleting(false);
+        setPendingDelete(null);
+      },
+      (err: unknown) => {
+        setDeleting(false);
+        setDeleteError(errorText(err));
+      },
+    );
+  }
+
   return (
     <div className="flex shrink-0 items-center gap-1 border-t border-line bg-surface px-2 py-1.5">
       <IconButton size="sm" label="Добавить лист" disabled={adding} onClick={onAdd}>
@@ -64,7 +92,7 @@ export function SheetTabs({
                 role="menuitem"
                 label={`Удалить лист ${i + 1}`}
                 className="hover:bg-danger-soft hover:text-danger"
-                onClick={() => onDelete(sheet.id)}
+                onClick={() => setPendingDelete({ id: sheet.id, index: i + 1 })}
               >
                 <Trash2 size={16} />
               </IconButton>
@@ -95,6 +123,23 @@ export function SheetTabs({
           );
         })}
       </div>
+
+      {/* Вне `Menu`: список пунктов — это `children`, и он размонтируется
+          в момент закрытия меню, тем же кликом, что открывает этот диалог. */}
+      {pendingDelete && (
+        <ConfirmDialog
+          title="Удалить лист"
+          confirmLabel="Удалить"
+          danger
+          pending={deleting}
+          error={deleteError}
+          onConfirm={confirmDelete}
+          onClose={() => setPendingDelete(null)}
+        >
+          Лист {pendingDelete.index} будет удалён без возможности восстановить — вместе со всем,
+          что на нём нарисовано.
+        </ConfirmDialog>
+      )}
     </div>
   );
 }

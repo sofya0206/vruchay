@@ -18,9 +18,13 @@
 export const TRASH_DAYS = 7;
 
 /** Сколько дней осталось документу в корзине. Ноль — сегодня ночью исчезнет. */
-export function daysLeftInTrash(deletedAt: Date | string, now: Date = new Date()): number {
+export function daysLeftInTrash(
+  deletedAt: Date | string,
+  trashDays: number = TRASH_DAYS,
+  now: Date = new Date(),
+): number {
   const deleted = typeof deletedAt === 'string' ? new Date(deletedAt) : deletedAt;
   const dayMs = 24 * 60 * 60 * 1000;
   const passed = Math.floor((now.getTime() - deleted.getTime()) / dayMs);
-  return Math.max(0, TRASH_DAYS - passed);
+  return Math.max(0, trashDays - passed);
 }

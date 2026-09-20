@@ -2375,7 +2375,7 @@ export function EditorPage() {
           setActiveSheetId(sheetId);
         }}
         onAdd={() => addSheet.mutate()}
-        onDelete={(sheetId) => deleteSheet.mutate(sheetId)}
+        onDelete={(sheetId) => deleteSheet.mutateAsync(sheetId)}
         adding={addSheet.isPending}
       />
       )}

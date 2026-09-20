@@ -1,7 +1,8 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Award } from 'lucide-react';
 import { useAcceptInvite } from '../api/team';
-import { AuthCard, AuthLayout } from '../auth/AuthLayout';
+import { AuthCard, AuthLayout, AuthResult } from '../auth/AuthLayout';
 import { Button } from '../ui/Button';
 import { ErrorBar } from '../ui/ErrorState';
 import { Field, Input } from '../ui/Field';
@@ -30,13 +31,18 @@ export function InvitePage() {
 
   if (!token) {
     return (
-      <AuthLayout icon={icon} title="Вручай">
-        <h2 className="text-xl font-medium">Ссылка неполная</h2>
-        <p className="mt-2 text-muted">
-          Откройте приглашение из письма целиком — вместе с длинной частью после знака вопроса. Проще всего
-          нажать кнопку в письме, а не копировать адрес руками.
-        </p>
-      </AuthLayout>
+      <AuthResult
+        icon={<Award size={26} strokeWidth={1.75} />}
+        title="Ссылка неполная"
+        footer={
+          <Link to="/login" className="text-sm underline underline-offset-2">
+            Перейти ко входу
+          </Link>
+        }
+      >
+        Откройте приглашение из письма целиком — вместе с длинной частью после знака вопроса. Проще всего
+        нажать кнопку в письме, а не копировать адрес руками.
+      </AuthResult>
     );
   }
 

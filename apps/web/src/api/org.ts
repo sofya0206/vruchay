@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { TRASH_DAYS } from '@gramota/shared';
 import { api } from './client';
 
 export interface OrgProfile {
@@ -124,6 +125,12 @@ export function usePublicProfile() {
     queryKey: ['org-public-profile'],
     queryFn: () => api.get<PublicProfile>('/org/public-profile'),
   });
+}
+
+/** Настоящий срок хранения корзины этой организации — вместо общего дефолта. */
+export function useTrashDays(): number {
+  const { data } = usePublicProfile();
+  return data?.trashDays ?? TRASH_DAYS;
 }
 
 export function useUpdatePublicProfile() {

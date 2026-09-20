@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Archive, FileText, FolderOpen, LayoutTemplate, Plus, Search } from 'lucide-react';
-import { TRASH_DAYS } from '@gramota/shared';
 import { api, errorText } from '../api/client';
 import { useFolders } from '../api/folders';
+import { useTrashDays } from '../api/org';
 import type { DocumentDetail, DocumentList, DocumentSummary } from '../api/types';
 import { CreateDocumentPanel } from '../documents/CreateDocumentPanel';
 import { DocumentCard } from '../documents/DocumentCard';
@@ -117,6 +117,8 @@ export function DocumentsPage({
     queryFn: () => api.get<DocumentList>('/documents?limit=1&trashed=true'),
     select: (d) => d.total,
   });
+
+  const trashDays = useTrashDays();
 
   /** После любого действия обновляем и список, и счётчик архива. */
   const refresh = () => {
@@ -279,7 +281,7 @@ export function DocumentsPage({
               а что в разделе — видно по карточкам. */}
           <p className="mt-0.5 text-sm text-muted max-md:hidden">
             {trash ? (
-              <>Удалённое хранится {TRASH_DAYS} дней, потом стирается насовсем</>
+              <>Удалённое хранится {trashDays} дней, потом стирается насовсем</>
             ) : templates ? (
               <>Нажмите на шаблон — получите новый документ с его макетом</>
             ) : folder ? (
@@ -309,7 +311,7 @@ export function DocumentsPage({
             <NextAction
               icon={Archive}
               title="Архив пока пуст"
-              text={`Удалённые документы лежат здесь ${TRASH_DAYS} дней — успеете передумать`}
+              text={`Удалённые документы лежат здесь ${trashDays} дней — успеете передумать`}
               secondary={{ label: 'К документам', to: '/documents' }}
             />
           ) : templates && !search ? (

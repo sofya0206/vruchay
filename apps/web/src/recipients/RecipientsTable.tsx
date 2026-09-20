@@ -144,6 +144,56 @@ export function RecipientsTable({
   };
   /** Ячейки, чья правка не дошла до сервера, — «строка:колонка»; они красные. */
   const [unsavedCells, setUnsavedCells] = useState<ReadonlySet<string>>(() => new Set());
+
+  /**
+   * Удаление строки — с отменой, а не с окном подтверждения.
+   *
+   * На сервере это настоящее удаление, восстановить нечем, а корзина
+   * всегда видна на сенсорном экране — палец промахивается чаще мыши.
+   * Поэтому запрос не шлём сразу: строка гаснет и ждёт таймер, тост
+   * предлагает отменить. Если отмена не успела — строка уже правда ушла,
+   * и «Отменить» после этого молча ничего не делает, а не пытается вернуть
+   * то, чего больше нет.
+   */
+  const DELETE_UNDO_MS = 5000;
+  const [pendingDeletes, setPendingDeletes] = useState<ReadonlySet<string>>(() => new Set());
+  const deleteTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  function requestDeleteRow(rowId: string) {
+    setPendingDeletes((prev) => new Set(prev).add(rowId));
+    const timer = setTimeout(() => {
+      deleteTimers.current.delete(rowId);
+      report(
+        m.deleteRow.mutateAsync(rowId).catch((err: unknown) => {
+          setPendingDeletes((prev) => {
+            const next = new Set(prev);
+            next.delete(rowId);
+            return next;
+          });
+          throw err;
+        }),
+      );
+    }, DELETE_UNDO_MS);
+    deleteTimers.current.set(rowId, timer);
+    toast({
+      title: 'Строка удалена',
+      tone: 'ok',
+      duration: DELETE_UNDO_MS,
+      action: {
+        label: 'Отменить',
+        onClick: () => {
+          const t = deleteTimers.current.get(rowId);
+          if (!t) return;
+          clearTimeout(t);
+          deleteTimers.current.delete(rowId);
+          setPendingDeletes((prev) => {
+            const next = new Set(prev);
+            next.delete(rowId);
+            return next;
+          });
+        },
+      },
+    });
+  }
   const markCell = (key: string, failed: boolean) =>
     setUnsavedCells((prev) => {
       if (prev.has(key) === failed) return prev;
@@ -537,7 +587,13 @@ export function RecipientsTable({
                 </thead>
                 <tbody>
                   {rows.map((row, index) => (
-                    <tr key={row.id} className="group hover:bg-row-hover">
+                    <tr
+                      key={row.id}
+                      className={cn(
+                        'group hover:bg-row-hover',
+                        pendingDeletes.has(row.id) && 'pointer-events-none opacity-40',
+                      )}
+                    >
                       <td className="border-r border-b border-line px-3 py-1 text-center">
                         <Checkbox
                           checked={row.checked}
@@ -604,7 +660,7 @@ export function RecipientsTable({
                         <IconButton
                           size="sm"
                           label="Удалить строку"
-                          onClick={() => report(m.deleteRow.mutateAsync(row.id))}
+                          onClick={() => requestDeleteRow(row.id)}
                           className="size-7 opacity-0 group-hover:opacity-100 hover:text-danger pointer-coarse:size-10 pointer-coarse:opacity-100"
                         >
                           <Trash2 size={ICON.sm} strokeWidth={STROKE} />

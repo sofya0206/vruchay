@@ -1,15 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bold, ChevronDown, Italic, Paperclip } from 'lucide-react';
-import { api, errorText } from '../api/client';
-import { Button } from '../ui/Button';
+import { api } from '../api/client';
+import { Badge } from '../ui/Badge';
 import { Card } from '../ui/Card';
 import { Checkbox } from '../ui/Checkbox';
 import { Collapse } from '../ui/Collapse';
-import { ErrorBar } from '../ui/ErrorState';
 import { Field, Input, Textarea } from '../ui/Field';
 import { IconButton } from '../ui/IconButton';
-import { toast } from '../ui/Toast';
 import { cn } from '../ui/cn';
 import { DEFAULT_LETTER } from './letter-defaults';
 import { insertToken, parseBody, toHtml, toText, wrapSelection, type Run } from './email-body';
@@ -22,6 +20,8 @@ interface EmailTemplate {
   bodyHtml: string;
   attachGeneratedFile: boolean;
 }
+
+const AUTOSAVE_DELAY_MS = 1500;
 
 /**
  * Письмо, которое получит участник вместе с документом.
@@ -45,10 +45,17 @@ export function EmailTemplateEditor({
   const [body, setBody] = useState('');
   const [attach, setAttach] = useState(true);
   const [more, setMore] = useState(false);
+  const [saved, setSaved] = useState<'saved' | 'saving' | 'dirty' | 'error'>('saved');
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   /** Где стоял курсор последним — в теме или в тексте. */
   const lastField = useRef<'subject' | 'body'>('body');
   const subjectRef = useRef<HTMLInputElement | null>(null);
+  /** Для какого документа уже пришли данные — автосохранение молчит до этого. */
+  const loadedFor = useRef<string | null>(null);
+  /** Сразу после загрузки поля меняются сами — это не правка человека. */
+  const justLoaded = useRef(false);
+  const version = useRef(0);
+  const latestVersion = useRef(0);
 
   /**
    * Начертание для выделенного куска. Курсор возвращаем на место сами:
@@ -80,20 +87,52 @@ export function EmailTemplateEditor({
     setSubject(template.data?.subject ?? DEFAULT_LETTER.subject);
     setBody(template.data ? toText(template.data.bodyHtml) : DEFAULT_LETTER.body);
     setAttach(template.data?.attachGeneratedFile ?? true);
-  }, [template.data]);
+    loadedFor.current = documentId;
+    justLoaded.current = true;
+  }, [template.data, documentId]);
 
   const save = useMutation({
-    mutationFn: () =>
+    mutationFn: (data: { subject: string; bodyHtml: string; attachGeneratedFile: boolean; version: number }) =>
       api.post<EmailTemplate>(`/mail/templates/${documentId}`, {
-        subject,
-        bodyHtml: toHtml(body),
-        attachGeneratedFile: attach,
+        subject: data.subject,
+        bodyHtml: data.bodyHtml,
+        attachGeneratedFile: data.attachGeneratedFile,
       }),
-    onSuccess: () => {
-      toast({ title: 'Письмо сохранено', tone: 'ok' });
+    onSuccess: (_data, sent) => {
+      if (sent.version === latestVersion.current) setSaved('saved');
       void qc.invalidateQueries({ queryKey: ['email-template', documentId] });
     },
+    // Без этого упавший запрос оставлял бы значок на «Сохраняем» навсегда.
+    onError: () => setSaved('error'),
   });
+
+  /*
+   * Автосохранение — как у листа: остальные шаги документа не требуют
+   * отдельной кнопки, и письмо не должно быть исключением, которое молча
+   * теряет набранное при переходе на соседний шаг.
+   */
+  useEffect(() => {
+    if (loadedFor.current !== documentId) return;
+    // Значения только что подставились с сервера — это не правка человека.
+    if (justLoaded.current) {
+      justLoaded.current = false;
+      return;
+    }
+    setSaved('dirty');
+    // Сервер отвергает пустую тему — заявка, которая точно не пройдёт, не нужна;
+    // «Есть правки» выше уже показывает, что письмо не сохранено.
+    if (!subject.trim()) return;
+    version.current += 1;
+    const mine = version.current;
+    latestVersion.current = mine;
+    const timer = setTimeout(() => {
+      setSaved('saving');
+      save.mutate({ subject, bodyHtml: toHtml(body), attachGeneratedFile: attach, version: mine });
+    }, AUTOSAVE_DELAY_MS);
+    return () => clearTimeout(timer);
+    // Намеренно следим только за этими четырьмя: объект мутации пересоздаётся
+    // на каждый рендер и в зависимостях сбрасывал бы таймер бесконечно.
+  }, [subject, body, attach, documentId]);
 
   const variables = columns.data?.columns.map((c) => c.name) ?? [];
 
@@ -132,12 +171,23 @@ export function EmailTemplateEditor({
        и центрированная колонка при переходе к письму уезжала в сторону.
        Узкая колонка нужна только тексту. */
     <div className="w-full max-w-3xl space-y-5 p-4 sm:p-6">
-      <header>
-        <h2 className="text-lg font-medium">Письмо участнику</h2>
-        <p className="mt-1 text-sm text-muted">
-          Так выглядит письмо, которое придёт вместе с документом. Отправителем участник увидит название
-          вашей организации.
-        </p>
+      <header className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-medium">Письмо участнику</h2>
+          <p className="mt-1 text-sm text-muted">
+            Так выглядит письмо, которое придёт вместе с документом. Отправителем участник увидит название
+            вашей организации.
+          </p>
+        </div>
+        <Badge dot tone={saved === 'saved' ? 'ok' : saved === 'error' ? 'danger' : 'neutral'}>
+          {saved === 'saved'
+            ? 'Сохранено'
+            : saved === 'saving'
+              ? 'Сохраняем…'
+              : saved === 'error'
+                ? 'Не сохранилось'
+                : 'Есть правки'}
+        </Badge>
       </header>
 
       <Field label="Тема письма">
@@ -211,14 +261,6 @@ export function EmailTemplateEditor({
       </Card>
 
       <Preview subject={subject} body={body} variables={variables} />
-
-      {save.isError && <ErrorBar>{errorText(save.error)}</ErrorBar>}
-
-      <div className="flex items-center gap-3">
-        <Button variant="primary" onClick={() => save.mutate()} loading={save.isPending}>
-          Сохранить письмо
-        </Button>
-      </div>
     </div>
   );
 }

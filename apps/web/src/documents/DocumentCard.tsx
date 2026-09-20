@@ -15,9 +15,10 @@ import {
   RotateCcw,
   Trash2,
 } from 'lucide-react';
-import { daysLeftInTrash, TRASH_DAYS } from '@gramota/shared';
+import { daysLeftInTrash } from '@gramota/shared';
 import type { DocumentSummary } from '../api/types';
 import { useFolders } from '../api/folders';
+import { useTrashDays } from '../api/org';
 import { formatWhen, plural } from '../overview/format';
 import { SheetRenderer } from '../render/SheetRenderer';
 import { Button } from '../ui/Button';
@@ -159,7 +160,8 @@ function TrashedCard({
   onRestore: () => void;
   onPurge: () => void;
 }) {
-  const left = doc.deletedAt ? daysLeftInTrash(doc.deletedAt) : TRASH_DAYS;
+  const trashDays = useTrashDays();
+  const left = doc.deletedAt ? daysLeftInTrash(doc.deletedAt, trashDays) : trashDays;
   const [purging, setPurging] = useState(false);
 
   return (

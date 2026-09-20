@@ -381,7 +381,10 @@ export class RegistryService {
         verifyCount: file.verifyCount,
         verifyLastAt: file.verifyLastAt,
         downloadCount: file.downloadCount,
-        retention: retentionOf(file.document?.deletedAt ?? null),
+        retention: retentionOf(
+          file.document?.deletedAt ?? null,
+          file.document?.org?.trashDays ?? TRASH_DAYS,
+        ),
       };
     });
   }
@@ -417,7 +420,15 @@ const fileSelect = {
   verifyLastAt: true,
   downloadCount: true,
   row: { select: { data: true } },
-  document: { select: { title: true, eventName: true, eventDate: true, deletedAt: true } },
+  document: {
+    select: {
+      title: true,
+      eventName: true,
+      eventDate: true,
+      deletedAt: true,
+      org: { select: { trashDays: true } },
+    },
+  },
 } satisfies Prisma.FileSelect;
 
 type FileRecord = Prisma.FileGetPayload<{ select: typeof fileSelect }>;
@@ -428,15 +439,15 @@ type FileRecord = Prisma.FileGetPayload<{ select: typeof fileSelect }>;
  * Считается только для материалов в корзине, и это не упущение: пока
  * материал жив, срока у выданных файлов нет — организация сама решает,
  * сколько хранить документы своих участников. Срок начинает течь с того
- * дня, когда материал отправили в корзину; TRASH_DAYS дней спустя ночная
- * уборка удаляет и записи, и сами файлы (ч. 7 ст. 5 152-ФЗ — хранить
- * не дольше, чем требует цель).
+ * дня, когда материал отправили в корзину; свой для организации
+ * (`trashDays`) — ночная уборка удаляет и записи, и сами файлы этим же
+ * сроком (ч. 7 ст. 5 152-ФЗ — хранить не дольше, чем требует цель).
  */
-function retentionOf(trashedAt: Date | null): RegistryRow['retention'] {
+function retentionOf(trashedAt: Date | null, trashDays: number): RegistryRow['retention'] {
   if (!trashedAt) return null;
   const purgeAt = new Date(trashedAt);
-  purgeAt.setDate(purgeAt.getDate() + TRASH_DAYS);
-  return { trashedAt, purgeAt, daysLeft: daysLeftInTrash(trashedAt) };
+  purgeAt.setDate(purgeAt.getDate() + trashDays);
+  return { trashedAt, purgeAt, daysLeft: daysLeftInTrash(trashedAt, trashDays) };
 }
 
 function formatDate(date: Date): string {

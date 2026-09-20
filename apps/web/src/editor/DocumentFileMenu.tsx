@@ -10,9 +10,9 @@ import {
   PencilLine,
   Trash2,
 } from 'lucide-react';
-import { TRASH_DAYS } from '@gramota/shared';
 import { api, errorText } from '../api/client';
 import { useFolders } from '../api/folders';
+import { useTrashDays } from '../api/org';
 import type { DocumentDetail } from '../api/types';
 import { Button } from '../ui/Button';
 import { Label } from '../ui/Field';
@@ -49,6 +49,7 @@ export function useDocumentFileMenu(doc: DocumentDetail | undefined): {
   const [folderId, setFolderId] = useState<string | ''>('');
 
   const folders = useFolders();
+  const trashDays = useTrashDays();
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ['document', doc?.id] });
@@ -203,7 +204,7 @@ export function useDocumentFileMenu(doc: DocumentDetail | undefined): {
         >
           {/* Про архив говорим прямо: без этой строчки удаление читается
               как безвозвратное, и его боятся нажимать даже там, где надо. */}
-          «{doc?.title}» уедет в архив. Оттуда его можно вернуть в течение {TRASH_DAYS} дней, потом он
+          «{doc?.title}» уедет в архив. Оттуда его можно вернуть в течение {trashDays} дней, потом он
           исчезнет насовсем.
         </ConfirmDialog>
       )}
