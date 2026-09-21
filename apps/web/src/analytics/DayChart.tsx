@@ -205,7 +205,14 @@ export function DayChart({
   );
 }
 
-/** Маленькая линия за период — для плиток. Без осей и подписей: это намёк, а не график. */
+/**
+ * Маленькая линия за период — для плиток. Без осей и подписей: это намёк,
+ * а не график.
+ *
+ * Пустой период не рисуем вовсе. Ноль за все дни давал прямую по нижнему
+ * краю с точкой на конце — на плитке она читалась как оборванный график
+ * или случайная чёрточка поверх подписи, хотя не говорила ничего.
+ */
 export function Sparkline({
   points,
   tone = 'accent',
@@ -218,7 +225,7 @@ export function Sparkline({
   const w = 84;
   const h = 28;
   const buckets = bucketize(points, 60);
-  if (buckets.length < 2) return null;
+  if (buckets.length < 2 || buckets.every((b) => b.n === 0)) return null;
   const max = Math.max(1, ...buckets.map((b) => b.n));
   const pts = buckets.map(
     (b, i) =>

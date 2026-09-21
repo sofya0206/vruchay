@@ -58,7 +58,9 @@ export function SectionLayout({
             onClick={() => setOpen(true)}
             aria-haspopup="dialog"
             aria-label={`${columnTitle}: выбрать`}
-            className="-mx-1 flex min-w-0 basis-full items-center gap-1.5 rounded-control px-1 py-0.5 text-left active:bg-sunken md:hidden"
+            // Кнопка — единственная дорога по разделам на телефоне,
+            // поэтому под палец: 44 точки в высоту, а не 30.
+            className="-mx-1 flex min-h-11 min-w-0 basis-full items-center gap-1.5 rounded-control px-1 py-0.5 text-left active:bg-sunken md:hidden"
           >
             <span className="min-w-0">{head}</span>
             <ChevronsUpDown size={16} className="shrink-0 text-muted" />

@@ -307,6 +307,9 @@ function CopyBtn({ copied, onClick }: { copied: boolean; onClick: () => void }) 
       type="button"
       onClick={onClick}
       aria-label={copied ? 'Скопировано' : 'Скопировать'}
+      // Под палец не растёт: без заголовка кнопка лежит поверх самого
+      // кода, и крупная накрывала бы первую строку, а у короткого
+      // примера ещё и вылезала за скруглённый угол рамки.
       className="grid size-7 place-items-center rounded-md text-code-muted transition-colors hover:bg-code-line hover:text-code-fg"
     >
       {copied ? <Check size={14} /> : <Copy size={14} />}

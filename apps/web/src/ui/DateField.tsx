@@ -197,7 +197,7 @@ function Step({
       type="button"
       aria-label={label}
       onClick={onClick}
-      className="grid size-7 place-items-center rounded-md text-muted transition-colors hover:bg-sunken hover:text-ink"
+      className="grid size-7 place-items-center rounded-md text-muted transition-colors hover:bg-sunken hover:text-ink pointer-coarse:size-11"
     >
       {children}
     </button>

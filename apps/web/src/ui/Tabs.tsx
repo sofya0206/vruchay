@@ -71,7 +71,9 @@ export function Segmented<T extends string>({
             tabIndex={active ? 0 : -1}
             onClick={() => onChange(tab.id)}
             className={cn(
-              'pressable inline-flex h-9 items-center justify-center gap-1.5 rounded-[6px] px-3.5 text-sm font-medium whitespace-nowrap',
+              // Под пальцем — 44 точки: переключателем отбирают список,
+              // а 36 точек между соседними вкладками — промах.
+              'pressable inline-flex h-9 items-center justify-center gap-1.5 rounded-[6px] px-3.5 text-sm font-medium whitespace-nowrap pointer-coarse:h-11',
               stretch ? 'min-w-0 flex-1' : 'shrink-0',
               active ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink',
             )}

@@ -20,8 +20,12 @@ export const control =
   'focus-visible:ring-2 focus-visible:ring-focus aria-invalid:ring-danger ' +
   'disabled:cursor-not-allowed disabled:opacity-50';
 
-/** Поле в строке таблицы или на панели: ниже и теснее. */
-export const controlCompact = 'h-8 px-2.5';
+/**
+ * Поле в строке таблицы или на панели: ниже и теснее. Под пальцем
+ * остаётся 44 точки — в поиск по реестру и в поля отбора иначе не
+ * попасть, а на мелком поле iOS ещё и приближает страницу.
+ */
+export const controlCompact = 'h-8 px-2.5 pointer-coarse:h-11';
 
 /**
  * Подпись поля. Настоящий `label`: с `htmlFor` читалка называет поле

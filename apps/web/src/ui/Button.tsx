@@ -30,9 +30,14 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
  * Высоты 32 / 40 / 48: контрол в строке таблицы, обычный, на телефоне
  * под палец. Крупный ещё и в разделах, набранных в 16 точек, — там кнопка
  * с текстом в 14 выпадала из строки.
+ *
+ * Мелкий под пальцем подрастает до 44: он стоит в панелях редактора и
+ * в строках таблицы, где соседи в паре точек, и 32 точки — это промах
+ * по соседней кнопке. По ширине он остаётся прежним, растёт только
+ * высота: ряды кнопок от этого не переносятся.
  */
 const sizes: Record<ButtonSize, { text: string; icon: string }> = {
-  sm: { text: 'h-8 gap-1.5 px-3 text-sm', icon: 'size-8' },
+  sm: { text: 'h-8 gap-1.5 px-3 text-sm pointer-coarse:h-11', icon: 'size-8' },
   md: { text: 'h-10 gap-2 px-4 text-sm', icon: 'size-10' },
   lg: { text: 'h-12 gap-2 px-5 text-base', icon: 'size-12' },
 };

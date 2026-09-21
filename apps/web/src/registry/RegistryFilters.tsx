@@ -187,7 +187,12 @@ export function RegistryFilters({ value, facets, onChange, onReset }: Props) {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-0 flex-1 md:max-w-72">
+        {/* Своя наименьшая ширина, а не `min-w-0`: у остальных полей строки
+            ширина постоянная, и в тесной строке весь недостаток места
+            доставался поиску — он схлопывался в ноль, а само поле
+            вылезало поверх «Все материалы» и срезало ему начало. Теперь
+            строка переносится, а поиск остаётся полем. */}
+        <div className="relative min-w-56 flex-1 md:max-w-72">
           <Search
             size={16}
             aria-hidden
