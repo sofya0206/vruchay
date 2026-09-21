@@ -10,6 +10,7 @@ import {
   Steps,
 } from '../landing/blocks';
 import { Faq } from '../landing/Faq';
+import { EditorMock } from '../landing/Mocks';
 import { Meta } from '../seo/Meta';
 
 /**
@@ -98,7 +99,7 @@ const EDU_FAQ = [
   },
   {
     q: 'Сколько это стоит для школы с потоком в тысячу человек в месяц?',
-    a: '12 000 документов в год укладываются в тариф «Про» — 69 000 ₽ в год, 3,45 ₽ за документ. В него входят выдача со своего домена, форма на сайте и доступ по API.',
+    a: 'Посчитаем под ваш объём и пришлём расчёт — тарифную сетку сейчас пересматриваем, поэтому цифр на сайте нет. Выдача со своего домена, форма на сайте и доступ по API есть независимо от объёма.',
   },
   {
     q: 'Мы государственный вуз. Есть ли особенности?',
@@ -117,7 +118,7 @@ export function EducationPage() {
       <SiteHeader
         links={[
           { href: '#vydacha', label: 'Как выдавать' },
-          { href: '/pricing', label: 'Цены', compact: true },
+          { href: '/pricing', label: 'Оплата', compact: true },
         ]}
       />
 
@@ -166,6 +167,17 @@ export function EducationPage() {
         lead="Выбирается один — тот, который меньше меняет ваш процесс."
       >
         <Steps items={FLOW} />
+        <div className="mt-12 grid items-center gap-8 lg:grid-cols-[1fr_1.3fr]">
+          <div>
+            <h3 className="font-medium">Один макет — любой курс</h3>
+            <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
+              Название курса, число часов и дата подставляются переменными, а не набираются заново
+              в сорока копиях бланка. Часы можно вывести и прописью — «в объёме сто двадцать часов» —
+              формальность, которую спрашивают в удостоверениях о повышении квалификации.
+            </p>
+          </div>
+          <EditorMock />
+        </div>
       </Section>
 
       <Section
@@ -194,7 +206,7 @@ export function EducationPage() {
         title="Первый поток — на пробных пятидесяти"
         text="Их хватает, чтобы пройти путь целиком: макет, выдача, письмо, проверка подлинности."
         primary={{ to: '/register', label: 'Попробовать бесплатно' }}
-        secondary={{ to: '/pricing', label: 'Смотреть тарифы' }}
+        secondary={{ to: '/pricing', label: 'Как устроена оплата' }}
       />
       <SiteFooter />
     </div>

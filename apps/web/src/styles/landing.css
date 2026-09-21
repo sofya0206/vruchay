@@ -145,24 +145,6 @@
   }
 }
 
-/* Посадочная экранами: одна секция — один экран. Ниже ноутбука экранов нет. */
-html[data-snap='y'] {
-  scroll-behavior: smooth;
-}
-@media (min-width: 1024px) and (min-height: 700px) {
-  html[data-snap='y'] {
-    scroll-snap-type: y mandatory;
-  }
-  .vru-screen {
-    min-height: 100dvh;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    scroll-snap-align: start;
-    scroll-snap-stop: always;
-  }
-}
-
 /*
  * Появление при входе в экран: чуть снизу и из прозрачности. Задержка
  * растёт с порядковым номером (--reveal-i) — элементы выходят друг за другом.
@@ -178,116 +160,6 @@ html[data-snap='y'] {
 .vru-reveal.is-in {
   opacity: 1;
   transform: none;
-}
-
-/* Точки экранов у правого края; подпись выезжает на наведение. */
-.vru-dots {
-  position: fixed;
-  right: 20px;
-  top: 50%;
-  z-index: 20;
-  display: none;
-  flex-direction: column;
-  gap: 14px;
-  transform: translateY(-50%);
-}
-@media (min-width: 1024px) and (min-height: 700px) {
-  .vru-dots {
-    display: flex;
-  }
-}
-.vru-dots__dot {
-  position: relative;
-  display: block;
-  width: 8px;
-  height: 8px;
-  border-radius: 9999px;
-  background: var(--line-strong);
-  transition:
-    background var(--duration-fast),
-    transform var(--duration-base) var(--ease-out);
-}
-.vru-dots__dot:hover,
-.vru-dots__dot[aria-current='true'] {
-  background: var(--accent);
-  transform: scale(1.4);
-}
-.vru-dots__label {
-  position: absolute;
-  right: 20px;
-  top: 50%;
-  translate: 0 -50%;
-  white-space: nowrap;
-  border-radius: var(--radius-pill);
-  background: var(--surface);
-  box-shadow: var(--ring-line);
-  padding: 4px 10px;
-  font-size: var(--text-sm);
-  color: var(--text);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--duration-fast);
-}
-.vru-dots__dot:hover .vru-dots__label,
-.vru-dots__dot:focus-visible .vru-dots__label {
-  opacity: 1;
-}
-
-/* Закладки как путь: между шагами стрелка, активный — синий с линией. */
-.vru-tabbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 16px;
-  border-bottom: 1px solid var(--line);
-}
-.vru-tabbar button {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  border: 0;
-  background: none;
-  padding: 0 0 12px;
-  margin-bottom: -1px;
-  border-bottom: 2px solid transparent;
-  font-family: inherit;
-  font-size: var(--text-lg);
-  font-weight: 500;
-  letter-spacing: var(--text-lg--letter-spacing);
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: color var(--duration-fast);
-}
-.vru-tabbar button:hover {
-  color: var(--text);
-}
-.vru-tabbar button[aria-selected='true'] {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
-}
-.vru-tabbar__arrow {
-  display: inline-flex;
-  align-items: center;
-  height: 28px;
-  color: var(--line-strong);
-}
-@media (max-width: 640px) {
-  .vru-tabbar {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
-    gap: 12px;
-  }
-  .vru-tabbar::-webkit-scrollbar {
-    display: none;
-  }
-  .vru-tabbar button {
-    white-space: nowrap;
-  }
-}
-/* Без рейки: в кабинете закладки стоят последними на экране. */
-.vru-tabbar--flat {
-  border-bottom: 0;
 }
 
 /*
@@ -335,17 +207,6 @@ html[data-snap='y'] {
       var(--elevation-lg);
     transform: translateY(-3px);
   }
-}
-
-/* Шаг «Как это работает»: уходящий пропадает сразу, входящий проявляется. */
-.vru-step {
-  opacity: 0;
-  visibility: hidden;
-}
-.vru-step.is-active {
-  opacity: 1;
-  visibility: visible;
-  animation: vru-fade var(--duration-base) var(--ease-out) both;
 }
 
 /* Окно терминала: та же рамка, что у экранов продукта. */
@@ -420,16 +281,12 @@ html[data-snap='y'] {
 
 @media (prefers-reduced-motion: reduce) {
   .vru-enter,
-  .vru-aura__blob,
-  .vru-step.is-active {
+  .vru-aura__blob {
     animation: none;
   }
   .vru-reveal {
     opacity: 1;
     transform: none;
     transition: none;
-  }
-  html[data-snap='y'] {
-    scroll-behavior: auto;
   }
 }

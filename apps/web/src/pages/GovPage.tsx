@@ -18,6 +18,7 @@ import {
   Section,
 } from '../landing/blocks';
 import { Faq } from '../landing/Faq';
+import { VerifyMock } from '../landing/Mocks';
 import { Meta } from '../seo/Meta';
 
 /**
@@ -84,7 +85,7 @@ const PROCUREMENT = [
   {
     icon: Gavel,
     title: 'По 44-ФЗ — без конкурса',
-    text: 'Годовая лицензия стоит от 29 000 до 149 000 ₽ и укладывается в закупку у единственного поставщика по пункту 4 части 1 статьи 93 44-ФЗ (до 600 000 ₽ по договору). Конкурентную процедуру проводить не требуется — при соблюдении годовых лимитов учреждения.',
+    text: 'Годовая лицензия укладывается в закупку у единственного поставщика по пункту 4 части 1 статьи 93 44-ФЗ — точную сумму под ваш объём награждений посчитаем и пришлём коммерческим предложением. Конкурентную процедуру проводить не требуется — при соблюдении годовых лимитов учреждения.',
   },
   {
     icon: Landmark,
@@ -146,7 +147,7 @@ export function GovPage() {
       <SiteHeader
         links={[
           { href: '#zakupki', label: 'Закупки' },
-          { href: '/pricing', label: 'Цены', compact: true },
+          { href: '/pricing', label: 'Оплата', compact: true },
         ]}
       />
 
@@ -199,6 +200,17 @@ export function GovPage() {
       </Section>
 
       <Section
+        tone="surface"
+        title="Как выглядит подтверждение подлинности"
+        lead="Код на документе ведёт на открытую страницу с вердиктом — то, о чём говорит уведомление в Роскомнадзор и договор-поручение выше, а не абстрактное обещание."
+        narrow
+      >
+        <div className="mt-8 max-w-sm">
+          <VerifyMock />
+        </div>
+      </Section>
+
+      <Section
         id="zakupki"
         tone="surface"
         title="Как это закупить"
@@ -224,7 +236,7 @@ export function GovPage() {
         title="Проверьте на ближайшем награждении"
         text="Пятьдесят документов на пробу не требуют ни договора, ни закупки. Пакет для юридического отдела пришлём параллельно."
         primary={{ to: '/register', label: 'Попробовать бесплатно' }}
-        secondary={{ to: '/pricing', label: 'Смотреть тарифы' }}
+        secondary={{ to: '/pricing', label: 'Как устроена оплата' }}
       />
       <SiteFooter />
     </div>

@@ -63,11 +63,15 @@ export function Certificate() {
             </p>
             <div className="mx-auto mt-3 h-px w-12 bg-[var(--award)]/45" />
 
-            <p className="mt-6 font-serif text-[2rem] leading-none tracking-wide">Сертификат</p>
+            <p className="mt-6 font-serif text-[2rem] leading-none tracking-wide">Диплом</p>
+            <p className="mt-1 text-[11px] tracking-[0.2em] text-[var(--text-muted)] uppercase">
+              победителя
+            </p>
 
-            <p className="mt-6 text-xs text-[var(--text-muted)]">награждается</p>
-            {/* Имя — самое крупное после заголовка: документ именной. */}
-            <p className="mt-1.5 font-serif text-xl">Кузьмина-Караваева Анна</p>
+            <p className="mt-5 text-xs text-[var(--text-muted)]">награждается</p>
+            {/* Имя — самое крупное после заголовка: документ именной. Тот же
+                человек, что и в остальных экранах ниже — одна история. */}
+            <p className="mt-1.5 font-serif text-xl">Иванов Иван</p>
 
             <p className="mx-auto mt-3 max-w-[16rem] text-xs leading-relaxed text-[var(--text-muted)]">
               за первое место в номинации «Лучший проект»
@@ -120,16 +124,54 @@ function Seal() {
   );
 }
 
-/** Условный код: рисунок, а не настоящая ссылка — это витрина, не документ. */
+/**
+ * Условный код: рисунок, а не настоящая ссылка — это витрина, не документ.
+ *
+ * Восемь на восемь случайных точек читаются глазом как шум, а не как QR:
+ * узнаваемость коду дают три вложенных квадрата-маяка по углам — без них
+ * взгляд не опознаёт форму. Модули считаются, а не перечисляются вручную
+ * (21×21 — размер настоящего QR первой версии), плотно, без зазоров:
+ * зазор между точками и превращал рисунок в «дырявый», а не в код.
+ */
+const QR_SIZE = 21;
+const QR_FINDER_CORNERS: [number, number][] = [
+  [0, 0],
+  [0, QR_SIZE - 7],
+  [QR_SIZE - 7, 0],
+];
+
+function qrFinderModule(row: number, col: number): boolean | null {
+  for (const [r0, c0] of QR_FINDER_CORNERS) {
+    const r = row - r0;
+    const c = col - c0;
+    if (r >= 0 && r < 7 && c >= 0 && c < 7) {
+      const ring = r === 0 || r === 6 || c === 0 || c === 6;
+      const core = r >= 2 && r <= 4 && c >= 2 && c <= 4;
+      return ring || core;
+    }
+  }
+  return null;
+}
+
+/** Детерминированный псевдошум вместо Math.random(): одинаковый при каждой отрисовке. */
+function qrNoiseModule(row: number, col: number): boolean {
+  return (row * 928371 + col * 12841 + row * col * 7) % 5 < 2;
+}
+
 function QrMark() {
-  const cells = [
-    1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 0, 0, 1, 1,
-    0, 0, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1,
-  ];
+  const cells = Array.from({ length: QR_SIZE * QR_SIZE }, (_, i) => {
+    const row = Math.floor(i / QR_SIZE);
+    const col = i % QR_SIZE;
+    return qrFinderModule(row, col) ?? qrNoiseModule(row, col);
+  });
   return (
-    <div className="ml-auto grid h-9 w-9 grid-cols-8 gap-px" aria-hidden="true">
+    <div
+      className="ml-auto grid h-12 w-12 bg-[var(--text)]/[0.06] p-1"
+      style={{ gridTemplateColumns: `repeat(${QR_SIZE}, 1fr)` }}
+      aria-hidden="true"
+    >
       {cells.map((on, i) => (
-        <span key={i} className={on ? 'bg-[var(--text)] opacity-75' : ''} />
+        <span key={i} className={on ? 'bg-[var(--text)] opacity-80' : ''} />
       ))}
     </div>
   );

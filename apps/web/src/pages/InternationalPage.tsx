@@ -10,6 +10,7 @@ import {
   Section,
 } from '../landing/blocks';
 import { Faq } from '../landing/Faq';
+import { EditorMock } from '../landing/Mocks';
 import { Meta } from '../seo/Meta';
 
 /**
@@ -105,7 +106,7 @@ export function InternationalPage() {
       <SiteHeader
         links={[
           { href: '#varianty', label: 'Варианты размещения' },
-          { href: '/pricing', label: 'Цены', compact: true },
+          { href: '/pricing', label: 'Оплата', compact: true },
         ]}
       />
 
@@ -139,9 +140,21 @@ export function InternationalPage() {
       <Section
         tone="surface"
         title="Что работает без всяких оговорок"
-        lead="Эти вещи не зависят от страны заказчика и включены в любой тариф."
+        lead="Эти вещи не зависят от страны заказчика."
       >
         <ArgumentGrid items={WHAT_WORKS} columns={3} />
+        <div className="mt-12 grid items-center gap-8 lg:grid-cols-[1fr_1.3fr]">
+          <div>
+            <h3 className="font-medium">Фамилия — как в загранпаспорте, а не как получится</h3>
+            <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
+              Для документов, которые проверят за рубежом, редактор подставляет фамилию латиницей
+              сразу в двух стандартах — ICAO (как в загранпаспорте) и ГОСТ 7.79-2000
+              (делопроизводственный). Расхождение между ними — реальная причина, по которой диплом
+              не совпадает с документом человека; выбор стандарта виден прямо в названии поля.
+            </p>
+          </div>
+          <EditorMock />
+        </div>
       </Section>
 
       <Section
@@ -196,7 +209,7 @@ export function InternationalPage() {
         title="Проверьте на обычном контуре"
         text="Пятьдесят документов на пробу покажут, подходит ли сервис по существу. Вопрос о размещении решается отдельно и до договора."
         primary={{ to: '/register', label: 'Попробовать бесплатно' }}
-        secondary={{ to: '/pricing', label: 'Смотреть тарифы' }}
+        secondary={{ to: '/pricing', label: 'Как устроена оплата' }}
       />
       <SiteFooter />
     </div>

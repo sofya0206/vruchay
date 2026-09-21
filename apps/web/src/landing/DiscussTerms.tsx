@@ -172,7 +172,7 @@ export function DiscussTerms() {
 
             <div>
               <Label>Как к вам обращаться</Label>
-              <Input name="contact" required maxLength={120} placeholder="Наталья Сергеевна" />
+              <Input name="contact" required maxLength={120} placeholder="Иван Иванов" />
             </div>
             <div>
               <Label>Почта</Label>
