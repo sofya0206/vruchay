@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import type { ReactElement } from 'react';
+import { LandingPage } from '../pages/LandingPage';
 import { GovPage } from '../pages/GovPage';
 import { BusinessPage } from '../pages/BusinessPage';
 import { PersonalPage } from '../pages/PersonalPage';
@@ -13,14 +14,17 @@ import { LANDING_JSON_LD } from '../seo/landing-schema';
 /**
  * Проверки посадочных страниц.
  *
- * Вёрстку тесты не стерегут — её видно глазами. Стерегут они две вещи,
- * которые глазами как раз не видны: расхождение цен между страницами
- * и утверждения, за которые придётся отвечать.
+ * Вёрстку тесты не стерегут — её видно глазами. Стерегут они утверждения,
+ * за которые придётся отвечать и которые глазами не всегда заметны.
  *
- * Цена, названная на одной странице иначе, чем на другой, — это спор
- * с клиентом при оплате. А фраза «мы в реестре российского ПО», написанная
- * до того, как запись появилась, снимает предложение с закупки целиком:
- * реестр открытый и проверяется поиском за минуту.
+ * Тарифную сетку пересматривают (решение владельца, 29.08.2026): пока
+ * пересмотр не закончен, ни одна публичная страница не должна называть
+ * рубли — случайно оставленная цифра на одной странице спорит с текстом
+ * «цены обсуждаются лично» на всех остальных.
+ *
+ * А фраза «мы в реестре российского ПО», написанная до того, как запись
+ * появилась, снимает предложение с закупки целиком: реестр открытый
+ * и проверяется поиском за минуту.
  */
 
 function html(page: ReactElement): string {
@@ -28,12 +32,13 @@ function html(page: ReactElement): string {
 }
 
 const PAGES: [string, ReactElement][] = [
+  ['главная', <LandingPage />],
   ['госучреждениям', <GovPage />],
   ['организациям', <BusinessPage />],
   ['физлицам', <PersonalPage />],
   ['образованию', <EducationPage />],
   ['международный контур', <InternationalPage />],
-  ['тарифы', <PricingPage />],
+  ['оплата', <PricingPage />],
 ];
 
 describe.each(PAGES)('посадочная: %s', (_name, page) => {
@@ -56,26 +61,15 @@ describe.each(PAGES)('посадочная: %s', (_name, page) => {
   });
 });
 
-describe('цены не расходятся между страницами', () => {
-  const pricing = html(<PricingPage />);
-
-  it('совпадают с разметкой данных для поисковиков', () => {
-    // Разметка отдаёт роботу те же числа, что человек видит на странице:
-    // расхождение поисковики считают обманом и снимают сниппет целиком.
-    const offers = JSON.stringify(LANDING_JSON_LD);
-    expect(offers).toContain('29000');
-    expect(offers).toContain('69000');
-    expect(offers).toContain('149000');
-    expect(pricing).toContain('29 000 ₽');
-    expect(pricing).toContain('69 000 ₽');
-    expect(pricing).toContain('149 000 ₽');
+describe('на публичных страницах нет цен', () => {
+  it.each(PAGES)('%s — без рублей', (_name, page) => {
+    expect(html(page)).not.toMatch(/\d[\d\s]*₽/);
   });
 
-  it('называют одну и ту же цену превышения на всех страницах', () => {
-    for (const [, page] of PAGES) {
-      const out = html(page);
-      if (out.includes('сверх')) expect(out).toContain('3 ₽');
-    }
+  it('разметка данных для поисковиков не публикует предложение с ценой', () => {
+    // Offer без указанной цены — не Offer, поэтому его нет вовсе,
+    // а не «Offer с пустым price»: последнее поисковики тоже читают как обман.
+    expect(JSON.stringify(LANDING_JSON_LD)).not.toContain('"@type":"Offer"');
   });
 });
 

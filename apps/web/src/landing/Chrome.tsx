@@ -35,7 +35,7 @@ interface HeaderLink {
 
 export function SiteHeader({ links }: { links?: HeaderLink[] }) {
   const items = links ?? [
-    { href: '/pricing', label: 'Цены' },
+    { href: '/pricing', label: 'Оплата' },
     { href: '/#kak', label: 'Как это работает', compact: true },
   ];
 
@@ -93,7 +93,7 @@ export function SiteFooter() {
               ))}
               <li>
                 <Link to="/pricing" className="transition-colors hover:text-[var(--text)]">
-                  Тарифы
+                  Оплата
                 </Link>
               </li>
             </ul>

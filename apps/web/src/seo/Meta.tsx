@@ -15,6 +15,9 @@ import { useEffect } from 'react';
 
 const SITE = 'https://vruchay.ru';
 
+/** Картинка превью по умолчанию — одна на все публичные страницы, 1200×630. */
+const DEFAULT_OG_IMAGE = `${SITE}/og-image.png`;
+
 interface Props {
   title: string;
   description: string;
@@ -22,6 +25,8 @@ interface Props {
   /** Закрыть от индексации: страницы ошибок и кабинета в выдаче не нужны. */
   noindex?: boolean;
   jsonLd?: object;
+  /** Своя картинка превью вместо общей — абсолютный URL. */
+  image?: string;
 }
 
 function upsert(selector: string, create: () => HTMLElement, apply: (el: HTMLElement) => void) {
@@ -33,7 +38,7 @@ function upsert(selector: string, create: () => HTMLElement, apply: (el: HTMLEle
   apply(el);
 }
 
-export function Meta({ title, description, path, noindex, jsonLd }: Props) {
+export function Meta({ title, description, path, noindex, jsonLd, image }: Props) {
   useEffect(() => {
     document.title = title;
 
@@ -59,7 +64,9 @@ export function Meta({ title, description, path, noindex, jsonLd }: Props) {
     meta('og:type', 'website', true);
     meta('og:locale', 'ru_RU', true);
     meta('og:site_name', 'Вручай', true);
+    meta('og:image', image ?? DEFAULT_OG_IMAGE, true);
     meta('twitter:card', 'summary_large_image');
+    meta('twitter:image', image ?? DEFAULT_OG_IMAGE);
 
     upsert(
       'link[rel="canonical"]',
@@ -84,7 +91,7 @@ export function Meta({ title, description, path, noindex, jsonLd }: Props) {
         },
       );
     }
-  }, [title, description, path, noindex, jsonLd]);
+  }, [title, description, path, noindex, jsonLd, image]);
 
   return null;
 }

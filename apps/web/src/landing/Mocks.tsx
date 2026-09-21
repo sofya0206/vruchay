@@ -1,5 +1,20 @@
 import type { CSSProperties, ReactNode } from 'react';
-import { Archive, Download, FileText, Image, QrCode, Type, WandSparkles } from 'lucide-react';
+import {
+  Archive,
+  Check,
+  CheckCircle2,
+  Download,
+  FileText,
+  Image,
+  Mail,
+  QrCode,
+  Search,
+  ShieldCheck,
+  Trophy,
+  Type,
+  WandSparkles,
+  XCircle,
+} from 'lucide-react';
 
 /**
  * Экраны продукта для посадочной.
@@ -8,7 +23,18 @@ import { Archive, Download, FileText, Image, QrCode, Type, WandSparkles } from '
  * показываем то, что человек увидит в кабинете. Это разметка, а не снимки
  * экрана: она не устаревает при следующей правке интерфейса и не весит
  * мегабайт на первом экране.
+ *
+ * Одна история на все экраны: везде, где нужен пример человека, — Иванов
+ * Иван. Остальные строки списков нарочно скрыты плашками, а не выдуманы:
+ * так видно, что список большой, и не появляется случайный второй герой,
+ * который никуда дальше не ведёт.
  */
+
+const PERSON = 'Иванов Иван';
+const PERSON_DATIVE = 'Иванову Ивану';
+const ORG = 'Центр «Развитие»';
+const EVENT = 'Конкурс «Мастер года»';
+const CODE = 'K7M2-9QXR-4TVB';
 
 function Frame({ url, children }: { url: string; children: ReactNode }) {
   return (
@@ -24,6 +50,20 @@ function Frame({ url, children }: { url: string; children: ReactNode }) {
   );
 }
 
+/** Скрытая строка списка: плашки вместо выдуманного имени — список большой, а герой один. */
+function RedactedRow({ widths = [96, 130, 40] }: { widths?: number[] }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 14px', opacity: 0.55 }}>
+      {widths.map((w, i) => (
+        <span
+          key={i}
+          style={{ width: w, height: 8, borderRadius: 4, background: 'var(--line-strong)' }}
+        />
+      ))}
+    </div>
+  );
+}
+
 interface SheetProps {
   scale?: number;
   kind?: string;
@@ -33,7 +73,6 @@ interface SheetProps {
   event?: string;
   foot?: string;
   signer?: string;
-  signerName?: string;
   org?: string;
   highlightName?: boolean;
 }
@@ -42,20 +81,19 @@ interface SheetProps {
  * Наградной лист витрины.
  *
  * Размеры внутри листа считаются от `u`, а не задаются в пикселях: лист
- * показывают в четырёх разных масштабах, и только пропорциональная вёрстка
- * переживает это без разъезжающейся типографики.
+ * показывают в нескольких разных масштабах, и только пропорциональная
+ * вёрстка переживает это без разъезжающейся типографики.
  */
 export function MiniSheet({
   scale = 1,
-  kind = 'Сертификат',
-  label = 'участника',
-  name = 'Островская Анна',
+  kind = 'Диплом',
+  label = 'победителя',
+  name = PERSON,
   main = 'за первое место в номинации «Лучший проект»',
-  event = 'Конкурс «Мастер года»',
+  event = EVENT,
   foot = '17–19 июня 2026 · Челябинск',
   signer = 'Директор центра',
-  signerName = 'А. В. Соколов',
-  org = 'Центр «Развитие»',
+  org = ORG,
   highlightName = false,
 }: SheetProps) {
   const u = 10 * scale;
@@ -116,7 +154,7 @@ export function MiniSheet({
           }}
         >
           <span>{org}</span>
-          <span>№ K7M2-9QXR</span>
+          <span>№ {CODE.slice(0, 9)}</span>
         </div>
         <div style={{ marginTop: 'auto', marginBottom: 'auto', textAlign: 'center' }}>
           <div style={{ fontSize: u * 1.35, fontWeight: 700, letterSpacing: '.02em', lineHeight: 1.1 }}>{kind}</div>
@@ -186,20 +224,17 @@ export function MiniSheet({
             <div style={{ color: 'var(--text-muted)' }}>Дата</div>
             <div style={{ fontWeight: 500 }}>{foot}</div>
           </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ color: 'var(--text-muted)' }}>{signer}</div>
-            <div style={{ fontWeight: 500 }}>{signerName}</div>
-          </div>
+          <div style={{ textAlign: 'right', color: 'var(--text-muted)' }}>{signer}</div>
         </div>
       </div>
     </div>
   );
 }
 
-/** Документ: редактор макета с подставляемым полем. */
+/** Шаг 1 — Лист: редактор макета, автомасштаб текста, служебные поля. */
 export function EditorMock() {
   return (
-    <Frame url="vruchay.ru / документ">
+    <Frame url="vruchay.ru / документ / лист">
       <div
         style={{
           display: 'flex',
@@ -209,6 +244,7 @@ export function EditorMock() {
           padding: '10px 16px',
           fontSize: 14,
           color: 'var(--text-muted)',
+          flexWrap: 'wrap',
         }}
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -225,8 +261,6 @@ export function EditorMock() {
         </span>
       </div>
       <div style={{ padding: 20, background: 'var(--surface-sunken)' }}>
-        {/* Ширина листа ограничена, чтобы этот экран не возвышался над тремя
-            остальными: лист квадратнее их содержимого и рос бы вдвое быстрее. */}
         <div
           style={{
             maxWidth: 360,
@@ -262,50 +296,46 @@ export function EditorMock() {
   );
 }
 
-/** Таблица: колонки списка становятся полями бланка. */
-export function TableMock() {
+/** Шаг 2 — Получатели: список стал таблицей, колонки сами стали полями. */
+export function RecipientsMock() {
   const cols = ['ФИО', 'Почта', 'Место', 'Номинация'];
   const vars = ['%name', '%email', '%place', '%event'];
-  const rows = [
-    ['Островская Анна', 'anna.k@mail.ru', '1', 'Лучший проект'],
-    ['Иванов Пётр', 'p.ivanov@yandex.ru', '2', 'Лучший проект'],
-    ['Смирнова Дарья', 'd.smirnova@gmail.com', '3', 'Лучшая команда'],
-    ['Ким Артём', 'a.kim@mail.ru', '4', 'Лучшая команда'],
-    ['Тарасов Илья', 'i.tarasov@mail.ru', '5', 'Приз зрителей'],
-  ];
   return (
-    <Frame url="vruchay.ru / список участников">
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
-        <thead>
-          <tr>
-            {cols.map((c, i) => (
-              <th
-                key={c}
-                style={{
-                  textAlign: 'left',
-                  padding: '10px 14px',
-                  borderBottom: '1px solid var(--line)',
-                  background: 'var(--surface-sunken)',
-                  fontWeight: 500,
-                }}
-              >
-                {c}
-                <span style={{ marginLeft: 8, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--accent)' }}>
-                  {vars[i]}
-                </span>
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r[0]}>
-              {r.map((cell, i) => (
+    <Frame url="vruchay.ru / документ / получатели">
+      {/* Таблица не сжимается уже своих ячеек: на узком экране скроллится
+          сама, а не раздвигает всю страницу за край окна. */}
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', minWidth: 480, borderCollapse: 'collapse', fontSize: 14 }}>
+          <thead>
+            <tr>
+              {cols.map((c, i) => (
+                <th
+                  key={c}
+                  style={{
+                    textAlign: 'left',
+                    padding: '10px 14px',
+                    borderBottom: '1px solid var(--line)',
+                    background: 'var(--surface-sunken)',
+                    fontWeight: 500,
+                  }}
+                >
+                  {c}
+                  <span style={{ marginLeft: 8, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--accent)' }}>
+                    {vars[i]}
+                  </span>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            <tr style={{ background: 'var(--accent-soft)' }}>
+              {[PERSON, 'ivan.iv@yandex.ru', '1', 'Лучший проект'].map((cell, i) => (
                 <td
                   key={cell}
                   style={{
                     padding: '10px 14px',
                     borderBottom: '1px solid var(--line)',
+                    fontWeight: i === 0 ? 600 : 400,
                     color: i === 0 ? 'var(--text)' : 'var(--text-muted)',
                     whiteSpace: 'nowrap',
                   }}
@@ -314,11 +344,363 @@ export function TableMock() {
                 </td>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </tbody>
+        </table>
+      </div>
+      <RedactedRow widths={[110, 140, 20, 90]} />
+      <RedactedRow widths={[90, 120, 20, 100]} />
+      <RedactedRow widths={[100, 130, 20, 80]} />
       <div style={{ padding: '12px 14px', fontSize: 14, color: 'var(--text-muted)' }}>
-        Excel или CSV · 212 строк · колонки распознаны автоматически
+        Вставлено из Excel · 212 строк · колонки распознаны автоматически
+      </div>
+    </Frame>
+  );
+}
+
+/** Шаг 3 — Проверка: линтер перед выпуском, не после. */
+export function ValidationMock() {
+  const rows: [string, string, 'ok' | 'warn' | 'bad'][] = [
+    [PERSON, 'Всё в порядке', 'ok'],
+    ['Падеж не подобрался — проверьте вручную', 'Фамилия на «-ых», род неочевиден', 'warn'],
+    ['Нет адреса почты — письмо не уйдёт', 'Можно выпустить файл и без письма', 'bad'],
+  ];
+  const tone = { ok: 'var(--ok)', warn: 'var(--warn)', bad: 'var(--danger)' } as const;
+  const Icon = { ok: CheckCircle2, warn: ShieldCheck, bad: XCircle } as const;
+  return (
+    <Frame url="vruchay.ru / документ / проверка">
+      <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--line)', display: 'flex', gap: 18, fontSize: 13 }}>
+        <span style={{ color: 'var(--ok)' }}>● 209 без замечаний</span>
+        <span style={{ color: 'var(--warn)' }}>● 2 предупреждения</span>
+        <span style={{ color: 'var(--danger)' }}>● 1 блокирует</span>
+      </div>
+      {rows.map(([title, sub, kind]) => {
+        const IconC = Icon[kind];
+        return (
+          <div
+            key={title}
+            style={{
+              display: 'flex',
+              gap: 12,
+              alignItems: 'flex-start',
+              padding: '12px 16px',
+              borderBottom: '1px solid var(--line)',
+              background: kind === 'ok' ? 'var(--accent-soft)' : 'transparent',
+            }}
+          >
+            <IconC size={16} style={{ color: tone[kind], marginTop: 2, flexShrink: 0 }} />
+            <div style={{ minWidth: 0 }}>
+              <p style={{ fontSize: 14, fontWeight: kind === 'ok' ? 600 : 500 }}>{title}</p>
+              <p style={{ marginTop: 2, fontSize: 12, color: 'var(--text-muted)' }}>{sub}</p>
+            </div>
+          </div>
+        );
+      })}
+      <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span
+          style={{
+            borderRadius: 'var(--radius-control)',
+            background: 'var(--accent-button)',
+            color: 'var(--accent-contrast)',
+            padding: '6px 14px',
+            fontSize: 13,
+            fontWeight: 500,
+          }}
+        >
+          Исправить все 2
+        </span>
+        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>или отметьте строки, которые пропустить</span>
+      </div>
+    </Frame>
+  );
+}
+
+/** Правила награждения: одно место — три довода — три документа, автоматически. */
+export function AwardsMock() {
+  const rules: [string, string, number][] = [
+    ['Место = 1 → «Диплом победителя»', 'Иванов Иван и ещё 37', 38],
+    ['Место 2–3 → «Диплом призёра»', 'на основе колонки «Место»', 76],
+    ['Иначе → «Сертификат участника»', 'всем, кто не выбыл', 98],
+  ];
+  return (
+    <Frame url="vruchay.ru / документ / правила награждения">
+      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {rules.map(([rule, sub, count], i) => (
+          <div
+            key={rule}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              borderRadius: 'var(--radius-card)',
+              padding: '12px 14px',
+              background: i === 0 ? 'var(--accent-soft)' : 'var(--surface-sunken)',
+            }}
+          >
+            {i === 0 ? (
+              <Trophy size={18} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+            ) : (
+              <span
+                style={{
+                  width: 18,
+                  height: 18,
+                  flexShrink: 0,
+                  borderRadius: 9999,
+                  background: 'var(--surface)',
+                  boxShadow: 'var(--ring-line)',
+                }}
+              />
+            )}
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <p style={{ fontSize: 13, fontWeight: 500 }}>{rule}</p>
+              <p style={{ marginTop: 1, fontSize: 12, color: 'var(--text-muted)' }}>{sub}</p>
+            </div>
+            <span
+              className="tabular"
+              style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)', flexShrink: 0 }}
+            >
+              {count}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div style={{ padding: '10px 16px', borderTop: '1px solid var(--line)', fontSize: 12, color: 'var(--text-muted)' }}>
+        Что выйдет: 212 документов трёх видов · пересчитано по загруженному протоколу
+      </div>
+    </Frame>
+  );
+}
+
+/** Шаг 4 — Письмо: свой шаблон и то, что увидит именно Иван. */
+export function LetterMock() {
+  return (
+    <Frame url="vruchay.ru / документ / письмо">
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', minHeight: 0 }}>
+        <div style={{ padding: 16, borderRight: '1px solid var(--line)' }}>
+          <p style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-muted)' }}>
+            Тема
+          </p>
+          <p style={{ marginTop: 4, fontSize: 13, fontWeight: 500 }}>Ваш диплом за «{EVENT}»</p>
+          <p
+            style={{
+              marginTop: 12,
+              fontSize: 11,
+              textTransform: 'uppercase',
+              letterSpacing: '.06em',
+              color: 'var(--text-muted)',
+            }}
+          >
+            Текст
+          </p>
+          <p style={{ marginTop: 4, fontSize: 13, lineHeight: 1.6, color: 'var(--text-muted)' }}>
+            Здравствуйте,{' '}
+            <span
+              style={{
+                borderRadius: 4,
+                background: 'var(--accent-soft)',
+                padding: '1px 5px',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 12,
+                color: 'var(--accent)',
+              }}
+            >
+              %name_dat
+            </span>
+            ! Ваш документ во вложении.
+          </p>
+          <p
+            style={{
+              marginTop: 14,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: 12,
+              color: 'var(--accent)',
+            }}
+          >
+            <Check size={14} /> Прикрепить документ
+          </p>
+        </div>
+        <div style={{ padding: 16, background: 'var(--surface-sunken)' }}>
+          <p style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-muted)' }}>
+            Как увидит {PERSON.split(' ')[1]}
+          </p>
+          <div
+            style={{
+              marginTop: 8,
+              borderRadius: 'var(--radius-card)',
+              background: 'var(--surface)',
+              boxShadow: 'var(--ring-line)',
+              padding: 14,
+            }}
+          >
+            <p style={{ fontSize: 13, fontWeight: 500 }}>Ваш диплом за «{EVENT}»</p>
+            <p style={{ marginTop: 6, fontSize: 13, lineHeight: 1.6 }}>
+              Здравствуйте, {PERSON_DATIVE}! Ваш документ во вложении.
+            </p>
+            <div
+              style={{
+                marginTop: 10,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                borderRadius: 'var(--radius-control)',
+                boxShadow: 'var(--ring-line)',
+                padding: '6px 10px',
+                fontSize: 12,
+                color: 'var(--text-muted)',
+              }}
+            >
+              <FileText size={14} /> диплом-иванов.pdf
+            </div>
+          </div>
+        </div>
+      </div>
+      <div
+        style={{
+          padding: '10px 16px',
+          borderTop: '1px solid var(--line)',
+          fontSize: 12,
+          color: 'var(--text-muted)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+        }}
+      >
+        <Mail size={13} /> Письма уйдут с вашего домена, не с адреса сервиса
+      </div>
+    </Frame>
+  );
+}
+
+/** Шаг 5 — Выпуск: список готовности и живой прогресс. */
+export function IssueMock() {
+  const checks = ['Получатели — 212 отмечено', 'Проверка строк — пройдена', 'Письмо участнику — готово', 'Правила награждения — 3 правила'];
+  return (
+    <Frame url="vruchay.ru / документ / выпуск">
+      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {checks.map((c) => (
+          <div key={c} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
+            <CheckCircle2 size={15} style={{ color: 'var(--ok)', flexShrink: 0 }} />
+            {c}
+          </div>
+        ))}
+      </div>
+      <div style={{ padding: '0 16px 16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-muted)' }}>
+          <span>Создаём: {PERSON} · Диплом победителя</span>
+          <span className="tabular">187 из 212</span>
+        </div>
+        <div style={{ marginTop: 6, height: 6, borderRadius: 9999, background: 'var(--surface-sunken)', overflow: 'hidden' }}>
+          <div style={{ width: '88%', height: '100%', borderRadius: 9999, background: 'var(--accent)' }} />
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 10, padding: '0 16px 16px', flexWrap: 'wrap' }}>
+        <span
+          style={{
+            borderRadius: 'var(--radius-control)',
+            background: 'var(--accent-button)',
+            color: 'var(--accent-contrast)',
+            padding: '8px 14px',
+            fontSize: 13,
+            fontWeight: 500,
+          }}
+        >
+          Создать и разослать
+        </span>
+        <span
+          style={{
+            borderRadius: 'var(--radius-control)',
+            boxShadow: 'var(--ring-line)',
+            padding: '8px 14px',
+            fontSize: 13,
+            color: 'var(--text-muted)',
+          }}
+        >
+          Только создать файлы
+        </span>
+      </div>
+    </Frame>
+  );
+}
+
+/** Публичная страница проверки — то, куда ведёт QR на документе. */
+export function VerifyMock() {
+  return (
+    <Frame url={`vruchay.ru / c / ${CODE}`}>
+      <div style={{ padding: 20, textAlign: 'center' }}>
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            borderRadius: 'var(--radius-pill)',
+            background: 'var(--ok-soft)',
+            color: 'var(--ok)',
+            padding: '6px 14px',
+            fontSize: 13,
+            fontWeight: 600,
+          }}
+        >
+          <CheckCircle2 size={15} /> Документ подлинный
+        </div>
+        <p style={{ marginTop: 14, fontSize: 18, fontWeight: 600 }}>{PERSON}</p>
+        <p style={{ marginTop: 2, fontSize: 13, color: 'var(--text-muted)' }}>
+          Диплом победителя · {EVENT} · {ORG}
+        </p>
+        <div
+          style={{
+            margin: '16px auto 0',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            borderRadius: 'var(--radius-control)',
+            boxShadow: 'var(--ring-line)',
+            padding: '6px 12px',
+            fontFamily: 'var(--font-mono)',
+            fontSize: 12,
+            color: 'var(--text-muted)',
+          }}
+        >
+          <QrCode size={14} /> {CODE}
+        </div>
+        <p style={{ marginTop: 16, fontSize: 12, color: 'var(--text-muted)' }}>
+          Перетащите PDF сюда — сверим по отпечатку файла, не выходя за пределы браузера
+        </p>
+      </div>
+    </Frame>
+  );
+}
+
+/** Реестр — внутренний, для «найти и переслать через три месяца». */
+export function RegistryMock() {
+  return (
+    <Frame url="vruchay.ru / реестр">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', borderBottom: '1px solid var(--line)' }}>
+        <Search size={14} style={{ color: 'var(--text-muted)' }} />
+        <span style={{ fontSize: 13, color: 'var(--text)' }}>Иванов</span>
+        <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted)' }}>212 записей</span>
+      </div>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          padding: '12px 16px',
+          background: 'var(--accent-soft)',
+          borderBottom: '1px solid var(--line)',
+        }}
+      >
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <p style={{ fontSize: 13, fontWeight: 600 }}>{PERSON}</p>
+          <p style={{ marginTop: 1, fontSize: 12, color: 'var(--text-muted)' }}>{EVENT} · выдан 2 августа</p>
+        </div>
+        <span className="vru-chip vru-chip--ok">Действителен</span>
+        <span className="vru-chip vru-chip--ok">Доставлено</span>
+      </div>
+      <RedactedRow widths={[120, 160]} />
+      <RedactedRow widths={[100, 140]} />
+      <div style={{ padding: '10px 16px', fontSize: 12, color: 'var(--text-muted)' }}>
+        Переслать · Перевыпустить · Отозвать — на выбранных строках или на всём результате поиска
       </div>
     </Frame>
   );
@@ -326,9 +708,8 @@ export function TableMock() {
 
 /** Файлы: один лист крупно, рядом список выпущенных PDF. */
 export function FilesMock() {
-  const files = ['Островская Анна', 'Иванов Пётр', 'Смирнова Дарья', 'Ким Артём', 'Тарасов Илья'];
   return (
-    <Frame url="vruchay.ru / выпущенные файлы">
+    <Frame url="vruchay.ru / документ / файлы">
       <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: 16, padding: 16 }}>
         <div
           style={{
@@ -339,13 +720,11 @@ export function FilesMock() {
             alignContent: 'center',
           }}
         >
-          <MiniSheet kind="Сертификат" label="" main="за первое место" event="" />
+          <MiniSheet label="" main="за первое место" event="" />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           <div style={{ paddingBottom: 10, borderBottom: '1px solid var(--line)', fontSize: 14 }}>
-            <p style={{ fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              Сертификат за место
-            </p>
+            <p style={{ fontWeight: 500 }}>Диплом победителя</p>
             <p
               style={{
                 marginTop: 2,
@@ -354,7 +733,6 @@ export function FilesMock() {
                 gap: 8,
                 fontSize: 12,
                 color: 'var(--text-muted)',
-                whiteSpace: 'nowrap',
               }}
             >
               212 файлов
@@ -363,72 +741,32 @@ export function FilesMock() {
               </span>
             </p>
           </div>
-          {files.map((n, i) => (
-            <div
-              key={n}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                padding: '10px 0',
-                borderBottom: '1px solid var(--line)',
-                fontSize: 14,
-                background: i === 0 ? 'var(--accent-soft)' : 'transparent',
-                margin: i === 0 ? '0 -8px' : 0,
-                paddingLeft: i === 0 ? 8 : 0,
-                paddingRight: i === 0 ? 8 : 0,
-                borderRadius: i === 0 ? 8 : 0,
-              }}
-            >
-              <FileText size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-              <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {n}.pdf
-              </span>
-              <Download size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-            </div>
-          ))}
-          <p style={{ marginTop: 'auto', paddingTop: 10, fontSize: 12, color: 'var(--text-muted)' }}>и ещё 207 файлов</p>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: '10px 0',
+              borderBottom: '1px solid var(--line)',
+              fontSize: 14,
+              background: 'var(--accent-soft)',
+              margin: '0 -8px',
+              paddingLeft: 8,
+              paddingRight: 8,
+              borderRadius: 8,
+            }}
+          >
+            <FileText size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+            <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {PERSON}.pdf
+            </span>
+            <Download size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+          </div>
+          <RedactedRow widths={[130]} />
+          <RedactedRow widths={[110]} />
+          <p style={{ marginTop: 'auto', paddingTop: 10, fontSize: 12, color: 'var(--text-muted)' }}>и ещё 209 файлов</p>
         </div>
       </div>
-    </Frame>
-  );
-}
-
-/** Письма: судьба каждого письма. */
-export function LettersMock() {
-  const items: [string, string, string, string][] = [
-    ['anna.k@mail.ru', 'Доставлено', 'ok', '2 августа, 14:02'],
-    ['p.ivanov@yandex.ru', 'Открыто', 'ok', '2 августа, 14:03'],
-    ['d.smirnova@gmail.com', 'Доставлено', 'ok', '2 августа, 14:03'],
-    ['a.kim@mail.ru', 'Письмо в пути', 'wait', '2 августа, 14:05'],
-    ['i.tarasov@mail.ru', 'Ящик не существует', 'bad', '2 августа, 14:05'],
-  ];
-  return (
-    <Frame url="vruchay.ru / рассылка">
-      <div style={{ padding: 16, borderBottom: '1px solid var(--line)' }}>
-        <p style={{ fontSize: 14, color: 'var(--text-muted)' }}>От: Центр «Развитие» &lt;award@example.ru&gt;</p>
-        <p style={{ marginTop: 4, fontWeight: 500 }}>Ваш сертификат за конкурс «Мастер года»</p>
-      </div>
-      {items.map(([mail, label, tone, when]) => (
-        <div
-          key={mail}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            padding: '12px 16px',
-            borderBottom: '1px solid var(--line)',
-            fontSize: 14,
-          }}
-        >
-          <span style={{ flex: 1 }}>{mail}</span>
-          <span className={`vru-chip vru-chip--${tone}`}>{label}</span>
-          <span className="tabular" style={{ width: 130, textAlign: 'right', color: 'var(--text-muted)' }}>
-            {when}
-          </span>
-        </div>
-      ))}
-      <div style={{ padding: '12px 16px', fontSize: 14, color: 'var(--text-muted)' }}>212 писем · ушло с вашего домена</div>
     </Frame>
   );
 }
