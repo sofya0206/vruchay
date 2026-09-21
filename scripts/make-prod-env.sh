@@ -23,6 +23,13 @@ OUT="$ROOT/docs/business/generated/prod.env"
 
 PGPASS=$(openssl rand -hex 24)
 SESSION=$(openssl rand -base64 48 | tr -d '\n')
+MAIL_WEBHOOK=$(openssl rand -hex 32)
+
+REQ="$ROOT/docs/business/requisites.md"
+OPERATOR_EMAIL=$(grep -oE '^Email для документов:\s*\S+' "$REQ" 2>/dev/null | awk '{print $NF}')
+OPERATOR_EMAIL=${OPERATOR_EMAIL:-ЗАПОЛНИТЬ}
+OPERATOR_PHONE=$(grep -oE '^Телефон:\s*\S+' "$REQ" 2>/dev/null | awk '{print $NF}')
+OPERATOR_PHONE=${OPERATOR_PHONE:-ЗАПОЛНИТЬ}
 
 cat > "$OUT" <<ENV
 # Боевое окружение «Вручай». Скопировать на сервер как /opt/vruchay/.env
@@ -54,22 +61,29 @@ REDIS_URL=redis://redis:6379
 # Смена значения разлогинивает всех.
 SESSION_SECRET=${SESSION}
 
-# ─── Объектное хранилище ─────────────────────────────────────────────────
-# Создайте два бакета в Selectel (ru-1) и сервисного пользователя с доступом.
-S3_ENDPOINT=https://s3.ru-1.storage.selcloud.ru
+# ─── Объектное хранилище (Timeweb S3) ─────────────────────────────────────
+# Создайте два бакета в панели Timeweb (vruchay-prod, vruchay-backups —
+# с раздельными ключами доступа) и сервисного пользователя с доступом.
+# Эндпоинт и регион проверены вживую запросом к реальному бакету на
+# аккаунте, не по документации Timeweb (см. скилл timeweb).
+S3_ENDPOINT=https://s3.timeweb.cloud
 S3_REGION=ru-1
 S3_BUCKET=vruchay-prod
 S3_ACCESS_KEY=ЗАПОЛНИТЬ
 S3_SECRET_KEY=ЗАПОЛНИТЬ
-S3_ORIGIN=https://s3.ru-1.storage.selcloud.ru
+S3_ORIGIN=https://s3.timeweb.cloud
 
 # ─── Почта ───────────────────────────────────────────────────────────────
 # Основной путь — транзакционное API DashaMail: оно ходит по HTTPS, и
-# закрытые у Selectel почтовые порты его не касаются. Без ключа сервер
-# с MAIL_PROVIDER=dashamail не стартует — это нарочно.
+# блокировки почтовых портов у провайдера сервера его не касаются. Без
+# ключа сервер с MAIL_PROVIDER=dashamail не стартует — это нарочно.
 # Ключ: кабинет DashaMail → «Интеграции» → «Транзакционные письма».
 MAIL_PROVIDER=dashamail
 DASHAMAIL_API_KEY=ЗАПОЛНИТЬ
+
+# Секрет вебхука приёма статусов писем от DashaMail. Пустое значение
+# выключает приём.
+MAIL_WEBHOOK_SECRET=${MAIL_WEBHOOK}
 
 # Запасной путь — SMTP-шлюз того же DashaMail, включается строкой
 # MAIL_PROVIDER=smtp. Держим заполненным, чтобы переключиться за минуту.
@@ -77,13 +91,10 @@ DASHAMAIL_API_KEY=ЗАПОЛНИТЬ
 # Адрес шлюза — dashasender.ru, а не dashamail.ru: почтовый шлюз живёт
 # на отдельном домене. Значения из кабинета: «Email-транспорт» → SMTP.
 #
-# Порт 2525, а не указанные в кабинете 465 или 587. Причина не в DashaMail:
-# Selectel по умолчанию отбрасывает исходящие пакеты на почтовые порты —
-# защита от рассылки спама с арендованных серверов. Проверяется просто:
-# на 443 к тому же адресу приходит явный отказ, а на 465 и 587 — тишина.
-# 2525 — запасной порт подачи, который почтовые сервисы держат именно
-# на этот случай; шифрование там поднимается через STARTTLS, поэтому
-# SMTP_SECURE=false (приложение требует STARTTLS обязательным).
+# Порт 2525, а не указанные в кабинете 465 или 587 — запасной порт подачи
+# на случай, если хостер блокирует исходящие почтовые порты (было так
+# у Selectel). Для текущего провайдера (Timeweb) это не проверено — если
+# 465/587 открыты, использовать их напрямую вместо 2525.
 SMTP_HOST=smtps.dashasender.ru
 SMTP_PORT=2525
 SMTP_SECURE=false
@@ -103,8 +114,8 @@ $(grep '^SELLER_' "$SELLER")
 # Подставляются в страницу /privacy при сборке образа. Наименование, ИНН,
 # ОГРНИП и адрес берутся из SELLER_* выше — это те же сведения. Здесь только
 # то, чего в реквизитах для счетов нет.
-OPERATOR_EMAIL=$(grep -oE '^EMAIL: .*' "$ROOT/docs/business/requisites.md" 2>/dev/null | cut -d' ' -f2- || echo ЗАПОЛНИТЬ)
-OPERATOR_PHONE=$(grep -oE '^ТЕЛЕФОН: .*' "$ROOT/docs/business/requisites.md" 2>/dev/null | cut -d' ' -f2- || echo ЗАПОЛНИТЬ)
+OPERATOR_EMAIL=${OPERATOR_EMAIL}
+OPERATOR_PHONE=${OPERATOR_PHONE}
 # Дата публикации политики. Меняется только вместе с текстом политики.
 POLICY_DATE=$(date '+%d.%m.%Y')
 ENV
@@ -114,7 +125,7 @@ chmod 600 "$OUT"
 echo "✓ Готово: $OUT"
 echo
 echo "Заполнено автоматически:"
-echo "  • пароль базы и секрет сессий — сгенерированы"
+echo "  • пароль базы, секрет сессий и секрет вебхука почты — сгенерированы"
 echo "  • реквизиты продавца — из requisites.md"
 echo "  • домен, адреса хранилища и почты — из наших решений"
 echo

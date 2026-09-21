@@ -21,8 +21,9 @@ set -euo pipefail
 : "${AGE_IDENTITY:?не задан файл с секретным ключом}"
 RESTORE_DATABASE="${RESTORE_DATABASE:-vruchay_drill}"
 
-# Тот же системный набор корневых сертификатов, что и в backup.sh: своему
-# набору AWS CLI сертификат хранилища Selectel не проходит. Подробности там же.
+# Тот же системный набор корневых сертификатов, что и в backup.sh — там же
+# подробности и оговорка, что для текущего провайдера (Timeweb) это не
+# перепроверялось.
 export AWS_CA_BUNDLE="${AWS_CA_BUNDLE:-/etc/ssl/certs/ca-certificates.crt}"
 
 WORK=$(mktemp -d)
@@ -62,4 +63,4 @@ dc psql -U "$PGUSER" --dbname "$RESTORE_DATABASE" --tuples-only --command "
 
 echo
 echo "Проверьте глазами: числа похожи на боевые? Если да — учение пройдено."
-echo "Запишите дату и результат в RUNBOOK.md."
+echo "Запишите дату и результат учебного восстановления."

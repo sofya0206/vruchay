@@ -64,8 +64,7 @@ VPS настраиваем сами, TLS выпускает Caddy.
 `implementing-gdpr-data-protection-controls`, `implementing-gdpr-data-subject-access-request`,
 `performing-privacy-impact-assessment` — требования GDPR и 152-ФЗ не совпадают,
 но набор мер похож: ответы субъектам, сроки хранения, оценка воздействия.
-Российские сроки и формулировки берём из [ADR-0003](../../docs/adr/0003-jurisdiction-rf-rb.md),
-а отсюда — методику.
+Российские сроки и формулировки берём из требований 152-ФЗ, а отсюда — методику.
 
 ### Резервные копии и инциденты
 

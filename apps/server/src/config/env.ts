@@ -79,7 +79,7 @@ export const envSchema = z.object({
   /**
    * Почта. Локально — SMTP в Mailpit на 1025 без авторизации, наружу
    * ничего не уходит. В проде — транзакционное API DashaMail: оно идёт
-   * по HTTPS, а почтовые порты у Selectel закрыты (см. docs/launch-day.md).
+   * по HTTPS и не зависит от того, блокирует ли хостер почтовые порты.
    */
   MAIL_PROVIDER: z.enum(['smtp', 'dashamail']).default('smtp'),
   SMTP_HOST: z.string().default('localhost'),

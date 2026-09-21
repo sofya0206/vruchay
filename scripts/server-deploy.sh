@@ -117,6 +117,6 @@ cat <<INFO
 2. Проверить снаружи (TLS поднимется сам, когда DNS дойдёт):
      ./scripts/smoke.sh https://vruchay.ru
 
-3. Включить резервные копии — docs/launch-day.md, шаг 8.
+3. Включить резервные копии — см. scripts/backup.sh и scripts/restore-drill.sh.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 INFO
