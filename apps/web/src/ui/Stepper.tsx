@@ -25,6 +25,11 @@ export interface StepItem {
  *
  * На телефоне в строку пять подписей не помещаются: остаётся одна
  * кнопка «Шаг 2 из 5 · Получатели», а список открывается нижним листом.
+ *
+ * Лента прокручивается внутри себя. Без этого она в узком окне просто
+ * вылезала за край: «Письмо» и «Выпуск» уезжали за правую границу окна,
+ * страница получала боковую прокрутку, а кнопка «Выпуск» из рамки
+ * документа накрывала собой соседний шаг.
  */
 export function Stepper({
   steps,
@@ -41,7 +46,7 @@ export function Stepper({
 
   return (
     <nav aria-label={label} className={cn('min-w-0', className)}>
-      <ol className="hidden items-center gap-1 md:flex">
+      <ol className="no-scrollbar hidden min-w-0 items-center gap-1 overflow-x-auto md:flex">
         {steps.map((s, i) => (
           <li key={s.id} className="flex items-center">
             <Link

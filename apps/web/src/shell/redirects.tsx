@@ -10,11 +10,21 @@ import { movedViewTarget } from '../editor/moved-views';
  * меню, и на них ссылалась поддержка. Таблица одна, и она же проверяется
  * тестом: адрес, который перестал открываться, — поломка, а не мелочь.
  */
+/**
+ * Собственные страницы писем под `/mailing/…`. Они выглядят как прежний
+ * адрес рабочего места (`/mailing/:id`), но документами не являются:
+ * без этой оговорки «Сводка» в колонке разделов и кнопка «Новая
+ * рассылка» уводили на `/documents/stats/recipients` — документ с таким
+ * именем не существует, и человек попадал в пустоту.
+ */
+const MAIL_PAGES = ['stats', 'new'];
+
 export function legacyTarget(pathname: string, search: string): string | null {
   const params = new URLSearchParams(search);
 
   const workspace = pathname.match(/^\/mailing\/([^/]+)\/?$/);
-  if (workspace) return materialPath(decodeURIComponent(workspace[1]), legacyWorkspaceTab(params.get('tab')));
+  if (workspace && !MAIL_PAGES.includes(workspace[1]))
+    return materialPath(decodeURIComponent(workspace[1]), legacyWorkspaceTab(params.get('tab')));
 
   const editor = pathname.match(/^\/documents\/([^/]+)\/?$/);
   if (editor && params.get('view')) return movedViewTarget(params.get('view'), decodeURIComponent(editor[1]));

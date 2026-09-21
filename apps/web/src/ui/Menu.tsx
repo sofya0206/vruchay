@@ -96,15 +96,22 @@ export function Menu({
       const other = side === 'top' ? 'bottom' : 'top';
       const dir = room[side] < h && room[other] > room[side] ? other : side;
 
+      // Место под список: не меньше 160 точек, но и не больше окна,
+      // а сам список ещё и придвигается к краю, если в отведённое место
+      // не уложился, — иначе он просто уезжал бы за границу экрана.
+      const cap = Math.min(window.innerHeight - EDGE * 2, Math.max(160, room[dir]));
+      const fits = Math.min(h || cap, cap);
+      const clamp = (value: number) => Math.max(EDGE, Math.min(value, window.innerHeight - EDGE - fits));
+
       const left = align === 'right' ? rect.right - w : rect.left;
       setBox({
         left: Math.max(EDGE, Math.min(left, window.innerWidth - w - EDGE)),
-        room: room[dir],
+        room: cap,
         // Вверх — через `bottom`: высота списка на этот момент может быть
         // ещё неизвестна, а `bottom` её знать и не требует.
         ...(dir === 'top'
-          ? { bottom: window.innerHeight - rect.top + GAP }
-          : { top: rect.bottom + GAP }),
+          ? { bottom: clamp(window.innerHeight - rect.top + GAP) }
+          : { top: clamp(rect.bottom + GAP) }),
       });
     };
 
@@ -164,7 +171,9 @@ export function Menu({
             ref={panel}
             role="menu"
             onClick={closeOnPick}
-            className="vru-pop-in fixed z-[60] min-w-56 overflow-y-auto rounded-card bg-raised p-1.5 shadow-lg ring-1 ring-line"
+            // `max-w` — по окну: длинный пункт иначе растягивал список
+            // шире экрана, и правый край уезжал за границу.
+            className="vru-pop-in fixed z-[60] max-w-[calc(100vw-16px)] min-w-56 overflow-y-auto rounded-card bg-raised p-1.5 shadow-lg ring-1 ring-line"
             // Предел высоты — по месту, которое осталось: длинное меню
             // прокручивается, а не уезжает за край окна. Появляется от
             // угла кнопки, а не из центра: так видно, откуда оно.
@@ -172,7 +181,7 @@ export function Menu({
               left: box.left,
               top: box.top,
               bottom: box.bottom,
-              maxHeight: Math.max(160, box.room),
+              maxHeight: box.room,
               ['--pop-origin' as string]: `${box.bottom !== undefined ? 'bottom' : 'top'} ${align}`,
             }}
           >

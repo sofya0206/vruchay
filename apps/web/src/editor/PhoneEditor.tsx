@@ -124,7 +124,10 @@ function BarButton({
           icon
         )}
       </span>
-      <span className="max-w-full truncate">{label}</span>
+      {/* Своя высота строки: `leading-none` у кнопки даёт строку ровно
+          в кегль, а буквы в неё не влезают — `truncate` срезал бы им
+          хвосты снизу на три точки. */}
+      <span className="max-w-full truncate leading-4">{label}</span>
       {badge ? (
         <span className="absolute top-1.5 right-[calc(50%-22px)] grid h-4 min-w-4 place-items-center rounded-full bg-accent px-1 text-[10px] font-semibold leading-none text-on-accent">
           {badge}

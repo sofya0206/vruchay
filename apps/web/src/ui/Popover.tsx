@@ -66,7 +66,7 @@ export function Popover({
        * отрисовку слой не попадает — закрытый он ничего не рисует.
        */
       if (window.matchMedia('(pointer: coarse)').matches) {
-        setBox({ left: 0, right: 0, bottom: 0, room: window.innerHeight * 0.6, sheet: true });
+        setBox({ left: 0, right: 0, bottom: 0, room: Math.max(180, window.innerHeight * 0.6), sheet: true });
         return;
       }
 
@@ -93,6 +93,19 @@ export function Popover({
       const up = below < height && above > below;
 
       /*
+       * Место под слой: не меньше 180 точек, иначе у поля в самом низу
+       * окна список схлопнулся бы в полоску, — но и не больше самого
+       * окна. Дальше слой ещё и придвигается к краю, если по своей
+       * высоте в отведённое место не уложился: раньше нижняя часть
+       * календаря вместе с «Сегодня» и «Очистить» просто оказывалась
+       * за экраном, и нажать их было нечем.
+       */
+      const vh = window.innerHeight;
+      const room = Math.min(vh - 16, Math.max(180, up ? above : below));
+      const fits = Math.min(height, room);
+      const clamp = (value: number) => Math.max(8, Math.min(value, vh - 8 - fits));
+
+      /*
        * Вверх переворачиваем через bottom, а не через top. С top слой
        * по-прежнему рос бы вниз — от верхнего края поля, — и поле у низа
        * окна открывало бы список за экраном. Высоту слоя на этот момент
@@ -101,9 +114,9 @@ export function Popover({
       setBox({
         left,
         width: w,
-        room: up ? above : below,
+        room,
         sheet: false,
-        ...(up ? { bottom: window.innerHeight - rect.top + 4 } : { top: rect.bottom + 4 }),
+        ...(up ? { bottom: clamp(vh - rect.top + 4) } : { top: clamp(rect.bottom + 4) }),
       });
     };
 
@@ -157,7 +170,7 @@ export function Popover({
         top: box.top,
         bottom: box.bottom,
         width: box.width,
-        maxHeight: Math.max(180, box.room),
+        maxHeight: box.room,
       }}
       /*
        * Нажатие внутри слоя не уводит фокус.

@@ -101,11 +101,15 @@ export function DocumentChrome({
 
   return (
     <header className="shrink-0 border-b border-line bg-surface">
-      {/* На телефоне строка переносится: название и действия сверху, лента
-          вкладок — второй строкой во всю ширину. В одну строку лента
-          сжималась до нуля, и из листа нельзя было попасть в таблицу. */}
-      <div className="flex flex-wrap items-center gap-1 px-3 max-md:pt-1 md:h-12 md:flex-nowrap md:border-b md:border-line">
-        <h1 className="flex min-w-0 items-center gap-1 text-sm font-medium max-md:flex-1 md:max-w-[32ch] md:shrink">
+      {/* В узком окне строка переносится: название и действия сверху, лента
+          шагов — второй строкой во всю ширину. В одну строку лента
+          сжималась до нуля, и из листа нельзя было попасть в таблицу.
+          Порог — 1280, а не 768: пяти подписям со связками нужно около
+          570 точек, и рядом с названием, разделителем и «Выпуском» они
+          помещаются только начиная с этой ширины — даже развёрнутой
+          колонкой разделов. */}
+      <div className="flex flex-wrap items-center gap-1 px-3 max-xl:pt-1 xl:h-12 xl:flex-nowrap xl:border-b xl:border-line">
+        <h1 className="flex min-w-0 items-center gap-1 text-sm font-medium max-xl:flex-1 xl:max-w-[32ch] xl:shrink">
           {/* На телефоне — стрелка под палец вместо значка библиотеки. */}
           <Link
             to={isTemplate ? '/documents/templates' : '/documents'}
@@ -120,9 +124,10 @@ export function DocumentChrome({
           <DocumentTitle documentId={documentId} title={title} />
         </h1>
 
-        <span aria-hidden className="mx-2 h-5 w-px shrink-0 bg-line max-md:hidden" />
+        {/* Разделитель нужен только когда лента стоит в той же строке. */}
+        <span aria-hidden className="mx-2 h-5 w-px shrink-0 bg-line max-xl:hidden" />
 
-        <div className="min-w-0 flex-1 max-md:order-last max-md:basis-full" data-tour="stepper">
+        <div className="min-w-0 flex-1 max-xl:order-last max-xl:basis-full" data-tour="stepper">
           <Stepper steps={steps} />
         </div>
 

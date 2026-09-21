@@ -40,6 +40,10 @@ describe('старые адреса', () => {
   it('живые адреса не трогает', () => {
     expect(legacyTarget('/mailing', '')).toBeNull();
     expect(legacyTarget('/mailing', '?list=all')).toBeNull();
+    // Свои страницы писем под тот же образец подходят, но это не документы.
+    expect(legacyTarget('/mailing/stats', '')).toBeNull();
+    expect(legacyTarget('/mailing/new', '')).toBeNull();
+    expect(legacyTarget('/mailing/new', '?mode=text')).toBeNull();
     expect(legacyTarget(`/documents/${ID}`, '')).toBeNull();
     expect(legacyTarget('/settings/account', '')).toBeNull();
     expect(legacyTarget('/registry', '?tab=analytics')).toBeNull();
