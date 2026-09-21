@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { CheckCircle2, ChevronRight, CircleAlert, Info, ListChecks, ShieldCheck, TriangleAlert, Wand2, X } from 'lucide-react';
+import { CheckCircle2, ChevronRight, CircleAlert, Info, ListChecks, ShieldCheck, TriangleAlert, Users, Wand2, X } from 'lucide-react';
 import {
   PROBLEM_KINDS,
   quotaFits,
@@ -10,6 +10,7 @@ import {
 } from '@gramota/shared';
 import { useValidation, useValidationFixes, type CellFix } from '../api/validation';
 import { DiscussTermsLink } from '../billing/DiscussTermsLink';
+import { materialPath } from '../documents/material-steps';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
@@ -110,21 +111,40 @@ export function ValidationScreen({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <Summary
-        report={report}
-        busy={busy}
-        onRecheck={() => void run()}
-        onUncheckBlocked={() => {
-          const dirty = report.rows.filter(isBlocked).map((r) => r.rowId);
-          if (dirty.length) void drop(dirty);
-          else onDone();
-        }}
-        onDone={onDone}
-      />
+      {/* При нуле отмеченных строк подводить нечего: полоса всё равно
+          показала бы «0 без замечаний» и кнопку «Дальше», как будто
+          проверка прошла, — тот же обман, что и ниже. */}
+      {report.total > 0 && (
+        <Summary
+          report={report}
+          busy={busy}
+          onRecheck={() => void run()}
+          onUncheckBlocked={() => {
+            const dirty = report.rows.filter(isBlocked).map((r) => r.rowId);
+            if (dirty.length) void drop(dirty);
+            else onDone();
+          }}
+          onDone={onDone}
+        />
+      )}
 
       {error && <ErrorBar className="mx-4 mt-3">{error}</ErrorBar>}
 
-      {report.rows.length === 0 ? (
+      {report.total === 0 ? (
+        // Отдельно от настоящего прохода: отмеченных строк не было вовсе,
+        // и «Проверили 0 строк — всё на месте» читалось бы как успех там,
+        // где проверять было нечего.
+        <div className="mx-auto w-full max-w-2xl p-6">
+          <Card padding="none">
+            <NextAction
+              icon={Users}
+              title="Нечего проверять"
+              text="Ни одна строка не отмечена — сначала отметьте, кого собираетесь выпускать."
+              primary={{ label: 'К получателям', to: materialPath(documentId, 'recipients') }}
+            />
+          </Card>
+        </div>
+      ) : report.rows.length === 0 ? (
         <div className="mx-auto w-full max-w-2xl p-6">
           <Card padding="none">
             <NextAction

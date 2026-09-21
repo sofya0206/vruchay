@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bold, ChevronDown, Italic, Paperclip } from 'lucide-react';
-import { api } from '../api/client';
+import { Bold, ChevronDown, Italic, Paperclip, Send } from 'lucide-react';
+import { api, errorText } from '../api/client';
 import { Badge } from '../ui/Badge';
+import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Checkbox } from '../ui/Checkbox';
 import { Collapse } from '../ui/Collapse';
 import { Field, Input, Textarea } from '../ui/Field';
 import { IconButton } from '../ui/IconButton';
+import { toast } from '../ui/Toast';
 import { cn } from '../ui/cn';
 import { DEFAULT_LETTER } from './letter-defaults';
 import { insertToken, parseBody, toHtml, toText, wrapSelection, type Run } from './email-body';
@@ -134,6 +136,19 @@ export function EmailTemplateEditor({
     // на каждый рендер и в зависимостях сбрасывал бы таймер бесконечно.
   }, [subject, body, attach, documentId]);
 
+  // Шлёт черновик из состояния, а не сохранённый шаблон — работает
+  // и до первого автосохранения, и без единой строки получателей.
+  const testSend = useMutation({
+    mutationFn: () =>
+      api.post<{ to: string }>(`/mail/templates/${documentId}/test-send`, {
+        subject,
+        bodyHtml: toHtml(body),
+        attachGeneratedFile: attach,
+      }),
+    onSuccess: (result) => toast({ title: `Отправили на ${result.to}`, tone: 'ok' }),
+    onError: (err) => toast({ title: 'Не отправилось', description: errorText(err), tone: 'danger' }),
+  });
+
   const variables = columns.data?.columns.map((c) => c.name) ?? [];
 
   /**
@@ -179,15 +194,28 @@ export function EmailTemplateEditor({
             вашей организации.
           </p>
         </div>
-        <Badge dot tone={saved === 'saved' ? 'ok' : saved === 'error' ? 'danger' : 'neutral'}>
-          {saved === 'saved'
-            ? 'Сохранено'
-            : saved === 'saving'
-              ? 'Сохраняем…'
-              : saved === 'error'
-                ? 'Не сохранилось'
-                : 'Есть правки'}
-        </Badge>
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          <Badge dot tone={saved === 'saved' ? 'ok' : saved === 'error' ? 'danger' : 'neutral'}>
+            {saved === 'saved'
+              ? 'Сохранено'
+              : saved === 'saving'
+                ? 'Сохраняем…'
+                : saved === 'error'
+                  ? 'Не сохранилось'
+                  : 'Есть правки'}
+          </Badge>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<Send size={16} />}
+            loading={testSend.isPending}
+            disabled={!subject.trim()}
+            onClick={() => testSend.mutate()}
+            data-tour="letter-test-send"
+          >
+            Отправить тестовое себе
+          </Button>
+        </div>
       </header>
 
       <Field label="Тема письма">
@@ -207,7 +235,7 @@ export function EmailTemplateEditor({
           <span className="text-sm font-medium text-muted">Текст письма</span>
           {/* Кнопки, а не разметка руками: человек выделяет кусок и нажимает,
               как в любом мессенджере. Знаки при этом видны в тексте. */}
-          <div className="ml-auto flex items-center gap-1">
+          <div className="ml-auto flex items-center gap-1" data-tour="letter-fields">
             <IconButton size="sm" label="Полужирный" onClick={() => applyFormat('*')}>
               <Bold size={16} />
             </IconButton>
@@ -234,7 +262,7 @@ export function EmailTemplateEditor({
       {/* Убрано под раскрывашку: нужно редко — когда документ вручают
           на бумаге, а письмо служит уведомлением. На виду эта галочка
           только пугала. */}
-      <Card padding="none">
+      <Card padding="none" data-tour="letter-attach">
         <button
           type="button"
           onClick={() => setMore((v) => !v)}

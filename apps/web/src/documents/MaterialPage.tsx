@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import type { DocumentDetail } from '../api/types';
+import { useMe } from '../auth/useAuth';
+import { onboarding } from '../onboarding/store';
+import { track } from '../onboarding/track';
 import { Loading } from '../ui/Loading';
 import { NextAction } from '../ui/NextAction';
 import { RecipientsTable } from '../recipients/RecipientsTable';
@@ -44,6 +47,19 @@ export function MaterialPage() {
   /** Куда вставляет панель полей: письмо отдаёт свою каретку. */
   const [fieldTarget, setFieldTarget] = useState<FieldTarget | null>(null);
   const fieldsOpen = useFieldsPanelOpen();
+
+  /*
+   * Подсказки по разделу сами, один раз за пользователя — как уже
+   * происходит на «Листе» (EditorPage.tsx). Только на «Получателях» и
+   * «Проверке»: там путаница в первый раз обычно выше всего (невидимые
+   * до первой строки колонки, пустой прогон проверки, похожий на успех).
+   */
+  const email = useMe().data?.email;
+  useEffect(() => {
+    if (!doc.data || !email || (view !== 'recipients' && view !== 'check')) return;
+    onboarding.load(email);
+    if (onboarding.autoTips(view)) track({ flow: 'tips', step: `${view}.1`, action: 'shown' });
+  }, [doc.data, email, view]);
 
   if (view === 'sheet') return <Navigate to={materialPath(id)} replace />;
   if (doc.isPending) return <Loading />;

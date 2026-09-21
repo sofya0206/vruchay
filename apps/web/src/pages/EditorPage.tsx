@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ErrorState } from '../ui/ErrorState';
-import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { NextAction } from '../ui/NextAction';
+import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   ChevronLeft,
@@ -34,6 +35,7 @@ import {
   Undo2,
   Variable,
   Wand2,
+  FileX2,
 } from 'lucide-react';
 import type { Editor } from '@tiptap/core';
 import {
@@ -88,6 +90,7 @@ import type { EventValues } from '../editor/EventFields';
 import { canvasPreviewData } from '../editor/preview-data';
 import { movedViewTarget } from '../editor/moved-views';
 import { workspacePath } from '../mailing/workspace-tabs';
+import { BlankTile } from '../documents/BlankTile';
 import { SheetRenderer } from '../render/SheetRenderer';
 import { PropertiesPanel } from '../editor/PropertiesPanel';
 import { LayersPanel } from '../editor/LayersPanel';
@@ -217,6 +220,7 @@ const LONG_PRESS_MS = 450;
 export function EditorPage() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
   const [editingId, setEditingId] = useState<string | null>(null);
   /**
@@ -359,6 +363,27 @@ export function EditorPage() {
     setEventDraft(null);
     setActiveSheetId(null);
   }, [id]);
+
+  /*
+   * Вопрос «с чего начать лист» уже решили в окне создания документа
+   * (documents/CreateDocumentPanel.tsx) — там же выбрали бланк или явно
+   * сказали «начну с пустого». Здесь его не повторяем: гасим плитки для
+   * самого первого листа тем же способом, каким их гасит собственный
+   * выбор на холсте — заранее кладём id листа в `buildHere`.
+   *
+   * Флаг — в состоянии перехода, не в адресе: обновление той же страницы
+   * должно показать плитки заново, если бланк и правда не выбран,
+   * а не подставлять устаревший флаг из закладки или пересланной ссылки.
+   * `consumedNavState` — чтобы не перечитывать `location.state` при каждой
+   * смене листа: он относится только к самому первому открытию.
+   */
+  const consumedNavState = useRef(false);
+  useEffect(() => {
+    if (consumedNavState.current || !sheet) return;
+    consumedNavState.current = true;
+    const state = location.state as { skipStartPicker?: boolean } | null;
+    if (state?.skipStartPicker) setBuildHere((prev) => new Set(prev).add(sheet.id));
+  }, [sheet, location.state]);
   const history = useLayoutHistory([]);
   const { reset, beginGesture, endGesture, setLayout } = history;
 
@@ -1196,7 +1221,16 @@ export function EditorPage() {
       />
     );
   }
-  if (!doc.data || !sheet) return <div className="p-6 text-muted">Документ не найден</div>;
+  if (!doc.data || !sheet) {
+    return (
+      <NextAction
+        icon={FileX2}
+        title="Документ не найден"
+        text="Его удалили или ссылка неполная."
+        primary={{ label: 'К документам', to: '/documents' }}
+      />
+    );
+  }
 
   const page = doc.data;
   const pageBox = { w: page.pageWidthMm, h: page.pageHeightMm };
@@ -2614,50 +2648,5 @@ function SheetView({
         </div>
       )}
     </div>
-  );
-}
-
-
-/**
- * Плитка «Свой бланк» — как и другие варианты начать лист, но ещё
- * принимает файл, брошенный прямо на неё: так бланк ставят фоном,
- * а не картинкой поверх листа. Пунктирная рамка (`dropzone`) сплошнеет
- * и заливается акцентом на время наведения файла — тем же приёмом,
- * что и у выбранного варианта.
- */
-function BlankTile({
-  onPick,
-  onFile,
-  disabled,
-}: {
-  onPick: () => void;
-  onFile: (file: File) => void;
-  disabled?: boolean;
-}) {
-  const [over, setOver] = useState(false);
-  return (
-    <OptionCard
-      icon={ImageUp}
-      title="Свой бланк"
-      description="PNG · JPG"
-      dropzone
-      disabled={disabled}
-      tabIndex={0}
-      selected={over}
-      onSelect={onPick}
-      onDragOver={(e) => {
-        if (!e.dataTransfer.types.includes('Files')) return;
-        e.preventDefault();
-        setOver(true);
-      }}
-      onDragLeave={() => setOver(false)}
-      onDrop={(e) => {
-        const file = e.dataTransfer.files[0];
-        if (!file) return;
-        e.preventDefault();
-        setOver(false);
-        onFile(file);
-      }}
-    />
   );
 }

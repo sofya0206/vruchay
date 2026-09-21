@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   ChevronLeft,
+  CircleHelp,
   FilePlus2,
   FileText,
   LayoutTemplate,
@@ -14,6 +15,9 @@ import {
   stepOfView,
   type MaterialView,
 } from '../documents/material-steps';
+import { onboarding } from '../onboarding/store';
+import { sectionOf } from '../onboarding/sections';
+import { track } from '../onboarding/track';
 import { Button } from '../ui/Button';
 import { IconButton } from '../ui/IconButton';
 import { Menu, MenuDivider, MenuItem } from '../ui/Menu';
@@ -99,6 +103,15 @@ export function DocumentChrome({
     state: i < at ? 'done' : i === at ? 'current' : 'todo',
   }));
 
+  /*
+   * Подсказки по шагу — прямо отсюда, не только из общего меню «Помощь»:
+   * рамка одна на все шесть экранов документа, и раздел под текущим
+   * адресом каждый раз свой (sectionOf уже умеет отличать лист от
+   * получателей, проверки, письма и выпуска).
+   */
+  const { pathname, search } = useLocation();
+  const section = sectionOf(pathname, search);
+
   return (
     <header className="shrink-0 border-b border-line bg-surface">
       {/* В узком окне строка переносится: название и действия сверху, лента
@@ -152,6 +165,17 @@ export function DocumentChrome({
             </Button>
           ) : (
             action
+          )}
+          {section && (
+            <IconButton
+              label="Подсказки на этом экране"
+              onClick={() => {
+                track({ flow: 'tips', step: `${section.key}.1`, action: 'shown' });
+                onboarding.startTips(section.key);
+              }}
+            >
+              <CircleHelp size={18} strokeWidth={1.75} />
+            </IconButton>
           )}
           <Menu
             trigger={({ open, toggle }) => (
