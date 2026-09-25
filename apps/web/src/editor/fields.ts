@@ -35,7 +35,7 @@ export interface ColumnInfo {
 }
 
 /** Колонки, которые сервис называет по-своему, а не именем ключа. */
-const KNOWN_COLUMN_TITLES: Record<string, string> = {
+export const KNOWN_COLUMN_TITLES: Record<string, string> = {
   name: 'Фамилия и имя',
   email: 'Почта',
   place: 'Место',
