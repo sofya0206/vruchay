@@ -11,6 +11,7 @@ import {
   useSend,
   type SendResult,
 } from '../api/recipients';
+import { useLastValidation } from '../api/validation';
 import type { DocumentDetail } from '../api/types';
 import { toHtml } from '../mail/email-body';
 import { DEFAULT_LETTER } from '../mail/letter-defaults';
@@ -20,6 +21,7 @@ import { Badge, type BadgeTone } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card, Rows } from '../ui/Card';
 import { Collapse } from '../ui/Collapse';
+import { ConfirmDialog } from '../ui/Dialog';
 import { ErrorBar } from '../ui/ErrorState';
 import { NextAction } from '../ui/NextAction';
 import { OptionCard, OptionGroup } from '../ui/OptionCard';
@@ -49,6 +51,7 @@ export function IssueStep({ doc }: { doc: DocumentDetail }) {
   const qc = useQueryClient();
   const table = useRecipients(id);
   const template = useMailTemplate(id);
+  const lastValidation = useLastValidation(id);
   const [mode, setMode] = useState<Mode>('files');
   const [jobId, setJobId] = useState<string | null>(null);
   const { job, start, cancel, resume } = useGeneration(id, jobId);
@@ -57,6 +60,7 @@ export function IssueStep({ doc }: { doc: DocumentDetail }) {
   const [error, setError] = useState<string | null>(null);
   const [validity, setValidity] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [confirmSend, setConfirmSend] = useState(false);
   const failures = useJobFailures(jobId, (job?.failed ?? 0) > 0);
 
   /*
@@ -98,12 +102,27 @@ export function IssueStep({ doc }: { doc: DocumentDetail }) {
   const { rows, columns, checkedCount } = table.data;
   const checked = rows.filter((r) => r.checked);
   const withoutEmail = checked.filter((r) => !(r.data.email ?? '').trim()).length;
+  const sendableCount = checkedCount - withoutEmail;
   const nobodyToSend = checked.length > 0 && withoutEmail === checked.length;
   const stuck = job?.status === 'queued' && job.stuck === true;
   const running = !stuck && (job?.status === 'queued' || job?.status === 'running');
   const canResume = !!job && (job.status === 'failed' || job.status === 'canceled' || stuck) && job.done < job.total;
 
-  async function issue() {
+  // «Проверка строк» в сводке — по тому, что реально видела эта вкладка
+  // в этом заходе, а не постоянная нейтральная подпись: проверка нигде
+  // не сохраняется на сервере (POST, а не GET — отчёт с именами и почтами
+  // не должен оседать в кэше), поэтому источник правды — общий кэш
+  // React Query, который пишет ValidationScreen.
+  const warnOnly = lastValidation ? lastValidation.total - lastValidation.clean - lastValidation.blocked : 0;
+  const checkRow: { value: string; tone: BadgeTone } = !lastValidation
+    ? { value: 'проверить перед выпуском', tone: 'neutral' }
+    : lastValidation.blocked > 0
+      ? { value: `нельзя выпускать: ${lastValidation.blocked}`, tone: 'danger' }
+      : warnOnly > 0
+        ? { value: `с замечаниями: ${warnOnly}`, tone: 'warn' }
+        : { value: 'без замечаний', tone: 'ok' };
+
+  async function issue(): Promise<boolean> {
     setError(null);
     setSent(null);
     wantSend.current = mode === 'files-and-send';
@@ -111,8 +130,10 @@ export function IssueStep({ doc }: { doc: DocumentDetail }) {
       if (wantSend.current && !template.data) await saveDefault.mutateAsync();
       const created = await start.mutateAsync();
       setJobId(created.id);
+      return true;
     } catch (err) {
       setError(errorText(err));
+      return false;
     }
   }
 
@@ -208,7 +229,7 @@ export function IssueStep({ doc }: { doc: DocumentDetail }) {
 
       {!running && (
         <>
-          <Card padding="none">
+          <Card padding="none" data-tour="issue-summary">
             <Rows className="rounded-card">
               <SummaryRow
                 icon={Users}
@@ -221,8 +242,8 @@ export function IssueStep({ doc }: { doc: DocumentDetail }) {
                 icon={ChevronRight}
                 to={materialPath(id, 'check')}
                 title="Проверка строк"
-                value="проверить перед выпуском"
-                tone="neutral"
+                value={checkRow.value}
+                tone={checkRow.tone}
               />
               <SummaryRow
                 icon={Mail}
@@ -236,7 +257,7 @@ export function IssueStep({ doc }: { doc: DocumentDetail }) {
                 to={materialPath(id, 'rules')}
                 title="Правила награждения"
                 value={doc.ruleSetId ? 'заданы' : 'всем один документ'}
-                tone="neutral"
+                tone={doc.ruleSetId ? 'ok' : 'neutral'}
               />
             </Rows>
           </Card>
@@ -258,7 +279,11 @@ export function IssueStep({ doc }: { doc: DocumentDetail }) {
             </Collapse>
           </Card>
 
-          <Card title="Что сделать" about="Файлы создаются в любом случае. Письма уходят только во втором варианте.">
+          <Card
+            title="Что сделать"
+            about="Файлы создаются в любом случае. Письма уходят только во втором варианте."
+            data-tour="issue-mode"
+          >
             <OptionGroup label="Что сделать после создания файлов" columns={2}>
               <OptionCard
                 icon={Download}
@@ -288,10 +313,10 @@ export function IssueStep({ doc }: { doc: DocumentDetail }) {
                 size="lg"
                 loading={start.isPending || saveDefault.isPending}
                 disabled={checkedCount === 0}
-                onClick={() => void issue()}
+                onClick={() => (mode === 'files-and-send' ? setConfirmSend(true) : void issue())}
                 data-tour="issue"
               >
-                {mode === 'files-and-send' ? `Выпустить и разослать: ${checkedCount - withoutEmail}` : `Выпустить: ${checkedCount}`}
+                {mode === 'files-and-send' ? `Выпустить и разослать: ${sendableCount}` : `Выпустить: ${checkedCount}`}
               </Button>
               <span className="text-sm text-muted">Каждая строка станет отдельным PDF с QR-кодом.</span>
             </div>
@@ -307,8 +332,35 @@ export function IssueStep({ doc }: { doc: DocumentDetail }) {
           onClose={() => setDownloading(false)}
         />
       )}
+
+      {/* Только для настоящей рассылки: «Только создать файлы» — обратимо
+          и без внешнего эффекта, лишнее подтверждение там было бы просто
+          трением. */}
+      {confirmSend && (
+        <ConfirmDialog
+          title="Разослать письма участникам?"
+          confirmLabel={`Выпустить и разослать: ${sendableCount}`}
+          pending={start.isPending || saveDefault.isPending}
+          error={error}
+          onConfirm={() => void issue().then((ok) => ok && setConfirmSend(false))}
+          onClose={() => setConfirmSend(false)}
+        >
+          Каждая отмеченная строка станет отдельным PDF с QR-кодом, и {sendableCount}{' '}
+          {plural(sendableCount, 'человек', 'человека', 'человек')}{' '}
+          {plural(sendableCount, 'получит', 'получат', 'получат')} письмо с документом на почту.
+          Отменить рассылку после отправки нельзя.
+        </ConfirmDialog>
+      )}
     </div>
   );
+}
+
+function plural(n: number, one: string, few: string, many: string): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
+  return many;
 }
 
 function SummaryRow({

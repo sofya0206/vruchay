@@ -243,6 +243,53 @@ export class MailService {
     return { ok: true as const, providerMessageId };
   }
 
+  /**
+   * Тестовое письмо черновика — до сохранения.
+   *
+   * Отдельно от sendTest (проверка домена) и MailingService.testSend
+   * (готовый шаблон + настоящая строка списка): здесь черновик мог не
+   * сохраниться ни разу, а строк получателей могло не быть вовсе.
+   * Примеры значений — те же, что показывает предпросмотр редактора
+   * (mail/EmailTemplateEditor.tsx, компонент Preview) — держите их в паре.
+   *
+   * Мимо очереди, мимо журнала, мимо volumeRefusal: как и sendPreview,
+   * это не выдача документа, и на квоту организации не влияет.
+   */
+  async sendDraftTest(
+    orgId: string,
+    documentId: string,
+    toEmail: string,
+    draft: { subject: string; bodyHtml: string; attachGeneratedFile: boolean },
+  ): Promise<{ to: string }> {
+    if (!isValidEmail(toEmail)) throw new BadRequestException('Некорректный адрес');
+    const doc = await this.prisma.document.findFirst({
+      where: { id: documentId, orgId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!doc) throw new NotFoundException('Документ не найден');
+
+    const columns = await this.prisma.recipientColumn.findMany({
+      where: { documentId },
+      orderBy: { position: 'asc' },
+      select: { name: true },
+    });
+    const data: Record<string, string> = { name: 'Иванов Пётр Ильич', email: 'participant@example.com' };
+    for (const c of columns) data[c.name] ??= `значение ${c.name}`;
+
+    const subject = renderSubject(draft.subject, data);
+    // Чистим при отправке, а не при сохранении: черновик из этой кнопки
+    // мог не пройти через saveTemplate ни разу, и без очистки в письмо
+    // попал бы необработанный ввод пользователя.
+    const notice = draft.attachGeneratedFile
+      ? '<p style="font-size:13px;color:#091135;background:#fdf1df;border-radius:8px;padding:10px 12px;margin:0 0 16px">' +
+        'Проверочное письмо: настоящий документ прикладывается только участнику, у примера его нет.</p>'
+      : '';
+    const html = notice + renderHtmlTemplate(sanitizeEmailHtml(draft.bodyHtml), data);
+
+    await this.sendPreview(orgId, toEmail, `[Проверка] ${subject}`, html, null);
+    return { to: toEmail };
+  }
+
   // ─── Шаблоны писем ───────────────────────────────────────────────────────
 
   async saveTemplate(

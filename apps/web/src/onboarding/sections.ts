@@ -145,6 +145,50 @@ export const SECTIONS: Section[] = [
     ],
   },
   {
+    key: 'letter',
+    title: 'Письмо',
+    steps: [
+      {
+        at: ['[data-tour="letter-fields"]', { text: 'Данные', in: 'button' }],
+        title: 'Своё поле — в текст',
+        text: 'Впишите %имя_поля или перетащите его из панели справа — в каждом письме подставится значение из своей строки.',
+        placement: 'left',
+      },
+      {
+        at: ['[data-tour="letter-attach"]', { text: 'Дополнительно' }],
+        title: 'Документ во вложении',
+        text: 'Обычно нужно — участник получает грамоту прямо в письме. Загляните сюда, если вручаете документ на бумаге.',
+        placement: 'top',
+      },
+      {
+        at: ['[data-tour="letter-test-send"]', { text: 'тестовое' }],
+        title: 'Проверьте на себе',
+        text: 'Отправьте письмо на свою почту — увидите готовый текст и вложение, как у получателя.',
+        placement: 'bottom',
+      },
+      RELEASE,
+    ],
+  },
+  {
+    key: 'issue',
+    title: 'Выпуск',
+    steps: [
+      {
+        at: ['[data-tour="issue-summary"]'],
+        title: 'Сводка перед выпуском',
+        text: 'Получатели, проверка, письмо и правила — нажмите на строку, чтобы сразу попасть туда и поправить.',
+        placement: 'bottom',
+      },
+      {
+        at: ['[data-tour="issue-mode"]'],
+        title: 'Файлы или сразу письма',
+        text: '«Только создать файлы» ничего не отправляет — раздадите сами. «Создать и разослать» — каждому уйдёт письмо.',
+        placement: 'top',
+      },
+      SIDES,
+    ],
+  },
+  {
     key: 'material',
     title: 'Материал',
     steps: [SIDES, RELEASE],
@@ -202,7 +246,11 @@ export function sectionOf(pathname: string, _search = ''): Section | null {
               ? 'recipients'
               : material[2] === 'check'
                 ? 'check'
-                : 'material'
+                : material[2] === 'letter'
+                  ? 'letter'
+                  : material[2] === 'issue'
+                    ? 'issue'
+                    : 'material'
           : pathname.startsWith('/mailing')
             ? 'mailing'
             : pathname.startsWith('/registry')

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { CurrentUser } from '../common/current-user.decorator';
@@ -8,6 +8,7 @@ import type { SessionUser } from '../auth/auth.service';
 import { uuidSchema } from '../documents/documents.dto';
 import { AuditActor } from '../audit/actor.decorator';
 import { AuditService, type Actor } from '../audit/audit.service';
+import { RateLimitService } from '../common/rate-limit.service';
 import { MailService } from './mail.service';
 import { MailProcessor } from './mail.processor';
 
@@ -46,6 +47,7 @@ export class MailController {
     private readonly mail: MailService,
     private readonly processor: MailProcessor,
     private readonly audit: AuditService,
+    private readonly rateLimit: RateLimitService,
   ) {}
 
   @Get('domains')
@@ -127,6 +129,29 @@ export class MailController {
     @Body(new ZodValidationPipe(templateSchema)) dto: z.infer<typeof templateSchema>,
   ) {
     return this.mail.saveTemplate(user.orgId, documentId, dto);
+  }
+
+  /**
+   * Тестовое письмо черновика — до сохранения, на свою же почту.
+   *
+   * Ограничение частоты не от злоумышленника, а от нетерпения — тот же
+   * повод, что у mailing.controller.ts.
+   */
+  @Post('templates/:documentId/test-send')
+  async sendDraftTest(
+    @CurrentUser() user: SessionUser,
+    @Param('documentId', uuidParam) documentId: string,
+    @Body(new ZodValidationPipe(templateSchema)) dto: z.infer<typeof templateSchema>,
+  ) {
+    await this.limitDraftTest(user.orgId);
+    return this.mail.sendDraftTest(user.orgId, documentId, user.email, dto);
+  }
+
+  private async limitDraftTest(orgId: string) {
+    const limit = await this.rateLimit.hit(`mail-draft-test:${orgId}`, 60_000, 5);
+    if (!limit.allowed) {
+      throw new BadRequestException(`Слишком часто. Подождите ${limit.retryAfterSeconds} секунд и попробуйте снова`);
+    }
   }
 
   @Post('send/:documentId')
