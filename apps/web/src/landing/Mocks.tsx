@@ -31,7 +31,6 @@ import {
  */
 
 const PERSON = 'Иванов Иван';
-const PERSON_DATIVE = 'Иванову Ивану';
 const ORG = 'Центр «Развитие»';
 const EVENT = 'Конкурс «Мастер года»';
 const CODE = 'K7M2-9QXR-4TVB';
@@ -274,7 +273,7 @@ export function EditorMock() {
           <MiniSheet scale={1.5} highlightName />
         </div>
         <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          {['%name_dat', '%place_word', '%event', '%event_date', '%valid_until'].map((v) => (
+          {['ФИО в дательном падеже', 'Место словом', 'Название мероприятия', 'Даты мероприятия', 'Действителен до'].map((v) => (
             <span
               key={v}
               style={{
@@ -282,7 +281,6 @@ export function EditorMock() {
                 background: 'var(--accent-soft)',
                 boxShadow: 'inset 0 0 0 1px var(--accent-line)',
                 padding: '4px 10px',
-                fontFamily: 'var(--font-mono)',
                 fontSize: 12,
                 color: 'var(--accent)',
               }}
@@ -498,12 +496,11 @@ export function LetterMock() {
                 borderRadius: 4,
                 background: 'var(--accent-soft)',
                 padding: '1px 5px',
-                fontFamily: 'var(--font-mono)',
-                fontSize: 12,
                 color: 'var(--accent)',
+                whiteSpace: 'nowrap',
               }}
             >
-              %name_dat
+              Фамилия и имя
             </span>
             ! Ваш документ во вложении.
           </p>
@@ -535,7 +532,7 @@ export function LetterMock() {
           >
             <p style={{ fontSize: 13, fontWeight: 500 }}>Ваш диплом за «{EVENT}»</p>
             <p style={{ marginTop: 6, fontSize: 13, lineHeight: 1.6 }}>
-              Здравствуйте, {PERSON_DATIVE}! Ваш документ во вложении.
+              Здравствуйте, {PERSON}! Ваш документ во вложении.
             </p>
             <div
               style={{
