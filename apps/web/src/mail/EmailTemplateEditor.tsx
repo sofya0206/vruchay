@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { Editor } from '@tiptap/core';
 import { Bold, ChevronDown, Italic, Paperclip, Send } from 'lucide-react';
 import { api, errorText } from '../api/client';
 import { Badge } from '../ui/Badge';
@@ -7,14 +8,17 @@ import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Checkbox } from '../ui/Checkbox';
 import { Collapse } from '../ui/Collapse';
-import { Field, Input, Textarea } from '../ui/Field';
 import { IconButton } from '../ui/IconButton';
 import { toast } from '../ui/Toast';
 import { cn } from '../ui/cn';
 import { DEFAULT_LETTER } from './letter-defaults';
-import { insertToken, parseBody, toHtml, toText, wrapSelection, type Run } from './email-body';
+import { parseBody, toHtml, toText, type Run } from './email-body';
+import { toggleLetterMark } from './letter-doc';
+import { LetterInput } from './LetterInput';
 import type { FieldTarget } from '../editor/FieldsSidebar';
 import { FieldsToggle } from '../editor/FieldsToggle';
+import type { FieldInfo } from '../editor/fields';
+import { useLetterFields } from './useLetterFields';
 
 interface EmailTemplate {
   id: string;
@@ -28,9 +32,10 @@ const AUTOSAVE_DELAY_MS = 1500;
 /**
  * Письмо, которое получит участник вместе с документом.
  *
- * Человек печатает обычный текст, как в почте: пустая строка — новый абзац,
- * кнопки для полужирного и курсива, адрес сам становится ссылкой. Разметку
- * собирает сервис. Набор возможностей узкий намеренно: почтовые клиенты
+ * Человек печатает обычный текст, как в почте: Enter — новый абзац,
+ * кнопки для полужирного и курсива, адрес сам становится ссылкой, данные
+ * из таблицы — фишками. Разметку собирает сервис. Набор возможностей
+ * узкий намеренно: почтовые клиенты
  * понимают ограниченный набор тегов, и произвольная вёрстка разъехалась бы
  * в Outlook незаметно для отправителя.
  */
@@ -48,50 +53,37 @@ export function EmailTemplateEditor({
   const [attach, setAttach] = useState(true);
   const [more, setMore] = useState(false);
   const [saved, setSaved] = useState<'saved' | 'saving' | 'dirty' | 'error'>('saved');
-  const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const subjectEditor = useRef<Editor | null>(null);
+  const bodyEditor = useRef<Editor | null>(null);
   /** Где стоял курсор последним — в теме или в тексте. */
   const lastField = useRef<'subject' | 'body'>('body');
-  const subjectRef = useRef<HTMLInputElement | null>(null);
-  /** Для какого документа уже пришли данные — автосохранение молчит до этого. */
-  const loadedFor = useRef<string | null>(null);
+  /** Для какого документа уже пришли данные — до этого поля не показываем и не сохраняем. */
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
   /** Сразу после загрузки поля меняются сами — это не правка человека. */
   const justLoaded = useRef(false);
   const version = useRef(0);
   const latestVersion = useRef(0);
-
-  /**
-   * Начертание для выделенного куска. Курсор возвращаем на место сами:
-   * без этого он прыгал бы в конец после каждой кнопки.
-   */
-  function applyFormat(marker: '*' | '_') {
-    const field = bodyRef.current;
-    if (!field) return;
-    const next = wrapSelection(body, field.selectionStart, field.selectionEnd, marker);
-    setBody(next.text);
-    requestAnimationFrame(() => {
-      field.focus();
-      field.setSelectionRange(next.selectionStart, next.selectionEnd);
-    });
-  }
 
   const template = useQuery({
     queryKey: ['email-template', documentId],
     queryFn: () => api.get<EmailTemplate | null>(`/mail/templates/${documentId}`),
   });
 
-  const columns = useQuery({
-    queryKey: ['recipient-columns', documentId],
-    queryFn: () => api.get<{ columns: { name: string }[] }>(`/documents/${documentId}/recipients`),
-  });
+  const { fields, labels, known } = useLetterFields(documentId);
 
+  /*
+   * Письмо берём с сервера один раз на документ. Ответ на каждое
+   * автосохранение приходил бы сюда же и затирал бы то, что человек
+   * успел напечатать, пока запрос шёл.
+   */
   useEffect(() => {
-    if (template.data === undefined) return;
+    if (template.data === undefined || loadedFor === documentId) return;
     setSubject(template.data?.subject ?? DEFAULT_LETTER.subject);
     setBody(template.data ? toText(template.data.bodyHtml) : DEFAULT_LETTER.body);
     setAttach(template.data?.attachGeneratedFile ?? true);
-    loadedFor.current = documentId;
+    setLoadedFor(documentId);
     justLoaded.current = true;
-  }, [template.data, documentId]);
+  }, [template.data, documentId, loadedFor]);
 
   const save = useMutation({
     mutationFn: (data: { subject: string; bodyHtml: string; attachGeneratedFile: boolean; version: number }) =>
@@ -114,7 +106,7 @@ export function EmailTemplateEditor({
    * теряет набранное при переходе на соседний шаг.
    */
   useEffect(() => {
-    if (loadedFor.current !== documentId) return;
+    if (loadedFor !== documentId) return;
     // Значения только что подставились с сервера — это не правка человека.
     if (justLoaded.current) {
       justLoaded.current = false;
@@ -132,9 +124,9 @@ export function EmailTemplateEditor({
       save.mutate({ subject, bodyHtml: toHtml(body), attachGeneratedFile: attach, version: mine });
     }, AUTOSAVE_DELAY_MS);
     return () => clearTimeout(timer);
-    // Намеренно следим только за этими четырьмя: объект мутации пересоздаётся
-    // на каждый рендер и в зависимостях сбрасывал бы таймер бесконечно.
-  }, [subject, body, attach, documentId]);
+    // Намеренно без объекта мутации: он пересоздаётся на каждый рендер
+    // и в зависимостях сбрасывал бы таймер бесконечно.
+  }, [subject, body, attach, documentId, loadedFor]);
 
   // Шлёт черновик из состояния, а не сохранённый шаблон — работает
   // и до первого автосохранения, и без единой строки получателей.
@@ -149,31 +141,30 @@ export function EmailTemplateEditor({
     onError: (err) => toast({ title: 'Не отправилось', description: errorText(err), tone: 'danger' }),
   });
 
-  const variables = columns.data?.columns.map((c) => c.name) ?? [];
-
   /**
-   * Переменная вставляется туда, где стоит курсор, а не в конец текста —
+   * Поле вставляется туда, где стоит курсор, а не в конец текста —
    * и в то поле, где он стоял: в теме письма имя нужно не реже, чем в тексте.
+   * Редактор помнит выделение и после ухода фокуса на панель.
    */
-  const insert = useCallback((name: string) => {
-    const inSubject = lastField.current === 'subject';
-    const field = inSubject ? subjectRef.current : bodyRef.current;
-    const set = inSubject ? setSubject : setBody;
-    if (!field) {
-      set((v) => insertToken(v, v.length, v.length, name).text);
-      return;
-    }
-    const from = field.selectionStart ?? field.value.length;
-    const to = field.selectionEnd ?? from;
-    const next = insertToken(field.value, from, to, name);
-    set(next.text);
-    requestAnimationFrame(() => {
-      field.focus();
-      field.setSelectionRange(next.caret, next.caret);
-    });
+  const insert = useCallback((field: FieldInfo) => {
+    const editor = lastField.current === 'subject' ? subjectEditor.current : bodyEditor.current;
+    editor
+      ?.chain()
+      .focus()
+      .insertContent([
+        { type: 'mergeField', attrs: { source: field.source, fieldId: field.fieldId } },
+        { type: 'text', text: ' ' },
+      ])
+      .run();
   }, []);
 
-  const target = useMemo<FieldTarget>(() => ({ insert: (field) => insert(field.source), columnsOnly: true }), [insert]);
+  const target = useMemo<FieldTarget>(() => ({ insert, columnsOnly: true }), [insert]);
+  const onSubjectEditor = useCallback((e: Editor | null) => {
+    subjectEditor.current = e;
+  }, []);
+  const onBodyEditor = useCallback((e: Editor | null) => {
+    bodyEditor.current = e;
+  }, []);
 
   useEffect(() => {
     if (!onFieldTarget) return;
@@ -218,46 +209,69 @@ export function EmailTemplateEditor({
         </div>
       </header>
 
-      <Field label="Тема письма">
-        <Input
-          value={subject}
-          onChange={(e) => setSubject(e.target.value)}
-          onFocus={(e) => {
-            lastField.current = 'subject';
-            subjectRef.current = e.currentTarget;
-          }}
-          placeholder={DEFAULT_LETTER.subject}
-        />
-      </Field>
-
-      <div>
-        <div className="mb-1.5 flex items-center gap-1">
-          <span className="text-sm font-medium text-muted">Текст письма</span>
-          {/* Кнопки, а не разметка руками: человек выделяет кусок и нажимает,
-              как в любом мессенджере. Знаки при этом видны в тексте. */}
-          <div className="ml-auto flex items-center gap-1" data-tour="letter-fields">
-            <IconButton size="sm" label="Полужирный" onClick={() => applyFormat('*')}>
-              <Bold size={16} />
-            </IconButton>
-            <IconButton size="sm" label="Курсив" onClick={() => applyFormat('_')}>
-              <Italic size={16} />
-            </IconButton>
-            {/* Поля — общей панелью справа, как на листе: вставка идёт
-                туда, где стоял курсор, в тему или в текст. */}
-            <FieldsToggle />
+      {loadedFor === documentId && (
+        <>
+          <div>
+            <span className="mb-1.5 block text-sm font-medium text-muted">Тема письма</span>
+            <LetterInput
+              key={`subject-${documentId}`}
+              initialValue={subject}
+              onChange={setSubject}
+              multiline={false}
+              fields={fields}
+              labels={labels}
+              known={known}
+              onFocus={() => (lastField.current = 'subject')}
+              onEditor={onSubjectEditor}
+              placeholder="Например: Ваш документ"
+              ariaLabel="Тема письма"
+            />
           </div>
-        </div>
-        <Textarea
-          ref={bodyRef}
-          onFocus={() => (lastField.current = 'body')}
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          rows={10}
-          spellCheck
-          aria-label="Текст письма"
-        />
-        <p className="mt-1.5 text-xs text-muted">Пустая строка — новый абзац. Адрес сайта сам станет ссылкой.</p>
-      </div>
+
+          <div>
+            <div className="mb-1.5 flex items-center gap-1">
+              <span className="text-sm font-medium text-muted">Текст письма</span>
+              {/* Кнопки, а не разметка руками: человек выделяет кусок и нажимает,
+                  как в любом мессенджере. */}
+              <div className="ml-auto flex items-center gap-1" data-tour="letter-fields">
+                <IconButton
+                  size="sm"
+                  label="Полужирный"
+                  onClick={() => bodyEditor.current && toggleLetterMark(bodyEditor.current, 'bold')}
+                >
+                  <Bold size={16} />
+                </IconButton>
+                <IconButton
+                  size="sm"
+                  label="Курсив"
+                  onClick={() => bodyEditor.current && toggleLetterMark(bodyEditor.current, 'italic')}
+                >
+                  <Italic size={16} />
+                </IconButton>
+                {/* Поля — общей панелью справа, как на листе: вставка идёт
+                    туда, где стоял курсор, в тему или в текст. */}
+                <FieldsToggle />
+              </div>
+            </div>
+            <LetterInput
+              key={`body-${documentId}`}
+              initialValue={body}
+              onChange={setBody}
+              multiline
+              fields={fields}
+              labels={labels}
+              known={known}
+              onFocus={() => (lastField.current = 'body')}
+              onEditor={onBodyEditor}
+              ariaLabel="Текст письма"
+            />
+            <p className="mt-1.5 text-xs text-muted">
+              Enter — новый абзац, Shift+Enter — перенос строки. Данные из таблицы — кнопкой «Данные» или
+              набрав @. Адрес сайта сам станет ссылкой.
+            </p>
+          </div>
+        </>
+      )}
 
       {/* Убрано под раскрывашку: нужно редко — когда документ вручают
           на бумаге, а письмо служит уведомлением. На виду эта галочка
@@ -288,7 +302,7 @@ export function EmailTemplateEditor({
         </Collapse>
       </Card>
 
-      <Preview subject={subject} body={body} variables={variables} />
+      <Preview subject={subject} body={body} variables={fields.map((f) => f.source)} />
     </div>
   );
 }

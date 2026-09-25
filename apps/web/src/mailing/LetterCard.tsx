@@ -1,13 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { Editor } from '@tiptap/core';
 import { Bold, Check, Eye, Italic, MoreHorizontal, Paperclip, Send, Users } from 'lucide-react';
 import { IconButton } from '../ui/IconButton';
 import { Menu, MenuItem } from '../ui/Menu';
-import { api } from '../api/client';
-import type { RecipientTable } from '../api/recipients';
 import { Button } from '../ui/Button';
 import { Input, Label } from '../ui/Field';
-import { toHtml, toText, wrapSelection } from '../mail/email-body';
+import { toHtml, toText } from '../mail/email-body';
+import { toggleLetterMark } from '../mail/letter-doc';
+import { LetterInput } from '../mail/LetterInput';
+import { useLetterFields } from '../mail/useLetterFields';
+import type { FieldInfo } from '../editor/fields';
 import { TriplePreview } from './TriplePreview';
 import { useMailingTemplate, useSaveTemplate, useTestSend, type Audience, type LetterKind } from './api';
 import { Checkbox } from '../ui/Checkbox';
@@ -57,51 +59,42 @@ export function LetterCard({
   const [advertiser, setAdvertiser] = useState('');
   const [saved, setSaved] = useState(false);
   const [preview, setPreview] = useState(false);
-  const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const bodyEditor = useRef<Editor | null>(null);
+  const onBodyEditor = useCallback((e: Editor | null) => {
+    bodyEditor.current = e;
+  }, []);
+  /** Какое письмо уже в полях: ответ на сохранение не должен перетирать набранное. */
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  const letterKey = `${documentId}:${kind}`;
 
   const template = useMailingTemplate(documentId, kind);
   const save = useSaveTemplate(documentId, kind);
   const test = useTestSend();
 
-  const columns = useQuery({
-    queryKey: ['recipients', documentId],
-    queryFn: () => api.get<RecipientTable>(`/documents/${documentId}/recipients`),
-    select: (table) => table.columns.map((c) => c.name),
-  });
+  const { fields, labels, known } = useLetterFields(documentId);
 
   useEffect(() => {
-    if (template.data === undefined) return;
+    if (template.data === undefined || loadedFor === letterKey) return;
     setSubject(template.data?.subject ?? DEFAULTS[kind].subject);
     setBody(template.data ? toText(template.data.bodyHtml) : DEFAULTS[kind].body);
     setAttach(template.data?.attachGeneratedFile ?? kind === 'transactional');
     setAdvertiser(template.data?.advertiserName ?? '');
-  }, [template.data, kind]);
+    setLoadedFor(letterKey);
+  }, [template.data, kind, letterKey, loadedFor]);
 
-  /** Начертание выделенного куска. Курсор возвращаем на место сами. */
-  function applyFormat(marker: '*' | '_') {
-    const field = bodyRef.current;
-    if (!field) return;
-    const next = wrapSelection(body, field.selectionStart, field.selectionEnd, marker);
-    setBody(next.text);
-    requestAnimationFrame(() => {
-      field.focus();
-      field.setSelectionRange(next.selectionStart, next.selectionEnd);
-    });
+  function applyFormat(mark: 'bold' | 'italic') {
+    if (bodyEditor.current) toggleLetterMark(bodyEditor.current, mark);
   }
 
-  function insert(name: string) {
-    const field = bodyRef.current;
-    const token = `%${name}`;
-    if (!field) {
-      setBody((b) => b + token);
-      return;
-    }
-    const { selectionStart: from, selectionEnd: to } = field;
-    setBody(body.slice(0, from) + token + body.slice(to));
-    requestAnimationFrame(() => {
-      field.focus();
-      field.setSelectionRange(from + token.length, from + token.length);
-    });
+  function insert(field: FieldInfo) {
+    bodyEditor.current
+      ?.chain()
+      .focus()
+      .insertContent([
+        { type: 'mergeField', attrs: { source: field.source, fieldId: field.fieldId } },
+        { type: 'text', text: ' ' },
+      ])
+      .run();
   }
 
   function onSave() {
@@ -121,8 +114,6 @@ export function LetterCard({
     );
   }
 
-  const variables = columns.data ?? [];
-
   return (
     <section className="rounded-sheet bg-surface p-5 ring-1 ring-line">
       <header className="mb-4 flex flex-wrap items-center gap-3">
@@ -140,10 +131,21 @@ export function LetterCard({
       </header>
 
       <div className="space-y-4">
-        <div>
-          <Label>Тема письма</Label>
-          <Input value={subject} onChange={(e) => setSubject(e.target.value)} />
-        </div>
+        {loadedFor === letterKey && (
+          <div>
+            <Label>Тема письма</Label>
+            <LetterInput
+              key={`subject-${letterKey}`}
+              initialValue={subject}
+              onChange={setSubject}
+              multiline={false}
+              fields={fields}
+              labels={labels}
+              known={known}
+              ariaLabel="Тема письма"
+            />
+          </div>
+        )}
 
         {kind === 'marketing' && (
           <div>
@@ -162,35 +164,40 @@ export function LetterCard({
         <div>
           <Label>Текст письма</Label>
           <div className="mb-2 flex items-center gap-1">
-            <FormatButton onClick={() => applyFormat('*')} title="Полужирный">
+            <FormatButton onClick={() => applyFormat('bold')} title="Полужирный">
               <Bold size={15} />
             </FormatButton>
-            <FormatButton onClick={() => applyFormat('_')} title="Курсив">
+            <FormatButton onClick={() => applyFormat('italic')} title="Курсив">
               <Italic size={15} />
             </FormatButton>
             <span className="ml-2 text-xs text-muted">
-              Пустая строка — новый абзац. Адрес сайта сам станет ссылкой.
+              Enter — новый абзац. Данные получателя — кнопками ниже или набрав @.
             </span>
           </div>
-          <textarea
-            ref={bodyRef}
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            rows={8}
-            spellCheck
-            className="w-full rounded-card bg-surface px-3 py-2 text-sm ring-1 ring-line focus:ring-2 focus:ring-accent focus:outline-none"
-          />
+          {loadedFor === letterKey && (
+            <LetterInput
+              key={`body-${letterKey}`}
+              initialValue={body}
+              onChange={setBody}
+              multiline
+              fields={fields}
+              labels={labels}
+              known={known}
+              onEditor={onBodyEditor}
+              ariaLabel="Текст письма"
+            />
+          )}
         </div>
 
-        {variables.length > 0 && (
+        {fields.length > 0 && (
           <div className="rounded-card bg-sunken p-3">
             <p className="text-xs text-muted">
               Подставить данные получателя — нажмите, чтобы добавить в текст:
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
-              {variables.map((name) => (
-                <Button key={name} size="sm" onClick={() => insert(name)} className="font-mono text-xs">
-                  %{name}
+              {fields.map((field) => (
+                <Button key={field.source} size="sm" onClick={() => insert(field)}>
+                  {field.title}
                 </Button>
               ))}
             </div>

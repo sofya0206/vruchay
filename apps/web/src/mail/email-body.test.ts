@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { insertToken, parseBody, toHtml, toText, wrapSelection } from './email-body';
+import { parseBody, toHtml, toText, wrapSelection } from './email-body';
 
 /*
  * Перевод идёт в обе стороны: человек правит текст, сервер хранит разметку.
@@ -123,6 +123,14 @@ describe('разбор для предпросмотра', () => {
     expect(parseBody('\n\n  \n')).toEqual([]);
   });
 
+  it('подчёркивания в ключах полей не открывают курсив', () => {
+    expect(toHtml('Здравствуйте, %last_name %first_name!')).toBe('<p>Здравствуйте, %last_name %first_name!</p>');
+  });
+
+  it('поле с подчёркиванием внутри курсива остаётся целым', () => {
+    expect(toHtml('_%name_dat, поздравляем_')).toBe('<p><i>%name_dat, поздравляем</i></p>');
+  });
+
   it('разбор и разметка согласованы: одинаковое число абзацев', () => {
     const sample = 'Первый\n\n*Второй* с https://vruchay.ru\n\nТретий';
     expect(parseBody(sample)).toHaveLength(toHtml(sample).split('<p>').length - 1);
@@ -146,23 +154,5 @@ describe('кнопки начертания', () => {
     expect(r.text).toBe('Текст__');
     expect(r.selectionStart).toBe(6);
     expect(r.selectionEnd).toBe(6);
-  });
-});
-
-describe('insertToken', () => {
-  it('вставляет поле на место курсора', () => {
-    expect(insertToken('Здравствуйте, !', 14, 14, 'name')).toEqual({ text: 'Здравствуйте, %name!', caret: 19 });
-  });
-
-  it('не даёт полю слиться с латиницей или цифрой справа', () => {
-    expect(insertToken('за 1 место', 3, 3, 'place').text).toBe('за %place 1 место');
-  });
-
-  it('отделяет пробелом от слова слева', () => {
-    expect(insertToken('грамота', 7, 7, 'name').text).toBe('грамота %name');
-  });
-
-  it('заменяет выделенный кусок', () => {
-    expect(insertToken('Привет, Иван!', 8, 12, 'name').text).toBe('Привет, %name!');
   });
 });

@@ -54,25 +54,39 @@ export function parseBody(text: string): Run[][] {
  *
  * Хвостовую пунктуацию в ссылку не забираем: «зайдите на https://vruchay.ru.»
  * не должно давать ссылку с точкой на конце — такая ссылка не открывается.
+ *
+ * Поле `%ключ` разбирается первым и целиком: подчёркивание внутри ключа
+ * не открывает курсив. Иначе «%last_name %first_name» давало курсив
+ * «name %first», и оба поля в письме ломались.
  */
-const INLINE_RE = /\*([^*\n]+)\*|_([^_\n]+)_|(https?:\/\/[^\s]+[^\s.,;:!?)])|\n/g;
+const FIELD = '%[a-zA-Z][a-zA-Z0-9_]*';
+const INLINE_RE = new RegExp(
+  `(${FIELD})|\\*([^*\\n]+)\\*|_((?:${FIELD}|[^_\\n])+)_|(https?:\\/\\/[^\\s]+[^\\s.,;:!?)])|\\n`,
+  'g',
+);
 
 function parseParagraph(paragraph: string): Run[] {
   const runs: Run[] = [];
+  const pushText = (text: string) => {
+    const prev = runs.at(-1);
+    if (prev?.kind === 'text') prev.text += text;
+    else runs.push({ kind: 'text', text });
+  };
   let last = 0;
 
   for (const m of paragraph.matchAll(INLINE_RE)) {
-    if (m.index > last) runs.push({ kind: 'text', text: paragraph.slice(last, m.index) });
+    if (m.index > last) pushText(paragraph.slice(last, m.index));
 
-    if (m[1] !== undefined) runs.push({ kind: 'bold', text: m[1] });
-    else if (m[2] !== undefined) runs.push({ kind: 'italic', text: m[2] });
-    else if (m[3] !== undefined) runs.push({ kind: 'link', text: m[3], href: m[3] });
+    if (m[1] !== undefined) pushText(m[1]);
+    else if (m[2] !== undefined) runs.push({ kind: 'bold', text: m[2] });
+    else if (m[3] !== undefined) runs.push({ kind: 'italic', text: m[3] });
+    else if (m[4] !== undefined) runs.push({ kind: 'link', text: m[4], href: m[4] });
     else runs.push({ kind: 'break' });
 
     last = m.index + m[0].length;
   }
 
-  if (last < paragraph.length) runs.push({ kind: 'text', text: paragraph.slice(last) });
+  if (last < paragraph.length) pushText(paragraph.slice(last));
   return runs;
 }
 
@@ -166,26 +180,4 @@ export function wrapSelection(
     selectionStart: start + 1,
     selectionEnd: end + 1,
   };
-}
-
-/**
- * Вставить `%поле` на место выделения.
- *
- * Пробел справа ставим, если сразу за курсором латиница, цифра или
- * подчёркивание: иначе `%place` и «1» слились бы в `%place1` — другое,
- * несуществующее поле, и в письме напечатался бы сам ключ. Слева — если
- * перед курсором буква или цифра: «за%place» читается как опечатка.
- */
-export function insertToken(
-  text: string,
-  from: number,
-  to: number,
-  name: string,
-): { text: string; caret: number } {
-  const before = text.slice(0, from);
-  const after = text.slice(to);
-  const lead = /[\p{L}\p{N}]$/u.test(before) ? ' ' : '';
-  const tail = /^[A-Za-z0-9_]/.test(after) ? ' ' : '';
-  const token = `${lead}%${name}${tail}`;
-  return { text: before + token + after, caret: from + token.length };
 }

@@ -149,18 +149,11 @@ export function useRecipientMutations(documentId: string) {
       // { title } — название по-русски: имя тогда подбирает сервер.
       mutationFn: (v: string | { title: string }) =>
         api.post<RecipientColumn>(`${base}/columns`, typeof v === 'string' ? { name: v } : v),
-      onSuccess: () => {
-        void refresh();
-        // Письмо держит колонки отдельным запросом.
-        void qc.invalidateQueries({ queryKey: ['recipient-columns', documentId] });
-      },
+      onSuccess: refresh,
     }),
     reorderColumns: useMutation({
       mutationFn: (order: string[]) => api.post(`${base}/columns/order`, { order }),
-      onSuccess: () => {
-        void refresh();
-        void qc.invalidateQueries({ queryKey: ['recipient-columns', documentId] });
-      },
+      onSuccess: refresh,
     }),
     deleteColumn: useMutation({
       mutationFn: (columnId: string) => api.delete(`${base}/columns/${columnId}`),
